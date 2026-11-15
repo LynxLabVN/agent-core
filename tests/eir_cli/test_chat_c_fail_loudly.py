@@ -1,6 +1,6 @@
 """Tests for `chat -c <title>` failing loudly (stderr) and `--create-if-missing`.
 
-Regression for #86794: a background/quiet `hermes chat -c "<title>" -q "..."`
+Regression for #86794: a background/quiet `eir chat -c "<title>" -q "..."`
 against a not-yet-existing titled session silently no-oped — the error message
 was written to stdout (which quiet/programmatic callers treat as the "final
 response" channel) instead of stderr, and there was no way to create the
@@ -20,15 +20,15 @@ import pytest
 
 @pytest.fixture
 def isolated_home(tmp_path, monkeypatch):
-    """Point HERMES_HOME at a temp dir so session creation stays isolated. The gateway is the single
+    """Point EIR_HOME at a temp dir so session creation stays isolated. The gateway is the single
     writer: ``session.create {title}`` is played by a stand-in that writes the row the owner would."""
-    home = tmp_path / "hermes_home"
+    home = tmp_path / "eir_home"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    from hermes_cli import gateway_session_store
+    monkeypatch.setenv("EIR_HOME", str(home))
+    from eir_cli import gateway_session_store
 
     def create_titled(title):
-        from hermes_state import SessionDB
+        from eir_state import SessionDB
         db = SessionDB()
         try:
             sid = "local-" + "ab" * 32
@@ -42,7 +42,7 @@ def isolated_home(tmp_path, monkeypatch):
 
 
 def _create_titled_session(title):
-    from hermes_cli.main import _create_titled_session as fn
+    from eir_cli.main import _create_titled_session as fn
 
     return fn(title)
 
@@ -50,7 +50,7 @@ def _create_titled_session(title):
 class TestCreateIfMissingFlagParsing:
     def test_flag_parses_on_chat_subparser(self):
         """--create-if-missing is accepted by the real chat parser."""
-        from hermes_cli._parser import build_top_level_parser
+        from eir_cli._parser import build_top_level_parser
 
         parser, _subparsers, _chat_parser = build_top_level_parser()
         args = parser.parse_args(
@@ -61,7 +61,7 @@ class TestCreateIfMissingFlagParsing:
 
     def test_flag_absent_means_false(self):
         """Without the flag, create_if_missing stays unset (SUPPRESS default)."""
-        from hermes_cli._parser import build_top_level_parser
+        from eir_cli._parser import build_top_level_parser
 
         parser, _subparsers, _chat_parser = build_top_level_parser()
         args = parser.parse_args(["chat", "-c", "Bot Chat", "-q", "hi"])
@@ -75,7 +75,7 @@ class TestCreateTitledSession:
         sid = _create_titled_session("Bot Chat")
         assert sid, "should return a session id"
 
-        from hermes_state import SessionDB
+        from eir_state import SessionDB
 
         db = SessionDB()
         try:
@@ -90,7 +90,7 @@ class TestCreateTitledSession:
         sid = _create_titled_session("Bot Chat")
         assert sid
 
-        from hermes_state import SessionDB
+        from eir_state import SessionDB
 
         db = SessionDB()
         try:
@@ -107,7 +107,7 @@ class TestChatCFailLoudlyOnStderr:
         """-c <missing title> → exit 1, message on stderr, stdout untouched."""
         import sys
 
-        import hermes_cli.main as main_mod
+        import eir_cli.main as main_mod
 
         stderr_lines = []
 
@@ -145,14 +145,14 @@ class TestChatCFailLoudlyOnStderr:
 
         assert ei.value.args[0] == 1
         assert any("No session found matching 'Bot Chat'" in l for l in stderr_lines)
-        assert not stderr_lines[0].startswith("Use 'hermes sessions list'")
+        assert not stderr_lines[0].startswith("Use 'eir sessions list'")
 
     def test_create_if_missing_sets_resume(self, isolated_home, monkeypatch):
         """--create-if-missing resolves to a new session id on args.resume. The classic CLI's
         gateway is the single writer: the titled session is the gateway's ``session.create`` (with
         ``title``), and this process writes no state.db row."""
-        import hermes_cli.main as main_mod
-        import hermes_cli.gateway_session_store as store_mod
+        import eir_cli.main as main_mod
+        import eir_cli.gateway_session_store as store_mod
 
         created = []
         monkeypatch.setattr(store_mod, "create_titled_session",
@@ -175,13 +175,13 @@ class TestChatCFailLoudlyOnStderr:
 
     def test_tui_create_if_missing_keeps_the_local_titled_row(self, isolated_home):
         """The TUI launch is unchanged: main's titled row, then the TUI resumes it."""
-        import hermes_cli.main as main_mod
+        import eir_cli.main as main_mod
 
         args = type("Args", (), {"continue_last": "Bot Chat", "resume": None, "create_if_missing": True})()
         main_mod._resolve_continue_arg(args, use_tui=True)
 
         assert args.resume, "resume should be set to the new session id"
-        from hermes_state import SessionDB
+        from eir_state import SessionDB
 
         db = SessionDB()
         try:

@@ -1,4 +1,4 @@
-"""``hermes whatsapp`` warns once when a bot-mode number is open to everyone with no home channel."""
+"""``eir whatsapp`` warns once when a bot-mode number is open to everyone with no home channel."""
 
 from __future__ import annotations
 
@@ -15,22 +15,22 @@ _DOCS_ANCHOR = "whatsapp/#customer-facing-bot"
 
 @pytest.fixture
 def isolated_home(tmp_path, monkeypatch):
-    hermes = tmp_path / "home" / ".hermes"
-    hermes.mkdir(parents=True)
+    eir = tmp_path / "home" / ".eir"
+    eir.mkdir(parents=True)
     monkeypatch.setattr(Path, "home", lambda: tmp_path / "home")
-    monkeypatch.setenv("HERMES_HOME", str(hermes))
+    monkeypatch.setenv("EIR_HOME", str(eir))
     for key in list(os.environ):
         if key.startswith("WHATSAPP_"):
             monkeypatch.delenv(key, raising=False)
     monkeypatch.setattr("builtins.input", lambda _prompt="": "n")
-    monkeypatch.setattr("hermes_cli.main._require_tty", lambda *_a, **_kw: None)
+    monkeypatch.setattr("eir_cli.main._require_tty", lambda *_a, **_kw: None)
     # Stop right after the access-control step: no bridge script on disk.
     monkeypatch.setattr("gateway.platforms.whatsapp_common.resolve_whatsapp_bridge_dir", lambda: tmp_path / "nobridge")
-    return hermes
+    return eir
 
 
 def _run_wizard() -> str:
-    from hermes_cli.main_platform_setup import cmd_whatsapp
+    from eir_cli.main_platform_setup import cmd_whatsapp
 
     buf = io.StringIO()
     with redirect_stdout(buf):

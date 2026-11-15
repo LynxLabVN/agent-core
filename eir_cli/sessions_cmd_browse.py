@@ -1,10 +1,10 @@
-"""Interactive picker for ``hermes sessions browse``: curses UI with live search filtering and ``d``
+"""Interactive picker for ``eir sessions browse``: curses UI with live search filtering and ``d``
 delete-with-confirmation; numbered-list fallback when curses is unavailable (Windows, etc.)."""
 
 from typing import Optional
 
-from hermes_cli.timefmt import relative_time as _relative_time
-from hermes_state_errors import SessionActiveWriteGuardError
+from eir_cli.timefmt import relative_time as _relative_time
+from eir_state_errors import SessionActiveWriteGuardError
 
 
 def _session_status_tag(status: Optional[str]) -> str:
@@ -255,8 +255,8 @@ def _session_browse_picker(sessions: list, session_db=None) -> Optional[str]:
 
     def _delete_session(session_id: str) -> bool:
         try:
-            from hermes_cli.sessions_cmd import get_hermes_home
-            sessions_dir = get_hermes_home() / "sessions"
+            from eir_cli.sessions_cmd import get_eir_home
+            sessions_dir = get_eir_home() / "sessions"
         except Exception:
             sessions_dir = None
         try:

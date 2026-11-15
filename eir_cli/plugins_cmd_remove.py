@@ -1,7 +1,7 @@
-"""``hermes plugins remove``: tree + install-metadata removal kept consistent, config bookkeeping, and the
+"""``eir plugins remove``: tree + install-metadata removal kept consistent, config bookkeeping, and the
 dashboard/TUI remove path.
 
-Sibling of :mod:`hermes_cli.plugins_cmd` (the facade re-exports the names other modules use and is
+Sibling of :mod:`eir_cli.plugins_cmd` (the facade re-exports the names other modules use and is
 imported late here, never at module level).
 """
 
@@ -15,7 +15,7 @@ from typing import Any
 
 def _pc():
     """The facade, read at call time: tests patch ``plugins_cmd.<name>`` and sibling calls must see it."""
-    from hermes_cli import plugins_cmd
+    from eir_cli import plugins_cmd
     return plugins_cmd
 
 
@@ -23,9 +23,9 @@ _PENDING_DELETE_DIR = "plugin-pending-delete"
 
 
 def _pending_delete_root() -> Path:
-    """``<HERMES_HOME>/cache/plugin-pending-delete``: trees a running process still held at removal."""
-    from hermes_constants import get_hermes_home
-    return get_hermes_home() / "cache" / _PENDING_DELETE_DIR
+    """``<EIR_HOME>/cache/plugin-pending-delete``: trees a running process still held at removal."""
+    from eir_constants import get_eir_home
+    return get_eir_home() / "cache" / _PENDING_DELETE_DIR
 
 
 def sweep_pending_plugin_deletes() -> None:
@@ -59,7 +59,7 @@ def _discard_tree(tree: Path) -> None:
     root.mkdir(parents=True, exist_ok=True)
     parked = Path(tempfile.mkdtemp(prefix=f"{tree.name}-", dir=root)) / "plugin"
     try:
-        os.replace(tree, parked)  # same volume (both under HERMES_HOME): a rename, allowed on mapped DLLs
+        os.replace(tree, parked)  # same volume (both under EIR_HOME): a rename, allowed on mapped DLLs
     except OSError:
         # A held directory itself (a process's cwd, an open handle on it) cannot even be renamed. Strip
         # its manifests so the remnant no longer loads, and leave the files to the next start.
@@ -114,7 +114,7 @@ def cmd_remove(name: str) -> None:
     console.print(f"[red]✗[/red] Plugin [bold]{name}[/bold] removed from {plugins_dir}")
     if result.get("cleared_memory_provider"):
         console.print("[yellow]memory.provider pointed at this plugin and was reset; "
-                      "run `hermes memory setup` to pick another.[/yellow]")
+                      "run `eir memory setup` to pick another.[/yellow]")
     console.print()
 
 
@@ -133,7 +133,7 @@ def _remove_user_plugin(plugins_dir: Path, name: str, target: Path) -> dict[str,
     entry = next((e for e in _pc()._discover_all_plugins() if Path(str(e[4])) == target), None)
     key = entry[5] if entry else target.name
     aliases = _pc()._plugin_aliases(key) | {target.name}
-    from hermes_cli.plugin_oauth import forget_plugin_grants, plugin_key
+    from eir_cli.plugin_oauth import forget_plugin_grants, plugin_key
     grant_key = plugin_key(target)  # grants are stored by directory key, which the manifest name may not match
     _pc()._toggle_plugin_toolset(key, enable=False)
     _remove_plugin_core(target)
@@ -142,7 +142,7 @@ def _remove_user_plugin(plugins_dir: Path, name: str, target: Path) -> dict[str,
 
 
 def dashboard_remove_user_plugin(name: str) -> dict[str, Any]:
-    """Delete a plugin tree under ``~/.hermes/plugins/`` only."""
+    """Delete a plugin tree under ``~/.eir/plugins/`` only."""
     plugins_dir = _pc()._plugins_dir()
     if any(n == name and src == "bundled" for n, _ver, _d, src, _path, _key in _pc()._discover_all_plugins()):
         return {"ok": False, "error": "Bundled plugins cannot be removed from the dashboard."}

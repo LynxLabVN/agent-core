@@ -7,14 +7,14 @@ import pytest
 
 from gateway.config import PlatformConfig
 from gateway.platforms.webhook import _DYNAMIC_ROUTES_FILENAME, WebhookAdapter
-from hermes_cli.webhook import _load_subscriptions, _mutate_subscriptions, webhook_command
+from eir_cli.webhook import _load_subscriptions, _mutate_subscriptions, webhook_command
 
 
 @pytest.fixture(autouse=True)
 def _isolate(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-    monkeypatch.setattr("hermes_cli.webhook._is_webhook_enabled", lambda: True)
-    monkeypatch.setattr("hermes_cli.plugins.discover_plugins", lambda: None)
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
+    monkeypatch.setattr("eir_cli.webhook._is_webhook_enabled", lambda: True)
+    monkeypatch.setattr("eir_cli.plugins.discover_plugins", lambda: None)
 
 
 def _args(**kwargs):
@@ -37,7 +37,7 @@ def test_subscribe_accepts_dispatchable_targets(target):
 
 def test_subscribe_accepts_a_plugin_platform_registered_by_discovery(monkeypatch):
     discovered = []
-    monkeypatch.setattr("hermes_cli.plugins.discover_plugins", lambda: discovered.append(True))
+    monkeypatch.setattr("eir_cli.plugins.discover_plugins", lambda: discovered.append(True))
     monkeypatch.setattr("gateway.platform_registry.platform_registry.is_registered",
                         lambda target: bool(discovered) and target == "custom_chat")
     webhook_command(_args(name="plugin", deliver="custom_chat"))

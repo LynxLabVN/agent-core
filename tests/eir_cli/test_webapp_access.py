@@ -1,4 +1,4 @@
-"""Remote Webapp access (``hermes_cli.webapp_access``, ``/api/webapp-access/*``).
+"""Remote Webapp access (``eir_cli.webapp_access``, ``/api/webapp-access/*``).
 
 Contracts: Web Access writes only the ``webapp:`` block (the own-URL mode's URL in
 ``webapp.public_url``), LAN access registers the LAN callback on a Nous Portal client of Web Access's
@@ -18,7 +18,7 @@ from fastapi.testclient import TestClient
 def client(monkeypatch):
     """Native Desktop on this computer, calling the gateway's own listener as its Web Access pane
     does: one native grant per request."""
-    from tests.hermes_cli.native_gateway_client import native_desktop_client
+    from tests.eir_cli.native_gateway_client import native_desktop_client
 
     return native_desktop_client(monkeypatch)
 
@@ -26,7 +26,7 @@ def client(monkeypatch):
 @pytest.fixture()
 def restarts(monkeypatch):
     """Capture the gateway restart that applies the config instead of spawning it."""
-    import hermes_cli.web_server_gateway as gw
+    import eir_cli.web_server_gateway as gw
 
     calls: list[str] = []
 
@@ -41,7 +41,7 @@ def restarts(monkeypatch):
 @pytest.fixture()
 def nous(monkeypatch):
     """A signed-in Nous account; portal registration is captured (no network)."""
-    from hermes_cli import webapp_access
+    from eir_cli import webapp_access
 
     callbacks: list[str] = []
     monkeypatch.setattr(webapp_access, "nous_signed_in", lambda: True)
@@ -52,9 +52,9 @@ def nous(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def builds(monkeypatch):
-    """Capture the Webapp bundle builds (``hermes_cli.webapp.prepare_webapp_renderer``) instead of
+    """Capture the Webapp bundle builds (``eir_cli.webapp.prepare_webapp_renderer``) instead of
     compiling the renderer."""
-    from hermes_cli import webapp
+    from eir_cli import webapp
 
     roots: list = []
 
@@ -67,16 +67,16 @@ def builds(monkeypatch):
 
 
 def _config() -> dict:
-    from hermes_cli.config import load_config
+    from eir_cli.config import load_config
 
     return load_config()
 
 
 def _dashboard_setup() -> tuple[object, object]:
     """The standalone dashboard's own public URL, in config.yaml and in .env, as Web Access found it."""
-    from hermes_cli.config import load_env, read_raw_config
+    from eir_cli.config import load_env, read_raw_config
 
-    return read_raw_config().get("dashboard", {}).get("public_url"), load_env().get("HERMES_DASHBOARD_PUBLIC_URL")
+    return read_raw_config().get("dashboard", {}).get("public_url"), load_env().get("EIR_DASHBOARD_PUBLIC_URL")
 
 
 def test_web_access_keeps_its_url_in_the_webapp_block_and_leaves_the_dashboard_alone(client, restarts, nous):
@@ -84,10 +84,10 @@ def test_web_access_keeps_its_url_in_the_webapp_block_and_leaves_the_dashboard_a
     drops it (its callback follows each request), and the standalone dashboard's
     ``dashboard.public_url`` and ``.env`` pin, which a tunnelled dashboard needs after a restart,
     stay exactly as the user set them."""
-    from hermes_cli.config import save_config, save_env_value
+    from eir_cli.config import save_config, save_env_value
 
     save_config({**_config(), "dashboard": {"public_url": "https://dashboard.example.test"}})
-    save_env_value("HERMES_DASHBOARD_PUBLIC_URL", "https://dashboard.example.test")
+    save_env_value("EIR_DASHBOARD_PUBLIC_URL", "https://dashboard.example.test")
     dashboard = _dashboard_setup()
 
     response = client.post("/api/webapp-access/start", json={"mode": "public", "public_url": "https://hermes.example.test"})
@@ -111,7 +111,7 @@ def test_web_access_keeps_its_url_in_the_webapp_block_and_leaves_the_dashboard_a
 
 
 def test_start_without_a_nous_account_writes_and_restarts_nothing(client, restarts, nous, monkeypatch):
-    from hermes_cli import webapp_access
+    from eir_cli import webapp_access
 
     monkeypatch.setattr(webapp_access, "nous_signed_in", lambda: False)
 
@@ -132,7 +132,7 @@ def test_status_names_the_mode_the_config_serves(client, webapp, mode):
     """The pane's mode follows the config: the documented loopback setup (``webapp.enabled: true``)
     serves this computer only, a wildcard host serves the network, and ``webapp.public_url`` serves
     the user's own URL. A loopback Webapp is never shown as "My own URL" with no address."""
-    from hermes_cli.config import save_config
+    from eir_cli.config import save_config
 
     save_config({**_config(), "webapp": webapp})
 
@@ -144,7 +144,7 @@ def test_status_names_the_mode_the_config_serves(client, webapp, mode):
 def test_start_keeps_a_custom_port_and_builds_the_addresses_on_it(client, restarts, nous):
     """A ``webapp.port`` the user chose (a second gateway on this machine needs its own) survives
     every start and stop, and the status and the LAN callback use it, even while Web Access is off."""
-    from hermes_cli.config import save_config
+    from eir_cli.config import save_config
 
     save_config({**_config(), "webapp": {"enabled": False, "port": 9333}})
     assert client.get("/api/webapp-access/status").json()["port"] == 9333
@@ -165,13 +165,13 @@ def test_start_keeps_a_custom_port_and_builds_the_addresses_on_it(client, restar
     "https://user:secret@hermes.example.test",
     "https://hermes.example.test/?next=x",
     "https://hermes.example.test:99999",
-    "hermes.example.test",
+    "eir.example.test",
 ])
 def test_status_never_shows_a_public_url_the_gateway_refuses(client, public_url, enabled):
     """The pane shows the ``webapp:`` block as the gateway reads it, with the gateway's own reader: a
     ``webapp.public_url`` the gateway refuses shows as none, whether the Webapp is on or off, and
     the port the user chose still shows."""
-    from hermes_cli.config import save_config
+    from eir_cli.config import save_config
 
     save_config({**_config(), "webapp": {"enabled": enabled, "port": 9333, "public_url": public_url}})
 
@@ -209,11 +209,11 @@ def lan_browser(monkeypatch):
     """The gateway's Webapp on all interfaces behind password sign-in, and a browser on the LAN
     signed in with a cookie session."""
     import plugins.dashboard_auth.basic as basic_plugin
-    from hermes_cli import web_server
-    from hermes_cli.dashboard_auth import clear_providers, register_provider
-    from hermes_cli.dashboard_auth.routes import _reset_password_rate_limit
+    from eir_cli import web_server
+    from eir_cli.dashboard_auth import clear_providers, register_provider
+    from eir_cli.dashboard_auth.routes import _reset_password_rate_limit
 
-    monkeypatch.delenv("HERMES_DASHBOARD_PUBLIC_URL", raising=False)
+    monkeypatch.delenv("EIR_DASHBOARD_PUBLIC_URL", raising=False)
     for key, value in (("bound_host", "0.0.0.0"), ("bound_port", 9120), ("auth_required", True),
                        ("trusted_public_hosts", frozenset()), ("ui_surface", "webapp"),
                        ("listener_public_url", "")):
@@ -249,7 +249,7 @@ def webapp_tab(monkeypatch):
     """A tab of the default Webapp (loopback, no sign-in gate), which may be a browser on another
     machine through ``ssh -L 9120:127.0.0.1:9120``: it holds the browser credential, which on this
     listener is the loopback session token."""
-    from hermes_cli import web_server
+    from eir_cli import web_server
 
     for key, value in (("ui_surface", "webapp"), ("auth_required", False), ("bound_host", "127.0.0.1"),
                        ("trusted_public_hosts", frozenset())):
@@ -279,7 +279,7 @@ def test_a_webapp_tab_cannot_use_web_access(webapp_tab, restarts, nous):
 def test_native_desktop_uses_web_access_on_the_webapps_own_listener(client, monkeypatch):
     """With the Webapp on, native Desktop dials the gateway's listener that serves it, and its Web
     Access pane keeps working there."""
-    from hermes_cli import web_server
+    from eir_cli import web_server
 
     monkeypatch.setattr(web_server.app.state, "ui_surface", "webapp", raising=False)
 
@@ -288,9 +288,9 @@ def test_native_desktop_uses_web_access_on_the_webapps_own_listener(client, monk
 
 def test_start_builds_the_webapp_bundle_before_turning_it_on(client, restarts, nous, builds):
     """Start builds the bundle the gateway serves (``apps/desktop/dist-webapp``) with the function
-    ``hermes webapp`` uses, reusing it when current, so it never reports a Webapp with nothing to
+    ``eir webapp`` uses, reusing it when current, so it never reports a Webapp with nothing to
     serve as running."""
-    from hermes_cli.config import get_project_root
+    from eir_cli.config import get_project_root
 
     assert client.post("/api/webapp-access/start", json={"mode": "lan"}).status_code == 200
     assert builds == [get_project_root()]
@@ -300,7 +300,7 @@ def test_start_builds_the_webapp_bundle_before_turning_it_on(client, restarts, n
 def test_a_failed_build_turns_nothing_on_and_says_how_to_build(client, restarts, nous, monkeypatch):
     """When the bundle cannot be built, Start registers nothing with the Portal, writes nothing and
     restarts nothing, and its error names the command that builds the bundle."""
-    from hermes_cli import webapp
+    from eir_cli import webapp
 
     def fail(_project_root, **_options):
         raise webapp.WebappBuildError("Browser-hosted Desktop build failed: npm exited 1")
@@ -310,7 +310,7 @@ def test_a_failed_build_turns_nothing_on_and_says_how_to_build(client, restarts,
     response = client.post("/api/webapp-access/start", json={"mode": "lan"})
     assert response.status_code == 400
     assert "npm exited 1" in response.json()["detail"]
-    assert "hermes webapp --build-only" in response.json()["detail"]
+    assert "eir webapp --build-only" in response.json()["detail"]
     assert nous == []
     assert restarts == []
     assert not _config()["webapp"]["enabled"]
@@ -323,7 +323,7 @@ def test_other_requests_answer_while_start_builds_and_registers(client, restarts
     the callback (a network round trip), a config request answers at once."""
     import threading
 
-    from hermes_cli import webapp, webapp_access
+    from eir_cli import webapp, webapp_access
 
     answered_during_step: list[list[int]] = []
 
@@ -353,7 +353,7 @@ def test_restart_applies_the_saved_config_and_does_nothing_else(client, restarts
     """The pane's "Restart gateway" (a saved change the gateway has not applied yet) restarts the
     gateway serving the profile and nothing else: no Portal registration, no build, no config
     write."""
-    from hermes_cli.config import read_raw_config, save_config
+    from eir_cli.config import read_raw_config, save_config
 
     save_config({**_config(), "webapp": {"enabled": True, "host": "0.0.0.0"}})
     saved = read_raw_config()
@@ -371,7 +371,7 @@ def test_restart_applies_the_saved_config_and_does_nothing_else(client, restarts
 def test_a_restart_refused_by_a_running_chat_is_reported_as_busy(client, nous, monkeypatch):
     """When a running chat refuses the gateway restart, the change stays saved and the answer says
     so in a field the pane can word plainly (``restart_busy``), beside the CLI's own refusal text."""
-    import hermes_cli.web_server_gateway as gw
+    import eir_cli.web_server_gateway as gw
 
     refusal = ("Refusing to restart the gateway: 1 live session(s) would be interrupted.\n"
                "    POST /api/gateway/restart?interrupt=true   # interrupts 1 live session(s)")
@@ -397,7 +397,7 @@ def portal(monkeypatch):
     standalone dashboard's client (``agent:dashboard``)."""
     from types import SimpleNamespace
 
-    from hermes_cli import auth, dashboard_register, webapp_access
+    from eir_cli import auth, dashboard_register, webapp_access
 
     clients = {DASHBOARD_CLIENT: DASHBOARD_CALLBACK}
     requests: list[dict] = []
@@ -409,8 +409,8 @@ def portal(monkeypatch):
         clients[client_id] = custom_redirect_uri
         return {"client_id": client_id, "name": name or "kept"}
 
-    monkeypatch.delenv("HERMES_DASHBOARD_OAUTH_CLIENT_ID", raising=False)
-    monkeypatch.setenv("HERMES_DASHBOARD_PORTAL_URL", "https://portal.example.test")
+    monkeypatch.delenv("EIR_DASHBOARD_OAUTH_CLIENT_ID", raising=False)
+    monkeypatch.setenv("EIR_DASHBOARD_PORTAL_URL", "https://portal.example.test")
     monkeypatch.setattr(dashboard_register, "_register_self_hosted_client", register)
     monkeypatch.setattr(auth, "resolve_nous_access_token", lambda: "throwaway-access-token")
     monkeypatch.setattr(webapp_access, "nous_signed_in", lambda: True)
@@ -419,7 +419,7 @@ def portal(monkeypatch):
 
 
 def _env_bytes() -> bytes:
-    from hermes_cli.config import get_env_path
+    from eir_cli.config import get_env_path
 
     path = get_env_path()
     return path.read_bytes() if path.exists() else b""
@@ -428,14 +428,14 @@ def _env_bytes() -> bytes:
 def test_start_registers_a_portal_client_of_its_own_and_never_the_dashboards(client, restarts, portal, monkeypatch):
     """Web Access signs the Webapp in with a Portal client of its own, so turning it on can never
     change the redirect URI of the standalone dashboard's client, whatever the Portal does on an
-    update. The first Start registers a new client, never ``HERMES_DASHBOARD_OAUTH_CLIENT_ID``, and
+    update. The first Start registers a new client, never ``EIR_DASHBOARD_OAUTH_CLIENT_ID``, and
     writes nothing to ``.env``; a second Start with the same callback asks the Portal nothing; a moved
     callback updates Web Access's own client. The dashboard's client keeps its redirect URI and
     ``.env`` stays exactly as it was."""
-    from hermes_cli import webapp_access
-    from hermes_cli.config import save_env_value
+    from eir_cli import webapp_access
+    from eir_cli.config import save_env_value
 
-    save_env_value("HERMES_DASHBOARD_OAUTH_CLIENT_ID", DASHBOARD_CLIENT)
+    save_env_value("EIR_DASHBOARD_OAUTH_CLIENT_ID", DASHBOARD_CLIENT)
     env = _env_bytes()
 
     assert client.post("/api/webapp-access/start", json={"mode": "lan"}).status_code == 200
@@ -459,32 +459,32 @@ def test_start_registers_a_portal_client_of_its_own_and_never_the_dashboards(cli
 def test_web_access_keeps_its_client_id_under_the_gateway_home_not_in_env(portal):
     """The id of Web Access's client lives in ``webapp/sign-in-registration.json`` under the gateway
     home, beside the Portal it was registered on and the callback it carries; ``.env`` gets no
-    ``HERMES_DASHBOARD_OAUTH_CLIENT_ID``, so a standalone dashboard on this home finds no client it
+    ``EIR_DASHBOARD_OAUTH_CLIENT_ID``, so a standalone dashboard on this home finds no client it
     did not register itself."""
     import json
 
-    from hermes_cli import webapp_access
-    from hermes_cli.config import load_env
-    from hermes_constants import get_hermes_home
+    from eir_cli import webapp_access
+    from eir_cli.config import load_env
+    from eir_constants import get_eir_home
 
     webapp_access.register(LAN_CALLBACK)
 
-    record = json.loads((get_hermes_home() / "webapp" / "sign-in-registration.json").read_text(encoding="utf-8"))
+    record = json.loads((get_eir_home() / "webapp" / "sign-in-registration.json").read_text(encoding="utf-8"))
     assert {key: record.get(key) for key in ("portal", "client_id", "callback")} == {
         "portal": "https://portal.example.test", "client_id": "agent:client-1", "callback": LAN_CALLBACK}
-    assert "HERMES_DASHBOARD_OAUTH_CLIENT_ID" not in load_env()
-    assert webapp_access.sign_in_client(get_hermes_home()) == ("agent:client-1", "https://portal.example.test")
+    assert "EIR_DASHBOARD_OAUTH_CLIENT_ID" not in load_env()
+    assert webapp_access.sign_in_client(get_eir_home()) == ("agent:client-1", "https://portal.example.test")
 
 
 @pytest.mark.platforms("posix")  # POSIX mode bits; a Windows home keeps its own ACL
 def test_web_access_keeps_its_client_record_user_only(portal):
     import stat
 
-    from hermes_cli import webapp_access
-    from hermes_constants import get_hermes_home
+    from eir_cli import webapp_access
+    from eir_constants import get_eir_home
 
     webapp_access.register(LAN_CALLBACK)
-    record = get_hermes_home() / "webapp" / "sign-in-registration.json"
+    record = get_eir_home() / "webapp" / "sign-in-registration.json"
     assert stat.S_IMODE(record.stat().st_mode) == 0o600
     assert stat.S_IMODE(record.parent.stat().st_mode) == 0o700
 
@@ -496,48 +496,48 @@ def test_a_home_registered_on_the_dashboards_client_gets_its_own_at_the_next_sta
     client of Web Access's own, so the Webapp keeps signing in with the configured one."""
     import json
 
-    from hermes_cli import webapp_access
-    from hermes_cli.config import save_env_value
-    from hermes_constants import get_hermes_home
+    from eir_cli import webapp_access
+    from eir_cli.config import save_env_value
+    from eir_constants import get_eir_home
 
-    save_env_value("HERMES_DASHBOARD_OAUTH_CLIENT_ID", DASHBOARD_CLIENT)
-    record = get_hermes_home() / "webapp" / "sign-in-registration.json"
+    save_env_value("EIR_DASHBOARD_OAUTH_CLIENT_ID", DASHBOARD_CLIENT)
+    record = get_eir_home() / "webapp" / "sign-in-registration.json"
     record.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     record.write_text(json.dumps({"portal": "https://portal.example.test", "client_id": DASHBOARD_CLIENT,
                                   "callback": LAN_CALLBACK}) + "\n", encoding="utf-8")
     env = _env_bytes()
-    assert webapp_access.sign_in_client(get_hermes_home()) is None
+    assert webapp_access.sign_in_client(get_eir_home()) is None
 
     webapp_access.register(LAN_CALLBACK)
 
     assert [(r["callback"], r["client_id"]) for r in portal.requests] == [(LAN_CALLBACK, None)]
     assert portal.clients[DASHBOARD_CLIENT] == DASHBOARD_CALLBACK
-    assert webapp_access.sign_in_client(get_hermes_home()) == ("agent:client-1", "https://portal.example.test")
+    assert webapp_access.sign_in_client(get_eir_home()) == ("agent:client-1", "https://portal.example.test")
     assert _env_bytes() == env
     webapp_access.register(LAN_CALLBACK)
     assert len(portal.requests) == 1
 
 
 def test_dashboard_register_leaves_web_access_and_its_client_alone(portal):
-    """``hermes dashboard register`` updates the dashboard's own client only: Web Access's client,
+    """``eir dashboard register`` updates the dashboard's own client only: Web Access's client,
     its record and its next Start (which asks the Portal nothing for an unchanged callback) are
     untouched."""
     import argparse
 
-    from hermes_cli import dashboard_register, webapp_access
-    from hermes_cli.config import save_env_value
-    from hermes_constants import get_hermes_home
+    from eir_cli import dashboard_register, webapp_access
+    from eir_cli.config import save_env_value
+    from eir_constants import get_eir_home
 
-    save_env_value("HERMES_DASHBOARD_OAUTH_CLIENT_ID", DASHBOARD_CLIENT)
+    save_env_value("EIR_DASHBOARD_OAUTH_CLIENT_ID", DASHBOARD_CLIENT)
     webapp_access.register(LAN_CALLBACK)
-    record = (get_hermes_home() / "webapp" / "sign-in-registration.json").read_bytes()
+    record = (get_eir_home() / "webapp" / "sign-in-registration.json").read_bytes()
 
     dashboard_register.cmd_dashboard_register(argparse.Namespace(
         name=None, redirect_uri="https://dashboard2.example.test/auth/callback", portal_url=None))
 
     assert portal.requests[-1]["client_id"] == DASHBOARD_CLIENT
     assert portal.clients["agent:client-1"] == LAN_CALLBACK
-    assert (get_hermes_home() / "webapp" / "sign-in-registration.json").read_bytes() == record
+    assert (get_eir_home() / "webapp" / "sign-in-registration.json").read_bytes() == record
     webapp_access.register(LAN_CALLBACK)
     assert len(portal.requests) == 2
 
@@ -558,7 +558,7 @@ async def _login_client_id(mount, origin: str) -> str:
 
 def _load_nous_plugin_as_discovery_does():
     """The bundled Nous sign-in plugin imported as plugin discovery imports it: from its folder under
-    a module name of the loader's own (``hermes_plugins.<key>``), not as ``plugins.dashboard_auth.nous``,
+    a module name of the loader's own (``eir_plugins.<key>``), not as ``plugins.dashboard_auth.nous``,
     so its module-level state is not that of any other import of it."""
     import importlib.util
     from pathlib import Path
@@ -567,7 +567,7 @@ def _load_nous_plugin_as_discovery_does():
 
     folder = Path(source.__file__).parent
     spec = importlib.util.spec_from_file_location(
-        "hermes_plugins_test_f5.dashboard_auth__nous", folder / "__init__.py", submodule_search_locations=[str(folder)])
+        "eir_plugins_test_f5.dashboard_auth__nous", folder / "__init__.py", submodule_search_locations=[str(folder)])
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -584,10 +584,10 @@ def gateway_listeners(tmp_path, monkeypatch):
 
     from gateway.run_api import GatewayDashboardMount
     from gateway.webapp_listener import WebappMount
-    from hermes_cli import web_server
-    from hermes_cli.dashboard_auth import clear_providers, listener_client
-    from hermes_cli.dashboard_auth.registry import register_global_provider
-    from hermes_constants import get_hermes_home
+    from eir_cli import web_server
+    from eir_cli.dashboard_auth import clear_providers, listener_client
+    from eir_cli.dashboard_auth.registry import register_global_provider
+    from eir_constants import get_eir_home
 
     for key in ("bound_host", "bound_port", "auth_required", "trusted_public_hosts"):
         monkeypatch.setattr(web_server.app.state, key, getattr(web_server.app.state, key, None), raising=False)
@@ -601,7 +601,7 @@ def gateway_listeners(tmp_path, monkeypatch):
 
     def listener(*, webapp: bool):
         state = types.SimpleNamespace(bound_host="0.0.0.0", bound_port=9120,
-                                      **({"webapp": WebappMount(dist, get_hermes_home())} if webapp else {}))
+                                      **({"webapp": WebappMount(dist, get_eir_home())} if webapp else {}))
         return GatewayDashboardMount(types.SimpleNamespace(session_authority=None), state)
 
     clear_providers()
@@ -614,16 +614,16 @@ def test_the_webapps_nous_sign_in_uses_its_own_client_and_the_dashboards_keeps_i
         portal, gateway_listeners, monkeypatch, dashboard_client):
     """The gateway's Webapp listener signs browsers in to Nous with the client Web Access registered
     for it, also on a home with no dashboard client at all. The gateway's private listener mounted
-    after it signs in with ``HERMES_DASHBOARD_OAUTH_CLIENT_ID`` as on main (the standalone dashboard
+    after it signs in with ``EIR_DASHBOARD_OAUTH_CLIENT_ID`` as on main (the standalone dashboard
     reads the same setting), or offers no Nous sign-in when that is unset."""
     import asyncio
 
-    from hermes_cli import webapp_access
-    from hermes_cli.dashboard_auth import get_provider
+    from eir_cli import webapp_access
+    from eir_cli.dashboard_auth import get_provider
 
     webapp_access.register(LAN_CALLBACK)
     if dashboard_client:
-        monkeypatch.setenv("HERMES_DASHBOARD_OAUTH_CLIENT_ID", dashboard_client)
+        monkeypatch.setenv("EIR_DASHBOARD_OAUTH_CLIENT_ID", dashboard_client)
     gateway_listeners.discover()
 
     async def scenario():
@@ -648,13 +648,13 @@ def test_the_webapps_nous_sign_in_uses_its_own_client_and_the_dashboards_keeps_i
 
 def test_a_plugin_reload_while_the_webapp_serves_keeps_its_own_client(portal, gateway_listeners, monkeypatch):
     """Reloading plugins re-registers the Nous provider; while the gateway serves the Webapp it
-    is rebuilt on Web Access's client, not on ``HERMES_DASHBOARD_OAUTH_CLIENT_ID``."""
+    is rebuilt on Web Access's client, not on ``EIR_DASHBOARD_OAUTH_CLIENT_ID``."""
     import asyncio
 
-    from hermes_cli import webapp_access
+    from eir_cli import webapp_access
 
     webapp_access.register(LAN_CALLBACK)
-    monkeypatch.setenv("HERMES_DASHBOARD_OAUTH_CLIENT_ID", DASHBOARD_CLIENT)
+    monkeypatch.setenv("EIR_DASHBOARD_OAUTH_CLIENT_ID", DASHBOARD_CLIENT)
     gateway_listeners.discover()
 
     async def scenario():
@@ -674,22 +674,22 @@ def test_a_disabled_nous_plugin_keeps_nous_sign_in_off_the_webapp(portal, gatewa
     ``plugins.disabled`` keeps that plugin from loading (discovery never registered it), the Webapp
     gets no Nous sign-in from Web Access either."""
     from gateway.webapp_listener import WebappMount, use_own_sign_in
-    from hermes_cli import webapp_access
-    from hermes_cli.dashboard_auth import get_provider
-    from hermes_constants import get_hermes_home
+    from eir_cli import webapp_access
+    from eir_cli.dashboard_auth import get_provider
+    from eir_constants import get_eir_home
 
     webapp_access.register(LAN_CALLBACK)
 
-    assert use_own_sign_in(WebappMount(tmp_path, get_hermes_home())) is None
+    assert use_own_sign_in(WebappMount(tmp_path, get_eir_home())) is None
     assert get_provider("nous") is None
 
 
 def test_a_webapp_without_a_web_access_client_signs_in_with_the_configured_one(portal, gateway_listeners, monkeypatch):
-    """A Webapp whose Nous sign-in was set up by hand (``hermes dashboard register`` for its address,
-    no Web Access Start) keeps signing in with ``HERMES_DASHBOARD_OAUTH_CLIENT_ID``."""
+    """A Webapp whose Nous sign-in was set up by hand (``eir dashboard register`` for its address,
+    no Web Access Start) keeps signing in with ``EIR_DASHBOARD_OAUTH_CLIENT_ID``."""
     import asyncio
 
-    monkeypatch.setenv("HERMES_DASHBOARD_OAUTH_CLIENT_ID", DASHBOARD_CLIENT)
+    monkeypatch.setenv("EIR_DASHBOARD_OAUTH_CLIENT_ID", DASHBOARD_CLIENT)
     gateway_listeners.discover()
 
     async def scenario():
@@ -726,9 +726,9 @@ def test_the_gateway_restart_and_status_run_outside_the_config_lock(client, nous
     """Start and Stop write the config under the config lock every config, skills and tools request
     takes, then restart the gateway and read its status outside that lock: the restart spawn and the
     status query (a control-socket round trip of up to 5 seconds) hold no other request up."""
-    import hermes_cli.web_server_gateway as gw
-    from hermes_cli import webapp_access
-    from hermes_cli.config_backend import CONFIG_MUTATION_LOCK as lock
+    import eir_cli.web_server_gateway as gw
+    from eir_cli import webapp_access
+    from eir_cli.config_backend import CONFIG_MUTATION_LOCK as lock
     free_during: dict[str, bool] = {}
 
     def restart(_profile, *, what, label):
@@ -759,8 +759,8 @@ def test_web_access_changes_run_one_at_a_time(client, restarts, nous, monkeypatc
     serve, nor the Webapp on the network after the user stopped it."""
     import threading
 
-    from hermes_cli import webapp, webapp_access
-    from hermes_cli.web_routers import webapp_access as routes
+    from eir_cli import webapp, webapp_access
+    from eir_cli.web_routers import webapp_access as routes
 
     class WatchedLock:
         """The routes' change lock, noting when a change found it held."""
@@ -829,7 +829,7 @@ def test_a_gateway_older_than_the_webapp_reads_as_serving_none_until_it_restarts
     Restart gateway), never ``unavailable``, which the pane's restart wait takes as the final answer."""
     from pathlib import Path
 
-    from hermes_cli import webapp_access, webapp_launcher
+    from eir_cli import webapp_access, webapp_launcher
 
     answer = {"ok": False, "error": "unknown verb: 'webapp-status'", "protocol": 1,
               "supported_verbs": ["identify", "session-ticket", "status"]}

@@ -13,16 +13,16 @@ import importlib
 import os
 
 import pytest
-import hermes_yaml as yaml
-import hermes_cli.web_server_config as _web_server_config
+import eir_yaml as yaml
+import eir_cli.web_server_config as _web_server_config
 
 
 @pytest.fixture()
-def _hermes_home(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+def _eir_home(tmp_path, monkeypatch):
+    home = tmp_path / ".eir"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    import hermes_cli.config as config_mod
+    monkeypatch.setenv("EIR_HOME", str(home))
+    import eir_cli.config as config_mod
 
     importlib.reload(config_mod)
     yield home
@@ -38,7 +38,7 @@ def _write_config(home, providers):
 
 
 def _apply(provider, model="local/model"):
-    import hermes_cli.web_server as ws
+    import eir_cli.web_server as ws
 
     return _web_server_config._apply_model_assignment_sync("main", provider, model, "", "")
 
@@ -47,36 +47,36 @@ def _raw_model_cfg(home):
     return (yaml.safe_load((home / "config.yaml").read_text()) or {}).get("model", {})
 
 
-def test_env_ref_key_carries_template_not_plaintext(_hermes_home, monkeypatch):
+def test_env_ref_key_carries_template_not_plaintext(_eir_home, monkeypatch):
     monkeypatch.setenv("MY_LOCAL_KEY", "sk-super-secret-value")
     _write_config(
-        _hermes_home,
+        _eir_home,
         {"mylocal": {"base_url": "http://localhost:1234/v1", "api_key": "${MY_LOCAL_KEY}"}},
     )
     _apply("mylocal")
-    model_cfg = _raw_model_cfg(_hermes_home)
+    model_cfg = _raw_model_cfg(_eir_home)
     assert "sk-super-secret-value" not in yaml.safe_dump(model_cfg)
     # Pointer-carry: the raw ${VAR} template rides along so the model
     # config still resolves the credential at runtime.
     assert model_cfg.get("api_key") == "${MY_LOCAL_KEY}"
 
 
-def test_key_env_entry_carries_pointer(_hermes_home, monkeypatch):
+def test_key_env_entry_carries_pointer(_eir_home, monkeypatch):
     monkeypatch.setenv("MYLOCAL_API_KEY", "sk-keyenv-secret")
     _write_config(
-        _hermes_home,
+        _eir_home,
         {"mylocal": {"base_url": "http://localhost:1234/v1", "key_env": "MYLOCAL_API_KEY"}},
     )
     _apply("mylocal")
-    raw = (_hermes_home / "config.yaml").read_text()
+    raw = (_eir_home / "config.yaml").read_text()
     assert "sk-keyenv-secret" not in raw
-    assert _raw_model_cfg(_hermes_home).get("key_env") == "MYLOCAL_API_KEY"
+    assert _raw_model_cfg(_eir_home).get("key_env") == "MYLOCAL_API_KEY"
 
 
-def test_literal_key_still_mirrored(_hermes_home):
+def test_literal_key_still_mirrored(_eir_home):
     _write_config(
-        _hermes_home,
+        _eir_home,
         {"mylocal": {"base_url": "http://localhost:1234/v1", "api_key": "literal-key-abc"}},
     )
     _apply("mylocal")
-    assert _raw_model_cfg(_hermes_home).get("api_key") == "literal-key-abc"
+    assert _raw_model_cfg(_eir_home).get("api_key") == "literal-key-abc"

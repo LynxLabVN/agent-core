@@ -11,7 +11,7 @@ import pytest
 
 from agent.anthropic_thinking_replay import strip_rejected_thinking
 from agent.chat_completion_helpers import build_assistant_message
-from hermes_state import SessionDB
+from eir_state import SessionDB
 
 _SECRET = "ghp_" + "A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8"
 _THOUGHT = f"I will use the token {_SECRET} to call the API."

@@ -1,6 +1,6 @@
 """Memory-provider setup dashboard routes (schema, existing values, external dependency install).
 
-Extracted from ``hermes_cli.web_server``; helpers/state that tests monkeypatch on
+Extracted from ``eir_cli.web_server``; helpers/state that tests monkeypatch on
 ``web_server`` stay there and are late-bound (cycle-safe).
 """
 
@@ -16,28 +16,28 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException
 
-from hermes_cli.web_deps import late
-from hermes_cli.web_server_dashboard import _invalidate_plugins_hub_cache
-from hermes_cli.web_server_memory import (
+from eir_cli.web_deps import late
+from eir_cli.web_server_dashboard import _invalidate_plugins_hub_cache
+from eir_cli.web_server_memory import (
     _coerce_bool, _field_default, _field_is_set, _field_value, _field_visible, _load_memory_provider, _memory_provider_manifest, _memory_provider_setup_info, _memory_provider_setup_manifest, _normalize_memory_provider_schema, _read_memory_provider_existing_values, _require_memory_provider_ready, _run_setup_command,
 )
-from hermes_cli.web_models import MemoryProviderConfigUpdate, MemoryProviderSetupRequest
-from hermes_cli.config_backend import CONFIG_MUTATION_LOCK
-from hermes_cli.web_routers._common import scoped_to_thread
+from eir_cli.web_models import MemoryProviderConfigUpdate, MemoryProviderSetupRequest
+from eir_cli.config_backend import CONFIG_MUTATION_LOCK
+from eir_cli.web_routers._common import scoped_to_thread
 from plugins.memory.config_schema import (
     STORAGE_FLAT_JSON, STORAGE_PROVIDER, ProviderConfigSchema, ProviderField, get_provider_config_schema,
 )
 
-_log = logging.getLogger("hermes_cli.web_server")
+_log = logging.getLogger("eir_cli.web_server")
 router = APIRouter()
 
 # Late-bound so a test's monkeypatch on the owning module wins at call time.
-_discover_memory_provider_statuses = late("_discover_memory_provider_statuses", "hermes_cli.web_server_memory")
-get_hermes_home = late("get_hermes_home", "hermes_cli.config")
-load_config = late("load_config", "hermes_cli.config")
-save_config = late("save_config", "hermes_cli.config")
-save_env_value = late("save_env_value", "hermes_cli.config")
-load_env = late("load_env", "hermes_cli.config")
+_discover_memory_provider_statuses = late("_discover_memory_provider_statuses", "eir_cli.web_server_memory")
+get_eir_home = late("get_eir_home", "eir_cli.config")
+load_config = late("load_config", "eir_cli.config")
+save_config = late("save_config", "eir_cli.config")
+save_env_value = late("save_env_value", "eir_cli.config")
+load_env = late("load_env", "eir_cli.config")
 # Sentinel: remove this key so it falls back to the built-in default.
 _UNSET: Any = object()
 
@@ -116,7 +116,7 @@ def _read_json_dict(path: Path, what: str) -> dict[str, Any]:
 
 
 def _flat_json_path(provider: ProviderConfigSchema) -> Path:
-    return get_hermes_home() / provider.name / "config.json"
+    return get_eir_home() / provider.name / "config.json"
 
 
 def _read_flat_json(provider: ProviderConfigSchema) -> dict[str, Any]:
@@ -163,8 +163,8 @@ def _apply_field_values(provider: ProviderConfigSchema, values: dict[str, str], 
 
 def _write_json_0600(path: Path, data: dict[str, Any]) -> None:
     from utils import atomic_json_write
-    from hermes_constants import mkdir_under_hermes_home
-    mkdir_under_hermes_home(path.parent)
+    from eir_constants import mkdir_under_eir_home
+    mkdir_under_eir_home(path.parent)
     atomic_json_write(path, data, mode=0o600)
 
 
@@ -188,7 +188,7 @@ def _write_provider_own(provider: ProviderConfigSchema, values: dict[str, str]) 
     fields: dict[str, Any] = {field.key: submitted for field, submitted in _submitted_secrets(provider, values)}
     fields.update({k: None if v is _UNSET else v for k, v in _submitted_natives(provider, values).items()})
     try:
-        _provider_instance(provider).write_config_fields(fields, str(get_hermes_home()))
+        _provider_instance(provider).write_config_fields(fields, str(get_eir_home()))
     except NotImplementedError as exc:  # declares storage=provider without the writer: a plugin bug
         raise HTTPException(status_code=501, detail=str(exc)) from exc
     _save_submitted_secrets(provider, values)
@@ -242,7 +242,7 @@ def _declared_provider_payload(provider: ProviderConfigSchema) -> dict[str, Any]
     # A provider-owned layout reports presence (a stored False/0 is set); a flat file, truthiness.
     own = provider.storage == STORAGE_PROVIDER
     if own:
-        stored = _provider_instance(provider).read_config_fields(str(get_hermes_home())) or {}
+        stored = _provider_instance(provider).read_config_fields(str(get_eir_home())) or {}
         data, placeholders = dict(stored.get("values") or {}), dict(stored.get("placeholders") or {})
     else:
         data, placeholders = _read_flat_json(provider), {}
@@ -325,9 +325,9 @@ def _command_result(
 
 
 def _install_memory_provider_python_dependencies(name: str) -> list[dict[str, Any]]:
-    from hermes_cli.memory_setup import prepare_memory_provider_dependencies
+    from eir_cli.memory_setup import prepare_memory_provider_dependencies
 
-    command = "hermes pm install"
+    command = "eir pm install"
     try:
         _manifest, status = prepare_memory_provider_dependencies(name)
     except Exception as exc:
@@ -449,7 +449,7 @@ def _save_memory_provider_native_config(name: str, provider: Any, values: dict[s
         except Exception:
             _BaseMemoryProvider = None
         if _BaseMemoryProvider is None or type(provider).save_config is not _BaseMemoryProvider.save_config:
-            provider.save_config(values, str(get_hermes_home()))
+            provider.save_config(values, str(get_eir_home()))
             return
     with CONFIG_MUTATION_LOCK:  # RMW span vs. the dashboard's config autosave
         cfg = load_config()

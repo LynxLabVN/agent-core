@@ -1,4 +1,4 @@
-"""A checkout git no longer recognizes must never let ``hermes update`` act on an enclosing repo.
+"""A checkout git no longer recognizes must never let ``eir update`` act on an enclosing repo.
 
 git walks up from a damaged ``.git`` to the nearest parent repository, so an install under a home
 directory that is itself a git repo would otherwise stash, reset and clean the user's home (#146032).
@@ -7,8 +7,8 @@ import subprocess
 
 import pytest
 
-from hermes_cli import main as cli_main
-from tests.hermes_cli.test_update_target_identity import git, update_tree
+from eir_cli import main as cli_main
+from tests.eir_cli.test_update_target_identity import git, update_tree
 
 
 def _wrap_in_enclosing_repo(t):
@@ -48,7 +48,7 @@ def test_update_refuses_to_operate_on_the_repo_enclosing_a_damaged_checkout(upda
 
 
 def test_plugin_pull_refuses_a_plugin_dir_git_resolves_to_an_enclosing_repo(tmp_path, monkeypatch):
-    import hermes_cli.plugins_cmd as pc
+    import eir_cli.plugins_cmd as pc
 
     monkeypatch.setenv('GIT_CONFIG_GLOBAL', str(tmp_path / 'git-config'))
     monkeypatch.setenv('GIT_CONFIG_NOSYSTEM', '1')
@@ -79,7 +79,7 @@ def test_plugin_pull_refuses_a_plugin_dir_git_resolves_to_an_enclosing_repo(tmp_
 
 def test_update_git_ignores_an_inherited_git_dir(tmp_path, monkeypatch):
     """A GIT_DIR from the user's shell (a dotfiles alias, a git hook) must not retarget the updater."""
-    from hermes_cli.update_custody import run_git
+    from eir_cli.update_custody import run_git
 
     home, checkout = tmp_path / 'home', tmp_path / 'checkout'
     for repo in (home, checkout):
@@ -94,7 +94,7 @@ def test_update_git_ignores_an_inherited_git_dir(tmp_path, monkeypatch):
 
 
 def test_pinned_feed_update_refuses_a_plugin_dir_git_resolves_to_an_enclosing_repo(tmp_path):
-    from hermes_cli.plugins_cmd_git import _foreign_checkout_error
+    from eir_cli.plugins_cmd_git import _foreign_checkout_error
 
     home = tmp_path / 'home'
     plugin = home / 'plugins' / 'demo'
@@ -113,14 +113,14 @@ def test_update_plugin_to_a_feed_commit_refuses_a_plugin_dir_git_resolves_to_an_
     .git that is the git-managed home, so update_plugin must stop before touching it."""
     import json
 
-    import hermes_cli.plugins_updates as updates
-    from hermes_cli.plugins_cmd import PluginOperationError
-    from hermes_cli.plugins_transaction import update_plugin
+    import eir_cli.plugins_updates as updates
+    from eir_cli.plugins_cmd import PluginOperationError
+    from eir_cli.plugins_transaction import update_plugin
 
     home = tmp_path / 'home'
     plugin = home / 'plugins' / 'demo'
     plugin.mkdir(parents=True)
-    monkeypatch.setenv('HERMES_HOME', str(home))
+    monkeypatch.setenv('EIR_HOME', str(home))
     monkeypatch.setenv('GIT_CONFIG_GLOBAL', str(tmp_path / 'git-config'))
     monkeypatch.setenv('GIT_CONFIG_NOSYSTEM', '1')
     feed = 'https://feed.example/demo.yml'
@@ -144,7 +144,7 @@ def test_update_plugin_to_a_feed_commit_refuses_a_plugin_dir_git_resolves_to_an_
 
 def test_plugin_guard_ignores_an_inherited_git_dir(tmp_path, monkeypatch):
     """GIT_DIR disables discovery, so the toplevel would be the plugin dir even when git acts on another repo."""
-    from hermes_cli.plugins_cmd_git import _foreign_checkout_error
+    from eir_cli.plugins_cmd_git import _foreign_checkout_error
 
     home = tmp_path / 'home'
     plugin = home / 'plugins' / 'demo'

@@ -21,8 +21,8 @@ IMPORT-LIGHTNESS IS A CORRECTNESS PROPERTY: top-level module, stdlib only. Armin
 precede importing ``gateway`` (hundreds of modules; an import-time deadlock is in scope),
 and at fire time the wedged main thread may hold the import lock — so the fire path does
 no imports on its own thread; the ledger write runs on a helper thread joined with a
-timeout. Config is env-only (``HERMES_STARTUP_WATCHDOG=0``,
-``HERMES_STARTUP_WATCHDOG_TIMEOUT_S``) because config.yaml parsing is itself in scope.
+timeout. Config is env-only (``EIR_STARTUP_WATCHDOG=0``,
+``EIR_STARTUP_WATCHDOG_TIMEOUT_S``) because config.yaml parsing is itself in scope.
 Everything is best-effort: a watchdog failure must never affect the startup it observes.
 """
 
@@ -47,8 +47,8 @@ _MIN_TIMEOUT_S = 30.0
 # tests/gateway/test_startup_watchdog.py) — this module must not import gateway.
 SERVICE_RESTART_EXIT_CODE = 75
 
-ENV_STARTUP_WATCHDOG = "HERMES_STARTUP_WATCHDOG"
-ENV_STARTUP_WATCHDOG_TIMEOUT_S = "HERMES_STARTUP_WATCHDOG_TIMEOUT_S"
+ENV_STARTUP_WATCHDOG = "EIR_STARTUP_WATCHDOG"
+ENV_STARTUP_WATCHDOG_TIMEOUT_S = "EIR_STARTUP_WATCHDOG_TIMEOUT_S"
 
 _DUMP_RELATIVE = ("logs", "gateway-startup-watchdog.log")
 
@@ -90,28 +90,28 @@ _ARMED = "armed"
 _DISARMED = "disarmed"
 _FIRING = "firing"
 
-# Module singleton: the arm sites (hermes_cli.main / hermes_cli.gateway /
+# Module singleton: the arm sites (eir_cli.main / eir_cli.gateway /
 # gateway.run.main / cli.py --gateway) and the disarm site (GatewayRunner)
 # share no object, and only one gateway startup ever runs per process.
 _handle_lock = threading.Lock()
 _handle: Optional[StartupWatchdogHandle] = None
 
 
-def _process_hermes_home() -> Path:
+def _process_eir_home() -> Path:
     """Use the stdlib-only process resolver before application startup."""
-    from hermes_constants import get_process_hermes_home
+    from eir_constants import get_process_eir_home
 
-    return get_process_hermes_home()
+    return get_process_eir_home()
 
 
 def get_startup_watchdog_dump_path(home: Optional[Path] = None) -> Path:
-    """Return ``<HERMES_HOME>/logs/gateway-startup-watchdog.log``."""
-    base = home if home is not None else _process_hermes_home()
+    """Return ``<EIR_HOME>/logs/gateway-startup-watchdog.log``."""
+    base = home if home is not None else _process_eir_home()
     return base.joinpath(*_DUMP_RELATIVE)
 
 
 def startup_watchdog_disabled() -> bool:
-    """True when ``HERMES_STARTUP_WATCHDOG`` opts out explicitly."""
+    """True when ``EIR_STARTUP_WATCHDOG`` opts out explicitly."""
     return os.environ.get(ENV_STARTUP_WATCHDOG, "").strip().lower() in _FALSEY
 
 
@@ -429,7 +429,7 @@ def arm_startup_watchdog(
     """Arm the process-wide startup watchdog. Idempotent; never raises.
 
     Returns the (possibly pre-existing) handle, or ``None`` when disabled via
-    ``HERMES_STARTUP_WATCHDOG=0`` or when the thread could not be started.
+    ``EIR_STARTUP_WATCHDOG=0`` or when the thread could not be started.
     """
     global _handle
     try:

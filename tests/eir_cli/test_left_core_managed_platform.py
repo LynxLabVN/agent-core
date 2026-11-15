@@ -3,8 +3,8 @@ import json
 
 import pytest
 
-from hermes_cli import left_core_migration as lcm
-from hermes_cli import managed_scope
+from eir_cli import left_core_migration as lcm
+from eir_cli import managed_scope
 
 
 @pytest.mark.parametrize("shape", [
@@ -31,7 +31,7 @@ def test_managed_credentials_outweigh_stale_user_extras(tmp_path, monkeypatch, s
     config_path = home / "config.yaml"
     config_path.write_text(json.dumps(config))
     (managed / "config.yaml").write_text(json.dumps(layers[shape]))
-    monkeypatch.setenv("HERMES_MANAGED_DIR", str(managed))
+    monkeypatch.setenv("EIR_MANAGED_DIR", str(managed))
     for key in ("YUANBAO_APP_ID", "YUANBAO_APP_KEY", "YUANBAO_APP_SECRET"):
         monkeypatch.delenv(key, raising=False)
     managed_scope.invalidate_managed_cache()

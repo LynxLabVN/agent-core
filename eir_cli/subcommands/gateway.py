@@ -1,11 +1,11 @@
-"""``hermes gateway`` and ``hermes proxy`` subcommand parsers."""
+"""``eir gateway`` and ``eir proxy`` subcommand parsers."""
 
 from __future__ import annotations
 
 import argparse
 from typing import Callable
 
-from hermes_cli.subcommands._shared import add_accept_hooks_flag
+from eir_cli.subcommands._shared import add_accept_hooks_flag
 
 
 # `start`/`restart` on a named profile refuse while the default multiplexer serves it (a second gateway
@@ -102,7 +102,7 @@ def build_gateway_parser(
             "Inside the s6-overlay Docker image, normally `gateway run` is "
             "automatically redirected to the supervised s6 service (so the "
             "gateway gets auto-restart on crash, plus a supervised dashboard "
-            "if HERMES_DASHBOARD is set). Pass --no-supervise to opt out and "
+            "if EIR_DASHBOARD is set). Pass --no-supervise to opt out and "
             "get the historical pre-s6 foreground behavior: the gateway is "
             "the container's main process and the container exits with the "
             "gateway's exit code. No effect outside an s6 container."),
@@ -118,7 +118,7 @@ def build_gateway_parser(
     add_accept_hooks_flag(gateway_run)
     add_accept_hooks_flag(gateway_parser)
 
-    from hermes_cli.gateway_runtime_cli import cmd_gateway_attach, cmd_gateway_ensure
+    from eir_cli.gateway_runtime_cli import cmd_gateway_attach, cmd_gateway_ensure
     gateway_ensure = gateway_subparsers.add_parser(
         "ensure", json_verb="ensure",
         help="Ensure a local runtime without installing or replacing a service",
@@ -138,17 +138,17 @@ def build_gateway_parser(
                     "is a credential: it is printed for the calling process only, never logged, and "
                     "expires 30 seconds after it is minted.",
         epilog="Exit codes: 0 attached; 2 invalid invocation; otherwise the exit code "
-               "`hermes gateway ensure` gives the same verdict.")
+               "`eir gateway ensure` gives the same verdict.")
     _flag(gateway_attach, "--json", help="Emit one JSON result (default)")
     attach_mode = gateway_attach.add_mutually_exclusive_group()
     _flag(attach_mode, "--start", help="Start the gateway when none serves this profile")
     _flag(attach_mode, "--recover",
-        help="Discover first; start (or replace an older Hermes's) gateway only when it is not ready")
+        help="Discover first; start (or replace an older Eir's) gateway only when it is not ready")
     gateway_attach.add_argument("--timeout", default="60",
                                 help="Start deadline in seconds for --start/--recover (default: 60)")
     gateway_attach.set_defaults(func=cmd_gateway_attach)
 
-    from hermes_cli.gateway_runtime_tickets import cmd_gateway_tickets
+    from eir_cli.gateway_runtime_tickets import cmd_gateway_tickets
     gateway_tickets = gateway_subparsers.add_parser(
         "tickets",
         help="Mint single-use HTTP and WebSocket tickets for a client that reaches the gateway over SSH",
@@ -159,10 +159,10 @@ def build_gateway_parser(
                     'single-use ticket, until stdin closes. A line may add "profile": "<name>" for '
                     'another profile the same gateway serves. Purpose "interactive" is the WebSocket\'s '
                     "ticket for every profile that gateway serves. It never starts a gateway: use "
-                    "`hermes gateway attach --start` for that. Tickets are credentials: they are printed "
+                    "`eir gateway attach --start` for that. Tickets are credentials: they are printed "
                     "for the calling process only and never logged.",
         epilog="Exit codes: 0 probe printed, or --serve ended at stdin EOF; 2 invalid invocation; "
-               "otherwise (--serve with no gateway to use) the exit code `hermes gateway ensure` "
+               "otherwise (--serve with no gateway to use) the exit code `eir gateway ensure` "
                "gives the same verdict.")
     _flag(gateway_tickets, "--json", help="Emit JSON lines (default)")
     tickets_mode = gateway_tickets.add_mutually_exclusive_group(required=True)
@@ -221,7 +221,7 @@ def build_gateway_parser(
     _flag(gateway_install, "--if-missing", dest="if_missing",
         help="Do nothing when a gateway service is already installed")
     _flag(gateway_install, "--force-unit-path", dest="force_unit_path",
-        help="Repoint a service definition that pins another HERMES_HOME at this one")
+        help="Repoint a service definition that pins another EIR_HOME at this one")
     _flag(gateway_install, "--elevated-handoff", dest="elevated_handoff", help=argparse.SUPPRESS)
 
     gateway_uninstall = gateway_subparsers.add_parser("uninstall", help="Uninstall gateway service")
@@ -232,10 +232,10 @@ def build_gateway_parser(
     gateway_subparsers.add_parser("setup", help="Configure messaging platforms")
 
     gateway_migrate_legacy = gateway_subparsers.add_parser(
-        "migrate-legacy", help="Remove legacy hermes.service units from pre-rename installs",
-        description="Stop, disable, and remove legacy Hermes gateway unit files "
-            "(e.g. hermes.service) left over from older installs. Profile "
-            "units (hermes-gateway-<profile>.service) and unrelated "
+        "migrate-legacy", help="Remove legacy eir.service units from pre-rename installs",
+        description="Stop, disable, and remove legacy Eir gateway unit files "
+            "(e.g. eir.service) left over from older installs. Profile "
+            "units (eir-gateway-<profile>.service) and unrelated "
             "third-party services are never touched.")
     _flag(gateway_migrate_legacy, "--dry-run", dest="dry_run",
         help="List what would be removed without doing it")
@@ -255,7 +255,7 @@ def build_gateway_parser(
     _flag(gateway_migrate, "-y", "--yes", dest="yes", help="Apply without confirmation")
     _flag(gateway_migrate, "--backends", dest="backends",
         help="Report serve/dashboard background services and their ownership; "
-        "changes no service (normal Hermes startup bookkeeping still runs)")
+        "changes no service (normal Eir startup bookkeeping still runs)")
     _flag(gateway_migrate, "--json", dest="json", help="With --backends: print the report as JSON")
 
     # enroll: redeem a single-use connector token for the per-gateway secret + per-tenant
@@ -266,8 +266,8 @@ def build_gateway_parser(
             "Authenticates as your Nous Portal account (the connector derives the "
             "authoritative tenant from it), mints this gateway's per-gateway secret "
             "and per-tenant delivery key, and writes GATEWAY_RELAY_ID / "
-            "GATEWAY_RELAY_SECRET / GATEWAY_RELAY_DELIVERY_KEY into ~/.hermes/.env. "
-            "Requires being logged in (hermes setup). Not available in managed installs.")
+            "GATEWAY_RELAY_SECRET / GATEWAY_RELAY_DELIVERY_KEY into ~/.eir/.env. "
+            "Requires being logged in (eir setup). Not available in managed installs.")
     gateway_enroll.add_argument("--token", default=None,
         help="The single-use enrollment token from the connector (delivered with "
             "your gateway config). Also settable via GATEWAY_RELAY_ENROLL_TOKEN.")
@@ -282,7 +282,7 @@ def build_gateway_parser(
         help="Phase 5 §5.2 wake URL: a reachable URL the connector pokes "
             "(payload-free GET) to wake this gateway when buffered work arrives "
             "while it's idle/suspended, so it reconnects and drains. Persisted as "
-            "GATEWAY_RELAY_WAKE_URL in ~/.hermes/.env and forwarded at provision. "
+            "GATEWAY_RELAY_WAKE_URL in ~/.eir/.env and forwarded at provision. "
             "Optional — without it the gateway still drains whenever it next "
             "reconnects on its own.")
     gateway_enroll.set_defaults(func=cmd_gateway_enroll)
@@ -299,7 +299,7 @@ def build_gateway_parser(
 
     proxy_start = proxy_subparsers.add_parser("start", help="Run the proxy in the foreground")
     proxy_start.add_argument("--provider", default="nous",
-        help="Upstream provider: nous or xai (default: nous). See `hermes proxy providers`.")
+        help="Upstream provider: nous or xai (default: nous). See `eir proxy providers`.")
     proxy_start.add_argument("--host", default=None,
         help="Bind address (default: 127.0.0.1). Use 0.0.0.0 to expose on LAN.")
     proxy_start.add_argument("--port", type=int, default=None, help="Bind port (default: 8645)")

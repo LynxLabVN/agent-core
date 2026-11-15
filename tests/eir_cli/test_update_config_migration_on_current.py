@@ -3,7 +3,7 @@ import sys
 
 import pytest
 
-from hermes_cli import config, update_cmd
+from eir_cli import config, update_cmd
 
 
 @pytest.mark.parametrize('case,expected', [
@@ -65,7 +65,7 @@ def test_migration_policy(monkeypatch, capsys, case, expected):
         if case in {'yes', 'noninteractive', 'gateway'}:
             assert 'API keys require manual entry' in output
         elif not expected:
-            assert 'hermes config migrate' in output
+            assert 'eir config migrate' in output
     elif case in {'current', 'ahead'}:
         assert 'Configuration is up to date' in output
     elif case == 'read-error':
@@ -81,15 +81,15 @@ def test_migration_policy(monkeypatch, capsys, case, expected):
 @pytest.mark.parametrize('named', [False, True])
 def test_update_copies_bundled_skill_bytes_to_default_active_and_sibling(tmp_path, monkeypatch, named):
     from pathlib import Path
-    from hermes_cli import update_cmd_maint
+    from eir_cli import update_cmd_maint
 
-    home = tmp_path / '.hermes'
+    home = tmp_path / '.eir'
     homes = [home, home / 'profiles/active', home / 'profiles/sibling'] if named else [home]
     for profile in homes:
         profile.mkdir(parents=True, exist_ok=True)
         (profile / 'config.yaml').write_text('{}\n', encoding='utf-8')
     monkeypatch.setattr(Path, 'home', lambda: tmp_path)
-    monkeypatch.setenv('HERMES_HOME', str(homes[1] if named else home))
+    monkeypatch.setenv('EIR_HOME', str(homes[1] if named else home))
     update_cmd_maint._sync_profiles_after_update()
     bundled = Path(__file__).resolve().parents[2] / 'skills'
     witness = next(bundled.rglob('SKILL.md'))
@@ -103,9 +103,9 @@ def test_active_config_write_failure_still_migrates_siblings_and_restores_snapsh
     import json
     from pathlib import Path
 
-    from hermes_cli import backup, update_cmd_config
+    from eir_cli import backup, update_cmd_config
 
-    root = tmp_path / '.hermes'
+    root = tmp_path / '.eir'
     sibling = root / 'profiles' / 'sibling'
     jobs = {'jobs': [{'id': 'nightly', 'name': 'nightly', 'schedule': '0 3 * * *', 'prompt': 'report'}]}
     for home in (root, sibling):
@@ -113,8 +113,8 @@ def test_active_config_write_failure_still_migrates_siblings_and_restores_snapsh
         (home / 'config.yaml').write_text('_config_version: 48\n', encoding='utf-8')
         (home / 'cron' / 'jobs.json').write_text(json.dumps(jobs), encoding='utf-8')
     monkeypatch.setattr(Path, 'home', lambda: tmp_path)
-    monkeypatch.setenv('HERMES_HOME', str(root))
-    active_snapshot = backup.create_quick_snapshot(label='pre-update', hermes_home=root)
+    monkeypatch.setenv('EIR_HOME', str(root))
+    active_snapshot = backup.create_quick_snapshot(label='pre-update', eir_home=root)
     monkeypatch.setattr(update_cmd_config, '_LAST_SIBLING_SNAPSHOTS',
                         backup.create_pre_update_snapshots_all_profiles(root))
     for home in (root, sibling):  # the documented mutation-window loss the safety nets repair
@@ -132,7 +132,7 @@ def test_active_config_write_failure_still_migrates_siblings_and_restores_snapsh
     for home in (root, sibling):
         assert json.loads((home / 'cron' / 'jobs.json').read_text(encoding='utf-8')) == jobs
     assert config.check_config_version()[0] == 48  # the active write stays owed
-    monkeypatch.setenv('HERMES_HOME', str(sibling))
+    monkeypatch.setenv('EIR_HOME', str(sibling))
     sibling_version, latest = config.check_config_version()
     assert sibling_version == latest > 48
 
@@ -140,7 +140,7 @@ def test_owed_reasons_from_the_active_write_and_a_sibling_are_all_kept(monkeypat
     """A failed active write and a sibling that advanced then stopped both reach the receipt:
     one RuntimeError names each reason, chained to the write error, and the sibling that only
     got part of the way is not reported with a success mark."""
-    from hermes_cli import update_cmd_config
+    from eir_cli import update_cmd_config
 
     disk_full = OSError("disk full")
 
@@ -174,7 +174,7 @@ def test_partial_config_migration_stays_owed_after_update(monkeypatch, capsys, n
     config_migration follow-up and must not say the configuration was fully updated.
     The post-commit caller catches the raise and records the owed step in the update receipt.
     """
-    from hermes_cli import update_cmd_config
+    from eir_cli import update_cmd_config
 
     monkeypatch.setattr(config, "check_config_version", lambda **_: (20, 53))
     monkeypatch.setattr(config, "get_missing_env_vars", lambda **_: [])
@@ -213,10 +213,10 @@ def test_a_sibling_migration_that_stopped_stays_owed_after_update(tmp_path, monk
     sweep still finishes and the snapshot nets still run, then the update records a follow-up."""
     from pathlib import Path
 
-    import hermes_yaml as yaml
-    from hermes_cli import update_cmd_config
+    import eir_yaml as yaml
+    from eir_cli import update_cmd_config
 
-    root = tmp_path / '.hermes'
+    root = tmp_path / '.eir'
     sibling = root / 'profiles' / 'sibling'
     sibling.mkdir(parents=True)
     latest = config.DEFAULT_CONFIG['_config_version']
@@ -224,7 +224,7 @@ def test_a_sibling_migration_that_stopped_stays_owed_after_update(tmp_path, monk
     (sibling / 'config.yaml').write_text(
         yaml.safe_dump({'_config_version': 20, 'plugins': {'disabled': [['x']]}}), encoding='utf-8')
     monkeypatch.setattr(Path, 'home', lambda: tmp_path)
-    monkeypatch.setenv('HERMES_HOME', str(root))
+    monkeypatch.setenv('EIR_HOME', str(root))
     monkeypatch.setattr(config, 'get_missing_env_vars', lambda **_: [])
     monkeypatch.setattr(config, 'get_missing_config_fields', list)
     snapshots = []
@@ -233,5 +233,5 @@ def test_a_sibling_migration_that_stopped_stays_owed_after_update(tmp_path, monk
     with pytest.raises(RuntimeError, match="profile 'sibling' stopped at v21"):
         update_cmd_config._check_and_apply_config_migration(pre_update_snapshot_id='snap')
     assert snapshots == ['snap']
-    monkeypatch.setenv('HERMES_HOME', str(sibling))
+    monkeypatch.setenv('EIR_HOME', str(sibling))
     assert config.check_config_version()[0] == 20, 'the steps before v21 are kept, v21 stays owed'

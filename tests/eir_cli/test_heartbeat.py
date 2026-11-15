@@ -1,11 +1,11 @@
-"""Tests for /heartbeat (hermes_cli/heartbeat.py)."""
+"""Tests for /heartbeat (eir_cli/heartbeat.py)."""
 
 import threading
 import time
 
 import pytest
 
-from hermes_cli.heartbeat import (
+from eir_cli.heartbeat import (
     HeartbeatManager,
     HeartbeatState,
     MIN_INTERVAL_SECONDS,
@@ -159,7 +159,7 @@ def test_a_stale_manager_does_not_fire_a_heartbeat_stopped_since(stop, stored):
 
 @pytest.mark.parametrize("stop,stored", [("clear", None), ("pause", "paused")])
 def test_a_heartbeat_stopped_during_a_claim_stays_stopped(stop, stored, monkeypatch):
-    from hermes_cli import heartbeat
+    from eir_cli import heartbeat
     sid = f"hb-race-{stop}"
     mgr = HeartbeatManager(session_id=sid)
     mgr.set("tick", 600).created_at = time.time() - 700

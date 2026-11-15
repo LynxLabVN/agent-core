@@ -1,5 +1,5 @@
-"""External-tool checks for hermes doctor: terminal backends, git/rg, Node + Chromium, pnpm/npm audit, tool availability.
-Split out of ``hermes_cli/doctor.py``, which re-exports every name so ``hermes_cli.doctor.<name>`` keeps resolving (and monkeypatching)."""
+"""External-tool checks for eir doctor: terminal backends, git/rg, Node + Chromium, pnpm/npm audit, tool availability.
+Split out of ``eir_cli/doctor.py``, which re-exports every name so ``eir_cli.doctor.<name>`` keeps resolving (and monkeypatching)."""
 
 from __future__ import annotations
 
@@ -9,10 +9,10 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from hermes_cli.doctor_platform import _system_package_install_cmd
-from hermes_cli.doctor_report import Finding, _fail_and_issue, check_bool, check_info, check_ok, check_warn, doctor_check
-from hermes_cli.vercel_auth import describe_vercel_auth
-from hermes_constants import is_termux as _is_termux
+from eir_cli.doctor_platform import _system_package_install_cmd
+from eir_cli.doctor_report import Finding, _fail_and_issue, check_bool, check_info, check_ok, check_warn, doctor_check
+from eir_cli.vercel_auth import describe_vercel_auth
+from eir_constants import is_termux as _is_termux
 from tools.environments.docker import docker_runtime_name, docker_runtime_start_hint, find_docker
 
 
@@ -60,7 +60,7 @@ def _pm_package_for_command(command: str) -> str | None:
 
 
 def _doctor_tool(name: str) -> tuple[str | None, str]:
-    """Resolve the tool Hermes would actually run: the pm store first
+    """Resolve the tool Eir would actually run: the pm store first
     (pinned installs run tools out of the store, which nothing puts on
     PATH), then PATH. *name* is the command ("rg"); its pm package
     ("ripgrep") is resolved from pm's own definitions. Returns
@@ -83,7 +83,7 @@ def _run_ok(cmd: list[str], timeout: int, **kw) -> bool:
 
 
 _TERMUX_INSTALL_ALL_FALLBACK_NOTES = (
-    "Termux uses the Hermes APT package: pkg install hermes-agent.",
+    "Termux uses the Eir APT package: pkg install eir-agent.",
     "Matrix E2EE extra is excluded on Termux (python-olm currently fails to build).",
     "Local faster-whisper extra is excluded on Termux (ctranslate2/av build path unavailable).",
     "STT fallback: use Groq Whisper (set GROQ_API_KEY) or OpenAI Whisper (set VOICE_TOOLS_OPENAI_KEY).",
@@ -93,13 +93,13 @@ _TERMUX_INSTALL_ALL_FALLBACK_NOTES = (
 def _is_kanban_worker_env_gate(item: dict) -> bool:
     """Return True when Kanban is unavailable only because this is not a worker process."""
     tools = item.get("tools") or []
-    return (item.get("name") == "kanban" and not os.environ.get("HERMES_KANBAN_TASK")
+    return (item.get("name") == "kanban" and not os.environ.get("EIR_KANBAN_TASK")
             and bool(tools) and all(str(tool).startswith("kanban_") for tool in tools))
 
 
 def _doctor_tool_availability_detail(toolset: str) -> str:
     """Optional explanatory suffix for toolsets whose doctor status needs context."""
-    if toolset == "kanban" and not os.environ.get("HERMES_KANBAN_TASK"):
+    if toolset == "kanban" and not os.environ.get("EIR_KANBAN_TASK"):
         return "(runtime-gated; loaded only for dispatcher-spawned workers)"
     return ""
 
@@ -148,8 +148,8 @@ def _apply_doctor_tool_availability_overrides(available: list[str], unavailable:
 def _enabled_cli_toolsets_for_doctor() -> set[str] | None:
     """Return toolsets enabled for the CLI, or None if config resolution fails."""
     try:
-        from hermes_cli.config import load_config
-        from hermes_cli.tools_config import _get_platform_tools
+        from eir_cli.config import load_config
+        from eir_cli.tools_config import _get_platform_tools
         return {str(toolset) for toolset in _get_platform_tools(load_config() or {}, "cli")}
     except Exception:
         return None
@@ -159,7 +159,7 @@ def _enabled_cli_toolsets_for_doctor() -> set[str] | None:
 # `requires_env`, so the generic branch would call a missing credential a "system dependency".
 # Name the real fix instead (#9516).
 _TOOLSET_SETUP_HINTS: dict[str, str] = {
-    "image_gen": "(image generation unavailable — check the provider selection and its key or SDK with 'hermes tools')",
+    "image_gen": "(image generation unavailable — check the provider selection and its key or SDK with 'eir tools')",
 }
 
 
@@ -192,7 +192,7 @@ def _check_docker_backend(terminal_env: str, running_in_container: bool, issues:
     if terminal_env == "docker":
         if not docker_exe:
             _fail_and_issue("Docker or Podman not installed", "(needed for the 'docker' terminal backend)",
-                            "Install Docker or Podman, or run `hermes setup terminal` to switch backend.", issues)
+                            "Install Docker or Podman, or run `eir setup terminal` to switch backend.", issues)
         else:
             runtime = docker_runtime_name(docker_exe)
             hint = docker_runtime_start_hint(docker_exe)
@@ -204,7 +204,7 @@ def _check_docker_backend(terminal_env: str, running_in_container: bool, issues:
             _require(_run_ok([docker_exe, "version"], timeout=10),
                      (runtime, "(daemon running)" if runtime == "Docker" else "(reachable)"),
                      (unreachable, "(needed for the 'docker' terminal backend)"),
-                     f"{hint[0].upper()}{hint[1:]}, or run `hermes setup terminal` to switch backend.", issues)
+                     f"{hint[0].upper()}{hint[1:]}, or run `eir setup terminal` to switch backend.", issues)
     elif docker_exe:
         check_ok(docker_runtime_name(docker_exe), "(optional)")
     elif _is_termux():
@@ -217,7 +217,7 @@ def _check_ssh_backend(issues: list[str]) -> None:
     ssh_host = os.getenv("TERMINAL_SSH_HOST")
     if not ssh_host:
         return _fail_and_issue("SSH host not configured", "(needed for the 'ssh' terminal backend)",
-                               "run `hermes setup terminal` and enter the SSH host and user.", issues)
+                               "run `eir setup terminal` and enter the SSH host and user.", issues)
     ssh_user, ssh_port, ssh_key = (os.getenv(f"TERMINAL_SSH_{k}") for k in ("USER", "PORT", "KEY"))
     cmd = ["ssh", "-o", "ConnectTimeout=5", "-o", "BatchMode=yes"]
     if ssh_port:
@@ -238,12 +238,12 @@ def _require(cond, ok, bad, issue: str, issues: list[str]) -> None:
 def _check_daytona_backend(issues: list[str]) -> None:
     _require(os.getenv("DAYTONA_API_KEY"), ("Daytona API key", "(configured)"),
              ("Daytona API key missing", "(needed for the 'daytona' terminal backend)"),
-             "run `hermes setup terminal` (Daytona) to enter it.", issues)
+             "run `eir setup terminal` (Daytona) to enter it.", issues)
     try:
         from daytona import Daytona
         check_ok("daytona SDK", "(installed)")
     except ImportError:
-        _fail_and_issue("daytona SDK not installed", "(run hermes setup terminal)", "Run hermes setup terminal and select Daytona, then restart Hermes", issues)
+        _fail_and_issue("daytona SDK not installed", "(run eir setup terminal)", "Run eir setup terminal and select Daytona, then restart Eir", issues)
 
 
 def _check_vercel_backend(issues: list[str]) -> None:
@@ -256,8 +256,8 @@ def _check_vercel_backend(issues: list[str]) -> None:
              ("Vercel disk setting", "(uses platform default)"), ("Vercel custom disk unsupported", "(reset terminal.container_disk to 51200)"),
              "Vercel Sandbox does not support custom container_disk; use the shared default 51200", issues)
     _require(importlib.util.find_spec("vercel") is not None, ("vercel SDK", "(installed)"),
-             ("vercel SDK not installed", "(run hermes setup terminal)"),
-             "Run hermes setup terminal and select Vercel Sandbox, then restart Hermes", issues)
+             ("vercel SDK not installed", "(run eir setup terminal)"),
+             "Run eir setup terminal and select Vercel Sandbox, then restart Eir", issues)
     auth_status = describe_vercel_auth()
     if auth_status.ok:
         check_ok("Vercel auth", f"({auth_status.label})")
@@ -274,7 +274,7 @@ def _check_vercel_backend(issues: list[str]) -> None:
 
 def _check_plugin_backend(terminal_env: str, issues: list[str]) -> None:
     try:
-        from hermes_cli.plugins import discover_plugins
+        from eir_cli.plugins import discover_plugins
         discover_plugins()
         from agent.terminal_env_registry import get_provider
         provider = get_provider(terminal_env)
@@ -295,7 +295,7 @@ def _check_terminal_backend(should_fix: bool, f: Finding) -> None:
     """Docker/SSH/Daytona/Vercel/plugin terminal backends, gated on TERMINAL_ENV."""
     terminal_env = os.getenv("TERMINAL_ENV", "local")
     try:
-        from hermes_constants import is_container as _is_container
+        from eir_constants import is_container as _is_container
         running_in_container = _is_container()
     except Exception:
         running_in_container = False
@@ -314,7 +314,7 @@ def _check_terminal_backend(should_fix: bool, f: Finding) -> None:
 def _chromium_not_needed_reason() -> str:
     """Why this profile's config needs no local Chromium (``""`` when it does). Config-only, no I/O: a CDP
     override attaches to the user's browser, Lightpanda is its own engine, and a cloud provider hosts one."""
-    from hermes_cli.config import cfg_get, load_config_readonly
+    from eir_cli.config import cfg_get, load_config_readonly
 
     config = load_config_readonly()
     if os.environ.get("BROWSER_CDP_URL") or cfg_get(config, "browser", "cdp_url"):
@@ -329,7 +329,7 @@ def _check_chromium(should_fix: bool) -> None:
     """The Chromium browser_exec launches for a local session (``chromium_executable()``: browser.executable_path,
     pm, the Docker image's baked build, a Termux system build). Only --fix may acquire it through PM."""
     import pm
-    from hermes_cli.browser_runtime import chromium_executable, chromium_missing_hint
+    from eir_cli.browser_runtime import chromium_executable, chromium_missing_hint
 
     found = chromium_executable()
     if not found and should_fix and not _is_termux():
@@ -363,7 +363,7 @@ def _check_lightpanda() -> None:
         used, reason = False, f"status check failed: {e}"
     if not used:
         check_warn("browser.engine=lightpanda is shadowed", f"({reason})")
-        check_info("Fix: pick Lightpanda in `hermes tools` → Browser Automation, or set browser.engine: auto")
+        check_info("Fix: pick Lightpanda in `eir tools` → Browser Automation, or set browser.engine: auto")
     elif not check_bool(find_lightpanda_binary(), ("Lightpanda", f"({reason})"),
                         ("Lightpanda selected but binary not found", "(browser tools will fail until it is installed)")):
         check_info(LIGHTPANDA_INSTALL_HINT)
@@ -378,7 +378,7 @@ def _check_node_and_browser(should_fix: bool, f: Finding) -> None:
     elif _is_termux():
         check_info("Node.js not found (optional; install on Termux with: pkg install nodejs)")
     else:
-        check_warn("Node.js not found", "(optional; run: hermes pm install node)")
+        check_warn("Node.js not found", "(optional; run: eir pm install node)")
     _check_chromium(should_fix)
     _check_lightpanda()
 
@@ -391,7 +391,7 @@ def _audit_one(tool: str, cwd, label: str, audit_extra: list[str], manual_issues
     """Run one `pnpm audit --json` / `npm audit --json` and report; any failure is silently skipped.
 
     Every row here audits a tree whose versions come from a COMMITTED lockfile
-    (the frozen install every `hermes update` runs reifies exactly that state),
+    (the frozen install every `eir update` runs reifies exactly that state),
     so a local `audit --fix` never persists — the next update's deterministic
     install restores the pinned (vulnerable) versions and the finding reappears.
     The durable remedy in every case is a lockfile bump on main (update
@@ -399,10 +399,10 @@ def _audit_one(tool: str, cwd, label: str, audit_extra: list[str], manual_issues
     never prescribes a local mutating fix command. See #116774.
     """
     import json
-    from hermes_constants import with_hermes_node_path
+    from eir_constants import with_eir_node_path
     from pm.packages import pnpm_env
-    env = with_hermes_node_path()
-    if audit_extra:  # pnpm rows: its state and metadata cache stay Hermes-owned, not in the user's XDG dirs
+    env = with_eir_node_path()
+    if audit_extra:  # pnpm rows: its state and metadata cache stay Eir-owned, not in the user's XDG dirs
         env = pnpm_env(env)
     try:
         # Resolved absolute path so Windows can execute npm.cmd (CreateProcessW can't run bare .cmd names).
@@ -419,7 +419,7 @@ def _audit_one(tool: str, cwd, label: str, audit_extra: list[str], manual_issues
             check_ok(f"{label} deps", "(no known vulnerabilities)")
         elif critical > 0 or high > 0:
             remedy = ("fix is an upstream lockfile bump — a local manual fix does not persist"
-                      " (the next `hermes update` reinstalls from the committed lockfile)")
+                      " (the next `eir update` reinstalls from the committed lockfile)")
             check_warn(f"{label} deps", f"({critical} critical, {high} high, {moderate} moderate — {remedy})")
             if workspace_scoped:
                 check_info("  ^ workspace audit includes runtime and build dependencies")
@@ -441,16 +441,16 @@ def _check_npm_audit(should_fix: bool, f: Finding) -> None:
     """pnpm audit per installed workspace (root, web, ui-tui); npm audit for the WhatsApp bridge.
 
     The workspaces are audited one --filter each, so the desktop app's tree (Electron, node-pty, ...) is
-    never part of a routine check (#38772). The WhatsApp bridge may live under a writable HERMES_HOME
+    never part of a routine check (#38772). The WhatsApp bridge may live under a writable EIR_HOME
     mirror rather than the (possibly read-only) Docker install tree, hence the shared resolver.
     """
-    from hermes_cli.doctor import PROJECT_ROOT
+    from eir_cli.doctor import PROJECT_ROOT
     staged = _pm_tool_path("npm")
     npm_bin = str(staged) if staged else (_safe_which("npm") if _is_termux() else None)
     # Termux has no pnpm: nothing installs the JS workspaces on device.
     pnpm_bin = _pm_tool_path("pnpm")
     try:
-        # The WhatsApp bridge may live under a writable HERMES_HOME mirror instead of the (possibly
+        # The WhatsApp bridge may live under a writable EIR_HOME mirror instead of the (possibly
         # read-only) install tree in Docker — resolve it through the shared helper so we audit the dir
         # that actually holds node_modules. See #49561.
         from gateway.platforms.whatsapp_common import resolve_whatsapp_bridge_dir
@@ -460,7 +460,7 @@ def _check_npm_audit(should_fix: bool, f: Finding) -> None:
     for tool, tree, label, audit_extra in (
         # The root package.json itself (js-yaml, semver, eslint tooling). See #122223.
         (pnpm_bin, PROJECT_ROOT, "Root npm package", ["--filter", "."]),
-        # `{./X}...`: the workspace and the sibling workspaces it depends on (apps/shared, hermes-ink).
+        # `{./X}...`: the workspace and the sibling workspaces it depends on (apps/shared, eir-ink).
         (pnpm_bin, PROJECT_ROOT / "web", "web workspace", ["--filter", "{./web}..."]),
         (pnpm_bin, PROJECT_ROOT / "ui-tui", "ui-tui workspace", ["--filter", "{./ui-tui}..."]),
         (npm_bin, whatsapp_bridge_dir, "WhatsApp bridge", []),
@@ -476,7 +476,7 @@ def _check_npm_audit(should_fix: bool, f: Finding) -> None:
 
 @doctor_check("Could not check tool availability", "({e})")
 def _check_tool_availability(should_fix: bool, f: Finding) -> None:
-    from hermes_cli.doctor import PROJECT_ROOT
+    from eir_cli.doctor import PROJECT_ROOT
     if str(PROJECT_ROOT) not in sys.path:
         sys.path.insert(0, str(PROJECT_ROOT))
     from model_tools import check_tool_availability, TOOLSET_REQUIREMENTS
@@ -502,15 +502,15 @@ def _check_tool_availability(should_fix: bool, f: Finding) -> None:
     # disabled toolsets may warn above but must not pollute it.
     api_disabled = _missing_api_key_toolsets_for_summary(unavailable)
     if api_disabled or any(status != "ok" for status, _, _ in web_rows):
-        f.issues.append("Run 'hermes setup' to configure missing API keys for full tool access")
+        f.issues.append("Run 'eir setup' to configure missing API keys for full tool access")
     _warn_partially_stripped_toolsets(f)
 
 
 def _warn_partially_stripped_toolsets(f: Finding) -> None:
     """An enabled CLI toolset that agent.disabled_toolsets cuts down still reads as available above;
     name the missing tools and the entry removing them (#134593)."""
-    from hermes_cli.config import load_config
-    from hermes_cli.tools_config import _get_platform_tools, toolsets_partially_stripped
+    from eir_cli.config import load_config
+    from eir_cli.tools_config import _get_platform_tools, toolsets_partially_stripped
     config = load_config() or {}
     for ts, (tools, by, hint) in toolsets_partially_stripped(config, _get_platform_tools(config, "cli")).items():
         check_warn(f"{ts} (partly disabled)", f"({', '.join(tools)} removed by agent.disabled_toolsets: {', '.join(by)})")

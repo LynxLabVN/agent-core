@@ -6,7 +6,7 @@ description: >-
   started detached background work (systemd-run unit, PID or file) when that
   work ends, so the agent reports back on its own instead of the human asking
   "any updates?". Tools: wake_me_when, wake_list. Disclosure: runs the public
-  'hermes kanban' CLI (board hermes-wake, notify-subscribe --delivery-mode wake)
+  'eir kanban' CLI (board hermes-wake, notify-subscribe --delivery-mode wake)
   and systemctl show; a daemon thread polls watches every 15s; stores watch
   targets, notes and origin ids in local SQLite under plugin-data/hermes-wake;
   makes no network calls of its own; adds a one-line hint to terminal output
@@ -16,7 +16,7 @@ tier: community
 category: general
 docs_url: https://github.com/getaskclaw/hermes-wake#readme
 version: "0.1.0"
-requires_hermes: ">=0.23.1"
+requires_eir: ">=0.23.1"
 platforms: []
 capabilities:
   provides_tools:

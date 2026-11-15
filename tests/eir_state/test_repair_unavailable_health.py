@@ -5,9 +5,9 @@ import gc
 import sqlite3
 from pathlib import Path
 
-import hermes_state_repair as repair
-from tests.hermes_state import test_fts_cjk_index_retirement as retirement
-from tests.hermes_state.test_state_db_malformed_repair import _corrupt_duplicate_fts
+import eir_state_repair as repair
+from tests.eir_state import test_fts_cjk_index_retirement as retirement
+from tests.eir_state.test_state_db_malformed_repair import _corrupt_duplicate_fts
 
 cjk_db = retirement.cjk_db
 
@@ -34,7 +34,7 @@ def test_unavailable_post_strategy_probe_preserves_source_and_retry_budget(cjk_d
     def constrained_connect(path, *args, **kwargs):
         conn = connect(path, *args, **kwargs)
         # Repair staging fits; the health probe's separate temporary destination does not.
-        if Path(path).parent.name.startswith("hermes-cjk-probe-"):
+        if Path(path).parent.name.startswith("eir-cjk-probe-"):
             constrained_probes.append(conn.execute("PRAGMA max_page_count=5").fetchone()[0])
         return conn
 

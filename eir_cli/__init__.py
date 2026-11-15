@@ -1,4 +1,4 @@
-"""Hermes CLI - Unified command-line interface for Hermes Agent."""
+"""Eir CLI - Unified command-line interface for Eir Agent."""
 
 import sys
 
@@ -11,18 +11,18 @@ def __getattr__(name: str) -> str:
     """Old-updater compat: shipped updaters import ``__version__`` after the checkout swap.
 
     tests/compat/old_updater_surface.json freezes that import. In-tree code resolves
-    identity through hermes_cli.version_info.get_version_info(); this reads only the
+    identity through eir_cli.version_info.get_version_info(); this reads only the
     install stamp -- never git -- and keeps the pre-stamp placeholder when a checkout
     has no stamp.
 
     Lazy because ``pm`` is not importable when this package loads: a venv
     editable-installed from a pre-PM tree maps only the top-level packages it knew
     at install time, and the repo root reaches ``sys.path`` only once
-    ``hermes_bootstrap`` runs -- after this ``__init__``, from ``hermes_cli.main``.
+    ``eir_bootstrap`` runs -- after this ``__init__``, from ``eir_cli.main``.
     """
     if name != "__version__":
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    from hermes_cli.steward import read_install_stamp
+    from eir_cli.steward import read_install_stamp
     try:
         from pm.paths import repo_root
     except ModuleNotFoundError as exc:
@@ -44,7 +44,7 @@ def _ensure_utf8() -> bool:
 
     The CLI prints box-drawing characters and the ☤ glyph in the setup wizard, doctor, and status
     banners; under a non-UTF-8 codec that raises before the command can even start (e.g.
-    `hermes setup` on a fresh Pi).
+    `eir setup` on a fresh Pi).
     """
     repaired = False
     for stream_name in ("stdout", "stderr"):
@@ -72,5 +72,5 @@ def _ensure_utf8() -> bool:
 
 # Import repairs only this process's streams. Gateway, compute host, and test code import this
 # package as a library; rewriting their os.environ would leak into every child they spawn, so the
-# child-process UTF-8 hint is applied by the CLI entry point (hermes_cli.main.main) instead.
+# child-process UTF-8 hint is applied by the CLI entry point (eir_cli.main.main) instead.
 _stdio_repaired = _ensure_utf8()

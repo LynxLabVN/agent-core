@@ -11,24 +11,24 @@ from agent.model_metadata import MINIMUM_CONTEXT_LENGTH
 
 @pytest.fixture
 def _isolate(tmp_path, monkeypatch):
-    """Isolate HERMES_HOME so tests don't touch real config."""
-    home = tmp_path / ".hermes"
+    """Isolate EIR_HOME so tests don't touch real config."""
+    home = tmp_path / ".eir"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
 
 
 @pytest.fixture
 def cli_obj(_isolate):
-    """Create a minimal HermesCLI instance for banner testing."""
+    """Create a minimal EirCLI instance for banner testing."""
     with patch("cli.load_cli_config", return_value={
         "display": {"tool_progress": "new"},
         "terminal": {},
     }), patch("cli.get_tool_definitions", return_value=[]), \
-         patch("hermes_cli.banner.build_welcome_banner"):
-        from cli import HermesCLI
-        obj = HermesCLI.__new__(HermesCLI)
+         patch("eir_cli.banner.build_welcome_banner"):
+        from cli import EirCLI
+        obj = EirCLI.__new__(EirCLI)
         obj.model = "test-model"
-        obj.enabled_toolsets = ["hermes-core"]
+        obj.enabled_toolsets = ["eir-core"]
         obj.compact = False
         obj.console = MagicMock()
         obj.session_id = None
@@ -47,10 +47,10 @@ class TestLowContextWarning:
     """Tests that the CLI warns about low context lengths."""
 
     def test_warning_for_below_minimum_context(self, cli_obj):
-        """Warning shown when context is below Hermes' minimum."""
+        """Warning shown when context is below Eir' minimum."""
         cli_obj.agent.context_compressor.context_length = 32768
         with patch("cli.get_tool_definitions", return_value=[]), \
-             patch("hermes_cli.banner.build_welcome_banner"):
+             patch("eir_cli.banner.build_welcome_banner"):
             cli_obj.show_banner()
 
         calls = [str(c) for c in cli_obj.console.print.call_args_list]
@@ -62,10 +62,10 @@ class TestLowContextWarning:
 
 
     def test_no_warning_at_boundary(self, cli_obj):
-        """No warning at exactly Hermes' minimum context length."""
+        """No warning at exactly Eir' minimum context length."""
         cli_obj.agent.context_compressor.context_length = MINIMUM_CONTEXT_LENGTH
         with patch("cli.get_tool_definitions", return_value=[]), \
-             patch("hermes_cli.banner.build_welcome_banner"):
+             patch("eir_cli.banner.build_welcome_banner"):
             cli_obj.show_banner()
 
         calls = [str(c) for c in cli_obj.console.print.call_args_list]
@@ -78,7 +78,7 @@ class TestLowContextWarning:
         cli_obj.agent.context_compressor.context_length = 4096
         cli_obj.base_url = "http://localhost:11434/v1"
         with patch("cli.get_tool_definitions", return_value=[]), \
-             patch("hermes_cli.banner.build_welcome_banner"):
+             patch("eir_cli.banner.build_welcome_banner"):
             cli_obj.show_banner()
 
         calls = [str(c) for c in cli_obj.console.print.call_args_list]
@@ -92,7 +92,7 @@ class TestLowContextWarning:
         cli_obj.agent.context_compressor.context_length = 4096
         cli_obj.base_url = "http://localhost:8080/v1"
         with patch("cli.get_tool_definitions", return_value=[]), \
-             patch("hermes_cli.banner.build_welcome_banner"):
+             patch("eir_cli.banner.build_welcome_banner"):
             cli_obj.show_banner()
 
         calls = [str(c) for c in cli_obj.console.print.call_args_list]

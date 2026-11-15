@@ -8,16 +8,16 @@ from pathlib import Path
 
 import pytest
 
-from hermes_cli import kanban_db as kb
-from hermes_cli.kanban_db_graph import decompose_triage_task
-from hermes_cli import kanban_db_connect as kbc
+from eir_cli import kanban_db as kb
+from eir_cli.kanban_db_graph import decompose_triage_task
+from eir_cli import kanban_db_connect as kbc
 
 
 @pytest.fixture
 def kanban_home(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     kb.init_db()
     return home

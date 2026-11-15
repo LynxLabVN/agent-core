@@ -1,4 +1,4 @@
-"""Billing and subscription handlers for the interactive CLI (mixed into ``HermesCLI``).
+"""Billing and subscription handlers for the interactive CLI (mixed into ``EirCLI``).
 cli.py symbols are imported LAZILY inside methods — never at module load (import cycle).
 
 User-facing copy is looked up through ``agent.i18n.t`` at call time (never at import — the
@@ -105,7 +105,7 @@ def _cancel_sub_choices() -> list[tuple[str, str, str]]:
 
 # Keep going on credits: window plans only (the portal sends the setting only there).
 def _keep_going_row() -> tuple[str, str, str]:
-    return ("hermes", t("cli.billing.keep_going_choice"), t("cli.billing.keep_going_desc"))
+    return ("eir", t("cli.billing.keep_going_choice"), t("cli.billing.keep_going_desc"))
 
 
 def _keep_going_agree_choices() -> list[tuple[str, str, str]]:
@@ -212,7 +212,7 @@ class CLIBillingMixin:
             return False
         print(f"  {t('cli.billing.opening_browser_remote_spending')}")
         try:
-            from hermes_cli.auth import step_up_nous_billing_scope
+            from eir_cli.auth import step_up_nous_billing_scope
             granted = step_up_nous_billing_scope(open_browser=True)
         except Exception as exc:
             print(f"  {t('cli.billing.couldnt_allow_remote_spending', error=exc)}")
@@ -232,7 +232,7 @@ class CLIBillingMixin:
         if not url:
             return False
         try:
-            from hermes_cli.auth import _can_open_graphical_browser, _is_remote_session
+            from eir_cli.auth import _can_open_graphical_browser, _is_remote_session
             if _is_remote_session() or not _can_open_graphical_browser():
                 return False
         except Exception:
@@ -487,7 +487,7 @@ class CLIBillingMixin:
         """Preview → effect → confirm+apply. ``allow_stepup=False`` (post-grant replay) never re-prompts a step-up."""
         from cli import _cprint, _b, _d
         from agent.subscription_view import is_upgrade, subscription_change_preview_from_payload, subscription_manage_url
-        from hermes_cli.nous_billing import BillingError, BillingScopeRequired, post_subscription_preview
+        from eir_cli.nous_billing import BillingError, BillingScopeRequired, post_subscription_preview
         self._dim(t("cli.subscription.checking_change"))
         try:
             payload = post_subscription_preview(subscription_type_id=tier_id)
@@ -577,7 +577,7 @@ class CLIBillingMixin:
     def _subscription_apply(self, state, action, idempotency_key=None, *, allow_stepup=True):
         """Run ("upgrade"|"schedule", tier_id) / ("cancel"|"resume", None); scope denial → step-up + ONE replay, same key."""
         from cli import _cprint
-        from hermes_cli.nous_billing import (
+        from eir_cli.nous_billing import (
             BillingError, BillingTransient, BillingRemoteSpendingRevoked, BillingScopeRequired, BillingSessionRevoked,
             delete_subscription_pending_change, post_subscription_upgrade, put_subscription_pending_change)
         kind, arg = action
@@ -637,7 +637,7 @@ class CLIBillingMixin:
         self._ok(t("cli.billing.remote_spending_allowed"))
         # Bust the 30s token cache (it still holds the pre-grant token; _request only busts on 401).
         try:
-            from hermes_cli import nous_billing as _nb
+            from eir_cli import nous_billing as _nb
             _nb.invalidate_cached_token()
         except Exception:
             pass
@@ -749,14 +749,14 @@ class CLIBillingMixin:
         print(f"  {_RULE}")
         # No "Allow Remote Spending" item — discovered at pay time. "Add funds" charges the org's
         # portal-saved card (server-held; no card ref leaves the client).
-        # "hermes" only on window plans (the portal sends the setting only there).
+        # "eir" only on window plans (the portal sends the setting only there).
         choices = _topup_menu_choices()
         if state.keep_going_on_credits is not None:
             choices.insert(2, _keep_going_row())  # after Auto-reload
         action = {
             "buy": self._billing_buy_flow,
             "auto": self._billing_auto_reload_flow,
-            "hermes": self._billing_keep_going_on_credits_flow,
+            "eir": self._billing_keep_going_on_credits_flow,
             "limit": self._billing_limit_screen,
             "portal": self._billing_open_portal}.get(self._modal_choice(t("cli.billing.topup_title"), "", choices))
         if action:
@@ -881,7 +881,7 @@ class CLIBillingMixin:
     def _billing_submit_and_poll(self, state, amount, key, *, missing_msg, status_msg, on_scope=None):
         """POST the charge, then poll. ``on_scope`` handles a scope denial (first submit); else it renders."""
         from cli import _cprint, _d
-        from hermes_cli.nous_billing import BillingError, BillingScopeRequired, post_charge
+        from eir_cli.nous_billing import BillingError, BillingScopeRequired, post_charge
         try:
             result = post_charge(amount_usd=amount, idempotency_key=key)
         except BillingError as exc:
@@ -901,7 +901,7 @@ class CLIBillingMixin:
         """Poll loop: 2s interval, 5-min cap, cancellable. settled = ledger truth."""
         import time as _time
         from agent.billing_view import format_money, parse_money
-        from hermes_cli.nous_billing import BillingError, BillingTransient, get_charge_status
+        from eir_cli.nous_billing import BillingError, BillingTransient, get_charge_status
         deadline = _time.time() + 300
         while _time.time() < deadline:
             try:
@@ -934,7 +934,7 @@ class CLIBillingMixin:
 
     def _billing_render_charge_error(self, state, exc):
         """Submit-time BillingError. Order matters: revoked/session before code lookups; Transient before scope."""
-        from hermes_cli.nous_billing import BillingTransient, BillingRemoteSpendingRevoked, BillingSessionRevoked
+        from eir_cli.nous_billing import BillingTransient, BillingRemoteSpendingRevoked, BillingSessionRevoked
         code = exc.error
         portal_url = exc.portal_url or state.portal_url
         if isinstance(exc, BillingRemoteSpendingRevoked) or code == "remote_spending_revoked":
@@ -1074,11 +1074,11 @@ class CLIBillingMixin:
 
     def _billing_patch_auto_top_up(self, state, **kwargs) -> bool:
         """PATCH auto-top-up; scope denials → step-up, other errors → renderer. True on success."""
-        from hermes_cli.nous_billing import patch_auto_top_up
+        from eir_cli.nous_billing import patch_auto_top_up
         return self._billing_patch(state, patch_auto_top_up, **kwargs)
 
     def _billing_patch(self, state, call, **kwargs) -> bool:
-        from hermes_cli.nous_billing import BillingError, BillingScopeRequired
+        from eir_cli.nous_billing import BillingError, BillingScopeRequired
         try:
             call(**kwargs)
         except BillingScopeRequired:
@@ -1111,7 +1111,7 @@ class CLIBillingMixin:
     def _billing_set_keep_going(self, state, turn_on: bool, *, allow_stepup: bool) -> None:
         """PATCH the setting. A scope denial runs the step-up, then sends the same change ONCE (no card or
         org Remote Spending check: the setting is not a charge, and turning it off must always work)."""
-        from hermes_cli.nous_billing import BillingError, BillingScopeRequired, patch_keep_going_on_credits
+        from eir_cli.nous_billing import BillingError, BillingScopeRequired, patch_keep_going_on_credits
         try:
             patch_keep_going_on_credits(enabled=turn_on)
         except BillingScopeRequired as exc:

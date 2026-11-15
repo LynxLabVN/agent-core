@@ -13,9 +13,9 @@ import urllib.request
 
 import pytest
 
-from hermes_cli import main as cli_main, update_cmd, update_receipt
-from hermes_cli.update_inventory import UpdatePlan
-from hermes_cli.update_cmd import _sync_with_upstream_if_needed
+from eir_cli import main as cli_main, update_cmd, update_receipt
+from eir_cli.update_inventory import UpdatePlan
+from eir_cli.update_cmd import _sync_with_upstream_if_needed
 
 
 def git(root, *args):
@@ -28,8 +28,8 @@ def update_tree(tmp_path, monkeypatch):
     monkeypatch.setenv('GIT_CONFIG_GLOBAL', str(tmp_path / 'git-config'))
     monkeypatch.setenv('GIT_CONFIG_NOSYSTEM', '1')
     monkeypatch.setenv('GIT_ALLOW_PROTOCOL', 'file')
-    monkeypatch.delenv('HERMES_UPDATE_HANDOFF_PID', raising=False)
-    monkeypatch.delenv('HERMES_UPDATE_REEXEC', raising=False)
+    monkeypatch.delenv('EIR_UPDATE_HANDOFF_PID', raising=False)
+    monkeypatch.delenv('EIR_UPDATE_REEXEC', raising=False)
     origin = tmp_path / 'origin'
     origin.mkdir()
     git(origin, 'init', '-q', '-b', 'main')
@@ -71,7 +71,7 @@ def update_tree(tmp_path, monkeypatch):
         plans.append(plan)
         return plan
 
-    monkeypatch.setattr('hermes_cli.update_inventory.collect_runtime_inventory', inventory)
+    monkeypatch.setattr('eir_cli.update_inventory.collect_runtime_inventory', inventory)
     monkeypatch.setattr(cli_main, '_sync_with_upstream_if_needed',
                         lambda *_a, **_k: pytest.fail('stable update reached upstream branch sync'))
 
@@ -90,7 +90,7 @@ def update_tree(tmp_path, monkeypatch):
 
 def _publish_stable(monkeypatch, t):
     """stable = the latest published GitHub release; its resolver pins t.wanted (v1.1.0)."""
-    from hermes_cli import source_releases
+    from eir_cli import source_releases
 
     monkeypatch.setattr(source_releases, '_resolve_stable', lambda repository, *_: source_releases.SourceTarget(
         'stable', 'stable', repository, commit=t.wanted, version='1.1.0'))
@@ -279,11 +279,11 @@ def test_stable_zip_consumes_the_same_commit_through_the_real_swap(update_tree, 
     monkeypatch.setattr(cli_main, '_pause_windows_gateways_for_update',
                         lambda: {"resume_needed": True})
     archive = tmp_path / 'source.zip'
-    git(t.origin, 'archive', '--format=zip', '--prefix=hermes-agent-source/', f'--output={archive}', t.wanted)
+    git(t.origin, 'archive', '--format=zip', '--prefix=eir-agent-source/', f'--output={archive}', t.wanted)
     archive_bytes = archive.read_bytes()
     _publish_stable(monkeypatch, t)
     routes = {
-        f'/NousResearch/hermes-agent/archive/{t.wanted}.zip': archive_bytes,
+        f'/NousResearch/eir-agent/archive/{t.wanted}.zip': archive_bytes,
     }
 
     class Handler(BaseHTTPRequestHandler):
@@ -311,14 +311,14 @@ def test_stable_zip_consumes_the_same_commit_through_the_real_swap(update_tree, 
     def local_open(request, *args, **kwargs):
         url = request.full_url if isinstance(request, urllib.request.Request) else request
         parsed = urlsplit(url)
-        assert parsed.scheme == 'https' and parsed.netloc in {'api.github.com', 'github.com', 'hermes-assets.nousresearch.com'}, url
+        assert parsed.scheme == 'https' and parsed.netloc in {'api.github.com', 'github.com', 'eir-assets.nousresearch.com'}, url
         urls.append(url)
         local = f'http://127.0.0.1:{server.server_port}{parsed.path}'
         if parsed.query:
             local += '?' + parsed.query
         return real_open(local, *args, **kwargs)
 
-    from hermes_cli import update_custody
+    from eir_cli import update_custody
 
     real_custody_run, seam = update_custody.run, threading.local()
 
@@ -411,10 +411,10 @@ def test_update_syntax_failure_restores_pre_update_head(update_tree, monkeypatch
         remote = upstream
     else:
         remote = t.origin
-    bad = remote / 'hermes_cli' / 'config.py'
+    bad = remote / 'eir_cli' / 'config.py'
     bad.parent.mkdir()
     bad.write_text('def broken(:\n', encoding='utf-8')
-    git(remote, 'add', 'hermes_cli/config.py')
+    git(remote, 'add', 'eir_cli/config.py')
     git(remote, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
         '-c', 'commit.gpgsign=false', 'commit', '-qm', 'invalid syntax')
     unexpected_head = git(remote, 'rev-parse', 'HEAD')
@@ -446,7 +446,7 @@ def test_update_syntax_failure_restores_pre_update_head(update_tree, monkeypatch
         # The broken upstream commit never landed; the unexpected branch keeps the HEAD it was cut at.
         assert git(t.clone, 'rev-parse', 'unexpected') == switched[0] != unexpected_head
         assert git(t.clone, 'branch', '--show-current') == 'unexpected'
-        assert not (t.clone / 'hermes_cli/config.py').exists()
+        assert not (t.clone / 'eir_cli/config.py').exists()
         assert "checkout is on 'unexpected'" in output
         assert 'Rolling back' not in output
     else:
@@ -455,7 +455,7 @@ def test_update_syntax_failure_restores_pre_update_head(update_tree, monkeypatch
         assert ('The update target has a syntax error' if sync_phase == 'origin'
                 else 'has a syntax error in a critical file; it was not merged') in output
         assert git(t.clone, 'rev-parse', 'HEAD') == t.base
-        assert not (t.clone / 'hermes_cli' / 'config.py').exists()
+        assert not (t.clone / 'eir_cli' / 'config.py').exists()
     if sync_phase == 'origin' and dirty:
         # Refused before the autostash too: the local work never left the tree, index included.
         assert not git(t.clone, 'stash', 'list')

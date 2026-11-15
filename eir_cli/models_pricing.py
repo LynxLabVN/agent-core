@@ -2,8 +2,8 @@
 
 OpenRouter-compatible ``/v1/models`` pricing fetch with a per-endpoint/per-credential cache,
 Nous Portal sale chrome and org-policy filtering, and the Vercel AI Gateway / Novita / Fireworks /
-DeepInfra pricing adapters. Split out of ``hermes_cli.models``; helpers still defined there are
-looked up on ``hermes_cli.models`` at call time so ``patch("hermes_cli.models.<name>")`` mocks keep
+DeepInfra pricing adapters. Split out of ``eir_cli.models``; helpers still defined there are
+looked up on ``eir_cli.models`` at call time so ``patch("eir_cli.models.<name>")`` mocks keep
 intercepting.
 """
 
@@ -15,7 +15,7 @@ import threading
 import time
 import urllib.request
 from typing import Any, Optional
-from hermes_cli.models_reasoning_caps import _seed_reasoning_caps
+from eir_cli.models_reasoning_caps import _seed_reasoning_caps
 
 
 # Cache: maps model_id → {"prompt": str, "completion": str} per endpoint
@@ -192,7 +192,7 @@ def compute_sale_discount(prompt: str, completion: str, original: Any) -> tuple[
 
 def _get_json(url: str, headers: dict[str, str], timeout: float, opener=None) -> Optional[dict]:
     """GET *url* as JSON via the origin's catalog opener (or *opener*); None on any failure."""
-    from hermes_cli.models import _urlopen_model_catalog_request
+    from eir_cli.models import _urlopen_model_catalog_request
 
     try:
         req = urllib.request.Request(url, headers=headers)
@@ -204,7 +204,7 @@ def _get_json(url: str, headers: dict[str, str], timeout: float, opener=None) ->
 
 def _pricing_entry(pricing: dict, prompt_key: str = "prompt", completion_key: str = "completion") -> dict[str, Any]:
     """Picker-shape ``{prompt, completion[, input_cache_read, input_cache_write]}`` from a catalog
-    ``pricing`` block whose cache fields already use the hermes names."""
+    ``pricing`` block whose cache fields already use the eir names."""
     entry: dict[str, Any] = {
         "prompt": str(pricing.get(prompt_key, "")),
         "completion": str(pricing.get(completion_key, "")),
@@ -237,9 +237,9 @@ def fetch_models_with_pricing(
     ...}}``, cached per *base_url* and per credential so one caller's catalog never answers
     another's read. *include_sale_original* (Nous Portal only) copies the gateway's pre-discount
     ``pricing.original`` rates through as a nested ``original`` dict for sale chrome."""
-    from hermes_cli.chat_catalog import catalog_item_is_generation
-    from hermes_cli.models import _openrouter_model_supports_tools
-    from hermes_cli.version_info import hermes_user_agent
+    from eir_cli.chat_catalog import catalog_item_is_generation
+    from eir_cli.models import _openrouter_model_supports_tools
+    from eir_cli.version_info import eir_user_agent
     url_root = (base_url or "").rstrip("/")
     cache_key = url_root + _pricing_auth_fingerprint(api_key)
     if not force_refresh:
@@ -248,7 +248,7 @@ def fetch_models_with_pricing(
             return cached
 
     url = url_root + "/v1/models"
-    headers = {"Accept": "application/json", "User-Agent": hermes_user_agent()}
+    headers = {"Accept": "application/json", "User-Agent": eir_user_agent()}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
     payload = _get_json(url, headers, timeout)
@@ -300,7 +300,7 @@ def fetch_models_with_pricing(
 def fetch_ai_gateway_pricing(timeout: float = 8.0, *, force_refresh: bool = False) -> dict[str, dict[str, str]]:
     """Vercel AI Gateway /v1/models pricing, translating its ``input`` / ``output`` field names to
     the picker's ``prompt`` / ``completion`` (cache read/write names already match)."""
-    from hermes_constants import AI_GATEWAY_BASE_URL
+    from eir_constants import AI_GATEWAY_BASE_URL
 
     cache_key = AI_GATEWAY_BASE_URL.rstrip("/")
     if not force_refresh:
@@ -334,15 +334,15 @@ def _resolve_nous_pricing_credentials() -> tuple[str, str]:
     preview) → resolved credential ``base_url`` → production default. Without the override a
     staging profile's sale ``pricing.original`` would never reach the pickers."""
     try:
-        from hermes_cli.auth import _nous_inference_env_override
+        from eir_cli.auth import _nous_inference_env_override
 
         env_base = _nous_inference_env_override()
     except Exception:
         env_base = None
     api_key = creds_base = ""
     try:
-        from hermes_cli.anon_challenge import background_caller
-        from hermes_cli.auth import resolve_nous_runtime_credentials
+        from eir_cli.anon_challenge import background_caller
+        from eir_cli.auth import resolve_nous_runtime_credentials
 
         with background_caller():  # a pricing read never opens a free-tier challenge
             creds = resolve_nous_runtime_credentials()
@@ -379,7 +379,7 @@ def nous_policy_allowed_ids(*, force_refresh: bool = False) -> Optional[set[str]
     say), an anonymous read (unfiltered catalog), or an empty read (a fetch failure, not an org
     that may reach nothing)."""
     try:
-        from hermes_cli.nous_account import nous_policy_present
+        from eir_cli.nous_account import nous_policy_present
 
         if nous_policy_present() is not True:
             return None
@@ -418,7 +418,7 @@ def restrict_to_nous_policy(
 
 
 def _remember_provider_cache_key(provider: str, cache_key: str) -> None:
-    from hermes_cli.models import _pricing_profile_key
+    from eir_cli.models import _pricing_profile_key
     _pricing_provider_cache_keys[(_pricing_profile_key(), provider)] = cache_key
 
 
@@ -465,7 +465,7 @@ def _fetch_kilocode_pricing(timeout: float = 8.0, *, force_refresh: bool = False
     The gateway's ``-1`` rate sentinel means "varies" (auto-router models); no price is shown
     rather than a fabricated one, so such rows are skipped.
     """
-    from hermes_cli.version_info import hermes_user_agent
+    from eir_cli.version_info import eir_user_agent
 
     cache_key = _kilo_pricing_scope()
     if not cache_key:
@@ -475,7 +475,7 @@ def _fetch_kilocode_pricing(timeout: float = 8.0, *, force_refresh: bool = False
         if cached is not None:
             return cached
 
-    headers = {"Accept": "application/json", "User-Agent": hermes_user_agent()}
+    headers = {"Accept": "application/json", "User-Agent": eir_user_agent()}
     api_key = os.getenv("KILOCODE_API_KEY", "").strip()
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
@@ -533,7 +533,7 @@ _FIREWORKS_PRICING_KEY = "models.dev/fireworks"
 
 
 def _ai_gateway_pricing_scope() -> str:
-    from hermes_constants import AI_GATEWAY_BASE_URL
+    from eir_constants import AI_GATEWAY_BASE_URL
     return AI_GATEWAY_BASE_URL.rstrip("/")
 
 
@@ -544,7 +544,7 @@ def _novita_pricing_scope() -> str:
 def get_cached_nous_inference_base_url() -> str:
     """The profile's persisted Nous endpoint (bare origin, no ``/v1``) without refreshing auth."""
     try:
-        from hermes_cli.auth import (
+        from eir_cli.auth import (
             _load_auth_store, _load_provider_state, _optional_base_url, _validate_nous_inference_url_from_network,
         )
 
@@ -572,7 +572,7 @@ def resolve_pricing_provider(provider: str, *, base_url: str = "") -> str:
     It can deliberately shadow a canonical name while pointing at a proxy, so custom entries may
     use pricing only when their concrete endpoint is recognized as that canonical upstream.
     """
-    from hermes_cli.models import normalize_provider
+    from eir_cli.models import normalize_provider
 
     normalized = normalize_provider(provider)
     if not normalized.startswith("custom:"):
@@ -605,7 +605,7 @@ def pricing_cache_scope(
     """The current endpoint identity a provider's pricing cache is keyed on. Resolves local configuration
     only, never fetches: picker prewarm single-flight uses it so an endpoint rotation can start a new
     worker while the previous endpoint is still slow or unreachable."""
-    from hermes_cli.models import _deepinfra_catalog_url, _pricing_profile_key, normalize_provider
+    from eir_cli.models import _deepinfra_catalog_url, _pricing_profile_key, normalize_provider
     normalized = resolve_pricing_provider(provider, base_url=base_url)
     static = _STATIC_PRICING_SCOPES.get(normalized)
     if static:
@@ -614,7 +614,7 @@ def pricing_cache_scope(
         return _deepinfra_catalog_url()[0]
     if normalized == "nous":
         try:
-            from hermes_cli.auth import _nous_inference_env_override
+            from eir_cli.auth import _nous_inference_env_override
 
             env_base = _nous_inference_env_override()
         except Exception:
@@ -632,7 +632,7 @@ def pricing_cache_scope(
 
 def _cached_only_pricing(normalized: str) -> dict[str, dict[str, str]]:
     """Process-resident pricing for *normalized* without any provider I/O."""
-    from hermes_cli.models import _deepinfra_catalog_cache, _deepinfra_catalog_url, _pricing_profile_key
+    from eir_cli.models import _deepinfra_catalog_cache, _deepinfra_catalog_url, _pricing_profile_key
     if normalized == "deepinfra":
         cache_key, _url = _deepinfra_catalog_url()
         return _fetch_deepinfra_pricing() if cache_key in _deepinfra_catalog_cache else {}
@@ -689,7 +689,7 @@ def _fireworks_pricing_from_models_dev(*, force_refresh: bool = False) -> dict[s
 def _fetch_novita_pricing(timeout: float = 8.0, *, force_refresh: bool = False) -> dict[str, dict[str, str]]:
     """NovitaAI /v1/models pricing (per-million prices in units of 0.0001 USD → per-token strings),
     cached on the resolved base URL so menu renders don't re-hit the network."""
-    from hermes_cli.version_info import hermes_user_agent
+    from eir_cli.version_info import eir_user_agent
     api_key = os.getenv("NOVITA_API_KEY", "").strip()
     if not api_key:
         return {}
@@ -700,7 +700,7 @@ def _fetch_novita_pricing(timeout: float = 8.0, *, force_refresh: bool = False) 
         if cached is not None:
             return cached
 
-    headers = {"Authorization": f"Bearer {api_key}", "Accept": "application/json", "User-Agent": hermes_user_agent()}
+    headers = {"Authorization": f"Bearer {api_key}", "Accept": "application/json", "User-Agent": eir_user_agent()}
     payload = _get_json(cache_key + "/models", headers, timeout)
     if payload is None:
         return _cache_catalog(cache_key, {})
@@ -723,7 +723,7 @@ def _fetch_deepinfra_pricing(timeout: float = 5.0, *, force_refresh: bool = Fals
     """DeepInfra chat-model pricing: ``input_tokens`` / ``output_tokens`` / ``cache_read_tokens`` in
     $/MTok → per-token ``prompt`` / ``completion`` / ``input_cache_read`` (cached by the by-tag
     helper)."""
-    from hermes_cli.models import _fetch_deepinfra_models_by_tag
+    from eir_cli.models import _fetch_deepinfra_models_by_tag
     items = _fetch_deepinfra_models_by_tag("chat", timeout=timeout, force_refresh=force_refresh)
     result: dict[str, dict[str, str]] = {}
     for item in items or []:

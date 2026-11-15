@@ -1,6 +1,6 @@
 """Dashboard/serve support: managed-service restart (systemd/respawn), status/listening probes, SSH session token file, named-profile routing, web-dist resolution, update stdio hangup protection.
 
-Split out of ``hermes_cli/main.py``. Names that still live in main (``PROJECT_ROOT``, ...)
+Split out of ``eir_cli/main.py``. Names that still live in main (``PROJECT_ROOT``, ...)
 are imported lazily inside the functions that use them (avoids an import cycle).
 """
 
@@ -14,9 +14,9 @@ import time
 
 from pathlib import Path
 from typing import NoReturn
-from hermes_cli.cli_output import line_input
-from hermes_cli.process_identity import is_desktop_owned_backend as _is_desktop_owned_backend
-from hermes_cli._startup_fast import project_root_str
+from eir_cli.cli_output import line_input
+from eir_cli.process_identity import is_desktop_owned_backend as _is_desktop_owned_backend
+from eir_cli._startup_fast import project_root_str
 
 _PRE_BUILD_HINT = "  Pre-build first:  pnpm install --frozen-lockfile --filter web... && pnpm --dir web run build"
 
@@ -25,23 +25,23 @@ def _find_stale_dashboard_pids(*, exclude_pids: set[int] | None = None,
                                scope_home: str | None = None) -> list[int]:
     """PIDs of running ``dashboard``/``serve`` backends the caller may stop.
 
-    *scope_home*: keep only backends whose resolved Hermes home (see
-    ``_hermes_home_for_pid``) is this home; unreadable ownership is spared, never guessed.
+    *scope_home*: keep only backends whose resolved Eir home (see
+    ``_eir_home_for_pid``) is this home; unreadable ownership is spared, never guessed.
     ``--stop`` and the post-update cleanup pass their own home so another install's or
     profile's backend on the same machine is never a target (#113978).
     """
-    from hermes_cli.dashboard_procs import (
+    from eir_cli.dashboard_procs import (
         _caller_ancestor_pids,
         _is_caller_wrapper_shell,
-        _pids_owned_by_hermes_home,
+        _pids_owned_by_eir_home,
         _scan_dashboard_processes,
     )
     pids = [pid for pid, _cmd in _scan_dashboard_processes(exclude_pids=exclude_pids)]
-    # The scan also selects the caller's own wrapper shell (``bash -c 'hermes dashboard --stop'``);
+    # The scan also selects the caller's own wrapper shell (``bash -c 'eir dashboard --stop'``);
     # killing it takes down the invoking terminal.
     ancestors = _caller_ancestor_pids()
     pids = [pid for pid in pids if not _is_caller_wrapper_shell(pid, ancestors)]
-    return _pids_owned_by_hermes_home(pids, scope_home) if scope_home else pids
+    return _pids_owned_by_eir_home(pids, scope_home) if scope_home else pids
 
 
 def _parse_dashboard_runtime(command: str) -> tuple[str, str, int] | None:
@@ -50,8 +50,8 @@ def _parse_dashboard_runtime(command: str) -> tuple[str, str, int] | None:
     The mode is the canonical holder subcommand, never an argv substring: this gates the launchd
     backend inventory (a kill + kickstart path) and ``--status`` (#121156).
     """
-    from hermes_cli.update_cmd_windows import _hermes_holder_subcommand
-    mode = _hermes_holder_subcommand(command)
+    from eir_cli.update_cmd_windows import _eir_holder_subcommand
+    mode = _eir_holder_subcommand(command)
     if mode not in ("dashboard", "serve"):
         return None
 
@@ -80,7 +80,7 @@ def _dashboard_probe_host(host: str | None) -> str:
     return normalized
 
 
-_DASHBOARD_SYSTEMD_UNIT = "hermes-dashboard.service"
+_DASHBOARD_SYSTEMD_UNIT = "eir-dashboard.service"
 
 _SYSTEMCTL_ERRORS = (FileNotFoundError, subprocess.TimeoutExpired, OSError)
 
@@ -104,7 +104,7 @@ def _restart_managed_dashboard_service(reason: str, unit: str = _DASHBOARD_SYSTE
     def _systemctl(*args: str, timeout: int = 10) -> subprocess.CompletedProcess:
         return _run_probe(["systemctl", *args], timeout=timeout)
 
-    # User manager first (Hermes installs Linux services in the user scope by
+    # User manager first (Eir installs Linux services in the user scope by
     # default), system manager only when the unit isn't there. Keep the selected
     # scope for ALL probes and the restart — a user unit must never be restarted
     # through the system manager (or raw-killed).
@@ -186,7 +186,7 @@ def _pid_unified_cgroup_entries(pid: int):
 
 
 def _get_systemd_service_for_pid(pid: int) -> str | None:
-    """The systemd service unit that supervises *pid* (``hermes-serve.service``), or None.
+    """The systemd service unit that supervises *pid* (``eir-serve.service``), or None.
 
     A ``.service`` cgroup alone only says where the process was started: a dashboard launched by
     hand from a shell that itself runs under some unit (a CI runner agent, ``cron.service``, a
@@ -271,7 +271,7 @@ def _try_restart_systemd_service(svc_name: str, cgroup_path: str | None = None) 
     return False
 
 
-# launchd plist directories that can supervise a ``hermes dashboard`` / ``hermes serve`` backend on
+# launchd plist directories that can supervise a ``eir dashboard`` / ``eir serve`` backend on
 # macOS, with the launchctl domain their jobs load into (LaunchAgents: ``gui/<uid>`` or ``user/<uid>``,
 # probed per label like the gateway helpers; LaunchDaemons: ``system``). Both LaunchAgents dirs are
 # per-user domains, so they share the ``agent`` kind.
@@ -287,7 +287,7 @@ def _loaded_launchd_backend_jobs(
     plist_dirs: list[tuple[str, Path]] | None = None,
 ) -> list[tuple[str, str, list[str], int | None]]:
     """``(domain, label, program_arguments, live_pid)`` for every LOADED launchd job whose
-    ``ProgramArguments`` is a ``hermes dashboard`` / ``hermes serve`` backend. macOS only (empty
+    ``ProgramArguments`` is a ``eir dashboard`` / ``eir serve`` backend. macOS only (empty
     elsewhere). Reads the plists (unreadable/malformed ones are skipped) and asks ``launchctl print``
     per candidate label — a job that is not loaded in any domain is not returned, so an operator's
     stale plist never claims a process."""
@@ -296,7 +296,7 @@ def _loaded_launchd_backend_jobs(
     import plistlib
     from xml.parsers.expat import ExpatError
 
-    from hermes_cli.gateway import _launchd_print_service_pid
+    from eir_cli.gateway import _launchd_print_service_pid
     uid = os.getuid()  # windows-footgun: ok — darwin-only branch
     jobs: list[tuple[str, str, list[str], int | None]] = []
     for kind, plist_dir in (plist_dirs if plist_dirs is not None else _launchd_plist_dirs()):
@@ -363,7 +363,7 @@ def _restart_launchd_job(domain: str, label: str, old_pid: int | None, *, timeou
     take that fresh process down), then require launchd to report a live PID other than *old_pid*
     within *timeout*. A kickstart that returns 0 only means "restart requested"; a job that is loaded
     but never comes back on a fresh PID is a failure the operator must hear about."""
-    from hermes_cli.gateway import _wait_for_launchd_service_pid
+    from eir_cli.gateway import _wait_for_launchd_service_pid
     try:
         if _run_probe(["launchctl", "kickstart", f"{domain}/{label}"], timeout=30).returncode != 0:
             return False
@@ -403,34 +403,34 @@ _RESPAWN_LIVENESS_GRACE_SECONDS = 1.0
 
 
 def _respawnable_command_for_current_install(argv: list[str]) -> list[str]:
-    """Rebuild a captured ``[<interpreter>, <hermes launcher>, ...]`` argv on this install's launcher.
+    """Rebuild a captured ``[<interpreter>, <eir launcher>, ...]`` argv on this install's launcher.
 
-    A pre-PM-takeover install left ``~/.local/bin/hermes`` as a symlink to a Python console
+    A pre-PM-takeover install left ``~/.local/bin/eir`` as a symlink to a Python console
     script, so the kernel recorded a manual backend as ``[<old venv python>, <launcher>, dashboard,
     ...]``. The takeover then rewrote that launcher into a POSIX shell shim, and replaying the
     captured argv verbatim asks the old interpreter to parse a shell script (#124778). This
-    checkout's own ``hermes`` entry script stays Python, so it and every other shape replay unchanged.
+    checkout's own ``eir`` entry script stays Python, so it and every other shape replay unchanged.
     """
     root = Path(project_root_str())
     if (len(argv) > 2 and os.path.basename(argv[0]).startswith("python")
-            and os.path.basename(argv[1]) == "hermes" and Path(argv[1]) != root / "hermes"):
-        from hermes_cli._launchers import runtime_command
+            and os.path.basename(argv[1]) == "eir" and Path(argv[1]) != root / "eir"):
+        from eir_cli._launchers import runtime_command
         return runtime_command(root, argv[2:])
     return list(argv)
 
 
 def _respawn_dashboard_processes(commands: list[list[str]]) -> list[list[str]]:
-    """Respawn manually-started dashboards after ``hermes update``, detached, logging to
+    """Respawn manually-started dashboards after ``eir update``, detached, logging to
     ``logs/dashboard-restart.log``; returns the argvs that failed to spawn. Callers pre-filter via
     ``_filter_dashboard_respawn_candidates`` (no Desktop ``--port 0`` backends, capped per profile).
 
     See #78821.
     """
-    from hermes_constants import get_hermes_home
+    from eir_constants import get_eir_home
     respawned: list[list[str]] = []
     spawned: list[tuple[list[str], list[str], subprocess.Popen]] = []
     failed: list[tuple[list[str], list[str], str]] = []
-    log_path = get_hermes_home() / "logs" / "dashboard-restart.log"
+    log_path = get_eir_home() / "logs" / "dashboard-restart.log"
     with contextlib.suppress(OSError):
         log_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -472,7 +472,7 @@ def _respawn_dashboard_processes(commands: list[list[str]]) -> list[list[str]]:
 
 
 class _UpdateOutputStream:
-    """stdout/stderr wrapper for ``hermes update``: mirrors to ``logs/update.log`` and, once the
+    """stdout/stderr wrapper for ``eir update``: mirrors to ``logs/update.log`` and, once the
     terminal vanishes (BrokenPipe/OSError/ValueError), drops screen output instead of the update."""
 
     _BROKEN = (BrokenPipeError, OSError, ValueError)
@@ -541,15 +541,15 @@ def _install_hangup_protection(gateway_mode: bool = False):
         # Late-bound import so tests can monkeypatch it to simulate setup failure. The ROOT
         # home, never a sticky profile's: the update mutates the shared checkout, and the
         # Desktop and the hand-off scripts read <root>/logs/update.log.
-        from hermes_constants import get_default_hermes_root as _get_root_home
+        from eir_constants import get_default_eir_root as _get_root_home
         logs_dir = _get_root_home() / "logs"
         logs_dir.mkdir(parents=True, exist_ok=True)
         log_file = open(logs_dir / "update.log", "a", buffering=1, encoding="utf-8")
 
         import datetime as _dt
 
-        stage = "continued on the pulled code" if os.environ.get("HERMES_UPDATE_POST_SWAP") == "1" else "started"
-        log_file.write(f"\n=== hermes update {stage} {_dt.datetime.now().isoformat(timespec='seconds')} ===\n")
+        stage = "continued on the pulled code" if os.environ.get("EIR_UPDATE_POST_SWAP") == "1" else "started"
+        log_file.write(f"\n=== eir update {stage} {_dt.datetime.now().isoformat(timespec='seconds')} ===\n")
 
         state["log_file"] = log_file
         sys.stdout = _UpdateOutputStream(state["prev_stdout"], log_file)
@@ -587,7 +587,7 @@ def _report_dashboard_status() -> int:
     augmentation in _scan_dashboard_processes, and the ledger's recorded bind replaces the argv port so
     ``--port 0`` backends are probed on the port the OS actually gave them. See #81564.
     """
-    from hermes_cli.dashboard_procs import _ledger_serve_binds, _scan_dashboard_processes
+    from eir_cli.dashboard_procs import _ledger_serve_binds, _scan_dashboard_processes
     from gateway.status import _pid_exists
     binds = _ledger_serve_binds()
     live: list[tuple[int, str, str]] = []
@@ -604,10 +604,10 @@ def _report_dashboard_status() -> int:
         live.append((pid, command, mode))
 
     if not live:
-        print("No hermes dashboard or serve processes running.")
+        print("No eir dashboard or serve processes running.")
         return 0
 
-    print(f"{len(live)} hermes dashboard/serve process(es) running:")
+    print(f"{len(live)} eir dashboard/serve process(es) running:")
     for pid, command, mode in live:
         print(f"    PID {pid} [{mode}]: {command}")
     return len(live)
@@ -639,14 +639,14 @@ def _maybe_setup_dashboard_auth_interactively(args) -> None:
     host = getattr(args, "host", "127.0.0.1") or "127.0.0.1"
 
     try:
-        from hermes_cli.web_server import should_require_dashboard_auth
+        from eir_cli.web_server import should_require_dashboard_auth
         if not should_require_dashboard_auth(host):
             return
     except Exception:
         return  # if we can't tell, defer to start_server's own gate
 
     try:
-        from hermes_cli.dashboard_auth import list_providers
+        from eir_cli.dashboard_auth import list_providers
         if list_providers():
             return
     except Exception:
@@ -663,7 +663,7 @@ def _maybe_setup_dashboard_auth_interactively(args) -> None:
     print()
     print("  How do you want to authenticate the dashboard?")
     print("    [1] Username & password (quickest; for a trusted LAN / VPN)")
-    print("    [2] OAuth via Nous Portal (run `hermes dashboard register`)\n    [3] Cancel\n")
+    print("    [2] OAuth via Nous Portal (run `eir dashboard register`)\n    [3] Cancel\n")
 
     try:
         choice = input("  Choice [1]: ").strip() or "1"
@@ -675,9 +675,9 @@ def _maybe_setup_dashboard_auth_interactively(args) -> None:
         print(
             "  Run this on the host where the dashboard lives, then start "
             "the dashboard again:\n"
-            "    hermes dashboard register\n"
+            "    eir dashboard register\n"
             "  It provisions a Nous Portal OAuth client and writes "
-            "HERMES_DASHBOARD_OAUTH_CLIENT_ID into ~/.hermes/.env for you.\n"
+            "EIR_DASHBOARD_OAUTH_CLIENT_ID into ~/.eir/.env for you.\n"
             "  Docs: https://hermes-agent.nousresearch.com/docs/"
             "user-guide/features/web-dashboard#authentication-gated-mode"
         )
@@ -711,8 +711,8 @@ def _maybe_setup_dashboard_auth_interactively(args) -> None:
     secret = secrets.token_urlsafe(32)
 
     try:
-        from hermes_cli.config import load_config, save_config
-        from hermes_cli.plugins_cmd import ensure_basic_auth_plugin_enabled_in_config
+        from eir_cli.config import load_config, save_config
+        from eir_cli.plugins_cmd import ensure_basic_auth_plugin_enabled_in_config
         cfg = load_config()
         basic = cfg.setdefault("dashboard", {}).setdefault("basic_auth", {})
         basic["username"] = username
@@ -731,7 +731,7 @@ def _maybe_setup_dashboard_auth_interactively(args) -> None:
 
     # Re-run plugin discovery so the provider registers before start_server's gate.
     try:
-        from hermes_cli.plugins import discover_plugins
+        from eir_cli.plugins import discover_plugins
         discover_plugins(force=True)
     except Exception as exc:
         print(f"  ⚠ Plugin re-discovery failed ({exc}); the gate may still "
@@ -746,7 +746,7 @@ def _maybe_setup_dashboard_auth_interactively(args) -> None:
 def _read_ssh_session_token_file(path: str) -> str:
     """Read and unlink a Desktop SSH token from its private runtime directory."""
     if sys.platform == "win32":
-        from hermes_cli.windows_ssh_runtime import read_token
+        from eir_cli.windows_ssh_runtime import read_token
         return read_token(path)
 
     import stat as _stat
@@ -754,12 +754,12 @@ def _read_ssh_session_token_file(path: str) -> str:
     if not os.path.isabs(path):
         raise SystemExit("--ssh-session-token-file must be absolute")
 
-    # The Desktop client writes the token under the account's $HOME/.hermes/
-    # desktop-ssh, independent of HERMES_HOME and the active profile. Anchor
-    # validation there, NOT get_hermes_home(): a non-default profile or a Docker
-    # /opt/data root re-homes get_hermes_home() and would reject every token.
+    # The Desktop client writes the token under the account's $HOME/.eir/
+    # desktop-ssh, independent of EIR_HOME and the active profile. Anchor
+    # validation there, NOT get_eir_home(): a non-default profile or a Docker
+    # /opt/data root re-homes get_eir_home() and would reject every token.
     # See #69551.
-    token_root = Path.home() / ".hermes" / "desktop-ssh"
+    token_root = Path.home() / ".eir" / "desktop-ssh"
     try:
         relative = Path(path).relative_to(token_root)
     except ValueError as exc:
@@ -830,7 +830,7 @@ def _read_ssh_session_token_file(path: str) -> str:
 def _is_electron_packaged_web_dist(path: str) -> bool:
     """True when *path* is an Electron-packaged renderer dist (``app.asar[.unpacked]/dist``).
 
-    A standalone ``hermes dashboard`` inheriting that ``HERMES_WEB_DIST`` would
+    A standalone ``eir dashboard`` inheriting that ``EIR_WEB_DIST`` would
     serve the desktop frontend in the browser ("Desktop IPC bridge is unavailable").
     """
     if not path:
@@ -894,24 +894,24 @@ def _endpoint_conflict(args, record, typed: set) -> str:
 
 
 def _attach_to_host_backend(args, headless_backend: bool) -> None:
-    """Multiplex-only: a second `hermes serve`/`dashboard` attaches to the host backend.
+    """Multiplex-only: a second `eir serve`/`dashboard` attaches to the host backend.
 
     Exactly ONE backend runs per host and multiplexes every profile, so a second invocation —
     for ANY profile, the default included — reports the live one and exits 0 instead of binding
     a second port. ``--isolated`` opts out (Desktop's SSH backend proves ownership with it) and
-    Desktop pool backends (HERMES_DESKTOP=1) keep their own lifecycle.
+    Desktop pool backends (EIR_DESKTOP=1) keep their own lifecycle.
 
     Exit 0 means "the host backend answered and serves what you asked for", and nothing else:
 
     * the owner must ANSWER on its recorded port and identify itself (a record alone cannot see a
       graceful-shutdown window or a foreign listener that inherited the port) — a supervisor or
-      `hermes update` relaunch landing in that window would otherwise exit 0 with NOTHING
+      `eir update` relaunch landing in that window would otherwise exit 0 with NOTHING
       listening, reporting success for a dead service;
     * an explicitly typed ``--port``/``--host`` the owner cannot serve is a REFUSAL naming the
       owner, never a silent redirect. It exits 78 (EX_CONFIG), the deliberate-refusal code
       ``RestartPreventExitStatus=78`` parks on: exit 1 under ``Restart=always`` was an infinite
       restart loop with nothing listening on the ingress port (#119824);
-    * a `hermes dashboard` user is never handed a headless backend's URL (no SPA behind it).
+    * a `eir dashboard` user is never handed a headless backend's URL (no SPA behind it).
 
     Returns normally — leaving the caller to BIND — when no owner answers.
     """
@@ -940,22 +940,22 @@ def _attach_to_host_backend(args, headless_backend: bool) -> None:
 
     if not headless_backend and not identity.get("servesSpa"):
         print(f"Refusing to start: this host is already served by {hr.describe(record)}, "
-              "which is a headless `hermes serve` backend with no dashboard UI.")
-        print("  Stop it and run `hermes dashboard`, or use --isolated for a dedicated server.")
+              "which is a headless `eir serve` backend with no dashboard UI.")
+        print("  Stop it and run `eir dashboard`, or use --isolated for a dedicated server.")
         sys.exit(GATEWAY_FATAL_CONFIG_EXIT_CODE)
 
     try:
-        from hermes_cli.profiles import get_active_profile_name
+        from eir_cli.profiles import get_active_profile_name
         profile = get_active_profile_name()
     except Exception:
         profile = "default"
     wanted = getattr(args, "open_profile", "") or profile
-    from hermes_cli.url_utils import format_url_host
+    from eir_cli.url_utils import format_url_host
 
     url = f"http://{format_url_host(hr.dial_host(record))}:{record.port}/?profile={wanted}"
 
     kind = "backend" if headless_backend else "dashboard"
-    print(f"Hermes {kind} already running on this host: PID {record.pid}, port {record.port}.")
+    print(f"Eir {kind} already running on this host: PID {record.pid}, port {record.port}.")
     print(f"  Managing profile '{wanted}': {url}")
     if not headless_backend and not args.no_open:
         with contextlib.suppress(Exception):
@@ -972,11 +972,11 @@ def _route_named_profile_dashboard(
     No-record fallback to :func:`_attach_to_host_backend`, which already attached (and exited)
     when the host publishes a live rendezvous record: re-exec pinned to ``-p default`` (so
     ``_apply_profile_override`` can't re-route via the sticky active_profile file). ``--isolated``
-    opts out; Desktop pool backends (HERMES_DESKTOP=1) stay per-profile. Returns normally when no
+    opts out; Desktop pool backends (EIR_DESKTOP=1) stay per-profile. Returns normally when no
     routing applies.
     """
     try:
-        from hermes_cli.profiles import get_active_profile_name
+        from eir_cli.profiles import get_active_profile_name
         _launch_profile = get_active_profile_name()
     except Exception:
         _launch_profile = "default"
@@ -994,7 +994,7 @@ def _route_named_profile_dashboard(
         f"preselected). Use --isolated for a dedicated per-profile server."
     )
     reexec_argv = [
-        sys.executable, "-m", "hermes_cli.main",
+        sys.executable, "-m", "eir_cli.main",
         "-p", "default",
         # Preserve the lean serve path so a named-profile `serve` doesn't
         # silently rebuild the UI as `dashboard`.
@@ -1011,26 +1011,26 @@ def _route_named_profile_dashboard(
         if enabled:
             reexec_argv.extend(extra)
     from tools.environments.local import build_subprocess_env
-    # HERMES_HOME is pinned to the machine root below — the factory must not
+    # EIR_HOME is pinned to the machine root below — the factory must not
     # re-inject a profile home.
     env = build_subprocess_env(scrub_secrets=False, inherit_profile_home=False)
     # Pin the child to the machine ROOT, resolved explicitly rather than by
-    # dropping HERMES_HOME: in the Docker layout the root is /opt/data, and an
-    # unset HERMES_HOME would fall back to $HOME/.hermes = /opt/data/.hermes — an
+    # dropping EIR_HOME: in the Docker layout the root is /opt/data, and an
+    # unset EIR_HOME would fall back to $HOME/.eir = /opt/data/.eir — an
     # empty auto-seeded home with only the default profile and no install stamp.
-    # get_default_hermes_root() strips a trailing profiles/<name> for both layouts.
+    # get_default_eir_root() strips a trailing profiles/<name> for both layouts.
     try:
-        from hermes_constants import get_default_hermes_root
-        env["HERMES_HOME"] = str(get_default_hermes_root())
+        from eir_constants import get_default_eir_root
+        env["EIR_HOME"] = str(get_default_eir_root())
     except Exception:
-        env.pop("HERMES_HOME", None)  # prior behaviour rather than blocking the reroute
+        env.pop("EIR_HOME", None)  # prior behaviour rather than blocking the reroute
     # On Windows os.execvpe() spawns via CreateProcess then exits, which under
     # Python 3.14+ can crash with STATUS_ACCESS_VIOLATION; use Popen + exit.
     if sys.platform == "win32":
         proc = subprocess.Popen(reexec_argv, env=env)
         sys.exit(proc.wait())
     else:
-        from hermes_cli.cpu_profile import write_cpu_profile
+        from eir_cli.cpu_profile import write_cpu_profile
 
         write_cpu_profile()  # exec skips atexit
         os.execvpe(sys.executable, reexec_argv, env)
@@ -1039,35 +1039,35 @@ def _route_named_profile_dashboard(
 def _resolve_dashboard_web_dist(args, _headless_backend: bool) -> None:
     """Build or validate the web UI dist before the server imports.
 
-    ``serve`` sets HERMES_SERVE_HEADLESS so mount_spa() stays off. Otherwise build
-    unless HERMES_WEB_DIST / --skip-build promise a dist — then verify index.html
+    ``serve`` sets EIR_SERVE_HEADLESS so mount_spa() stays off. Otherwise build
+    unless EIR_WEB_DIST / --skip-build promise a dist — then verify index.html
     (else the server serves 404s). --skip-build on the default location gets ONE
-    recovery build; a caller-managed HERMES_WEB_DIST can't be populated.
+    recovery build; a caller-managed EIR_WEB_DIST can't be populated.
     """
-    from hermes_cli.main import PROJECT_ROOT
-    from hermes_cli.main_web_build import _build_web_ui
+    from eir_cli.main import PROJECT_ROOT
+    from eir_cli.main_web_build import _build_web_ui
     skip_build = getattr(args, "skip_build", False)
     if _headless_backend:
-        os.environ["HERMES_SERVE_HEADLESS"] = "1"  # set before web_server import
-    elif "HERMES_WEB_DIST" not in os.environ and not skip_build:
+        os.environ["EIR_SERVE_HEADLESS"] = "1"  # set before web_server import
+    elif "EIR_WEB_DIST" not in os.environ and not skip_build:
         if not _build_web_ui(PROJECT_ROOT / "web", fatal=True):
             sys.exit(1)
     elif skip_build:
         _dist_root = (
             # --build-mode skip trusts the caller to have pre-built the web UI. Verify the dist actually
             # exists; otherwise the server will start and serve 404s with no obvious cause (issue #23817).
-            Path(os.environ["HERMES_WEB_DIST"])
-            if "HERMES_WEB_DIST" in os.environ
-            else PROJECT_ROOT / "hermes_cli" / "web_dist"
+            Path(os.environ["EIR_WEB_DIST"])
+            if "EIR_WEB_DIST" in os.environ
+            else PROJECT_ROOT / "eir_cli" / "web_dist"
         )
         if not (_dist_root / "index.html").exists():
             # Only the default dist location is recoverable (desktop launches with
-            # --build-mode skip after a wipe of web_dist); a custom HERMES_WEB_DIST
+            # --build-mode skip after a wipe of web_dist); a custom EIR_WEB_DIST
             # is a caller-managed directory the build cannot populate.
             # The caller promised a pre-built dist but there isn't one. Instead of hard-failing (issue
             # #59288 — desktop launches with --build-mode skip after a wipe of web_dist), warn and attempt
             # ONE recovery build through the normal build path.
-            _recoverable = "HERMES_WEB_DIST" not in os.environ
+            _recoverable = "EIR_WEB_DIST" not in os.environ
             if _recoverable:
                 print(f"⚠ --skip-build was passed but no web dist found at: {_dist_root}")
                 print("  Attempting one recovery build of the web UI...")
@@ -1082,32 +1082,32 @@ def _resolve_dashboard_web_dist(args, _headless_backend: bool) -> None:
             print("  ✓ Recovery build produced a web dist")
         print(f"→ Skipping web UI build (--skip-build); using dist at {_dist_root}")
     else:
-        # HERMES_WEB_DIST without --skip-build: the env var points at a
+        # EIR_WEB_DIST without --skip-build: the env var points at a
         # caller-managed dist, so validate it like the --skip-build branch.
-        # HERMES_WEB_DIST is set without --skip-build: the build is skipped (the env var points at a
+        # EIR_WEB_DIST is set without --skip-build: the build is skipped (the env var points at a
         # caller-managed dist), so validate it the same way the --skip-build branch does — otherwise the
         # server starts and serves 404s with no obvious cause (same failure mode as #23817, via the env-var
         # path).
-        _dist_root = Path(os.environ["HERMES_WEB_DIST"]).expanduser()
+        _dist_root = Path(os.environ["EIR_WEB_DIST"]).expanduser()
         if not (_dist_root / "index.html").exists():
-            print(f"✗ HERMES_WEB_DIST is set but no web dist found at: {_dist_root}")
+            print(f"✗ EIR_WEB_DIST is set but no web dist found at: {_dist_root}")
             print(_PRE_BUILD_HINT)
-            print("  Or unset HERMES_WEB_DIST to build and use the default web UI dist.")
+            print("  Or unset EIR_WEB_DIST to build and use the default web UI dist.")
             sys.exit(1)
-        # web_server reads HERMES_WEB_DIST raw at import (no expanduser), so a
+        # web_server reads EIR_WEB_DIST raw at import (no expanduser), so a
         # validated "~/dist" would otherwise pass here and still 404 there.
-        os.environ["HERMES_WEB_DIST"] = str(_dist_root)
-        print(f"→ Using web dist from HERMES_WEB_DIST: {_dist_root}")
+        os.environ["EIR_WEB_DIST"] = str(_dist_root)
+        print(f"→ Using web dist from EIR_WEB_DIST: {_dist_root}")
 
 
 def _dashboard_validate_serve_args(args, headless_backend, token_file):
     """Headless-serve argument checks -> ssh_owner_nonce (or None)."""
-    # `hermes serve` is headless/non-interactive: fail closed on a corrupt
+    # `eir serve` is headless/non-interactive: fail closed on a corrupt
     # config.yaml instead of silently starting on defaults where provider
     # auto-detection can adopt unnamed .env credentials (issue #81952).
     # Same policy + escape hatch as _guard_noninteractive_user_config.
     if headless_backend:
-        from hermes_cli.config import (
+        from eir_cli.config import (
             InvalidUserConfigError,
             require_parseable_user_config,
         )
@@ -1123,5 +1123,5 @@ def _dashboard_validate_serve_args(args, headless_backend, token_file):
     if ssh_owner_nonce and not re.fullmatch(r"[0-9a-f]{16}", ssh_owner_nonce):
         raise SystemExit("--ssh-owner-nonce must be 16 lowercase hex characters")
     if token_file and not headless_backend:
-        raise SystemExit("--ssh-session-token-file is only valid with hermes serve")
+        raise SystemExit("--ssh-session-token-file is only valid with eir serve")
     return ssh_owner_nonce

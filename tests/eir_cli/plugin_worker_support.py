@@ -16,7 +16,7 @@ import sys
 
 
 import pytest
-import hermes_yaml as yaml
+import eir_yaml as yaml
 
 from tests.pm._fixtures import _wheel, isolated_python as isolated_python  # noqa: PLC0414 -- the self-alias is load-bearing: it suppresses F811 for the pytest fixture parameter shadowing this import
 
@@ -76,8 +76,8 @@ class PluginWorld:
         return repo, version(repo, **kwargs)
 
     def command(self, action: str, **kwargs) -> None:
-        from hermes_cli.plugins_cmd import plugins_command
-        from hermes_cli.subcommands.plugins import build_plugins_parser
+        from eir_cli.plugins_cmd import plugins_command
+        from eir_cli.subcommands.plugins import build_plugins_parser
 
         parser = argparse.ArgumentParser()
         build_plugins_parser(parser.add_subparsers(), cmd_plugins=plugins_command)
@@ -142,7 +142,7 @@ def publish_plugins(world: PluginWorld, plugins: dict[str, list[str]]) -> Path:
 
 @pytest.fixture
 def boot(plugin_world, monkeypatch):
-    """``boot(environment)``: this test process imports from ``environment`` the way a Hermes process
+    """``boot(environment)``: this test process imports from ``environment`` the way a Eir process
     booted on it does. Adoption rewrites sys.path and PATH (monkeypatch restores both); modules
     imported from the world are forgotten afterwards, so a later test imports its own."""
     from pm.environments import site_packages, venv_bin_dir
@@ -164,12 +164,12 @@ def plugin_world(tmp_path, monkeypatch, isolated_python):
     world = PluginWorld(tmp_path)
     uv = shutil.which("uv")
     assert uv, "real uv is required for the plugin lifecycle"
-    for key in ("HERMES_MANAGED_MODE", "HERMES_INSTALL_ROOT", "VIRTUAL_ENV"):
+    for key in ("EIR_MANAGED_MODE", "EIR_INSTALL_ROOT", "VIRTUAL_ENV"):
         monkeypatch.delenv(key, raising=False)
-    for key, value in {"HOME": tmp_path, "USERPROFILE": tmp_path, "HERMES_HOME": world.home,
-                       "HERMES_RUNTIME_DIR": tmp_path / "store", "UV_CACHE_DIR": tmp_path / "cache",
+    for key, value in {"HOME": tmp_path, "USERPROFILE": tmp_path, "EIR_HOME": world.home,
+                       "EIR_RUNTIME_DIR": tmp_path / "store", "UV_CACHE_DIR": tmp_path / "cache",
                        "XDG_CONFIG_HOME": tmp_path / "config", "XDG_CONFIG_DIRS": tmp_path / "config",
-                       "HERMES_DISABLE_LAZY_INSTALLS": "1", "UV_OFFLINE": "1"}.items():
+                       "EIR_DISABLE_LAZY_INSTALLS": "1", "UV_OFFLINE": "1"}.items():
         monkeypatch.setenv(key, str(value))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     monkeypatch.setattr(paths, "repo_root", lambda: world.core)

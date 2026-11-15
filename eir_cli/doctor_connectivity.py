@@ -1,4 +1,4 @@
-"""API connectivity probes for ``hermes doctor`` (split out of ``doctor.py``).
+"""API connectivity probes for ``eir doctor`` (split out of ``doctor.py``).
 
 Every probe is a pure function: one HTTP/SDK call returning a ``ProbeResult`` with the row(s) to
 print and issue strings to append. No printing inside workers — the caller prints in submission order.
@@ -15,9 +15,9 @@ import socket
 from typing import NamedTuple
 from urllib.parse import urlsplit
 
-from hermes_cli.colors import Colors, color
-from hermes_cli.version_info import hermes_user_agent
-from hermes_constants import OPENROUTER_MODELS_URL
+from eir_cli.colors import Colors, color
+from eir_cli.version_info import eir_user_agent
+from eir_constants import OPENROUTER_MODELS_URL
 from utils import base_url_host_matches, normalize_proxy_env_vars
 
 _APIKEY_PROVIDERS_CACHE: list | None = None
@@ -49,7 +49,7 @@ def _has_healthy_oauth_fallback_for_apikey_provider(provider_label: str) -> bool
     if not getter:
         return False
     try:
-        from hermes_cli import auth
+        from eir_cli import auth
         return bool((getattr(auth, getter)() or {}).get("logged_in"))
     except Exception:
         return False
@@ -96,7 +96,7 @@ def _build_apikey_providers_list() -> list:
         from providers import list_providers
         from providers.base import ProviderProfile as _PP
         try:
-            from hermes_cli.providers import normalize_provider as _normalize_provider
+            from eir_cli.providers import normalize_provider as _normalize_provider
         except Exception:  # pragma: no cover - normalization is best-effort
             def _normalize_provider(_name: str) -> str:
                 return (_name or "").strip().lower()
@@ -126,7 +126,7 @@ _OPENROUTER_STATUS = {
     401: ("(invalid API key)", "Check OPENROUTER_API_KEY in .env"),
     402: ("(out of credits — payment required)",
           "OpenRouter account has insufficient credits. "
-          "Fix: run 'hermes config set model.provider <provider>' "
+          "Fix: run 'eir config set model.provider <provider>' "
           "to switch providers, or fund your OpenRouter account "
           "at https://openrouter.ai/settings/credits"),
     429: ("(rate limited)", "OpenRouter rate limit hit — consider switching to a different provider or waiting"),
@@ -151,7 +151,7 @@ def _probe_openrouter() -> ProbeResult:
 
 def _probe_anthropic() -> ProbeResult:
     name = "Anthropic API"
-    from hermes_cli.auth import get_anthropic_key
+    from eir_cli.auth import get_anthropic_key
     key = get_anthropic_key()
     if not key:
         return _skip(name)
@@ -211,7 +211,7 @@ def _anthropic_messages_probe(base: str, key: str):
     from agent.anthropic_endpoints import _requires_bearer_auth
     normalized, kwargs = _base_client_kwargs(base, None)
     auth = {"Authorization": f"Bearer {key}"} if _requires_bearer_auth(normalized) else {"x-api-key": key}
-    headers = {"anthropic-version": "2023-06-01", "User-Agent": hermes_user_agent(), **auth}
+    headers = {"anthropic-version": "2023-06-01", "User-Agent": eir_user_agent(), **auth}
     model = str(_model_cfg().get("default") or "").strip() or "claude-sonnet-4-5"
     body = {"model": model, "max_tokens": 1, "messages": [{"role": "user", "content": "ping"}]}
     return httpx.post(normalized + "/v1/messages", headers=headers, params=kwargs.get("default_query"), json=body, timeout=10)
@@ -219,7 +219,7 @@ def _anthropic_messages_probe(base: str, key: str):
 
 def _model_cfg() -> dict:
     try:
-        from hermes_cli.config import load_config_readonly
+        from eir_cli.config import load_config_readonly
         model_cfg = (load_config_readonly() or {}).get("model")
     except Exception:
         return {}
@@ -242,7 +242,7 @@ def _apikey_request(key: str, base_env, default_url) -> tuple:
     if base_url_host_matches(base, "api.kimi.com") and base.rstrip("/").endswith("/coding"):
         base = base.rstrip("/") + "/v1"
     url = (base.rstrip("/") + "/models") if base else default_url
-    headers = {"Authorization": f"Bearer {key}", "User-Agent": hermes_user_agent()}
+    headers = {"Authorization": f"Bearer {key}", "User-Agent": eir_user_agent()}
     if base_url_host_matches(base, "api.kimi.com"):
         headers["User-Agent"] = "claude-code/0.1.0"
     # Google's Generative Language API rejects ``Authorization: Bearer <api-key>`` with 401
@@ -279,9 +279,9 @@ def _probe_bedrock() -> ProbeResult:
         n = len(client.list_foundation_models().get("modelSummaries", []))
         return _row(name, "ok", f"({auth_var}, {region}, {n} models)", label=label)
     except ImportError:
-        hint = ("From the Hermes environment, run: "
+        hint = ("From the Eir environment, run: "
                 f"{install_hint('bedrock')}. "
-                "Then restart Hermes.")
+                "Then restart Eir.")
         return _row(name, "warn", "(boto3 not installed)", [hint], label=label)
     except Exception as e:
         err_name = type(e).__name__
@@ -297,7 +297,7 @@ def _probe_azure_entra() -> ProbeResult:
     name = "Azure Foundry (Entra ID)"
     label = name.ljust(28)
     try:
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
         cfg = load_config()
         model_cfg = cfg.get("model") if isinstance(cfg, dict) else {}
         if not isinstance(model_cfg, dict):
@@ -313,9 +313,9 @@ def _probe_azure_entra() -> ProbeResult:
     except Exception as exc:
         return _row(name, "warn", f"(adapter import failed: {exc})", [f"Azure Foundry adapter import failed: {exc}"], label=label)
     if not has_azure_identity_installed():
-        return _row(name, "warn", "(azure-identity not installed)", ["From the Hermes environment, run: "
+        return _row(name, "warn", "(azure-identity not installed)", ["From the Eir environment, run: "
                      f"{install_hint('azure-identity')}. "
-                     "Then restart Hermes."], label=label)
+                     "Then restart Eir."], label=label)
     entra_cfg = model_cfg.get("entra") or {}
     scope = (str(entra_cfg.get("scope") or "").strip() if isinstance(entra_cfg, dict) else "") or SCOPE_AI_AZURE_DEFAULT
     info = describe_active_credential(config=EntraIdentityConfig(scope=scope), timeout_seconds=10.0)
@@ -329,7 +329,7 @@ def _probe_azure_entra() -> ProbeResult:
 
 def _load_network_config() -> dict:
     try:
-        from hermes_cli.config import load_config_readonly
+        from eir_cli.config import load_config_readonly
         net = (load_config_readonly() or {}).get("network")
     except Exception:
         return {}
@@ -386,16 +386,16 @@ def _probe_github_token() -> ProbeResult:
     still carries the stale token so they can remove it.
     """
     name = "GitHub token"
-    from hermes_cli.config import get_env_value, load_env
+    from eir_cli.config import get_env_value, load_env
     var = next((v for v in ("GITHUB_TOKEN", "GH_TOKEN") if get_env_value(v)), None)
     if var is None:
         return _skip(name)  # the Skills Hub section already reports gh-CLI / no-token state
-    from hermes_cli.doctor import _DHH
+    from eir_cli.doctor import _DHH
     where = f"{_DHH}/.env" if var in load_env() else "the environment"
     try:
         import httpx
         r = httpx.get(GITHUB_API_PROBE_URL, timeout=10, headers={
-            "Authorization": f"Bearer {get_env_value(var)}", "User-Agent": hermes_user_agent(),
+            "Authorization": f"Bearer {get_env_value(var)}", "User-Agent": eir_user_agent(),
             "Accept": "application/vnd.github+json"})
     except Exception as e:
         return _row(name, "fail", f"({e})", ["Check network connectivity"])

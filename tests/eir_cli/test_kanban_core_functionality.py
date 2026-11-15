@@ -1,7 +1,7 @@
 """Core-functionality tests for the kanban kernel + CLI additions.
 
-Complements tests/hermes_cli/test_kanban_db.py (schema + CAS atomicity)
-and tests/hermes_cli/test_kanban_cli.py (end-to-end run_slash).  The
+Complements tests/eir_cli/test_kanban_db.py (schema + CAS atomicity)
+and tests/eir_cli/test_kanban_cli.py (end-to-end run_slash).  The
 tests here exercise the pieces added as part of the kanban hardening
 pass: circuit breaker, crash detection, daemon loop, idempotency,
 retention/gc, stats, notify subscriptions, worker log accessor, run_slash
@@ -16,11 +16,11 @@ from pathlib import Path
 
 import pytest
 
-from hermes_cli import kanban_db as kb
-from hermes_cli import kanban_db_connect as kbc
-from hermes_cli import kanban_db_notify as kbn
-from hermes_cli import kanban_db_dispatch as kbd
-from hermes_cli import kanban_db_workspace as kbw
+from eir_cli import kanban_db as kb
+from eir_cli import kanban_db_connect as kbc
+from eir_cli import kanban_db_notify as kbn
+from eir_cli import kanban_db_dispatch as kbd
+from eir_cli import kanban_db_workspace as kbw
 
 
 # ---------------------------------------------------------------------------
@@ -29,12 +29,12 @@ from hermes_cli import kanban_db_workspace as kbw
 
 @pytest.fixture
 def kanban_home(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     # Existing crash-detection tests pre-date the grace window; pin to 0
     # so they keep their immediate-reclaim semantics.
-    monkeypatch.setenv("HERMES_KANBAN_CRASH_GRACE_SECONDS", "0")
+    monkeypatch.setenv("EIR_KANBAN_CRASH_GRACE_SECONDS", "0")
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     # Disable the detect_crashed_workers grace period for legacy tests in
     # this file that claim a task and immediately expect
@@ -43,8 +43,8 @@ def kanban_home(tmp_path, monkeypatch):
     # multi-dispatcher reap race in production; setting it to 0 here
     # restores the pre-fix instant-reclaim semantics these tests were
     # written against. The grace-period itself is covered by dedicated
-    # tests in tests/hermes_cli/test_kanban_db.py.
-    monkeypatch.setenv("HERMES_KANBAN_CRASH_GRACE_SECONDS", "0")
+    # tests in tests/eir_cli/test_kanban_db.py.
+    monkeypatch.setenv("EIR_KANBAN_CRASH_GRACE_SECONDS", "0")
     kb.init_db()
     return home
 
@@ -264,7 +264,7 @@ def test_max_runtime_terminates_overrun_worker(kanban_home):
         killed.append((pid, sig))
 
     # We bypass _pid_alive by stubbing it so the grace-poll exits fast.
-    import hermes_cli.kanban_db as _kb
+    import eir_cli.kanban_db as _kb
     original_alive = _kb._pid_alive
     _kb._pid_alive = lambda pid: False  # pretend SIGTERM worked immediately
 
@@ -337,9 +337,9 @@ def test_max_runtime_terminates_overrun_worker(kanban_home):
 def test_migration_renames_legacy_event_kinds(tmp_path, monkeypatch):
     """A DB created with the old vocab must have its event rows renamed
     in place on init_db()."""
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     # Init fresh.
     kb.init_db()
@@ -402,7 +402,7 @@ def test_migration_renames_legacy_event_kinds(tmp_path, monkeypatch):
 
 def test_stale_run_cannot_block_or_heartbeat_new_attempt(kanban_home, monkeypatch):
     """Stale retry attempts cannot mutate the active run lifecycle."""
-    import hermes_cli.kanban_db as _kb
+    import eir_cli.kanban_db as _kb
 
     conn = kbc.connect()
     try:
@@ -590,9 +590,9 @@ def test_migration_backfill_idempotent_under_re_run(tmp_path, monkeypatch):
     """init_db must be safe to re-run repeatedly. Each call should leave
     at most one run row per in-flight task, even if called while a
     dispatcher is simultaneously claiming."""
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
 
     # Fresh DB, one task left in 'running' with a claim but no run row.
@@ -682,7 +682,7 @@ def test_default_spawn_does_not_auto_load_any_skill(kanban_home, monkeypatch):
     when the task carries no per-task skills.
 
     We intercept Popen to capture the argv without actually spawning a
-    hermes subprocess (which would hang trying to call an LLM).
+    eir subprocess (which would hang trying to call an LLM).
     """
     captured = {}
 
@@ -712,11 +712,11 @@ def test_default_spawn_does_not_auto_load_any_skill(kanban_home, monkeypatch):
     assert "--skills" not in cmd, (
         f"spawn argv should not auto-load any skill: {cmd}"
     )
-    assert cmd[-2:] == ["-m", "hermes_cli.kanban_worker_client"]
+    assert cmd[-2:] == ["-m", "eir_cli.kanban_worker_client"]
     # Assignee + task identity reaches the owner client; policy is read from the board.
     env = captured["env"]
-    assert env.get("HERMES_KANBAN_TASK") == tid
-    assert env.get("HERMES_PROFILE") == "some-profile"
+    assert env.get("EIR_KANBAN_TASK") == tid
+    assert env.get("EIR_PROFILE") == "some-profile"
 
 
 # ---------------------------------------------------------------------------
@@ -949,9 +949,9 @@ def test_gateway_dispatcher_disables_corrupt_board_without_traceback(
     import sqlite3
 
     from gateway.run import GatewayRunner
-    import hermes_cli.config as _cfg_mod
-    import hermes_cli.kanban_db as _kb
-    from hermes_cli import kanban_db_connect as _kbc
+    import eir_cli.config as _cfg_mod
+    import eir_cli.kanban_db as _kb
+    from eir_cli import kanban_db_connect as _kbc
 
     runner = object.__new__(GatewayRunner)
     runner._running = True
@@ -1116,7 +1116,7 @@ def test_reclaim_task_resets_running_to_ready(kanban_home, monkeypatch):
     import signal
     import time
     import secrets
-    import hermes_cli.kanban_db as _kb
+    import eir_cli.kanban_db as _kb
     conn = kbc.connect()
     try:
         t = kb.create_task(conn, title="stuck", assignee="broken")
@@ -1195,15 +1195,15 @@ def _drive_worker_exit(conn, tid, fake_pid, raw_status):
     """Claim ``tid``, record ``raw_status`` for its dead worker pid, and run
     one reaper pass.
 
-    Deliberately resolves ``hermes_cli.kanban_db`` fresh and uses that single
+    Deliberately resolves ``eir_cli.kanban_db`` fresh and uses that single
     module object for the exit registry, the liveness patch, AND the reaper:
     earlier tests in a full-suite run can reload the module, and recording
     the exit into one module object while reaping through another (stale)
     one makes ``_classify_worker_exit`` return ``unknown`` — silently turning
     a clean-exit protocol violation into a plain crash.
     """
-    import hermes_cli.kanban_db as _kb
-    from hermes_cli import kanban_db_dispatch as _kbd
+    import eir_cli.kanban_db as _kb
+    from eir_cli import kanban_db_dispatch as _kbd
     host_prefix = _kb._claimer_id().split(":", 1)[0]
     claimed = _kb.claim_task(conn, tid, claimer=f"{host_prefix}:mock")
     assert claimed is not None, "task was not claimable for the next attempt"
@@ -1244,7 +1244,7 @@ def test_protocol_violation_budget_not_consumed_by_other_failures(kanban_home):
     retries, and below-budget violations must leave the unified counter
     untouched (so the two budgets stay independent).
     """
-    from hermes_cli import kanban_db_dispatch as _kbd
+    from eir_cli import kanban_db_dispatch as _kbd
     conn = kbc.connect()
     try:
         tid = kb.create_task(conn, title="mixed", assignee="worker")
@@ -1324,11 +1324,11 @@ def test_notify_sub_starts_caught_up_on_active_task(kanban_home):
 
 _WORKER_LOG_TAIL = (
     "Query: work kanban task\n"
-    "╭─ ☤ Hermes ───────────────────╮\n"
+    "╭─ ☤ Eir ───────────────────╮\n"
     "│ the board protocol requires reassigning this card to orchestrator, but the │\n"
     "│ native kanban_* tools available here have no reassignment operation.       │\n"
     "╰──────────────────────────────╯\n"
-    "\nResume this session with:\n  hermes --resume 20260915_000000_abc\n\n"
+    "\nResume this session with:\n  eir --resume 20260915_000000_abc\n\n"
     "Session:        20260915_000000_abc\nMessages:       3 (1 user, 2 tool calls)\n"
 )
 
@@ -1338,8 +1338,8 @@ def test_dead_worker_reap_surfaces_the_workers_own_last_output(kanban_home, driv
     """Regression for #88603 / #46593: a worker that explained why it could not comply
     (or printed a provider error) and then exited must have that text on the board and
     on the reap event — with the CLI exit summary trimmed — instead of only the canned label."""
-    import hermes_cli.kanban_db as kb
-    from hermes_cli import kanban_db_connect as kbc
+    import eir_cli.kanban_db as kb
+    from eir_cli import kanban_db_connect as kbc
     conn = kbc.connect()
     try:
         tid = kb.create_task(conn, title="handoff", assignee="worker")
@@ -1365,9 +1365,9 @@ def test_dead_worker_reap_reads_the_log_of_the_dispatching_board(kanban_home):
     """The reap must read the worker log under the board the tick runs for, not the
     ambient "current" board — otherwise every non-default board silently gets the canned
     message (the #88603 review finding)."""
-    import hermes_cli.kanban_db as kb
-    from hermes_cli import kanban_db_connect as kbc
-    from hermes_cli import kanban_db_dispatch as kbd
+    import eir_cli.kanban_db as kb
+    from eir_cli import kanban_db_connect as kbc
+    from eir_cli import kanban_db_dispatch as kbd
     assert kb.get_current_board() == "default"
     board = "other-board"
     kb.create_board(board)  # explicit creation; connect() must not create boards (#43243)

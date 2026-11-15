@@ -12,9 +12,9 @@ import os
 
 import pytest
 
-import hermes_cli.update_cmd_fleet as fleet_mod
-import hermes_cli.update_cmd_fleet_verify as fleet_verify
-import hermes_cli.update_receipt as ur
+import eir_cli.update_cmd_fleet as fleet_mod
+import eir_cli.update_cmd_fleet_verify as fleet_verify
+import eir_cli.update_receipt as ur
 
 OLD = "a" * 40
 HEAD = "b" * 40
@@ -22,7 +22,7 @@ HEAD = "b" * 40
 
 def _fleet_homes(monkeypatch, tmp_path, records: dict[str, dict]) -> None:
     """Default home + named profiles, each with a state file the identity resolver verifies as-is."""
-    root = tmp_path / ".hermes"
+    root = tmp_path / ".eir"
     (root / "profiles").mkdir(parents=True)
     homes = {"default": root}
     for profile, record in records.items():
@@ -31,9 +31,9 @@ def _fleet_homes(monkeypatch, tmp_path, records: dict[str, dict]) -> None:
         homes[profile] = home
         (home / "gateway_state.json").write_text(json.dumps(record), encoding="utf-8")
     by_home = {str(home): rec["pid"] for profile, home in homes.items() for rec in [records[profile]]}
-    monkeypatch.setattr("hermes_cli.version_info.get_code_identity", lambda refresh=False: {"sha": HEAD, "version": "1.0"})
-    monkeypatch.setattr("hermes_cli.profiles._get_default_hermes_home", lambda: root)
-    monkeypatch.setattr("hermes_cli.profiles._get_profiles_root", lambda: root / "profiles")
+    monkeypatch.setattr("eir_cli.version_info.get_code_identity", lambda refresh=False: {"sha": HEAD, "version": "1.0"})
+    monkeypatch.setattr("eir_cli.profiles._get_default_eir_home", lambda: root)
+    monkeypatch.setattr("eir_cli.profiles._get_profiles_root", lambda: root / "profiles")
     monkeypatch.setattr("gateway.control_socket.identify_gateway", lambda h, **k: None)
     monkeypatch.setattr("gateway.status.live_gateway_pid_for_home", lambda h: by_home.get(str(h)))
     monkeypatch.setattr(ur, "_gateway_code_root", lambda pid, home: None)
@@ -66,8 +66,8 @@ def test_restart_phase_records_accepted_self_restart_and_verify_exits_clean(monk
     """The ancestor branch of the drain triage feeds the pid set the matrix reads: end to end the
     verify phase exits 0 (not 1) and clears the pending marker for an update whose only old-code
     gateway is the one it runs inside."""
-    from hermes_cli import gateway
-    from hermes_cli import update_cmd
+    from eir_cli import gateway
+    from eir_cli import update_cmd
 
     ancestor = os.getpid()
     monkeypatch.setattr(gateway, "_is_pid_ancestor_of_current_process", lambda pid: pid == ancestor)
@@ -79,14 +79,14 @@ def test_restart_phase_records_accepted_self_restart_and_verify_exits_clean(monk
 
     _fleet_homes(monkeypatch, tmp_path, {"default": {"pid": ancestor, "gateway_state": "running", "code_sha": OLD}})
     monkeypatch.setattr(fleet_verify, "_print_legacy_units_warning", lambda: None)
-    monkeypatch.setattr("hermes_cli.update_cmd_maint._refresh_dashboard_after_update", lambda *a, **k: None)
+    monkeypatch.setattr("eir_cli.update_cmd_maint._refresh_dashboard_after_update", lambda *a, **k: None)
     monkeypatch.setattr(update_cmd, "_surviving_pre_update_serve_runtimes", lambda plan: [])
     monkeypatch.setattr(fleet_mod._time, "sleep", lambda s: None)
     cleared = []
     monkeypatch.setattr(fleet_mod, "_clear_fleet_restart_pending_marker", lambda: cleared.append(True))
-    monkeypatch.setattr("hermes_cli.gateway_migrate.maybe_auto_migrate_after_update", lambda: None)
+    monkeypatch.setattr("eir_cli.gateway_migrate.maybe_auto_migrate_after_update", lambda: None)
     restart = fleet_mod._GatewayRestartOutcome(
-        incomplete=False, phase_errors=[], pre_restart_gateway_pids=[ancestor], restarted_services=["hermes-gateway"],
+        incomplete=False, phase_errors=[], pre_restart_gateway_pids=[ancestor], restarted_services=["eir-gateway"],
         failed_or_stale_units=[], relaunched_profiles=[], externally_supervised_profiles=[], killed_pids=set(),
         self_restart_pending_pids=pending,
     )
@@ -113,17 +113,17 @@ def test_a_planned_gateway_left_with_its_restart_pending_is_not_reported_unaccou
     (self_restart_pending_pids). The runtime reconciliation must read that as a deferred restart, the
     same row the fleet matrix renders "restart pending", not a silently missed one owing a manual
     restart follow-up."""
-    from hermes_cli import update_cmd
-    from hermes_cli.update_inventory import RuntimeRecord, UpdatePlan, _restart_mechanism
+    from eir_cli import update_cmd
+    from eir_cli.update_inventory import RuntimeRecord, UpdatePlan, _restart_mechanism
 
     busy = os.getpid()
     _fleet_homes(monkeypatch, tmp_path, {"default": {"pid": busy, "gateway_state": "running", "code_sha": OLD}})
     monkeypatch.setattr(fleet_verify, "_print_legacy_units_warning", lambda: None)
-    monkeypatch.setattr("hermes_cli.update_cmd_maint._refresh_dashboard_after_update", lambda *a, **k: None)
+    monkeypatch.setattr("eir_cli.update_cmd_maint._refresh_dashboard_after_update", lambda *a, **k: None)
     monkeypatch.setattr(update_cmd, "_surviving_pre_update_serve_runtimes", lambda plan: [])
     monkeypatch.setattr(fleet_mod._time, "sleep", lambda s: None)
     monkeypatch.setattr(fleet_mod, "_clear_fleet_restart_pending_marker", lambda: None)
-    monkeypatch.setattr("hermes_cli.gateway_migrate.maybe_auto_migrate_after_update", lambda: None)
+    monkeypatch.setattr("eir_cli.gateway_migrate.maybe_auto_migrate_after_update", lambda: None)
     plan = UpdatePlan()
     plan.runtimes = [RuntimeRecord(kind="gateway", profile="default", pid=busy, supervisor="systemd",
                                    restart_via=_restart_mechanism("systemd", "default"))]

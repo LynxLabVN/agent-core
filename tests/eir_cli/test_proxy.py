@@ -1,4 +1,4 @@
-"""Tests for the `hermes proxy` subcommand and its upstream adapters."""
+"""Tests for the `eir proxy` subcommand and its upstream adapters."""
 
 from __future__ import annotations
 
@@ -11,10 +11,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from hermes_cli.proxy.adapters import ADAPTERS, get_adapter
-from hermes_cli.proxy.adapters.base import UpstreamAdapter, UpstreamCredential
-from hermes_cli.proxy.adapters.nous_portal import NousPortalAdapter
-from hermes_cli.proxy.adapters.xai import XAIGrokAdapter
+from eir_cli.proxy.adapters import ADAPTERS, get_adapter
+from eir_cli.proxy.adapters.base import UpstreamAdapter, UpstreamCredential
+from eir_cli.proxy.adapters.nous_portal import NousPortalAdapter
+from eir_cli.proxy.adapters.xai import XAIGrokAdapter
 
 
 # ---------------------------------------------------------------------------
@@ -33,9 +33,9 @@ from hermes_cli.proxy.adapters.xai import XAIGrokAdapter
 # ---------------------------------------------------------------------------
 
 
-def _write_auth_store(hermes_home: Path, nous_state: dict[str, Any]) -> Path:
-    """Write an auth.json with the given nous state into a hermetic HERMES_HOME."""
-    auth_path = hermes_home / "auth.json"
+def _write_auth_store(eir_home: Path, nous_state: dict[str, Any]) -> Path:
+    """Write an auth.json with the given nous state into a hermetic EIR_HOME."""
+    auth_path = eir_home / "auth.json"
     auth_path.write_text(json.dumps({
         "version": 1,
         "providers": {"nous": nous_state},
@@ -46,8 +46,8 @@ def _write_auth_store(hermes_home: Path, nous_state: dict[str, Any]) -> Path:
 def test_nous_adapter_never_waits_on_a_free_tier_challenge_under_its_lock(tmp_path, monkeypatch):
     """Every proxied request queues on the adapter lock, so the credential read inside it is a
     background caller: a browser challenge is announced and raised, never waited on."""
-    from hermes_cli import anon_challenge
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    from eir_cli import anon_challenge
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     _write_auth_store(tmp_path, {"access_token": "a", "refresh_token": "r"})
     seen = []
 
@@ -56,14 +56,14 @@ def test_nous_adapter_never_waits_on_a_free_tier_challenge_under_its_lock(tmp_pa
         return {"api_key": "k", "expires_at": "2099-01-01T00:00:00Z",
                 "base_url": "https://inference-api.nousresearch.com/v1"}
 
-    with patch("hermes_cli.proxy.adapters.nous_portal.resolve_nous_runtime_credentials", side_effect=resolve):
+    with patch("eir_cli.proxy.adapters.nous_portal.resolve_nous_runtime_credentials", side_effect=resolve):
         NousPortalAdapter().get_credential()
     assert seen == [True]
 
 
 def test_nous_adapter_concurrent_refresh_serialized(tmp_path, monkeypatch):
     """Two parallel get_credential() calls must serialize through the lock."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     _write_auth_store(tmp_path, {
         "access_token": "a", "refresh_token": "r",
     })
@@ -106,7 +106,7 @@ def test_nous_adapter_concurrent_refresh_serialized(tmp_path, monkeypatch):
             errors.append(exc)
 
     with patch(
-        "hermes_cli.proxy.adapters.nous_portal.resolve_nous_runtime_credentials",
+        "eir_cli.proxy.adapters.nous_portal.resolve_nous_runtime_credentials",
         side_effect=serializing_refresh,
     ):
         threads = [threading.Thread(target=worker) for _ in range(3)]
@@ -128,15 +128,15 @@ def test_nous_adapter_concurrent_refresh_serialized(tmp_path, monkeypatch):
 
 
 def _write_xai_pool_entry(
-    hermes_home: Path,
+    eir_home: Path,
     *,
     access_token: str = "xai-access-token",
     refresh_token: str = "xai-refresh-token",
     base_url: str = "https://api.x.ai/v1",
     source: str = "manual:xai_pkce",
 ) -> Path:
-    """Write an xai-oauth pool entry into a hermetic HERMES_HOME."""
-    auth_path = hermes_home / "auth.json"
+    """Write an xai-oauth pool entry into a hermetic EIR_HOME."""
+    auth_path = eir_home / "auth.json"
     auth_path.write_text(json.dumps({
         "version": 1,
         "providers": {},
@@ -159,7 +159,7 @@ def _write_xai_pool_entry(
 
 
 def test_xai_adapter_not_authenticated_when_no_pool_entry(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     (tmp_path / "auth.json").write_text(json.dumps({
         "version": 1,
         "providers": {},
@@ -181,7 +181,7 @@ def test_xai_adapter_retry_rotates_pool_entry_on_429(tmp_path, monkeypatch):
     via ``EXHAUSTED_TTL_429_SECONDS`` on the offending key, and
     returns the next available credential.
     """
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
 
     # Two pool entries so rotation has somewhere to go.
     auth_path = tmp_path / "auth.json"
@@ -219,7 +219,7 @@ def test_xai_adapter_retry_rotates_pool_entry_on_429(tmp_path, monkeypatch):
     def _refresh_must_not_run(*args, **kwargs):
         raise AssertionError("refresh_xai_oauth_pure must not run on 429")
 
-    monkeypatch.setattr("hermes_cli.auth.refresh_xai_oauth_pure", _refresh_must_not_run)
+    monkeypatch.setattr("eir_cli.auth.refresh_xai_oauth_pure", _refresh_must_not_run)
 
     adapter = XAIGrokAdapter()
     failed = adapter.get_credential()
@@ -246,7 +246,7 @@ def test_xai_adapter_retry_rotates_pool_entry_on_429(tmp_path, monkeypatch):
 aiohttp = pytest.importorskip("aiohttp")
 from aiohttp import web
 
-from hermes_cli.proxy.server import create_app
+from eir_cli.proxy.server import create_app
 
 
 class FakeAdapter(UpstreamAdapter):

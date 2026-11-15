@@ -3,21 +3,21 @@
 import pytest
 from pydantic import ValidationError
 
-import hermes_cli.web_models as _web_models
-import hermes_cli.web_routers.cron as _rt_cron
-import hermes_cli.web_server_cron as _web_server_cron
+import eir_cli.web_models as _web_models
+import eir_cli.web_routers.cron as _rt_cron
+import eir_cli.web_server_cron as _web_server_cron
 
 
 @pytest.fixture()
 def isolated_profiles(tmp_path, monkeypatch):
-    from hermes_cli import profiles
+    from eir_cli import profiles
 
-    default_home = tmp_path / ".hermes"
+    default_home = tmp_path / ".eir"
     worker_home = default_home / "profiles" / "worker_alpha"
     for home in (default_home, worker_home):
         (home / "cron").mkdir(parents=True, exist_ok=True)
         (home / "config.yaml").write_text("model: test-model\n", encoding="utf-8")
-    monkeypatch.setattr(profiles, "_get_default_hermes_home", lambda: default_home)
+    monkeypatch.setattr(profiles, "_get_default_eir_home", lambda: default_home)
     monkeypatch.setattr(profiles, "_get_profiles_root", lambda: default_home / "profiles")
     return worker_home
 

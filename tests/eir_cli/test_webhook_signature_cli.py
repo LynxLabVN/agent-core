@@ -1,4 +1,4 @@
-"""``hermes webhook subscribe`` pins new routes to ``signature: generic`` and ``webhook test`` signs so the
+"""``eir webhook subscribe`` pins new routes to ``signature: generic`` and ``webhook test`` signs so the
 real adapter accepts it under that pin (#84265)."""
 import json
 from argparse import Namespace
@@ -9,13 +9,13 @@ from multidict import CIMultiDict
 
 from gateway.config import PlatformConfig
 from gateway.platforms.webhook import WebhookAdapter
-from hermes_cli.webhook import _load_subscriptions, _mutate_subscriptions, webhook_command
+from eir_cli.webhook import _load_subscriptions, _mutate_subscriptions, webhook_command
 
 
 @pytest.fixture(autouse=True)
 def _isolate(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-    monkeypatch.setattr("hermes_cli.webhook._is_webhook_enabled", lambda: True)
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
+    monkeypatch.setattr("eir_cli.webhook._is_webhook_enabled", lambda: True)
 
 
 def _args(**kwargs):
@@ -26,7 +26,7 @@ def _args(**kwargs):
 
 
 def _send_test(monkeypatch, name: str):
-    """Run ``hermes webhook test`` and return the request it would have POSTed."""
+    """Run ``eir webhook test`` and return the request it would have POSTed."""
     sent = []
 
     class _Resp:
@@ -39,7 +39,7 @@ def _send_test(monkeypatch, name: str):
         sent.append(req)
         return _Resp()
 
-    monkeypatch.setattr("hermes_cli.webhook.urllib.request.urlopen", _urlopen)
+    monkeypatch.setattr("eir_cli.webhook.urllib.request.urlopen", _urlopen)
     webhook_command(_args(webhook_action="test", name=name))
     (req,) = sent
     return req

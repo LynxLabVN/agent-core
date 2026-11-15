@@ -1,5 +1,5 @@
-import * as sdk from '@hermes/plugin-sdk'
-import { Codicon, Tip } from '@hermes/plugin-sdk'
+import * as sdk from '@eir/plugin-sdk'
+import { Codicon, Tip } from '@eir/plugin-sdk'
 import { Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 
 import { type CanonicalGroupAttachment, CanonicalGroupAttachments, fetchCanonicalGroupAttachment } from './canonical-group-attachments'

@@ -11,7 +11,7 @@ the same durable rewind ``/undo`` uses (``_rewind_to_user_ordinal``). Cancelling
 an empty submit, or submitting something else) leaves the session as it was. Fork reuses
 ``/branch`` and rewinds only the child, so the original session's rows stay active.
 
-Mixin bound FIRST in ``HermesCLI``'s bases so its overrides wrap the TUI handlers via ``super()``.
+Mixin bound FIRST in ``EirCLI``'s bases so its overrides wrap the TUI handlers via ``super()``.
 cli.py-internal symbols are imported lazily (import cycle).
 """
 
@@ -50,7 +50,7 @@ class CLIBacktrackMixin:
         from agent.context_compressor import user_originated_turn_view
         from agent.image_routing import split_image_notes
         from agent.message_metadata import typed_prompt_content
-        from hermes_cli.cli_session_mixin import _user_turn_indices
+        from eir_cli.cli_session_mixin import _user_turn_indices
         history = self.conversation_history or []
         prompts = []
         for index in _user_turn_indices(history):
@@ -119,7 +119,7 @@ class CLIBacktrackMixin:
     # ---- browse --------------------------------------------------------------------------
     def _open_backtrack_picker(self) -> bool:
         from cli import _cprint
-        from hermes_cli.cli_backtrack_browse import transcript_turns
+        from eir_cli.cli_backtrack_browse import transcript_turns
         self._backtrack_primed = None
         if self._backtrack_state or self._backtrack_blocked():
             return False
@@ -144,8 +144,8 @@ class CLIBacktrackMixin:
         return entries[selected] if 0 <= selected < len(entries) else None
 
     def _get_backtrack_display_fragments(self):
-        from hermes_cli.cli_backtrack_browse import render_pager
-        from hermes_cli.cli_tui_mixin import _PANEL_RESERVED_BELOW
+        from eir_cli.cli_backtrack_browse import render_pager
+        from eir_cli.cli_tui_mixin import _PANEL_RESERVED_BELOW
         state = self._backtrack_state
         if not state:
             return []
@@ -347,7 +347,7 @@ class CLIBacktrackMixin:
         from prompt_toolkit.filters import Condition, vi_insert_mode
         from prompt_toolkit.keys import Keys
 
-        from hermes_cli.cli_subagent_monitor import modal_prompt_active
+        from eir_cli.cli_subagent_monitor import modal_prompt_active
         kb = super()._tui_build_key_bindings()
         picker = Condition(lambda: bool(self._backtrack_state))
         primable = Condition(lambda: not self._backtrack_state and not modal_prompt_active(self)

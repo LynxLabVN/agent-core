@@ -1,6 +1,6 @@
-"""Post-update maintenance for ``hermes update``: pre-update backup snapshot, state-db verify/restore, curator/FTS notices, FHS path guard, completion summary.
+"""Post-update maintenance for ``eir update``: pre-update backup snapshot, state-db verify/restore, curator/FTS notices, FHS path guard, completion summary.
 
-Split out of ``update_cmd.py``, which re-imports every name so ``hermes_cli.update_cmd.<name>``
+Split out of ``update_cmd.py``, which re-imports every name so ``eir_cli.update_cmd.<name>``
 still resolves/monkeypatches. Origin helpers are imported lazily per function (no cycle;
 test patches on ``update_cmd`` stay effective).
 """
@@ -14,16 +14,16 @@ import time as _time
 from pathlib import Path
 from typing import Optional
 
-from hermes_cli.update_cmd_common import _best_effort
+from eir_cli.update_cmd_common import _best_effort
 from datetime import UTC
 
 # Log-record parity with the origin module.
-logger = logging.getLogger("hermes_cli.update_cmd")
+logger = logging.getLogger("eir_cli.update_cmd")
 
 
 def _prepare_updated_checkout(project_root: Path, *, desktop: bool) -> None:
     """Historical updater hook: never complete inside the pre-swap interpreter."""
-    from hermes_cli._old_updater import stop_for_relaunch
+    from eir_cli._old_updater import stop_for_relaunch
     stop_for_relaunch(incomplete=True)
 
 
@@ -45,34 +45,34 @@ def _sqlite_partial_completion_lines(sqlite_version: str) -> list[str]:
     """Shared ``⚠ Update partially complete`` wording for a vulnerable post-update SQLite, so the
     two completion banners cannot drift. The lead names the consequence, the second line the
     exact fix command."""
-    from hermes_cli.update_cmd import _m
+    from eir_cli.update_cmd import _m
     return [
         f"⚠ Update partially complete — your Python's SQLite ({sqlite_version}) has a known "
-        "corruption bug. Hermes works, but sessions could be damaged.",
+        "corruption bug. Eir works, but sessions could be damaged.",
         f"  Fix: run the installer again ({_REINSTALL_ONE_LINER[bool(_m()._is_windows())]}) "
-        "which installs a safe Python, then run `hermes doctor` to confirm.",
+        "which installs a safe Python, then run `eir doctor` to confirm.",
     ]
 
 
 def _load_updates_cfg() -> dict:
     """``updates`` section of config.yaml; ``{}`` on any failure."""
-    from hermes_cli.config import load_config
+    from eir_cli.config import load_config
     cfg = load_config() or {}
     updates = cfg.get("updates", {}) if isinstance(cfg, dict) else {}
     return updates if isinstance(updates, dict) else {}
 
 
-def _purge_stale_hermes_modules() -> None:
+def _purge_stale_eir_modules() -> None:
     """Historical updater hook; module-graph surgery cannot complete an update."""
-    from hermes_cli._old_updater import stop_for_relaunch
+    from eir_cli._old_updater import stop_for_relaunch
     stop_for_relaunch(incomplete=True)
 
 
 def _reload_updated_runtime_modules() -> None:
     # Historical updater hook: dependency activation belongs to the next process.
-    from hermes_cli._old_updater import stop_historical_updater
+    from eir_cli._old_updater import stop_historical_updater
 
-    stop_historical_updater("hermes_cli.update_cmd_maint._reload_updated_runtime_modules")
+    stop_historical_updater("eir_cli.update_cmd_maint._reload_updated_runtime_modules")
 
 
 def _print_curator_first_run_notice() -> None:
@@ -100,8 +100,8 @@ def _print_curator_first_run_notice() -> None:
         f"~{days}d after installation; only agent-created skills are in "
         f"scope and nothing is ever auto-deleted (archive is recoverable)."
     )
-    print("  Preview now:  hermes curator run --dry-run")
-    print("  Pause it:     hermes curator pause")
+    print("  Preview now:  eir curator run --dry-run")
+    print("  Pause it:     eir curator pause")
     print("  Docs:         https://hermes-agent.nousresearch.com/docs/user-guide/features/curator")
 
 
@@ -111,7 +111,7 @@ def _print_fts_optimize_available_notice() -> None:
     ``sessions.fts_optimize_notice``: ``advise`` (default), ``require`` (firmer), ``off``.
     """
     try:
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
         mode = str(((load_config() or {}).get("sessions") or {}).get("fts_optimize_notice", "advise")).strip().lower()
     except Exception:
         mode = "advise"
@@ -119,11 +119,11 @@ def _print_fts_optimize_available_notice() -> None:
         return
 
     try:
-        from hermes_constants import get_hermes_home
-        from hermes_state import SessionDB
+        from eir_constants import get_eir_home
+        from eir_state import SessionDB
     except Exception:
         return
-    db_path = get_hermes_home() / "state.db"
+    db_path = get_eir_home() / "state.db"
     if not db_path.exists():
         return
     try:
@@ -139,7 +139,7 @@ def _print_fts_optimize_available_notice() -> None:
     try:
         db = SessionDB(db_path=db_path, read_only=True)
         # read_only opens skip schema init; probe the stored layout directly.
-        from hermes_state_fts import fts_layout_drift
+        from eir_state_fts import fts_layout_drift
         drift = fts_layout_drift(db._conn)
         legacy_inline = db._db_has_legacy_inline_fts(db._conn)
         # Interrupted optimize-storage: v23 table shape but backfill markers / trash
@@ -167,11 +167,11 @@ def _print_fts_optimize_available_notice() -> None:
         print()
         print("◆ Session database optimization incomplete")
         print(
-            "  A previous `hermes sessions optimize-storage` run was "
+            "  A previous `eir sessions optimize-storage` run was "
             "interrupted. Search still works; re-run the command to resume "
             "and finish reclaiming disk:"
         )
-        print("    hermes sessions optimize-storage")
+        print("    eir sessions optimize-storage")
         return
 
     print()
@@ -203,7 +203,7 @@ def _print_fts_optimize_available_notice() -> None:
             "optimization, but a later release changed it. Running the "
             "command again rebuilds it in the current layout."
         )
-    print("  Run when convenient:  hermes sessions optimize-storage")
+    print("  Run when convenient:  eir sessions optimize-storage")
     print(
         "  It runs in the foreground with a progress bar, is safe to "
         "interrupt/re-run, and never changes your conversations."
@@ -234,7 +234,7 @@ def _print_curator_recent_run_notice() -> None:
         print(f"ℹ Skill curator — last run {_format_time_ago(last_run_at)}")
         for line in summary.splitlines():
             print(f"  {line}")
-        print("  (This message shows once per curator run. View anytime: hermes curator status)")
+        print("  (This message shows once per curator run. View anytime: eir curator status)")
 
     with suppress(Exception):
         state["last_run_summary_shown_at"] = last_run_at
@@ -262,7 +262,7 @@ def _format_time_ago(iso_ts: str) -> str:
 
 def _reload_process_scan_modules() -> None:
     """Historical updater hook; scans now run only in fresh completion Python."""
-    from hermes_cli._old_updater import stop_for_relaunch
+    from eir_cli._old_updater import stop_for_relaunch
     stop_for_relaunch(incomplete=True)
 
 
@@ -270,9 +270,9 @@ def _finish_dashboard_update_cleanup(
     node_failures: list[str], already_restarted_units: set[str] | None = None
 ) -> None:
     """Historical updater hook; do not continue a pre-PM update after the swap."""
-    from hermes_cli._old_updater import stop_historical_updater
+    from eir_cli._old_updater import stop_historical_updater
 
-    stop_historical_updater("hermes_cli.update_cmd_maint._finish_dashboard_update_cleanup")
+    stop_historical_updater("eir_cli.update_cmd_maint._finish_dashboard_update_cleanup")
 
 
 def _refresh_dashboard_after_update(*, already_restarted_units: set[str] | None = None) -> set[int]:
@@ -285,13 +285,13 @@ def _refresh_dashboard_after_update(*, already_restarted_units: set[str] | None 
 
     See #83595.
     """
-    from hermes_cli.update_cmd import _m, _record_update_step
-    from hermes_constants import get_hermes_home
+    from eir_cli.update_cmd import _m, _record_update_step
+    from eir_constants import get_eir_home
 
     try:
         stop_result = _m()._kill_stale_dashboard_processes(
             restart_managed=True, already_restarted_units=already_restarted_units,
-            scope_home=str(get_hermes_home()),
+            scope_home=str(get_eir_home()),
         )
     except Exception as exc:
         # Isolated like every sibling post-update step: a failure here (#112604) used to abort
@@ -303,7 +303,7 @@ def _refresh_dashboard_after_update(*, already_restarted_units: set[str] | None 
         print()
         print(f"⚠ Could not refresh running dashboard/serve process(es): {exc}")
         print("  If one is still running, restart it so it serves the updated code:")
-        print("    hermes dashboard --port <port>   (or: systemctl --user restart hermes-dashboard)")
+        print("    eir dashboard --port <port>   (or: systemctl --user restart eir-dashboard)")
         return set()
     unrecovered = {int(pid) for pid in stop_result.get("unrecovered") or ()}
     if not unrecovered:
@@ -312,7 +312,7 @@ def _refresh_dashboard_after_update(*, already_restarted_units: set[str] | None 
     print()
     print("⚠ A web dashboard/serve process was stopped during update and could not be auto-restarted.")
     print("  Re-launch it when you want the web UI back:")
-    print("    hermes dashboard --port <port>")
+    print("    eir dashboard --port <port>")
     return unrecovered
 
 
@@ -322,17 +322,17 @@ def _print_update_completion(message: str) -> None:
 
     See #47359, #58764.
     """
-    from hermes_cli.update_cmd import _branch_head_suffix
+    from eir_cli.update_cmd import _branch_head_suffix
     print(f"{message}{_branch_head_suffix()}")
-    action_id = os.environ.get("HERMES_ACTION_ID", "")
+    action_id = os.environ.get("EIR_ACTION_ID", "")
     if len(action_id) == 32 and all(char in "0123456789abcdef" for char in action_id):
-        print(f"=== hermes-update completed {action_id} ===")
+        print(f"=== eir-update completed {action_id} ===")
 
 
 def _read_project_version() -> str | None:
     """``version`` from the checkout's pyproject.toml (not importlib.metadata, which still
     describes the OLD version after a pull). None on any failure — cosmetic, never breaks."""
-    from hermes_cli.update_cmd import _m
+    from eir_cli.update_cmd import _m
     try:
         import tomllib
         with open(_m().PROJECT_ROOT / "pyproject.toml", "rb") as fh:  # windows-footgun: ok — binary mode, tomllib requires bytes
@@ -348,8 +348,8 @@ def _checkout_version() -> str | None:
     pyproject.toml is an inert 0.0.0 on source checkouts; the release a checkout
     runs is derived from its reachable tags.
     """
-    from hermes_cli.update_cmd import _m
-    from hermes_cli.version_info import _git_version_info
+    from eir_cli.update_cmd import _m
+    from eir_cli.version_info import _git_version_info
     info = _git_version_info(Path(_m().PROJECT_ROOT), include_untracked=True)
     return info.derived_version if info.commit else None
 
@@ -376,15 +376,15 @@ def _update_complete_message(pre_version: str | None) -> str:
 
 def _post_update_sqlite_runtime_status():
     """Return whether the interpreter used after update has safe SQLite."""
-    from hermes_cli.sqlite_runtime import probe_sqlite_runtime
+    from eir_cli.sqlite_runtime import probe_sqlite_runtime
     # Completion already runs on PM's selected Python, not the obsolete repo venv.
     info = probe_sqlite_runtime(Path(sys.executable))
     return info is not None and not info.wal_reset_vulnerable, info
 
 
 def _print_verified_update_completion(message: str) -> bool:
-    """Print a success completion only after probing the next Hermes runtime."""
-    from hermes_cli.update_cmd import _post_update_sqlite_runtime_status
+    """Print a success completion only after probing the next Eir runtime."""
+    from eir_cli.update_cmd import _post_update_sqlite_runtime_status
     if not message.startswith("✓"):
         _print_update_completion(message)
         return False
@@ -404,9 +404,9 @@ def _print_verified_update_completion(message: str) -> bool:
 
 def _print_update_summary(*, node_failures: list, desktop_build_ok: bool, pre_update_version: str | None) -> bool:
     """Historical updater hook; old soft-build results cannot establish completion."""
-    from hermes_cli._old_updater import stop_historical_updater
+    from eir_cli._old_updater import stop_historical_updater
 
-    stop_historical_updater("hermes_cli.update_cmd_maint._print_update_summary")
+    stop_historical_updater("eir_cli.update_cmd_maint._print_update_summary")
 
 
 def _restore_state_db_from_snapshot(state_path: Path, snap_state: Path) -> bool:
@@ -415,8 +415,8 @@ def _restore_state_db_from_snapshot(state_path: Path, snap_state: Path) -> bool:
     Use the single-database primitive, not whole-profile restore: post-update config
     and unrelated files must not roll back with a damaged transcript store.
     """
-    from hermes_cli.backup import verify_sqlite_integrity
-    from hermes_cli.backup_restore import _safe_restore_db
+    from eir_cli.backup import verify_sqlite_integrity
+    from eir_cli.backup_restore import _safe_restore_db
 
     snap_state.stat()  # Preserve the caller's OSError reporting for missing snapshots.
     if not verify_sqlite_integrity(snap_state, check_header=True, run_pragma=True).get("valid"):
@@ -425,7 +425,7 @@ def _restore_state_db_from_snapshot(state_path: Path, snap_state: Path) -> bool:
         print("  ✗ Auto-restore refused or failed; state.db was not restored.")
         print("    Stop the owning runtime and close database handles before retrying.")
         print("    If the canonical runtime epoch is unreadable, do not restore in place:")
-        print("    use `hermes sessions recover --source <snapshot> --output <separate-path>`")
+        print("    use `eir sessions recover --source <snapshot> --output <separate-path>`")
         print("    to salvage transcripts into a separate output.")
         return False
     restored = verify_sqlite_integrity(state_path, check_header=True, run_pragma=True)
@@ -436,7 +436,7 @@ def _verify_and_restore_one_state_db(home: Path, *, label: str) -> None:
     """Integrity check + auto-restore for ONE home's state.db from its newest valid snapshot.
     Never raises: a guard that crashes the update tail is worse than what it detects."""
     try:
-        from hermes_cli.backup import _quick_snapshot_root, verify_sqlite_integrity
+        from eir_cli.backup import _quick_snapshot_root, verify_sqlite_integrity
         state_path = home / "state.db"
         if not state_path.exists():
             return
@@ -475,11 +475,11 @@ def _verify_and_restore_state_dbs_post_update() -> None:
 
     See #97994.
     """
-    from hermes_cli.update_cmd import get_hermes_home
-    home = get_hermes_home()
+    from eir_cli.update_cmd import get_eir_home
+    home = get_eir_home()
     _verify_and_restore_one_state_db(home, label="default home")
     with _best_effort('Sibling-profile state.db guard sweep failed: %s'):
-        from hermes_cli.backup import _sibling_profile_homes
+        from eir_cli.backup import _sibling_profile_homes
         for name, profile_home in _sibling_profile_homes(home):
             _verify_and_restore_one_state_db(profile_home, label=f"profile {name}")
 
@@ -493,22 +493,22 @@ def _invalidate_live_plugin_catalog_caches() -> None:
     TTL (#119340). Mirrors the state.db guard's home + siblings iteration. Never raises —
     :func:`plugin_catalog.invalidate_live_cache_for_home` is best-effort per home.
     """
-    from hermes_cli.update_cmd import get_hermes_home
-    home = get_hermes_home()
-    from hermes_cli.plugin_catalog import invalidate_live_cache_for_home
+    from eir_cli.update_cmd import get_eir_home
+    home = get_eir_home()
+    from eir_cli.plugin_catalog import invalidate_live_cache_for_home
     invalidate_live_cache_for_home(home)
     with suppress(Exception):
-        from hermes_cli.backup import _sibling_profile_homes
+        from eir_cli.backup import _sibling_profile_homes
         for _name, profile_home in _sibling_profile_homes(home):
             invalidate_live_cache_for_home(profile_home)
 
 
 def _report_catalog_plugin_updates() -> None:
-    from hermes_cli.backup import _sibling_profile_homes
-    from hermes_cli.plugins_auto_update import report_catalog_updates_after_hermes_update
-    from hermes_cli.update_cmd import get_hermes_home
-    home = get_hermes_home()
-    report_catalog_updates_after_hermes_update(home, _sibling_profile_homes(home))
+    from eir_cli.backup import _sibling_profile_homes
+    from eir_cli.plugins_auto_update import report_catalog_updates_after_eir_update
+    from eir_cli.update_cmd import get_eir_home
+    home = get_eir_home()
+    report_catalog_updates_after_eir_update(home, _sibling_profile_homes(home))
 
 
 def _print_bundled_skills_sync_report() -> None:
@@ -521,7 +521,7 @@ def _print_bundled_skills_sync_report() -> None:
         print(f"  ↑ {len(result['updated'])} updated: {', '.join(result['updated'])}")
     if result.get("user_modified"):
         print(f"  ~ {len(result['user_modified'])} user-modified (kept)")
-        print("    → see them: hermes skills list-modified  (diff/reset to resume updates)")
+        print("    → see them: eir skills list-modified  (diff/reset to resume updates)")
     if result.get("cleaned"):
         print(f"  − {len(result['cleaned'])} removed from manifest")
     if result.get("relocated"):
@@ -533,8 +533,8 @@ def _print_bundled_skills_sync_report() -> None:
 def _ensure_fhs_path_guard() -> None:
     """Ensure /usr/local/bin is on PATH for RHEL-family root non-login shells (su, sudo -s,
     tmux), where neither /etc/bashrc nor .bash_profile adds it. Mirrors install.sh. Idempotent;
-    no-op on non-Linux/non-root/non-FHS or when ``bash -i -c 'command -v hermes'`` resolves."""
-    from hermes_cli.update_cmd import _m
+    no-op on non-Linux/non-root/non-FHS or when ``bash -i -c 'command -v eir'`` resolves."""
+    from eir_cli.update_cmd import _m
     if _m().sys.platform != "linux":
         return
     try:
@@ -542,8 +542,8 @@ def _ensure_fhs_path_guard() -> None:
             return
     except AttributeError:
         return
-    # Only for FHS-layout installs (link at /usr/local/bin/hermes).
-    fhs_link = Path("/usr/local/bin/hermes")
+    # Only for FHS-layout installs (link at /usr/local/bin/eir).
+    fhs_link = Path("/usr/local/bin/eir")
     if not fhs_link.is_symlink() and not fhs_link.exists():
         return
 
@@ -560,7 +560,7 @@ def _ensure_fhs_path_guard() -> None:
                 "bash",
                 "-i",
                 "-c",
-                "command -v hermes",
+                "command -v eir",
             ],
             # Fallback: blunt systemctl restart. This is what the old code always did; we get here only when
             # the graceful path failed (unit missing SIGUSR1 wiring, drain exceeded the budget,
@@ -568,7 +568,7 @@ def _ensure_fhs_path_guard() -> None:
             # already parked the unit in a failed state (transient CHDIR / OOM / filesystem race after our
             # drain + exit-75), a plain `systemctl restart` can wedge against the RestartSec backoff and
             # leave the unit dead. Clearing the failed state first makes the restart idempotent. Mirrors the
-            # recovery path in `hermes gateway restart` (`systemd_restart()`) as of PR #20949.
+            # recovery path in `eir gateway restart` (`systemd_restart()`) as of PR #20949.
             capture_output=True,
             text=True, encoding="utf-8", errors="replace",
             timeout=10,
@@ -580,7 +580,7 @@ def _ensure_fhs_path_guard() -> None:
         return  # already on PATH, nothing to do
 
     path_line = 'export PATH="/usr/local/bin:$PATH"'
-    path_comment = "# Hermes Agent — ensure /usr/local/bin is on PATH (RHEL non-login shells)"
+    path_comment = "# Eir Agent — ensure /usr/local/bin is on PATH (RHEL non-login shells)"
     wrote_any = False
     for candidate in (".bashrc", ".bash_profile"):
         cfg = Path(home) / candidate
@@ -610,8 +610,8 @@ def _ensure_fhs_path_guard() -> None:
 
 def _ensure_acp_launcher() -> None:
     """Historical export; launcher policy belongs to the launcher owner."""
-    from hermes_cli import _launchers
-    from hermes_cli.update_cmd import _m
+    from eir_cli import _launchers
+    from eir_cli.update_cmd import _m
     _launchers.expose_cli(_m().PROJECT_ROOT)
 
 
@@ -651,9 +651,9 @@ def _resolve_pre_update_backup_mode(args) -> str:
 def _verify_state_db_after_snapshot(snapshot_id: str) -> None:
     """Verify live state.db after the snapshot: a concurrent process (antivirus, killed
     gateway, Windows filter driver) can corrupt it and we'd otherwise exit 0 silently."""
-    from hermes_cli.backup import _quick_snapshot_root, verify_sqlite_integrity
-    from hermes_cli.config import get_hermes_home
-    _src_path = get_hermes_home() / "state.db"
+    from eir_cli.backup import _quick_snapshot_root, verify_sqlite_integrity
+    from eir_cli.config import get_eir_home
+    _src_path = get_eir_home() / "state.db"
     if not _src_path.exists():
         return
     _integrity = verify_sqlite_integrity(
@@ -662,7 +662,7 @@ def _verify_state_db_after_snapshot(snapshot_id: str) -> None:
     if _integrity.get("valid"):
         return
     print(f"  ⚠ state.db integrity check FAILED after snapshot: {_integrity.get('message', 'unknown error')}")
-    _snap_state = _quick_snapshot_root(get_hermes_home()) / snapshot_id / "state.db"
+    _snap_state = _quick_snapshot_root(get_eir_home()) / snapshot_id / "state.db"
     if not _snap_state.exists():
         print("  ⚠ Snapshot does not contain state.db (was skipped or too large).")
     elif verify_sqlite_integrity(_snap_state, check_header=True, run_pragma=True).get("valid"):
@@ -675,8 +675,8 @@ def _verify_state_db_after_snapshot(snapshot_id: str) -> None:
 
 def _run_quick_snapshots() -> Optional[str]:
     """Quick snapshot of the root home plus every sibling profile; returns the root snapshot id."""
-    from hermes_cli.update_cmd import _record_update_step
-    from hermes_cli.backup import create_quick_snapshot
+    from eir_cli.update_cmd import _record_update_step
+    from eir_cli.backup import create_quick_snapshot
     snapshot_id = create_quick_snapshot(
         label="pre-update", keep=_PRE_UPDATE_SNAPSHOT_KEEP, max_file_size=_PRE_UPDATE_SNAPSHOT_MAX_FILE_SIZE,
     )
@@ -687,7 +687,7 @@ def _run_quick_snapshots() -> Optional[str]:
     # The code swap + fleet restart touch EVERY profile, so each gets the same snapshot
     # under its own state-snapshots/. Best-effort per profile.
     with _best_effort('Sibling profile snapshots failed: %s'):
-        from hermes_cli.backup import create_pre_update_snapshots_all_profiles
+        from eir_cli.backup import create_pre_update_snapshots_all_profiles
         _sibling_snaps = create_pre_update_snapshots_all_profiles(
             keep=_PRE_UPDATE_SNAPSHOT_KEEP, max_file_size=_PRE_UPDATE_SNAPSHOT_MAX_FILE_SIZE,
         )
@@ -698,16 +698,16 @@ def _run_quick_snapshots() -> Optional[str]:
                 True,
                 ", ".join(f"{k}={v}" for k, v in sorted(_sibling_snaps.items())),
             )
-            import hermes_cli.update_cmd_config as _cfg
+            import eir_cli.update_cmd_config as _cfg
             # The reader lives in update_cmd_config; write ITS module global, not ours.
             _cfg._LAST_SIBLING_SNAPSHOTS = _sibling_snaps
     return snapshot_id
 
 
 def _run_full_backup() -> None:
-    """Zip HERMES_HOME under ``backups/`` (restorable via ``hermes import``). Never raises."""
+    """Zip EIR_HOME under ``backups/`` (restorable via ``eir import``). Never raises."""
     try:
-        from hermes_cli.backup import create_pre_update_backup
+        from eir_cli.backup import create_pre_update_backup
     except Exception as exc:
         print(f"⚠ Pre-update backup: could not load backup module ({exc}); continuing update.")
         print()
@@ -739,16 +739,16 @@ def _run_full_backup() -> None:
     except OSError:
         size_bytes = 0
 
-    from hermes_cli.sizefmt import format_bytes
-    # display_hermes_home so the user sees ~/.hermes/...
+    from eir_cli.sizefmt import format_bytes
+    # display_eir_home so the user sees ~/.eir/...
     try:
-        from hermes_constants import get_hermes_home, display_hermes_home
-        display_path = f"{display_hermes_home()}/{out_path.relative_to(get_hermes_home())}"
+        from eir_constants import get_eir_home, display_eir_home
+        display_path = f"{display_eir_home()}/{out_path.relative_to(get_eir_home())}"
     except Exception:
         display_path = str(out_path)
 
     print(f"  Saved:    {display_path} ({format_bytes(size_bytes)}, {elapsed:.1f}s)")
-    print(f"  Restore:  hermes import {out_path}")
+    print(f"  Restore:  eir import {out_path}")
     print("  Disable:  set updates.pre_update_backup: quick (or off) in config.yaml")
     print()
 
@@ -758,7 +758,7 @@ def _run_pre_update_backup(args) -> Optional[str]:
 
     ``off`` — nothing. ``quick`` (default) — snapshot of critical small files under
     ``state-snapshots/``, files over 1 GiB skipped so a bloated state.db can't stall the update.
-    ``full`` — quick snapshot PLUS a zip of HERMES_HOME under ``backups/`` (``hermes import``).
+    ``full`` — quick snapshot PLUS a zip of EIR_HOME under ``backups/`` (``eir import``).
 
     Explicit user opt-out is honored fully. See #34600.
     """
@@ -804,9 +804,9 @@ def _sweep_bytecode_after_update(branch: str) -> None:
     Never fails the committed update: a failed sweep is a ``bytecode_sweep`` follow-up and the
     fingerprint stays un-stamped, so the launch-time sweep (fingerprint mismatch) retries it.
     """
-    from hermes_cli.main_web_build import _prune_dropped_directories, _recorded_bytecode_fingerprint
-    from hermes_cli.update_cmd import _m
-    from hermes_cli.update_receipt import record_followup
+    from eir_cli.main_web_build import _prune_dropped_directories, _recorded_bytecode_fingerprint
+    from eir_cli.update_cmd import _m
+    from eir_cli.update_receipt import record_followup
     # Timestamp-based .pyc validation can accept old bytecode after the source swap.
     try:
         root = _m().PROJECT_ROOT
@@ -823,7 +823,7 @@ def _sweep_bytecode_after_update(branch: str) -> None:
         _m()._refresh_bootstrap_cache_scripts(branch)
     except Exception as exc:  # health: allow BLE001 -- refreshed again by the next update
         record_followup("bootstrap_scripts", str(exc) or type(exc).__name__,
-                        retry="the next `hermes update` refreshes them")
+                        retry="the next `eir update` refreshes them")
 
 
 def _profile_skill_sync_status(r) -> str:
@@ -842,9 +842,9 @@ def _profile_skill_sync_status(r) -> str:
 def _sync_profiles_after_update() -> None:
     """Best-effort per-profile syncs: bundled skills, ``.env`` backfill."""
     # All profiles incl. the active one: seed_profile_skills() subprocesses with an explicit
-    # HERMES_HOME, so sync_skills()'s module-level HERMES_HOME cache can't skew it.
+    # EIR_HOME, so sync_skills()'s module-level EIR_HOME cache can't skew it.
     with suppress(Exception):
-        from hermes_cli.profiles import list_profiles, seed_profile_skills
+        from eir_cli.profiles import list_profiles, seed_profile_skills
         all_profiles = list_profiles()
         if all_profiles:
             print()
@@ -858,7 +858,7 @@ def _sync_profiles_after_update() -> None:
     # Seed the placeholder .env into any named profile lacking one (never a copy of the default's).
     with suppress(Exception):
         # See #44792.
-        from hermes_cli.profiles import backfill_profile_envs
+        from eir_cli.profiles import backfill_profile_envs
         backfilled = backfill_profile_envs(quiet=True)
         if backfilled:
             print()
@@ -871,7 +871,7 @@ def _refresh_cua_driver_after_update() -> None:
 
     if not _load_updates_cfg().get("refresh_cua_driver", True):
         return
-    if os.environ.get("HERMES_CUA_DRIVER_CMD", "").strip():
+    if os.environ.get("EIR_CUA_DRIVER_CMD", "").strip():
         return
     if pm.installed_package("cua-driver", allow_outdated=True) is None:
         return
@@ -879,13 +879,13 @@ def _refresh_cua_driver_after_update() -> None:
         # The scheduled task targets a versioned binary. Selecting a new pin
         # without re-registering leaves it stale; registration requires UAC.
         print("\n→ Windows cua-driver refresh deferred (autostart registration requires UAC).")
-        print("  Run `hermes computer-use install --upgrade` in an interactive terminal.")
+        print("  Run `eir computer-use install --upgrade` in an interactive terminal.")
         return
     print("\n→ Preparing pinned cua-driver (Computer Use)...")
     if sys.platform == "darwin":
         # PM preserves the signed app; setup validates and registers its new path
         # with LaunchServices. This path never requests permissions or elevation.
-        from hermes_cli.tools_config_cua import install_cua_driver
+        from eir_cli.tools_config_cua import install_cua_driver
         install_cua_driver(show_installer_progress=False)
     else:
         pm.ensure("cua-driver", explicit=True)
@@ -896,7 +896,7 @@ def _install_default_tools_after_update() -> None:
     cua-driver). browser_exec's engine (browser-harness) is a venv dependency.
 
     Runs at the end of both the installers (via the source completion) and
-    ``hermes update``: a source update re-syncs only the venv, so a tool that became
+    ``eir update``: a source update re-syncs only the venv, so a tool that became
     a default after this install was created would never arrive otherwise. Declined
     packages stay declined (pm/defaults.py). A failed download warns and never fails.
     """
@@ -907,7 +907,7 @@ def _install_default_tools_after_update() -> None:
     from pm.paths import lockfile_path
 
     # Sealed payloads ship their tools; the lazy-install policy (config or the
-    # Docker/test bridge) means the user asked Hermes not to fetch on its own.
+    # Docker/test bridge) means the user asked Eir not to fetch on its own.
     if sealed() or not lazy_installs_allowed():
         return
     for name in default_packages(Lockfile(lockfile_path()).names()):
@@ -918,12 +918,12 @@ def _install_default_tools_after_update() -> None:
             with suppress(pm.InstallError, OSError):
                 pm.ensure(name, explicit=True, verify=False)
             continue
-        print(f"\n→ Installing {name} (default tool; opt out with `hermes pm install --without {name}`)...")
+        print(f"\n→ Installing {name} (default tool; opt out with `eir pm install --without {name}`)...")
         try:
             pm.ensure(name, explicit=True)
         except (pm.InstallError, OSError) as exc:
             print(f"  ⚠ {name} was not installed: {exc}")
-            print(f"    Retry with: hermes pm install {name}")
+            print(f"    Retry with: eir pm install {name}")
 
 
 def _print_checkpoint_footprint_notice() -> None:
@@ -937,13 +937,13 @@ def _print_checkpoint_footprint_notice() -> None:
 def _print_post_update_notices_and_self_heals() -> None:
     """Best-effort notices (FTS optimize, curator) and self-heals (FHS PATH, ACP launcher,
     Windows bin launchers, cua-driver refresh) that run after the summary."""
-    from hermes_cli.update_cmd import _m, _print_curator_first_run_notice, _print_curator_recent_run_notice
-    from hermes_cli import _launchers
+    from eir_cli.update_cmd import _m, _print_curator_first_run_notice, _print_curator_recent_run_notice
+    from eir_cli import _launchers
 
     def _migrate_windows_bin_path() -> None:
         # Windows launchers into the managed bin dir: in-checkout launchers were swept by the
         # autostash (--include-untracked) and updates never run install.ps1. No-op on POSIX.
-        from hermes_cli._install_repair import migrate_windows_bin_path
+        from eir_cli._install_repair import migrate_windows_bin_path
         migrate_windows_bin_path(_m().PROJECT_ROOT)
 
     for message, step in (
@@ -957,7 +957,7 @@ def _print_post_update_notices_and_self_heals() -> None:
         ('cua-driver refresh failed: %s', _refresh_cua_driver_after_update),
         ('Default PM tool install failed: %s', _install_default_tools_after_update),
         ('Checkpoint footprint notice failed: %s', _print_checkpoint_footprint_notice),
-        # Legacy HERMES_NEMO_RELAY_ATIF_*/ATOF_* vars produce no traces since the Relay cutover;
+        # Legacy EIR_NEMO_RELAY_ATIF_*/ATOF_* vars produce no traces since the Relay cutover;
         # generate each profile's relay-plugins.toml instead of leaving exports silently dead.
         ('Relay exporter migration failed: %s', _migrate_relay_exporter_env),
     ):
@@ -966,7 +966,7 @@ def _print_post_update_notices_and_self_heals() -> None:
 
 
 def _migrate_relay_exporter_env() -> None:
-    from hermes_cli.relay_plugin_migrate import run_relay_migration_after_update
+    from eir_cli.relay_plugin_migrate import run_relay_migration_after_update
     run_relay_migration_after_update()
 
 
@@ -983,7 +983,7 @@ def _run_post_update_maintenance(
     that profile's error and carries on); only a sync that escapes the step is owed. An unsafe
     runtime withholds success (and is reported) but is not tail work.
     """
-    from hermes_cli.update_receipt import record_followup
+    from eir_cli.update_receipt import record_followup
 
     def owed_step(name, run):
         try:
@@ -994,8 +994,8 @@ def _run_post_update_maintenance(
             if followups is not None:
                 followups.append((name, reason))
 
-    from hermes_cli.update_cmd import _check_and_apply_config_migration, _m
-    from hermes_cli.update_windows_acl import repair_windows_home_acl
+    from eir_cli.update_cmd import _check_and_apply_config_migration, _m
+    from eir_cli.update_windows_acl import repair_windows_home_acl
     owed_step("windows_home_acl", repair_windows_home_acl)
     # macOS TCC: Desktop bundles are re-signed each update, so old grants can go stale
     # (toggle ON, yet macOS re-prompts with no Allow button). Tell users how to re-grant.
@@ -1006,9 +1006,9 @@ def _run_post_update_maintenance(
     if sys.platform == "darwin" and had_desktop_app_before_update:
         print()
         print(
-            "  ℹ macOS: if Hermes re-prompts for permissions you already "
+            "  ℹ macOS: if Eir re-prompts for permissions you already "
             "granted (toggle shows ON), the stored grant is stale — run "
-            "`tccutil reset ScreenCapture com.nousresearch.hermes` (repeat "
+            "`tccutil reset ScreenCapture com.nousresearch.eir` (repeat "
             "per affected service), toggle it ON in System Settings, then "
             "fully quit & relaunch once."
         )
@@ -1016,7 +1016,7 @@ def _run_post_update_maintenance(
     # macOS TCC interpreter anchor; boot-gated — a failed probe leaves the venv untouched.
     try:
         # See #95596.
-        from hermes_cli.macos_tcc_anchor import ensure_tcc_anchor
+        from eir_cli.macos_tcc_anchor import ensure_tcc_anchor
         ensure_tcc_anchor()
     except Exception:
         logger.debug("macOS TCC anchor refresh skipped", exc_info=True)
@@ -1028,8 +1028,8 @@ def _run_post_update_maintenance(
     # Both shallow history and missing tags can hide the release identity.
     # Refresh them before the completion line and install stamp read it.
     try:
-        from hermes_cli.gitlock import fetch_full_commit_graph
-        from hermes_cli.update_cmd import _no_prompt_git_kwargs
+        from eir_cli.gitlock import fetch_full_commit_graph
+        from eir_cli.update_cmd import _no_prompt_git_kwargs
         if fetch_full_commit_graph(Path(_m().PROJECT_ROOT), **_no_prompt_git_kwargs()):
             print("  ✓ Fetched release history (commits only) for version identity")
     except (OSError, subprocess.SubprocessError) as exc:
@@ -1037,12 +1037,12 @@ def _run_post_update_maintenance(
         print(f"  ⚠ Could not refresh release history ({detail[0]}); the version label may be stale or unknown until the next update")
     # Keeps every later version lookup off a full history walk; detached, so it never delays this run.
     with _best_effort('Commit-graph refresh failed to start: %s'):
-        from hermes_cli.git_commit_graph import spawn_commit_graph_refresh
+        from eir_cli.git_commit_graph import spawn_commit_graph_refresh
         spawn_commit_graph_refresh(Path(_m().PROJECT_ROOT))
 
     # Seed the model-catalog cache from the checkout instead of a bot-gated, flaky fetch.
     with _best_effort('Model catalog seed during update failed: %s'):
-        from hermes_cli.model_catalog import seed_cache_from_checkout
+        from eir_cli.model_catalog import seed_cache_from_checkout
         if seed_cache_from_checkout(_m().PROJECT_ROOT):
             print("  ✓ Model catalog cache refreshed from checkout")
 
@@ -1069,7 +1069,7 @@ def _run_post_update_maintenance(
     # Catalog plugins marked ``default: true`` that a profile never had: a fresh install's home, or a
     # default added since the last update. A failed fetch is retried from a later boot, so nothing is owed.
     with _best_effort('Default plugin install failed: %s'):
-        from hermes_cli.default_plugins import install_and_record
+        from eir_cli.default_plugins import install_and_record
         install_and_record()
 
     print()
@@ -1077,7 +1077,7 @@ def _run_post_update_maintenance(
     # A multi-profile host whose gateway came back standalone on a guard says so here too — the
     # update summary is the one line operators read (the boot log under s6 is not).
     with suppress(Exception):
-        from hermes_cli.gateway_multiplex_mode import consume_rewritten_notice, recorded_standalone_warning_lines
+        from eir_cli.gateway_multiplex_mode import consume_rewritten_notice, recorded_standalone_warning_lines
         for line in [*consume_rewritten_notice(), *recorded_standalone_warning_lines()]:
             print(line)
 

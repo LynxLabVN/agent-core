@@ -5,7 +5,7 @@ import type { ComponentProps } from 'react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 const request = vi.hoisted(() => vi.fn())
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@eir/plugin-sdk', async () => {
   const { pluginSdkMock, createGroupGateway } = await import('./group-test-utils')
   const gateway = createGroupGateway()
   const { en } = await import('@/i18n/en')
@@ -23,9 +23,9 @@ vi.mock('@hermes/plugin-sdk', async () => {
 
 import { CanonicalGroupWorkspace } from './canonical-group-workspace'
 
-const originalDesktop = window.hermesDesktop
-beforeEach(() => { Object.defineProperty(window, 'hermesDesktop', { configurable: true, writable: true, value: undefined }) })
-afterEach(() => { cleanup(); request.mockReset(); localStorage.clear(); window.hermesDesktop = originalDesktop })
+const originalDesktop = window.eirDesktop
+beforeEach(() => { Object.defineProperty(window, 'eirDesktop', { configurable: true, writable: true, value: undefined }) })
+afterEach(() => { cleanup(); request.mockReset(); localStorage.clear(); window.eirDesktop = originalDesktop })
 
 it('badges the room lead on its header chip when the room routes through a lead', async () => {
   const binding = { connectionId: 'local', profile: 'team', roomId: 'lead-room' }

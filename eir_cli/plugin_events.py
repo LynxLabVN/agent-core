@@ -4,7 +4,7 @@ A plugin's backend runs inside the gateway process. To push an update to its
 OWN desktop half it emits on the app's global event stream — the same stream
 ``host.onEvent`` subscribes to in the renderer::
 
-    from hermes_cli.plugin_events import broadcast_plugin_event
+    from eir_cli.plugin_events import broadcast_plugin_event
 
     broadcast_plugin_event("rss-reader", "feed.updated", {"count": 3})
     # event "plugin.rss-reader.feed.updated" reaches every connected desktop client
@@ -19,11 +19,11 @@ is core-internal. The ``plugin.`` prefix keeps plugin traffic out of core's own
 event names (``skin.changed``, ``session.reclaimed``, …).
 
 Delivery is per process: the frame goes to the clients of the gateway the
-caller runs in. Under ``hermes serve`` (the Desktop backend, where plugin
+caller runs in. Under ``eir serve`` (the Desktop backend, where plugin
 routers, slash commands and the agent turn's tools/hooks run) that is every
 connected window; a call from the ``dashboard.turn_isolation`` compute-host
-child rides the host pipe to ``hermes serve`` and fans out there. A process
-with no Desktop client at all (``hermes gateway run``, ``hermes chat``, cron)
+child rides the host pipe to ``eir serve`` and fans out there. A process
+with no Desktop client at all (``eir gateway run``, ``eir chat``, cron)
 has nobody to deliver to: the call is a logged no-op.
 """
 
@@ -47,7 +47,7 @@ _PLUGIN_ID_RE = re.compile(r"^[a-z0-9_-]{1,64}$")
 # [A-Za-z0-9_-], so ``../x``, ``a..b``, a leading/trailing dot, slashes and whitespace are refused.
 _EVENT_RE = re.compile(r"^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*$")
 
-# Set only inside a ``plugins.isolation: host`` process (``hermes_cli/plugin_host_child.py``): sessions
+# Set only inside a ``plugins.isolation: host`` process (``eir_cli/plugin_host_child.py``): sessions
 # live in the gateway process, so a session event crosses the host channel to it.
 _session_event_forwarder: Optional[Callable[[str, str, str, dict], bool]] = None
 
@@ -85,7 +85,7 @@ def broadcast_plugin_event(plugin_id: str, event: str, payload: Optional[dict[st
     try:
         from tui_gateway.server import _broadcast_global_event
     except ImportError:
-        # A plugin-only process (``hermes plugins validate`` importing the backend, a trimmed
+        # A plugin-only process (``eir plugins validate`` importing the backend, a trimmed
         # install) has no gateway at all: nobody to deliver to, and the handler must not die for it.
         logger.warning("plugin event %s dropped: no tui_gateway in this process", name, exc_info=True)
         return

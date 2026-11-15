@@ -1,4 +1,4 @@
-"""``hermes kanban …`` — dispatch (``kanban_command``), task-verb handlers, ``run_slash`` for ``/kanban``.
+"""``eir kanban …`` — dispatch (``kanban_command``), task-verb handlers, ``run_slash`` for ``/kanban``.
 DB work lives in ``kanban_db``; siblings: ``kanban_parser`` (argparse, re-exported ``build_parser``),
 ``kanban_output`` (text/--json), ``kanban_boards`` (``boards …``), ``kanban_ops`` (dispatch/daemon/
 tail/watch/gc/repair).
@@ -16,23 +16,23 @@ import time
 from pathlib import Path
 from typing import Optional
 
-from hermes_cli import kanban_db as kb
-from hermes_cli import kanban_db_connect as kbc
-from hermes_cli import kanban_db_dispatch as kbd
-from hermes_cli import kanban_db_workspace as kbw
-from hermes_cli import kanban_db_notify as kbn
-from hermes_cli import kanban_swarm as ks
-from hermes_cli import kanban_workflow
-from hermes_cli.kanban_output import (
+from eir_cli import kanban_db as kb
+from eir_cli import kanban_db_connect as kbc
+from eir_cli import kanban_db_dispatch as kbd
+from eir_cli import kanban_db_workspace as kbw
+from eir_cli import kanban_db_notify as kbn
+from eir_cli import kanban_swarm as ks
+from eir_cli import kanban_workflow
+from eir_cli.kanban_output import (
     _ATTACHMENT_FIELDS, _RUNS_RUN_FIELDS, _SHOW_RUN_FIELDS, _bulk_apply, _err,
     _fmt_counts, _fmt_task_line, _fmt_ts, _json_out, _obj_dict, _print_json,
     _task_to_dict,
 )
-from hermes_cli.kanban_boards import _dispatch_boards
-from hermes_cli.kanban_ops import (
+from eir_cli.kanban_boards import _dispatch_boards
+from eir_cli.kanban_ops import (
     _cmd_daemon, _kanban_config, _cmd_dispatch, _cmd_gc, _cmd_repair, _cmd_tail, _cmd_watch,
 )
-from hermes_cli.kanban_parser import build_parser
+from eir_cli.kanban_parser import build_parser
 
 
 # --- Flag parsing helpers ---
@@ -97,14 +97,14 @@ def _parse_branch_flag(value: Optional[str]) -> Optional[str]:
     return branch
 
 
-def _check_dispatcher_presence(hermes_home: Optional[Path] = None) -> tuple[bool, str]:
+def _check_dispatcher_presence(eir_home: Optional[Path] = None) -> tuple[bool, str]:
     """``(running, message)`` for the "will anything dispatch this?" warning: True when a gateway is
-    alive for this HERMES_HOME with ``kanban.dispatch_in_gateway`` on, else False + human guidance.
+    alive for this EIR_HOME with ``kanban.dispatch_in_gateway`` on, else False + human guidance.
     Fails OPEN (probe/config errors -> ``(True, "")``) — a missed warning beats crying wolf.
-    ``hermes_home`` scopes the probe to a profile dir (dashboard backend); CLI callers pass None.
+    ``eir_home`` scopes the probe to a profile dir (dashboard backend); CLI callers pass None.
 
     The dashboard plugin API passes it because the dashboard backend process can be running under a
-    different HERMES_HOME than the profile the request targets, which otherwise produced a "no gateway is
+    different EIR_HOME than the profile the request targets, which otherwise produced a "no gateway is
     running" warning against a perfectly healthy profile gateway (#71211). CLI callers leave it ``None`` and
     keep the existing process-level behavior.
     """
@@ -113,7 +113,7 @@ def _check_dispatcher_presence(hermes_home: Optional[Path] = None) -> tuple[bool
 
         # Same ladder as the dashboard status endpoints so PID-file-less / cross-container gateways
         # aren't misreported; use_cache=False because this one-shot probe must see the state now.
-        liveness = resolve_gateway_liveness(profile_dir=hermes_home, use_cache=False)
+        liveness = resolve_gateway_liveness(profile_dir=eir_home, use_cache=False)
     except Exception:
         return (True, "")  # can't probe — silent
     if liveness.probe_error:  # resolver swallows per-rung failures; "can't tell" != "no gateway"
@@ -126,9 +126,9 @@ def _check_dispatcher_presence(hermes_home: Optional[Path] = None) -> tuple[bool
         return (False, "Gateway is running but kanban.dispatch_in_gateway=false in "
                 "config.yaml — the task will sit in 'ready' until you flip it "
                 "back on and restart the gateway, OR run the legacy "
-                "standalone daemon (`hermes kanban daemon --force`).")
+                "standalone daemon (`eir kanban daemon --force`).")
     return (False, "No gateway is running — the task will sit in 'ready' until you "
-            "start it. Run:\n    hermes gateway start\n"
+            "start it. Run:\n    eir gateway start\n"
             "The gateway hosts an embedded dispatcher (tick interval 60s by "
             "default); your task will be picked up on the next tick after "
             "the gateway comes up.")
@@ -137,15 +137,15 @@ def _check_dispatcher_presence(hermes_home: Optional[Path] = None) -> tuple[bool
 # --- Command dispatch ---
 
 def kanban_command(args: argparse.Namespace) -> int:
-    """Entry point from ``hermes kanban …``; returns a shell-style exit code."""
+    """Entry point from ``eir kanban …``; returns a shell-style exit code."""
     action = getattr(args, "kanban_action", None)
     if not action:
         parser = getattr(args, "_kanban_parser", None)
         if parser is not None:
             parser.print_help()
         else:
-            print("usage: hermes kanban <action> [options]\n"
-                  "Run 'hermes kanban --help' for the full list of actions.", file=sys.stderr)
+            print("usage: eir kanban <action> [options]\n"
+                  "Run 'eir kanban --help' for the full list of actions.", file=sys.stderr)
         return 0
 
     # Fast-fail for UX only; the durable trust boundary is in kanban_db, since children can
@@ -158,7 +158,7 @@ def kanban_command(args: argparse.Namespace) -> int:
     if action == "boards":
         return _dispatch_boards(args)
 
-    # `--board <slug>` pins HERMES_KANBAN_BOARD for the duration of this call so it inherits the
+    # `--board <slug>` pins EIR_KANBAN_BOARD for the duration of this call so it inherits the
     # exact resolution the dispatcher uses for workers.
     board_override = getattr(args, "board", None)
     board_scope = contextlib.nullcontext()
@@ -173,7 +173,7 @@ def kanban_command(args: argparse.Namespace) -> int:
         # create an empty board.
         if normed != kb.DEFAULT_BOARD and not kb.board_exists(normed):
             return _err(f"kanban: board {normed!r} does not exist. "
-                        f"Create it with `hermes kanban boards create {normed}`.")
+                        f"Create it with `eir kanban boards create {normed}`.")
         board_scope = kb.scoped_current_board(normed)
 
     with board_scope:
@@ -182,7 +182,7 @@ def kanban_command(args: argparse.Namespace) -> int:
         if action == "repair":
             return _cmd_repair(args)
         # init_db is idempotent (one sqlite_master SELECT when tables exist) and prevents
-        # "no such table: tasks" on first use from a fresh HERMES_HOME.
+        # "no such table: tasks" on first use from a fresh EIR_HOME.
         try:
             kb.init_db()
         except Exception as exc:
@@ -201,7 +201,7 @@ def kanban_command(args: argparse.Namespace) -> int:
 
 def _profile_author() -> str:
     """Best-effort author name for an interactive CLI call."""
-    from hermes_cli.profiles import current_profile_name
+    from eir_cli.profiles import current_profile_name
     return current_profile_name("user") or "user"
 
 
@@ -297,11 +297,11 @@ def _cmd_init(args: argparse.Namespace) -> int:
         for name in profiles:
             print(f"  {name}")
     else:
-        print("No profiles found under ~/.hermes/profiles/.\n"
-              "Create one with `hermes -p <name> setup` before assigning tasks.")
+        print("No profiles found under ~/.eir/profiles/.\n"
+              "Create one with `eir -p <name> setup` before assigning tasks.")
     print(
         "\nNext step: start the gateway so ready tasks actually get picked up.\n"
-        "  hermes gateway start\n\n"
+        "  eir gateway start\n\n"
         "The gateway hosts an embedded dispatcher that ticks every 60 seconds\n"
         "by default (config: kanban.dispatch_interval_seconds). Without a\n"
         "running gateway, tasks stay in 'ready' forever."
@@ -323,7 +323,7 @@ def _cmd_assignees(args: argparse.Namespace) -> int:
     if _json_out(args, data):
         return 0
     if not data:
-        print("(no assignees — create a profile with `hermes -p <name> setup`)")
+        print("(no assignees — create a profile with `eir -p <name> setup`)")
         return 0
     print(f"{'NAME':20s}  {'ON DISK':8s}  COUNTS")
     for entry in data:
@@ -375,7 +375,7 @@ def _cmd_create(args: argparse.Namespace) -> int:
             goal_max_turns=getattr(args, "goal_max_turns", None),
             completion_contract=getattr(args, "completion_contract", None),
             initial_status=getattr(args, "initial_status", "running"),
-            creator_task_id=(os.environ.get("HERMES_KANBAN_TASK")
+            creator_task_id=(os.environ.get("EIR_KANBAN_TASK")
                              if is_dispatcher_owned_worker_context() else None),
         )
         task = kb.get_task(conn, task_id)
@@ -438,7 +438,7 @@ def _cmd_list(args: argparse.Namespace) -> int:
     if len(all_boards) > 1:
         other_count = len(all_boards) - 1
         print(f"Board: {kb.get_current_board()} ({other_count} other board{'s' if other_count != 1 else ''} — "
-              f"`hermes kanban boards list`)\n")
+              f"`eir kanban boards list`)\n")
     if not tasks:
         print("(no matching tasks)")
         return 0
@@ -528,7 +528,7 @@ def _cmd_show(args: argparse.Namespace) -> int:
     field("created", f"{_fmt_ts(task.created_at)} by {task.created_by or '-'}")
 
     # Diagnostics up top so CLI users see distress signals before scrolling.
-    from hermes_cli import kanban_diagnostics as kd
+    from eir_cli import kanban_diagnostics as kd
     diags = kd.compute_task_diagnostics(task, events, runs, graph=graph)
     if diags:
         print(f"\n  Diagnostics ({len(diags)}):")
@@ -628,13 +628,13 @@ def _rows_by_task(conn, table: str, ids: list[str]) -> dict[str, list]:
 
 def _cmd_diagnostics(args: argparse.Namespace) -> int:
     """List active diagnostics on the board via the same rule engine the dashboard uses."""
-    from hermes_cli import kanban_diagnostics as kd
+    from eir_cli import kanban_diagnostics as kd
     # Honour kanban.default_assignee as the fallback for unassigned ready tasks (#27145),
     # kanban.max_in_progress as the global concurrency cap (#33488), kanban.max_in_progress_per_profile as
     # the per-profile cap (#21582), and kanban.max_spawn as the per-tick spawn limit (#28805). Same
     # semantics as the gateway dispatch path so behavior matches whether the user runs the CLI directly or
     # relies on the gateway-embedded dispatcher.
-    from hermes_cli.config import load_config
+    from eir_cli.config import load_config
 
     diag_config = kd.config_from_runtime_config(load_config())
 
@@ -709,7 +709,7 @@ def _cmd_link(args: argparse.Namespace) -> int:
     # ownership with its run id; linking a foreign task never needs one.
     expected_child_run_id = (
         _worker_run_id_for(args.child_id)
-        if args.child_id == os.environ.get("HERMES_KANBAN_TASK") else None)
+        if args.child_id == os.environ.get("EIR_KANBAN_TASK") else None)
     with kbc.connect_closing() as conn:
         gated = kb.link_tasks(conn, args.parent_id, args.child_id,
                               expected_child_run_id=expected_child_run_id)
@@ -719,7 +719,7 @@ def _cmd_link(args: argparse.Namespace) -> int:
             f"Note: {args.child_id} was ready and is now todo — parent "
             f"{args.parent_id} is not done yet. The ready -> running claim "
             f"re-checks parents, so the child only runs after the parent "
-            f"completes; use `hermes kanban unlink {args.parent_id} {args.child_id}` "
+            f"completes; use `eir kanban unlink {args.parent_id} {args.child_id}` "
             f"to run it now."
         )
     return 0
@@ -813,11 +813,11 @@ def _cmd_attach_rm(args: argparse.Namespace) -> int:
 
 
 def _worker_run_id_for(task_id: str) -> Optional[int]:
-    env_tid = os.environ.get("HERMES_KANBAN_TASK")
+    env_tid = os.environ.get("EIR_KANBAN_TASK")
     if env_tid and env_tid != task_id:
         raise ValueError(f"worker is scoped to task {env_tid}; refusing to mutate {task_id}")
-    raw = os.environ.get("HERMES_KANBAN_RUN_ID")
-    if os.environ.get("HERMES_KANBAN_TASK") != task_id or not raw:
+    raw = os.environ.get("EIR_KANBAN_RUN_ID")
+    if os.environ.get("EIR_KANBAN_TASK") != task_id or not raw:
         return None
     try:
         return int(raw)
@@ -848,7 +848,7 @@ def _goal_mode_handoff_rejection(task: Optional[kb.Task], evidence: str):
     if client is None or not model:
         return ("done", None)
 
-    from hermes_cli.goals import judge_goal
+    from eir_cli.goals import judge_goal
 
     verdict, reason, transport_failed = "done", "", False
     try:
@@ -924,7 +924,7 @@ def _cmd_complete(args: argparse.Namespace) -> int:
                                         force=bool(getattr(args, "force", False)))
             except kb.LiveClaimError:
                 fail_msg[tid] = (f"cannot complete {tid}: a live worker is running it. Wait for the "
-                                 f"worker, `hermes kanban reclaim {tid}` to release it, or re-run with "
+                                 f"worker, `eir kanban reclaim {tid}` to release it, or re-run with "
                                  f"--force to close its run and complete anyway.")
                 return False
             except kb.EmptyCompletionError as empty_err:
@@ -938,7 +938,7 @@ def _cmd_complete(args: argparse.Namespace) -> int:
                 if blockers:
                     detail = ", ".join(f"{pid} ({status})" for pid, status in blockers)
                     fail_msg[tid] = (f"cannot complete {tid}: unsatisfied parent dependencies: {detail}; "
-                                     f"complete the parents first, or `hermes kanban unlink <parent> {tid}`.")
+                                     f"complete the parents first, or `eir kanban unlink <parent> {tid}`.")
             return done
 
         return _bulk_apply(ids, op, lambda tid: f"Completed {tid}", fail_msg.__getitem__)
@@ -1018,7 +1018,7 @@ def _cmd_schedule(args: argparse.Namespace) -> int:
 
 
 def _cmd_unblock(args: argparse.Namespace) -> int:
-    if os.environ.get("HERMES_KANBAN_TASK"):
+    if os.environ.get("EIR_KANBAN_TASK"):
         return _err("kanban unblock is orchestrator-only; workers must hand off their assigned task")
     ids, rc = _require_ids(args)
     if rc:
@@ -1161,12 +1161,12 @@ def _caller_identity_for_target(platform: str, chat_id: str, thread_id, user_id,
     if user_id or user_id_alt:  # an explicit recipient is never paired with the caller's other id
         return user_id, user_id_alt
     from gateway.session_context import get_session_env
-    if (str(get_session_env("HERMES_SESSION_PLATFORM", "")).lower() != str(platform or "").lower()
-            or str(get_session_env("HERMES_SESSION_CHAT_ID", "")) != str(chat_id or "")
-            or str(get_session_env("HERMES_SESSION_THREAD_ID", "")) != str(thread_id or "")):
+    if (str(get_session_env("EIR_SESSION_PLATFORM", "")).lower() != str(platform or "").lower()
+            or str(get_session_env("EIR_SESSION_CHAT_ID", "")) != str(chat_id or "")
+            or str(get_session_env("EIR_SESSION_THREAD_ID", "")) != str(thread_id or "")):
         return user_id, user_id_alt
-    return (get_session_env("HERMES_SESSION_USER_ID", "") or None,
-            get_session_env("HERMES_SESSION_USER_ID_ALT", "") or None)
+    return (get_session_env("EIR_SESSION_USER_ID", "") or None,
+            get_session_env("EIR_SESSION_USER_ID_ALT", "") or None)
 
 
 def _cmd_notify_subscribe(args: argparse.Namespace) -> int:
@@ -1178,7 +1178,7 @@ def _cmd_notify_subscribe(args: argparse.Namespace) -> int:
         )
         if value
     }
-    from hermes_cli.kanban_notify_thread import resolve_subscribe_thread
+    from eir_cli.kanban_notify_thread import resolve_subscribe_thread
     with kbc.connect_closing() as conn:
         if kb.get_task(conn, args.task_id) is None:
             return _err(f"no such task: {args.task_id}")
@@ -1219,7 +1219,7 @@ def _cmd_notify_list(args: argparse.Namespace) -> int:
 
 
 def _cmd_notify_unsubscribe(args: argparse.Namespace) -> int:
-    from hermes_cli.kanban_notify_thread import resolve_unsubscribe_thread
+    from eir_cli.kanban_notify_thread import resolve_unsubscribe_thread
     with kbc.connect_closing() as conn:
         ok = kbn.remove_notify_sub(conn, task_id=args.task_id, platform=args.platform, chat_id=args.chat_id,
                                   thread_id=resolve_unsubscribe_thread(conn, args))
@@ -1316,7 +1316,7 @@ def _retitled_suffix(outcome) -> str:
 
 def _cmd_specify(args: argparse.Namespace) -> int:
     """Spec a triage task (or all) via the auxiliary LLM, promote to todo."""
-    from hermes_cli import kanban_specify as spec
+    from eir_cli import kanban_specify as spec
 
     return _run_triage_sweep(args, "specify", spec, spec.specify_task, "specified",
                              ("task_id", "ok", "reason", "new_title"),
@@ -1332,7 +1332,7 @@ def _decompose_ok_line(o) -> str:
 
 def _cmd_decompose(args: argparse.Namespace) -> int:
     """Fan a triage task (or all) out into child tasks via the auxiliary LLM."""
-    from hermes_cli import kanban_decompose as decomp
+    from eir_cli import kanban_decompose as decomp
 
     return _run_triage_sweep(args, "decompose", decomp, decomp.decompose_task, "decomposed",
                              ("task_id", "ok", "reason", "fanout", "child_ids", "new_title"), _decompose_ok_line)

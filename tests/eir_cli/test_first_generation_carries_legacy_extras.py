@@ -3,9 +3,9 @@
 A main-era install (a release before PM, v2026.9.24 and older) holds its features in the checkout's
 own ``venv/`` with no PM ledger. Its launch migration normally builds the first generation and
 carries them, but a tree can reach a later sync with no selection recorded: the migration was
-skipped (``HERMES_DISABLE_LAZY_INSTALLS``, a tree with no self-update stamp) or interrupted before
-it published. Whichever sync then runs first (``hermes update``'s completion bootstrap, the
-historical takeover, the launch migration, the stdlib ``venv_sync`` entry, ``hermes pm update``,
+skipped (``EIR_DISABLE_LAZY_INSTALLS``, a tree with no self-update stamp) or interrupted before
+it published. Whichever sync then runs first (``eir update``'s completion bootstrap, the
+historical takeover, the launch migration, the stdlib ``venv_sync`` entry, ``eir pm update``,
 or a setup flow's narrow request), the generation it publishes must keep those features: nothing
 carries them afterwards, so a sync that records less drops Telegram, Discord and the rest for good
 while it reports success.
@@ -54,7 +54,7 @@ def legacy_tree(monkeypatch, tmp_path):
     root = tmp_path / "checkout"
     root.mkdir()
     (root / "pyproject.toml").write_text(
-        '[project]\nname="hermes-agent"\nversion="1"\n[project.optional-dependencies]\n'
+        '[project]\nname="eir-agent"\nversion="1"\n[project.optional-dependencies]\n'
         'all=[]\ntelegram=[]\ndiscord=[]\nfal=[]\nslack=[]\n', encoding="utf-8")
     main_era_venv(root, "telegram", "discord", "fal_client")
     monkeypatch.setattr(paths, "repo_root", lambda: root)
@@ -65,7 +65,7 @@ def legacy_tree(monkeypatch, tmp_path):
     monkeypatch.setattr(pm.client, "ensure_tools_for_sync", lambda: None)
     # Plugin eviction judges requires-python against the pinned interpreter; this tree has no plugins.
     monkeypatch.setattr("pm.plugin_eviction._interpreter_version", lambda: "3.14.0")
-    from hermes_cli import gitlock, venv_sync
+    from eir_cli import gitlock, venv_sync
 
     for name in ("arm_completion", "collect_superseded_generations", "publish_launchers",
                  "refuse_foreign_owned_venv"):
@@ -76,8 +76,8 @@ def legacy_tree(monkeypatch, tmp_path):
 
 
 def _completion_bootstrap(root: Path, tmp_path: Path, monkeypatch) -> None:
-    """``hermes update``'s completion bootstrap, on a pre-PM tree with no recorded selection."""
-    from hermes_cli import update_completion
+    """``eir update``'s completion bootstrap, on a pre-PM tree with no recorded selection."""
+    from eir_cli import update_completion
 
     result = tmp_path / "result.json"
 
@@ -93,30 +93,30 @@ def _completion_bootstrap(root: Path, tmp_path: Path, monkeypatch) -> None:
 
 def _historical_takeover(root: Path, tmp_path: Path, monkeypatch) -> None:
     """A pre-handoff updater's takeover of the new tree."""
-    from hermes_cli import _update_takeover, update_stage
+    from eir_cli import _update_takeover, update_stage
 
     monkeypatch.setattr(update_stage, "ensure_panel", lambda root: None)
     monkeypatch.setattr(_update_takeover, "_arm_fleet_obligation", lambda root: None)
-    monkeypatch.setattr("hermes_cli._launchers.resolve_store_python", lambda root: Path(sys.executable))
+    monkeypatch.setattr("eir_cli._launchers.resolve_store_python", lambda root: Path(sys.executable))
     _update_takeover.prepare({"root": str(root), "update_id": "u1"})
 
 
 def _launch_migration(root: Path, tmp_path: Path, monkeypatch) -> None:
     """The first launch after a pull finishes the source update's dependency sync."""
-    from hermes_cli import venv_sync
+    from eir_cli import venv_sync
 
     venv_sync._sync_source_dependencies(root, arm=False)
 
 
 def _venv_sync_entry(root: Path, tmp_path: Path, monkeypatch) -> None:
-    """``python -m hermes_cli.venv_sync``: the stdlib-only sync entry."""
-    from hermes_cli import venv_sync
+    """``python -m eir_cli.venv_sync``: the stdlib-only sync entry."""
+    from eir_cli import venv_sync
 
     assert venv_sync.sync(root) == {"state": "synced", "ok": True}
 
 
 def _pm_update_step(root: Path, tmp_path: Path, monkeypatch) -> None:
-    """``hermes pm update``/``pm lock --upgrade``'s venv step after it moved a pin or the lock."""
+    """``eir pm update``/``pm lock --upgrade``'s venv step after it moved a pin or the lock."""
     import pm.cli
 
     monkeypatch.setattr(pm.cli, "repo_root", lambda: root)
@@ -165,7 +165,7 @@ def test_a_facts_file_without_a_recorded_selection_still_carries_the_old_venv(le
 
 
 def test_a_narrow_request_on_a_pre_pm_tree_extends_what_the_old_venv_held(legacy_tree):
-    """`hermes setup` installing one extra unions it into the tree's selection, as on any PM install.
+    """`eir setup` installing one extra unions it into the tree's selection, as on any PM install.
 
     The tree still runs its old venv, so that venv's extras are the selection. A first generation
     holding only the request would end the old venv's re-scan, and every other feature would be gone.
@@ -204,7 +204,7 @@ def test_a_narrow_request_on_a_tree_without_an_old_venv_records_only_the_request
 
 @pytest.fixture(params=["venv", ".venv"])
 def reinstalled_tree(legacy_tree, request):
-    """A main-era venv that a pre-PM updater (v2026.3.12 .. v2026.5.29.2) reinstalled Hermes into with
+    """A main-era venv that a pre-PM updater (v2026.3.12 .. v2026.5.29.2) reinstalled Eir into with
     ``uv pip install -e .[all]`` right after pulling a PM tree: its dist-info is the PM tree's. ``.venv``
     is the old README's manual install (``uv venv .venv``) and uv's default name."""
     import shutil
@@ -228,7 +228,7 @@ def test_an_old_venv_an_old_updater_reinstalled_from_the_pulled_tree_is_carried(
 @pytest.fixture()
 def developer_tree(legacy_tree):
     """The same checkout with no main-era venv, but the test env CONTRIBUTING.md has a contributor
-    build into it (``pm.build_env --source . --out .venv --group dev --group test``): Hermes from a
+    build into it (``pm.build_env --source . --out .venv --group dev --group test``): Eir from a
     PM tree on PM's pinned Python, beside the same SDKs the main-era venv held."""
     import shutil
 
@@ -238,7 +238,7 @@ def developer_tree(legacy_tree):
 
 
 def test_a_pm_built_checkout_venv_is_not_an_old_install(developer_tree):
-    """A data root with no recorded selection (a test's or a borrowing launch's HERMES_HOME) on a
+    """A data root with no recorded selection (a test's or a borrowing launch's EIR_HOME) on a
     checkout with a developer ``.venv``: that venv is not the install's old state, so a sync
     records only what was asked for."""
     import pm
@@ -277,7 +277,7 @@ def test_an_old_venv_with_an_undecodable_pyvenv_cfg_is_still_carried(legacy_tree
 
 
 def test_a_bare_venv_holds_no_old_install(legacy_tree):
-    """`uv venv .venv` with nothing installed: no Hermes, so nothing of an old install to carry."""
+    """`uv venv .venv` with nothing installed: no Eir, so nothing of an old install to carry."""
     import shutil
 
     import pm
@@ -292,7 +292,7 @@ def test_a_bare_venv_holds_no_old_install(legacy_tree):
 
 
 def _pm_repair(root: Path, tmp_path: Path, monkeypatch) -> None:
-    """`hermes pm repair`, in the PM runtime it re-executes into."""
+    """`eir pm repair`, in the PM runtime it re-executes into."""
     import pm.cli
 
     monkeypatch.setattr("pm.runtime.is_runtime", lambda: True)
@@ -301,7 +301,7 @@ def _pm_repair(root: Path, tmp_path: Path, monkeypatch) -> None:
 
 def _launch_recovery(root: Path, tmp_path: Path, monkeypatch) -> None:
     """A launch that finds the marker a main-era update left behind when it was interrupted."""
-    from hermes_cli._early_recovery import recover_if_needed
+    from eir_cli._early_recovery import recover_if_needed
 
     (root / ".update-incomplete").write_text("", encoding="utf-8")
     assert recover_if_needed(root, argv=["chat"])

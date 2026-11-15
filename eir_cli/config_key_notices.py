@@ -1,10 +1,10 @@
-"""Notices ``hermes config set`` prints for a key path the schema does not know."""
+"""Notices ``eir config set`` prints for a key path the schema does not know."""
 
 from __future__ import annotations
 
 from typing import Optional
 
-from hermes_cli.colors import Colors, color
+from eir_cli.colors import Colors, color
 
 
 def unknown_subkey_refusal(key: str, suggestion: Optional[str]) -> str:

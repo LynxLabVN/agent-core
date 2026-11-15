@@ -1,13 +1,13 @@
 """Marked delegate subagents owned by one session's lineage (#150198).
 
-Kept beside hermes_state_sessions (at its line cap): the TUI kanban poller uses it to reclaim
+Kept beside eir_state_sessions (at its line cap): the TUI kanban poller uses it to reclaim
 subscriptions that ``kanban_create`` bound to a subagent while that subagent's row lacked its
 ``_delegate_from`` marker.
 """
 
 from __future__ import annotations
 
-from hermes_state_sessions import _collect_delegate_child_ids, _parse_model_config
+from eir_state_sessions import _collect_delegate_child_ids, _parse_model_config
 
 
 def delegate_descendant_ids(db, session_id: str) -> list[str]:

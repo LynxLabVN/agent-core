@@ -4,8 +4,8 @@ import struct
 
 import pytest
 
-from hermes_cli import desktop_update_verify as verify
-from tests.hermes_cli.test_source_build import copy_freshness_scripts, stamp_product, use_host_node_as_pm_node
+from eir_cli import desktop_update_verify as verify
+from tests.eir_cli.test_source_build import copy_freshness_scripts, stamp_product, use_host_node_as_pm_node
 
 
 @pytest.fixture
@@ -24,11 +24,11 @@ def bundle(tmp_path, monkeypatch):
     archive = resources / 'app.asar'
     archive.write_bytes(struct.pack('<4I', 4, 8 + len(padded), 4 + len(padded), len(header)) + padded + package)
     (tmp_path / '.gitignore').write_text('apps/desktop/release/\n', encoding='utf-8')
-    monkeypatch.setattr(verify, '_desktop_packaged_executable', lambda _: resources.parent / 'Hermes.exe')
+    monkeypatch.setattr(verify, '_desktop_packaged_executable', lambda _: resources.parent / 'Eir.exe')
     monkeypatch.setattr(verify, '_desktop_exe_integrity_error', lambda _: None)
     # Host-independent artifact contract; executable lookup itself is covered natively.
-    from hermes_cli import main_desktop
-    monkeypatch.setattr(main_desktop, '_desktop_packaged_executable', lambda _: resources.parent / 'Hermes.exe')
+    from eir_cli import main_desktop
+    monkeypatch.setattr(main_desktop, '_desktop_packaged_executable', lambda _: resources.parent / 'Eir.exe')
     copy_freshness_scripts(tmp_path)
     stamp_product(tmp_path, "desktop", dist)
     use_host_node_as_pm_node(monkeypatch)
@@ -56,14 +56,14 @@ def test_current_stamp_does_not_hide_damaged_output(bundle, damage):
 
 
 def test_default_root_is_the_imported_checkout_not_cwd(tmp_path, monkeypatch):
-    # The Windows hand-off is spawned from HERMES_HOME; the receipt must describe the checkout anyway.
+    # The Windows hand-off is spawned from EIR_HOME; the receipt must describe the checkout anyway.
     monkeypatch.chdir(tmp_path)
     seen = {}
     monkeypatch.setattr(verify, '_desktop_packaged_executable', lambda desktop: seen.setdefault('desktop', desktop) and None)
     with pytest.raises(RuntimeError, match='executable is missing'):
         verify.verify_windows_desktop_update()
     assert seen['desktop'] == verify.checkout_root() / 'apps' / 'desktop'
-    assert (verify.checkout_root() / 'hermes_cli' / 'desktop_update_verify.py').is_file()
+    assert (verify.checkout_root() / 'eir_cli' / 'desktop_update_verify.py').is_file()
     assert verify.checkout_root() != tmp_path
 
 
@@ -74,18 +74,18 @@ def _app_only_under(root):
     desktop = (root / 'apps' / 'desktop').resolve()
 
     def lookup(candidate):
-        return desktop / 'release/fixture/Hermes.exe' if Path(candidate).resolve() == desktop else None
+        return desktop / 'release/fixture/Eir.exe' if Path(candidate).resolve() == desktop else None
 
     return lookup
 
 
 def test_caller_root_without_a_packaged_app_falls_back_to_the_checkout(bundle, tmp_path, monkeypatch):
-    # A hand-off script read before the pull still passes HERMES_HOME, which never
+    # A hand-off script read before the pull still passes EIR_HOME, which never
     # holds a packaged app. The healthy checkout it just wrote must be verified instead.
     checkout, _, _ = bundle
     monkeypatch.setattr(verify, '_desktop_packaged_executable', _app_only_under(checkout))
     monkeypatch.setattr(verify, 'checkout_root', lambda: checkout)
-    verify.verify_windows_desktop_update(tmp_path / 'hermes_home')
+    verify.verify_windows_desktop_update(tmp_path / 'eir_home')
 
 
 def test_caller_root_that_has_a_packaged_app_is_verified_as_given(bundle, tmp_path, monkeypatch):

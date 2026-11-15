@@ -1,4 +1,4 @@
-import { useValue } from '@hermes/plugin-sdk'
+import { useValue } from '@eir/plugin-sdk'
 
 import { avatarColor, botAppearance, BotFace } from './avatar'
 import { isBackfilledFacePng } from './avatar-image'

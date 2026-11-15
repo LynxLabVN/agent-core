@@ -1,4 +1,4 @@
-"""Tests for the auxiliary-model configuration UI in ``hermes model``.
+"""Tests for the auxiliary-model configuration UI in ``eir model``.
 
 Covers the helper functions:
   - ``_save_aux_choice`` writes to config.yaml without touching main model config
@@ -12,8 +12,8 @@ here (they're stdin-driven curses prompts).
 
 from __future__ import annotations
 
-from hermes_cli.config import load_config
-from hermes_cli.main_provider_setup import _DELEGATION_TASK_KEY, _delegation_cfg_as_task, _format_aux_current, _reset_aux_to_auto, _save_aux_choice
+from eir_cli.config import load_config
+from eir_cli.main_provider_setup import _DELEGATION_TASK_KEY, _delegation_cfg_as_task, _format_aux_current, _reset_aux_to_auto, _save_aux_choice
 
 # ── Default config ──────────────────────────────────────────────────────────
 
@@ -24,9 +24,9 @@ from hermes_cli.main_provider_setup import _DELEGATION_TASK_KEY, _delegation_cfg
 def test_save_aux_choice_persists_to_config_yaml(tmp_path, monkeypatch):
     """Saving a task writes provider/model/base_url/api_key to auxiliary.<task>."""
     from pathlib import Path
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path / ".eir"))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    (tmp_path / ".hermes").mkdir(exist_ok=True)
+    (tmp_path / ".eir").mkdir(exist_ok=True)
 
     _save_aux_choice(
         "vision", provider="openrouter", model="google/gemini-2.5-flash",
@@ -47,9 +47,9 @@ def test_save_aux_choice_persists_to_config_yaml(tmp_path, monkeypatch):
 def _isolate_home(tmp_path, monkeypatch):
     from pathlib import Path
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path / ".eir"))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    (tmp_path / ".hermes").mkdir(exist_ok=True)
+    (tmp_path / ".eir").mkdir(exist_ok=True)
 
 def test_save_delegation_writes_top_level_section(tmp_path, monkeypatch):
     """Delegation picks write to delegation.*, never auxiliary.delegation."""
@@ -87,7 +87,7 @@ def test_save_delegation_auto_stores_empty_provider(tmp_path, monkeypatch):
 def test_reset_aux_clears_delegation_routing_preserves_settings(tmp_path, monkeypatch):
     """Reset-all clears delegation provider/model/base_url/api_key but leaves
     non-routing delegation settings (max_concurrent_children, etc.) alone."""
-    from hermes_cli.config import load_config as _lc, save_config
+    from eir_cli.config import load_config as _lc, save_config
 
     _isolate_home(tmp_path, monkeypatch)
 
@@ -121,11 +121,11 @@ def test_delegation_cfg_as_task_projection():
 def test_picker_provider_switch_drops_old_endpoint_credentials(tmp_path, monkeypatch):
     """Picking a new provider must not leave the old endpoint's key_env/api_mode behind: the aux
     resolver hands them to whatever provider the block now names (#141832)."""
-    import hermes_yaml as yaml
+    import eir_yaml as yaml
     from agent.auxiliary_client import _resolve_task_provider_model
     _isolate_home(tmp_path, monkeypatch)
     monkeypatch.setenv("OLD_ENDPOINT_KEY", "sk-old-endpoint")
-    (tmp_path / ".hermes" / "config.yaml").write_text(yaml.safe_dump({"auxiliary": {"vision": {
+    (tmp_path / ".eir" / "config.yaml").write_text(yaml.safe_dump({"auxiliary": {"vision": {
         "provider": "custom", "base_url": "https://api.openai.com/v1",
         "key_env": "OLD_ENDPOINT_KEY", "api_mode": "codex_responses"}}}))
 

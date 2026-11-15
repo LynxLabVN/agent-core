@@ -1,12 +1,12 @@
-"""Cloud peer access: ``/api/peer/...`` carries another Hermes agent's API calls to this agent's
-gateway api_server on loopback, so ``hermes peer`` can reach a hosted agent without its key.
+"""Cloud peer access: ``/api/peer/...`` carries another Eir agent's API calls to this agent's
+gateway api_server on loopback, so ``eir peer`` can reach a hosted agent without its key.
 
 The bearer is a short-lived pass minted for this one agent, verified before this route runs
-(``hermes_cli.dashboard_auth.peer_pass``). Each path in :data:`_ROUTES` needs one permission; a path
+(``eir_cli.dashboard_auth.peer_pass``). Each path in :data:`_ROUTES` needs one permission; a path
 not listed is never forwarded, which keeps machine plumbing (``/api/cron/fire``, platform event
 intake, RoomLink grants, ``/health/detailed``) off this route. The request goes on with the
 API_SERVER_KEY the listener checks, which never leaves the machine, and with the pass holder's id
-in ``X-Hermes-Peer-Principal`` so jobs they create stay attributable. Every turn is credited to the
+in ``X-Eir-Peer-Principal`` so jobs they create stay attributable. Every turn is credited to the
 pass holder. A messaging pass reaches only the agent's canonical Bot Chat, the one session every
 peer message lands in; a control pass has key-holder parity. Control actions are written to the
 dashboard-auth audit log. ``/api/peer/p/<profile>/...`` reaches one profile.
@@ -26,14 +26,14 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.background import BackgroundTask
 
 from gateway.platforms.api_server_profile_prefix import DEFAULT_PROFILE_HANDLE, unknown_profile_body
-from hermes_cli.dashboard_auth.audit import AuditEvent, audit_log
-from hermes_cli.dashboard_auth.peer_pass import PEER_PREFIX
-from hermes_cli.dashboard_auth.request_utils import client_ip
+from eir_cli.dashboard_auth.audit import AuditEvent, audit_log
+from eir_cli.dashboard_auth.peer_pass import PEER_PREFIX
+from eir_cli.dashboard_auth.request_utils import client_ip
 
 _log = logging.getLogger(__name__)
 router = APIRouter()
 
-#: Messaging: everything ``hermes peer`` sends today, plus run events and the streaming chat turn,
+#: Messaging: everything ``eir peer`` sends today, plus run events and the streaming chat turn,
 #: in the agent's Bot Chat only. Each turn runs with the agent's tools, terminal included.
 MESSAGE = "agents:message"
 #: Control: what a user controls through the agent's API, in any session. Includes messaging.
@@ -61,7 +61,7 @@ _ROUTES: dict[tuple[str, str], str] = {
 _METHODS = sorted({method for method, _ in _ROUTES})
 #: The routes whose turns the api_server credits to the body's ``author`` (memory attribution).
 _TURNS = frozenset({("POST", "api/sessions/*/chat"), ("POST", "api/sessions/*/chat/stream"), ("POST", "v1/runs")})
-#: The body fields a messaging pass may send where this route reads the body: what ``hermes peer``
+#: The body fields a messaging pass may send where this route reads the body: what ``eir peer``
 #: sends (the api_server's own Bot Chat create also takes only ``title`` and ``source``). The
 #: api_server takes more there, which change more than the turn's own message: a model, kept for
 #: every later caller with ``require_model_lock``; a system prompt; a history; a stored response
@@ -81,15 +81,15 @@ _HOP_BY_HOP = frozenset({"connection", "keep-alive", "proxy-authenticate", "prox
 #: cookies, browser origin). The agent's key and the verified pass holder replace them.
 _DROP_REQUEST = _HOP_BY_HOP | frozenset({
     "host", "cookie", "authorization", "origin", "referer", "forwarded", "x-real-ip",
-    "x-hermes-session-token", "x-hermes-gateway-ticket", "x-hermes-window-ticket"})
+    "x-eir-session-token", "x-eir-gateway-ticket", "x-eir-window-ticket"})
 #: The api_server's memory scope, which it keeps for key holders: only a control pass, which has
 #: key-holder parity, may set it or see it.
-_CONTROL_ONLY = frozenset({"x-hermes-session-key"})
+_CONTROL_ONLY = frozenset({"x-eir-session-key"})
 #: Response headers that come back: what describes the body, plus the api_server's own signals
 #: (session, replayed admission, partial or failed turn); the memory scope only to a control pass.
 _KEEP_RESPONSE = frozenset({"content-type", "content-length", "content-encoding", "cache-control",
-                            "x-accel-buffering", "retry-after", "x-hermes-session-id", "x-hermes-session-key",
-                            "idempotency-replayed", "x-hermes-completed", "x-hermes-partial", "x-hermes-error"})
+                            "x-accel-buffering", "retry-after", "x-eir-session-id", "x-eir-session-key",
+                            "idempotency-replayed", "x-eir-completed", "x-eir-partial", "x-eir-error"})
 #: Request headers replaced when this route sends a body it read.
 _BODY_HEADERS = frozenset({"content-length", "content-type", "content-encoding"})
 #: Failures before the request reached the gateway (asleep, restarting, off): safe to retry.
@@ -124,10 +124,10 @@ def _parse(scope) -> Optional[tuple[Optional[str], list[str]]]:
 def _upstream(profile: Optional[str]) -> Optional[tuple[str, str]]:
     """``(loopback base URL, API_SERVER_KEY)`` of the gateway api_server serving *profile* (None: the
     profile this dashboard serves), or None when this host has no such profile. The prefix reads as
-    the api_server reads it: the default profile's handle ``hermes`` is the default profile unless a
+    the api_server reads it: the default profile's handle ``eir`` is the default profile unless a
     profile has that name. Reads config and .env files: call it off the event loop."""
-    from hermes_cli import profiles
-    from hermes_cli import web_server_cron as cron
+    from eir_cli import profiles
+    from eir_cli import web_server_cron as cron
     if profile is None:
         name, home = cron._cron_profile_home(None)
         return cron._gateway_api_target(name, home)
@@ -186,7 +186,7 @@ async def _json_object(request: Request) -> tuple[Optional[dict], Optional[JSONR
 
 
 def _control_only_parts(method: str, template: str, body: dict) -> list[str]:
-    """What in a body only a control pass may send: fields ``hermes peer`` never sends, and a turn
+    """What in a body only a control pass may send: fields ``eir peer`` never sends, and a turn
     whose message is not plain text (a list ``input`` stands in for the history, and list content
     skips the hand-off to a Desktop holding the Bot Chat)."""
     parts = sorted(set(body) - _MESSAGING_FIELDS[(method, template)])
@@ -323,10 +323,10 @@ async def peer_forward(request: Request, path: str):
     target = "/" + "/".join(urllib.parse.quote(segment, safe="") for segment in segments)
     headers = {name: value for name, value in request.headers.items()
                if name.lower() not in _DROP_REQUEST
-               and not name.lower().startswith(("x-forwarded-", "x-hermes-peer-"))
+               and not name.lower().startswith(("x-forwarded-", "x-eir-peer-"))
                and (name.lower() not in _CONTROL_ONLY or control)
                and (body is None or name.lower() not in _BODY_HEADERS)}
-    headers.update({"Authorization": f"Bearer {key}", "X-Hermes-Peer-Principal": principal.principal})
+    headers.update({"Authorization": f"Bearer {key}", "X-Eir-Peer-Principal": principal.principal})
     if client_ip(request):
         headers["X-Forwarded-For"] = client_ip(request)
     if body is not None:

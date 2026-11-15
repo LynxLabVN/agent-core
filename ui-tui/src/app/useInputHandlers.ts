@@ -1,7 +1,7 @@
-import { forceRedraw, type Key, useInput } from '@hermes/ink'
-import { sharedControlParams } from '@hermes/shared/gateway-canonical'
-import type { ConfigSetResponse, SharedControlRespondResponse, VoiceRecordResponse } from '@hermes/shared/gateway-types'
-import { applyCompletion } from '@hermes/shared/slash-input'
+import { forceRedraw, type Key, useInput } from '@eir/ink'
+import { sharedControlParams } from '@eir/shared/gateway-canonical'
+import type { ConfigSetResponse, SharedControlRespondResponse, VoiceRecordResponse } from '@eir/shared/gateway-types'
+import { applyCompletion } from '@eir/shared/slash-input'
 import { useStore } from '@nanostores/react'
 import { useEffect, useRef } from 'react'
 

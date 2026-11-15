@@ -2,11 +2,11 @@
 
 from types import SimpleNamespace
 
-from cli import HermesCLI
+from cli import EirCLI
 
 
 def _bare_cli():
-    cli = HermesCLI.__new__(HermesCLI)
+    cli = EirCLI.__new__(EirCLI)
     return cli
 
 

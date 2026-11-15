@@ -1,1 +1,1 @@
-# Hermes plugins package
+# Eir plugins package

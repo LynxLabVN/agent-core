@@ -1,7 +1,7 @@
 """The PUBLIC debug paste is an allowlisted summary; full logs only reach private storage (#46006).
 
 Subtractive redaction scrubs credentials but not IPs, room IDs, display names or message bodies,
-so every surface that publishes to the public paste (``hermes debug share``, the ``/debug`` gateway
+so every surface that publishes to the public paste (``eir debug share``, the ``/debug`` gateway
 command, the dashboard ``POST /api/ops/debug-share``) must upload no log line text at all. The
 private ``--nous`` bundle still carries the redacted tails.
 """
@@ -24,10 +24,10 @@ _PII = (_MESSAGE, _DISPLAY_NAME, _ROOM_ID, _IP, _HOME_PATH, "landlord", "Elm Str
 
 @pytest.fixture
 def pii_home(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     logs = home / "logs"
     logs.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     (home / "config.yaml").write_text(
         "model:\n  default: secret-model-name\n  provider: openrouter\n"
         f"terminal:\n  cwd: {_HOME_PATH}\n"
@@ -69,12 +69,12 @@ def _capture_uploads():
 
 
 def test_cli_public_share_uploads_only_the_allowlisted_summary(pii_home, capsys):
-    from hermes_cli.debug import run_debug_share
+    from eir_cli.debug import run_debug_share
 
     uploaded, upload = _capture_uploads()
-    with patch("hermes_cli.debug.upload_to_pastebin", side_effect=upload), \
-            patch("hermes_cli.debug._schedule_auto_delete"), \
-            patch("hermes_cli.debug._sweep_expired_pastes", return_value=(0, 0)):
+    with patch("eir_cli.debug.upload_to_pastebin", side_effect=upload), \
+            patch("eir_cli.debug._schedule_auto_delete"), \
+            patch("eir_cli.debug._sweep_expired_pastes", return_value=(0, 0)):
         # --no-redact must not be able to put logs on the public paste either.
         for no_redact in (False, True):
             run_debug_share(SimpleNamespace(lines=200, expire=1, local=False, nous=False,
@@ -93,12 +93,12 @@ def test_cli_public_share_uploads_only_the_allowlisted_summary(pii_home, capsys)
 
 
 def test_dashboard_builder_uploads_only_the_summary(pii_home):
-    from hermes_cli.debug import build_debug_share
+    from eir_cli.debug import build_debug_share
 
     uploaded, upload = _capture_uploads()
-    with patch("hermes_cli.debug.upload_to_pastebin", side_effect=upload), \
-            patch("hermes_cli.debug._schedule_auto_delete"), \
-            patch("hermes_cli.debug._sweep_expired_pastes", return_value=(0, 0)):
+    with patch("eir_cli.debug.upload_to_pastebin", side_effect=upload), \
+            patch("eir_cli.debug._schedule_auto_delete"), \
+            patch("eir_cli.debug._sweep_expired_pastes", return_value=(0, 0)):
         result = build_debug_share(log_lines=200, redact=False)
 
     assert list(result.urls) == ["Report"]
@@ -122,10 +122,10 @@ async def test_gateway_debug_uploads_only_the_summary(pii_home):
     runner._run_in_executor_with_context = _inline
     source = SessionSource(platform=Platform.TELEGRAM, chat_id="c1", user_id="u1", chat_type="dm")
     uploaded: list[str] = []
-    with patch("hermes_cli.debug.upload_to_pastebin",
+    with patch("eir_cli.debug.upload_to_pastebin",
                lambda report: uploaded.append(report) or "https://paste.rs/x"), \
-            patch("hermes_cli.debug._schedule_auto_delete"), \
-            patch("hermes_cli.debug._sweep_expired_pastes", return_value=(0, 0)):
+            patch("eir_cli.debug._schedule_auto_delete"), \
+            patch("eir_cli.debug._sweep_expired_pastes", return_value=(0, 0)):
         await runner._handle_debug_command(MessageEvent(text="/debug upload", source=source))
 
     assert len(uploaded) == 1
@@ -134,12 +134,12 @@ async def test_gateway_debug_uploads_only_the_summary(pii_home):
 
 
 def test_nous_share_still_carries_redacted_log_tails(pii_home):
-    from hermes_cli.debug import run_debug_share
+    from eir_cli.debug import run_debug_share
 
-    with patch("hermes_cli.diagnostics_upload.share_to_nous",
+    with patch("eir_cli.diagnostics_upload.share_to_nous",
                return_value={"id": "x", "viewUrl": "https://v"}) as share, \
-            patch("hermes_cli.debug.upload_to_pastebin") as paste, \
-            patch("hermes_cli.debug._sweep_expired_pastes", return_value=(0, 0)):
+            patch("eir_cli.debug.upload_to_pastebin") as paste, \
+            patch("eir_cli.debug._sweep_expired_pastes", return_value=(0, 0)):
         run_debug_share(SimpleNamespace(lines=200, expire=1, local=False, nous=True,
                                         yes=True, no_redact=False))
 
@@ -151,11 +151,11 @@ def test_nous_share_still_carries_redacted_log_tails(pii_home):
 
 def test_lines_bounds_the_scanned_tail(tmp_path, monkeypatch):
     """``--lines`` is the window the summary counts, as the help and docs say."""
-    from hermes_cli.debug_summary import collect_public_summary
+    from eir_cli.debug_summary import collect_public_summary
 
-    logs = tmp_path / ".hermes" / "logs"
+    logs = tmp_path / ".eir" / "logs"
     logs.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path / ".eir"))
     (logs / "agent.log").write_text("".join(
         f"2026-04-12 17:00:00,001 WARNING agent.conversation_loop: row {i}\n" for i in range(300)))
 
@@ -167,7 +167,7 @@ def test_lines_bounds_the_scanned_tail(tmp_path, monkeypatch):
 def test_message_derived_names_never_reach_the_summary():
     """Identifier-shaped tokens from message text or a runtime-built logger name are not printed;
     real module paths and builtin exception names still are."""
-    from hermes_cli.debug_summary import _log_counts
+    from eir_cli.debug_summary import _log_counts
 
     log = (
         "2026-04-12 17:00:00,001 WARNING agent.john_smith_42_main_st_password_hunter2: x\n"
@@ -183,7 +183,7 @@ def test_message_derived_names_never_reach_the_summary():
 
 def test_known_module_prefix_does_not_launder_message_text():
     """A fabricated class after a real package name is still message text, not a diagnosis."""
-    from hermes_cli.debug_summary import _log_counts
+    from eir_cli.debug_summary import _log_counts
 
     private_token = "PrivateName427ElmStreet"
     log = (
@@ -196,10 +196,10 @@ def test_known_module_prefix_does_not_launder_message_text():
 
 
 def test_exception_check_keeps_real_classes_and_runs_no_module_code():
-    """Hermes and dependency exception classes stay named; verifying a log-derived path must not
+    """Eir and dependency exception classes stay named; verifying a log-derived path must not
     import it (``acp_adapter.__main__`` starts the ACP server on import)."""
     import acp_adapter.entry
-    from hermes_cli.debug_summary import _exception_label
+    from eir_cli.debug_summary import _exception_label
 
     with patch.object(acp_adapter.entry, "main") as server_main:
         assert _exception_label("acp_adapter.__main__.StartupError") == "(other)"
@@ -214,7 +214,7 @@ def test_exception_check_keeps_real_classes_and_runs_no_module_code():
 def test_info_lines_and_unknown_logger_roots_name_nothing():
     """INFO lines (where adapters log message text) are not mined, and a logger outside the known
     roots (one named after an MCP server or a user) is counted as (other), never printed."""
-    from hermes_cli.debug_summary import _log_counts
+    from eir_cli.debug_summary import _log_counts
 
     log = (
         "2026-04-12 17:00:00,001 INFO agent.conversation_loop: ConnectionResetError HTTP 502\n"
@@ -228,7 +228,7 @@ def test_custom_platform_plugin_names_are_counted_not_printed(pii_home):
     """Plugins register platform identifiers at runtime under any name (a person, a phone number);
     only platforms core ships (built-in members and bundled plugins) are named."""
     from gateway.platform_registry import PlatformEntry, platform_registry
-    from hermes_cli.debug_summary import _platform_names
+    from eir_cli.debug_summary import _platform_names
 
     private = "alice_private_oncall_15551234567"
     (pii_home / "config.yaml").write_text(
@@ -251,7 +251,7 @@ def test_symlinked_source_outside_the_package_does_not_vouch_for_a_class(
     any text; a class name quoted there is not verified, and empty dotted segments never match."""
     import sys
 
-    from hermes_cli import debug_summary as ds
+    from eir_cli import debug_summary as ds
 
     outside = tmp_path / "private.py"
     outside.write_text("# AliceOncall15551234567Error\n")

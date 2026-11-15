@@ -9,18 +9,18 @@ from types import SimpleNamespace
 
 import pytest
 
-from hermes_cli import kanban_db as kb
-from hermes_cli import kanban_db_dispatch as kbd
+from eir_cli import kanban_db as kb
+from eir_cli import kanban_db_dispatch as kbd
 
 pytestmark = pytest.mark.platforms("posix")
 
 
 @pytest.fixture
 def log_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
+    monkeypatch.setenv("EIR_KANBAN_HOME", str(home))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     return kb.worker_log_path("t_mode")
 
@@ -44,7 +44,7 @@ def test_existing_world_readable_log_and_its_backup_are_tightened(log_path, monk
     log_path.parent.mkdir(parents=True, exist_ok=True)
     log_path.write_bytes(b"old secret output\n" * 10)
     log_path.chmod(0o664)
-    monkeypatch.setattr("hermes_cli.kanban_worker_log.worker_log_rotation_config", lambda: (16, 1))
+    monkeypatch.setattr("eir_cli.kanban_worker_log.worker_log_rotation_config", lambda: (16, 1))
 
     with kbd._open_worker_log(SimpleNamespace(id="t_mode"), None) as f:
         f.write(b"x")

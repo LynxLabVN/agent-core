@@ -6,7 +6,7 @@
  * on routing.ts, for the owner descriptors it dispatches through.
  */
 
-import { atom, host, queryClient, useQuery, useValue } from '@hermes/plugin-sdk'
+import { atom, host, queryClient, useQuery, useValue } from '@eir/plugin-sdk'
 
 import { botsText } from './i18n'
 import { displayName } from './labels'
@@ -324,7 +324,7 @@ interface ProfilesConfigureResult {
   }
 }
 
-/** The bot's `hermes-bots` namespace as its OWN backend holds it right now. */
+/** The bot's `eir-bots` namespace as its OWN backend holds it right now. */
 interface ServerBotMeta {
   meta: StoredBotMeta
   /** Per-key CAS revision; null on gateways that predate `ui_meta_revisions`. */
@@ -355,12 +355,12 @@ async function readServerBotMeta(
     return null
   }
 
-  const meta = row.ui_meta?.['hermes-bots']
+  const meta = row.ui_meta?.['eir-bots']
   const revisions = row.ui_meta_revisions
 
   return {
     meta: meta && typeof meta === 'object' && !Array.isArray(meta) ? (meta as StoredBotMeta) : {},
-    revision: revisions && typeof revisions === 'object' ? Math.max(0, Number(revisions['hermes-bots'] || 0)) : null
+    revision: revisions && typeof revisions === 'object' ? Math.max(0, Number(revisions['eir-bots'] || 0)) : null
   }
 }
 
@@ -391,7 +391,7 @@ async function persistBotMetaPatch(
     const params: Record<string, unknown> = {
       name,
       ui_meta: {
-        'hermes-bots': {
+        'eir-bots': {
           ...base,
           ...fields
         }
@@ -400,7 +400,7 @@ async function persistBotMetaPatch(
 
     if (server.revision !== null) {
       params.ui_meta_expected_revisions = {
-        'hermes-bots': server.revision
+        'eir-bots': server.revision
       }
     }
 
@@ -485,7 +485,7 @@ export function setLocalBotMeta(owner: RosterRow | string, patch: StoredBotMeta)
   return writeLocalBotMeta(key, route, patch)
 }
 
-/** The bot's `hermes-bots` metadata as its own backend holds it now; null when it does not answer. */
+/** The bot's `eir-bots` metadata as its own backend holds it now; null when it does not answer. */
 export async function readBotMetaFromServer(owner: RosterRow | string): Promise<null | StoredBotMeta> {
   const { bot, name, route } = botOwner(owner)
 
@@ -752,7 +752,7 @@ export async function migrateBotMeta(storage: BotMetaStorage | undefined = getPl
 // ── data ─────────────────────────────────────────────────────────────────────
 
 /** True once profiles.list reports the backend injects the bot-to-bot
- *  protocol into the system prompt itself (hermes-agent bot_mode_probe).
+ *  protocol into the system prompt itself (eir-agent bot_mode_probe).
  *  Gates every SOUL.md protocol append below. */
 export let serverInjectsProtocol = false
 
@@ -884,7 +884,7 @@ async function fetchRosterSnapshot(activeConnectionId: null | string | undefined
   // carry a second copy. Older gateways lack the flag: keep appending.
   serverInjectsProtocol = Boolean(local?.bot_mode_protocol)
 
-  // Multi-source desktops (hermes-agent #86875) also expose the union
+  // Multi-source desktops (eir-agent #86875) also expose the union
   // agent roster across every registered connection. Merge agents from
   // OTHER sources in as additional rows. Feature-detected + best-effort:
   // an older Desktop build (no host.agents) or a roster hiccup leaves
@@ -1161,7 +1161,7 @@ export function mergeMultiSourceRoster(
     profiles.push({
       name: profile,
       // A remote row's title/display_name ride the union enumeration; without
-      // them a remote default titled "CoS Bot" only ever tags as @hermes(-device)
+      // them a remote default titled "CoS Bot" only ever tags as @eir(-device)
       // and its title slug is unknown to the composer (#103731).
       ...(agent.profileMetadata || {}),
       handle: agent.handle,
@@ -1235,46 +1235,46 @@ export function mergeMultiSourceRoster(
 /** The @handle users tag a bot with. Multi-source rosters precompute the
  *  handle (bare name, or name-device when the profile exists on several
  *  registered sources) — prefer it when present. The primary profile's
- *  callable alias is 'hermes' — the mention middleware resolves it back to
+ *  callable alias is 'eir' — the mention middleware resolves it back to
  *  'default' — so the word 'default' never surfaces in the UI, unless a real
- *  `hermes` profile on the same source holds that handle (`claimDefaultHandles`). */
+ *  `eir` profile on the same source holds that handle (`claimDefaultHandles`). */
 export function botHandle(name: string, bot?: Partial<RosterRow> | null): string {
-  if (bot?.handle && bot.handle !== name && !(bot.hermesHandleTaken && bot.handle === 'hermes')) {
+  if (bot?.handle && bot.handle !== name && !(bot.eirHandleTaken && bot.handle === 'eir')) {
     return bot.handle
   }
 
-  return (name || '').trim().toLowerCase() === 'default' && !bot?.hermesHandleTaken ? 'hermes' : name
+  return (name || '').trim().toLowerCase() === 'default' && !bot?.eirHandleTaken ? 'eir' : name
 }
 
-/** The row's own `handle` as a mention form, lowercased. A stale 'hermes'
- *  handle on a default row whose source has a real 'hermes' profile is that
+/** The row's own `handle` as a mention form, lowercased. A stale 'eir'
+ *  handle on a default row whose source has a real 'eir' profile is that
  *  profile's tag, not this row's (same rule as `botHandle`). */
 function claimableRowHandle(bot: Partial<RosterRow>): string {
-  return bot.handle && !(bot.hermesHandleTaken && bot.handle === 'hermes') ? String(bot.handle).toLowerCase() : ''
+  return bot.handle && !(bot.eirHandleTaken && bot.handle === 'eir') ? String(bot.handle).toLowerCase() : ''
 }
 
-/** Mark each default row whose source also lists a real `hermes` profile, so
- *  that profile keeps @hermes and the roster never shows two (the backend's
+/** Mark each default row whose source also lists a real `eir` profile, so
+ *  that profile keeps @eir and the roster never shows two (the backend's
  *  `tools/bot_mode_probe._handle` applies the same rule). Rows group by
  *  connection; rows without one are the active source. */
 export function claimDefaultHandles<T extends Partial<RosterRow>>(rows: T[]): T[] {
   const taken = new Set(
-    rows.filter(row => String(row?.name || '').trim() === 'hermes').map(row => String(row?.connectionId || ''))
+    rows.filter(row => String(row?.name || '').trim() === 'eir').map(row => String(row?.connectionId || ''))
   )
 
   return rows.map(row =>
     String(row?.name || '').trim() === 'default' && taken.has(String(row?.connectionId || ''))
-      ? { ...row, hermesHandleTaken: true }
+      ? { ...row, eirHandleTaken: true }
       : row
   )
 }
 
 /** Taggable @-forms derived from a bot's friendly names — the core profile
- *  display name (`hermes profile rename`) and the Bot Mode title. Free text
+ *  display name (`eir profile rename`) and the Bot Mode title. Free text
  *  reduces to the mention charset two ways: slugified ("Research Buddy" →
  *  research-buddy, the form autocomplete inserts) and collapsed
- *  (researchbuddy). Reserved tokens are dropped so a bot renamed "Hermes"
- *  can never hijack the primary profile's @hermes alias. */
+ *  (researchbuddy). Reserved tokens are dropped so a bot renamed "Eir"
+ *  can never hijack the primary profile's @eir alias. */
 export function mentionNameForms(value: null | string | undefined): string[] {
   const name = String(value || '')
     .trim()
@@ -1288,7 +1288,7 @@ export function mentionNameForms(value: null | string | undefined): string[] {
   const collapsed = name.replace(/[^a-z0-9_-]+/g, '')
 
   return [...new Set([slug, collapsed])].filter(
-    form => /^[a-z0-9][a-z0-9_-]*$/.test(form) && !['all', 'everyone', 'user', 'default', 'hermes'].includes(form)
+    form => /^[a-z0-9][a-z0-9_-]*$/.test(form) && !['all', 'everyone', 'user', 'default', 'eir'].includes(form)
   )
 }
 
@@ -1313,7 +1313,7 @@ export function botFriendlyNames(bot: Partial<RosterRow> | null | undefined): Ar
       alias.name
     : null
 
-  return [bot?.ui_meta?.['hermes-bots']?.title, localTitle, aliasTitle, bot?.title, bot?.display_name]
+  return [bot?.ui_meta?.['eir-bots']?.title, localTitle, aliasTitle, bot?.title, bot?.display_name]
 }
 
 /** The tag autocomplete inserts for a bot: the renamed (friendly) slug when
@@ -1393,7 +1393,7 @@ export function newBotChat(bot: RosterRow) {
     host.notify?.({
       kind: 'error',
       message:
-        getPluginCtx()?.i18n?.t('bot.openAnotherChatUnsupported') ?? 'Update Hermes Desktop to open another bot chat.'
+        getPluginCtx()?.i18n?.t('bot.openAnotherChatUnsupported') ?? 'Update Eir Desktop to open another bot chat.'
     })
 
     return
@@ -1405,7 +1405,7 @@ export function newBotChat(bot: RosterRow) {
     host.notify?.({
       kind: 'error',
       message:
-        getPluginCtx()?.i18n?.t('bot.openAnotherChatUnsupported') ?? 'Update Hermes Desktop to open another bot chat.'
+        getPluginCtx()?.i18n?.t('bot.openAnotherChatUnsupported') ?? 'Update Eir Desktop to open another bot chat.'
     })
 
     return
@@ -1510,8 +1510,8 @@ export function resolveRosterMentions(
     let token = match[2].toLowerCase()
     const connection = (match[3] || '').toLowerCase()
 
-    if (token === 'hermes') {
-      token = byForm.has('hermes') ? 'hermes' : token
+    if (token === 'eir') {
+      token = byForm.has('eir') ? 'eir' : token
     }
 
     const bot = connection

@@ -1,4 +1,4 @@
-"""Version transition reporting after ``hermes update``.
+"""Version transition reporting after ``eir update``.
 
 Ported from PrimeIntellect-ai/prime-agent#630: a successful self-update
 reports both versions (``v0.19.4 → v0.20.0``). pyproject.toml is an inert
@@ -12,13 +12,13 @@ import subprocess
 
 import pytest
 
-from hermes_cli import update_cmd
-from hermes_cli.source_stamp import write_source_stamp
+from eir_cli import update_cmd
+from eir_cli.source_stamp import write_source_stamp
 
 
 def _write_pyproject(root: Path, version: str) -> None:
     (root / "pyproject.toml").write_text(
-        f'[project]\nname = "hermes-agent"\nversion = "{version}"\n',
+        f'[project]\nname = "eir-agent"\nversion = "{version}"\n',
         encoding="utf-8",
     )
 

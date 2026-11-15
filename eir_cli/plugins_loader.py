@@ -1,8 +1,8 @@
 """Plugin loading: directory/entry-point module import, deferred bundled platforms, portable packages,
-dependency/config-schema warnings. Mixed into :class:`hermes_cli.plugins.PluginManager`.
+dependency/config-schema warnings. Mixed into :class:`eir_cli.plugins.PluginManager`.
 
 Origin-internal names (``PluginContext``, ``LoadedPlugin``, ``_PLUGINS_DEBUG`` …) are imported lazily
-through ``hermes_cli.plugins`` so tests that patch them on the origin keep working.
+through ``eir_cli.plugins`` so tests that patch them on the origin keep working.
 """
 
 from __future__ import annotations
@@ -22,18 +22,18 @@ from functools import wraps
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Mapping, Optional, Union
 
-from hermes_constants import get_hermes_home, reset_hermes_home_override, set_hermes_home_override
+from eir_constants import get_eir_home, reset_eir_home_override, set_eir_home_override
 from registration_lifecycle import replacement_coordinator
-from hermes_cli.plugins_discovery import ENTRY_POINTS_GROUP, _select_entry_point_group
-from hermes_cli.plugins_manifest import PluginManifest, manifest_key, portable_mcp_server_name, validate_config_schema
-from hermes_cli.plugins_state import _plugin_settings_entry
+from eir_cli.plugins_discovery import ENTRY_POINTS_GROUP, _select_entry_point_group
+from eir_cli.plugins_manifest import PluginManifest, manifest_key, portable_mcp_server_name, validate_config_schema
+from eir_cli.plugins_state import _plugin_settings_entry
 
 if TYPE_CHECKING:  # pragma: no cover
-    from hermes_cli.plugins import LoadedPlugin, PluginContext
+    from eir_cli.plugins import LoadedPlugin, PluginContext
 
-logger = logging.getLogger("hermes_cli.plugins")
+logger = logging.getLogger("eir_cli.plugins")
 
-_NS_PARENT = "hermes_plugins"
+_NS_PARENT = "eir_plugins"
 _MODULE_NAMESPACE_LOCK = threading.RLock()
 _BARE_MODULE_SCOPE: dict[str, str] = {}  # bare module name -> owning scope_key
 
@@ -51,7 +51,7 @@ _ABANDONED_LOADERS_LOCK = threading.Lock()
 _PLUGIN_HOST_CREATE_LOCK = threading.Lock()
 # PluginContexts of the outermost deadline-bounded load; set only inside its worker.
 _IN_PLUGIN_LOAD: contextvars.ContextVar[Optional[list[PluginContext]]] = contextvars.ContextVar(
-    "hermes_plugin_load_scope", default=None,
+    "eir_plugin_load_scope", default=None,
 )
 
 
@@ -69,7 +69,7 @@ def _resolve_plugin_load_timeout() -> float:
     loads inline with no deadline; clamped to ``_MAX_LOAD_TIMEOUT_SECS``)."""
     default = _LOAD_TIMEOUT_SECS
     try:
-        from hermes_cli.config import load_config_readonly
+        from eir_cli.config import load_config_readonly
         plugins_cfg = (load_config_readonly() or {}).get("plugins")
         if not isinstance(plugins_cfg, dict) or plugins_cfg.get("load_timeout_seconds") is None:
             return default
@@ -99,14 +99,14 @@ def _reserve_abandoned_loader_slot() -> None:
             return
     raise PluginLoadTimeout(
         f"not loaded: {_MAX_ABANDONED_LOADERS} abandoned plugin loader thread(s) are still running "
-        f"(plugins.load_timeout_seconds); restart Hermes to retry"
+        f"(plugins.load_timeout_seconds); restart Eir to retry"
     )
 
 
 def run_with_load_deadline(plugin_key: str, ctx: PluginContext, fn: Callable[[], Any]) -> Any:
     """Run ``fn`` (a plugin's import + ``register()``) under the per-plugin deadline.
 
-    The worker inherits the caller's context (the Hermes-home override is a ContextVar). On timeout the
+    The worker inherits the caller's context (the Eir-home override is a ContextVar). On timeout the
     worker is abandoned as a daemon, ``ctx`` is marked so any registration it still attempts is ignored,
     and :class:`PluginLoadTimeout` is raised on the calling thread so the usual failure path records the
     reason and disposes whatever was registered before the hang.
@@ -182,12 +182,12 @@ def _serialized_replacement(method):
 
 @contextmanager
 def _plugin_home_scope(home: Path):
-    """Bind discovery and loading to the manager's immutable Hermes home."""
-    token = set_hermes_home_override(home)
+    """Bind discovery and loading to the manager's immutable Eir home."""
+    token = set_eir_home_override(home)
     try:
         yield
     finally:
-        reset_hermes_home_override(token)
+        reset_eir_home_override(token)
 
 
 def _load_error_text(exc: BaseException) -> str:
@@ -233,7 +233,7 @@ def missing_python_dependencies(manifest: Any) -> list[str]:
 
 
 def _declared_requirements(manifest: Any) -> tuple[str, ...]:
-    """What PM installs into Hermes's environment for this plugin: its declaration read the way
+    """What PM installs into Eir's environment for this plugin: its declaration read the way
     admission reads it (``pm.plugin_declarations.read_python_declaration`` — an authored
     ``pyproject.toml`` first, then ``python_dependencies`` / ``pip_dependencies``; nothing for a
     ``python_runtime: external`` sidecar). A plugin with no directory (an entry point) has only its
@@ -248,14 +248,14 @@ def _declared_requirements(manifest: Any) -> tuple[str, ...]:
         return ()
 
 
-def hermes_fit_error(manifest: Any) -> Optional[str]:
-    """Why this Hermes is not one the plugin accepts: ``requires_hermes``, then the plugin's own
-    requirement on ``hermes-agent``. PM's build leaves such a plugin out by the same gate
-    (``pm.workspace.hermes_fit_error``), so it is skipped here rather than imported without its
-    dependencies, and loads again once Hermes fits."""
-    from hermes_cli.plugins_manifest import requires_hermes_error
+def eir_fit_error(manifest: Any) -> Optional[str]:
+    """Why this Eir is not one the plugin accepts: ``requires_eir``, then the plugin's own
+    requirement on ``eir-agent``. PM's build leaves such a plugin out by the same gate
+    (``pm.workspace.eir_fit_error``), so it is skipped here rather than imported without its
+    dependencies, and loads again once Eir fits."""
+    from eir_cli.plugins_manifest import requires_eir_error
 
-    reason = requires_hermes_error(manifest)
+    reason = requires_eir_error(manifest)
     path = getattr(manifest, "path", None)
     if reason or not path or not Path(path).is_dir():
         return reason
@@ -285,7 +285,7 @@ def installed_in_selected_environment(requirements: list[str]) -> bool:
     """Whether every one of *requirements* is in the dependency environment PM currently selects.
 
     Activation is a boot decision (``pm.environments.activate_dependencies``): a gateway or dashboard
-    that was running when ``hermes plugins enable`` committed a new generation keeps the old one. A
+    that was running when ``eir plugins enable`` committed a new generation keeps the old one. A
     requirement it cannot import that the selected generation carries therefore needs a restart, not
     a repair. False when unknown."""
     try:
@@ -303,11 +303,11 @@ class PluginLoaderMixin:
         """Subscribe to "a discovery sweep loaded plugins this process did not have": fires from INSIDE
         :meth:`discover_and_load` (never emitted by an install RPC) with one
         ``{name, key, activated_now, deferred}`` summary per NEWLY loaded plugin — every plugin at boot,
-        just the newcomer after a mid-run ``hermes plugins install/enable``, Desktop / dashboard /
+        just the newcomer after a mid-run ``eir plugins install/enable``, Desktop / dashboard /
         ``plugins.manage`` install-enable-update, a tool-triggered force re-discovery or the gateway's
         ``reload-plugins`` verb (all of which run ``discover_plugins(force=True)``; a non-forced call
         short-circuits on ``_discovered`` and never fires). See
-        :func:`hermes_cli.plugins_activation.plugin_activation_summary` for the payload: ``activated_now``
+        :func:`eir_cli.plugins_activation.plugin_activation_summary` for the payload: ``activated_now``
         (gateway commands/transforms/hooks/callbacks, live at once) vs ``deferred`` (``tools``/``prompt``
         until the next session, ``mcp_servers`` — the plugin's mcp.json server names — until ``mcp.reload``).
         Listeners belong to the process (gateway runner, TUI server), not to a plugin, so ``unload()``
@@ -330,7 +330,7 @@ class PluginLoaderMixin:
         ``loaded_before``; nothing new = no event. One raising listener never starves the rest."""
         if not self._plugin_loaded_listeners:
             return
-        from hermes_cli.plugins_activation import activation_summaries
+        from eir_cli.plugins_activation import activation_summaries
         summaries = [s for s in activation_summaries(self) if s["key"] not in loaded_before]
         if not summaries:
             return
@@ -352,8 +352,8 @@ class PluginLoaderMixin:
     def _register_deferred_platform(self, manifest: PluginManifest) -> None:
         """Register a lazy loader for a bundled platform: the adapter imports only when the
         ``platform_registry`` is first asked for it; a placeholder ``LoadedPlugin`` keeps it visible in
-        ``hermes plugins list`` until then."""
-        from hermes_cli.plugins import LoadedPlugin
+        ``eir plugins list`` until then."""
+        from eir_cli.plugins import LoadedPlugin
         lookup_key = manifest_key(manifest)
         loaded = LoadedPlugin(manifest=manifest, enabled=True, deferred=True)
         self._plugins[lookup_key] = loaded
@@ -370,14 +370,14 @@ class PluginLoaderMixin:
         retries the import. A failed load disposes its lease (the registry forgets the platform), so without
         this a load that raised or overran its deadline at startup stays down until a forced re-discovery
         (#126356). True when a loader was re-armed."""
-        from hermes_cli.plugins_discovery import _get_disabled_plugins, _get_enabled_plugins, gate_manifest
+        from eir_cli.plugins_discovery import _get_disabled_plugins, _get_enabled_plugins, gate_manifest
         with self._discovery_lock, _plugin_home_scope(self.home_path):
             failed = next((p.manifest for p in self._plugins.values()
                            if p.error and not p.enabled and p.manifest.kind == "platform"
                            and self._platform_name_from_manifest(p.manifest) == platform_name), None)
-            # Re-gate: a placeholder (disabled, not enabled, catalog-removed) or a requires_hermes mismatch
+            # Re-gate: a placeholder (disabled, not enabled, catalog-removed) or a requires_eir mismatch
             # carries the same error-set shape as a failed load but must never be imported.
-            if failed is None or hermes_fit_error(failed) or gate_manifest(
+            if failed is None or eir_fit_error(failed) or gate_manifest(
                     failed, _get_disabled_plugins(), _get_enabled_plugins()).action not in ("defer", "load"):
                 return False
             with _ABANDONED_LOADERS_LOCK:  # its hung import is still running: another retry only leaks a thread
@@ -426,13 +426,13 @@ class PluginLoaderMixin:
     def _register_deferred_platform_tools(self, manifest: PluginManifest, loaded: LoadedPlugin) -> None:
         """Register a deferred platform's *client* tools without its adapter. Deferring the plugin would
         otherwise defer its outbound tools too, so CLI/TUI processes (which never materialize platforms)
-        would miss them in ``hermes tools`` / ``platform_toolsets``. Opt-in is explicit via ``provides_tools``;
+        would miss them in ``eir tools`` / ``platform_toolsets``. Opt-in is explicit via ``provides_tools``;
         tools live in a ``tools`` submodule so ``__init__`` stays import-light.
 
         A platform plugin can ship two independent things: an inbound adapter (heavy — it imports the
         platform SDK) and outbound client tools the agent calls like any other tool. Deferring the plugin
         defers both, so in a CLI/TUI process the client tools never register at all: ``resolve_toolset()``
-        returns ``[]``, the toolset is missing from the ``hermes tools`` checklist, and even an explicit
+        returns ``[]``, the toolset is missing from the ``eir tools`` checklist, and even an explicit
         ``platform_toolsets`` entry is dropped because the key is unknown. The same tools work in
         gateway/web processes only because those materialize every platform at startup (issue #78050).
         Opting in is explicit: the manifest must declare ``provides_tools`` (the field the plugin list and
@@ -442,7 +442,7 @@ class PluginLoaderMixin:
         the code is imported from; ``provides_tools`` is what asks for it. A platform that does not declare
         the field is untouched and stays fully deferred.
         """
-        from hermes_cli.plugins import PluginContext, _PLUGINS_DEBUG
+        from eir_cli.plugins import PluginContext, _PLUGINS_DEBUG
         if not manifest.provides_tools:
             return
         lookup_key = manifest_key(manifest)
@@ -495,7 +495,7 @@ class PluginLoaderMixin:
                 registered,
             )
         except (Exception, SystemExit) as exc:
-            # Tools registered before the raise are live: credit them or `hermes plugins list` under-reports
+            # Tools registered before the raise are live: credit them or `eir plugins list` under-reports
             # (and _load_plugin's later diff would miss them too). Never break discovery (the platform stays
             # deferred), but a broken tools.py IS the symptom, so warn — and say where it failed first.
             partial, total = _credit(), len(declared)
@@ -523,15 +523,15 @@ class PluginLoaderMixin:
         if installed_in_selected_environment(missing):
             logger.warning(
                 "Plugin %s's Python dependencies were installed after this process started: %s. "
-                "A running process never switches dependency environments; restart Hermes "
-                "(hermes gateway restart for the gateway) to load them.",
+                "A running process never switches dependency environments; restart Eir "
+                "(eir gateway restart for the gateway) to load them.",
                 key, ", ".join(missing),
             )
         else:
             logger.warning(
                 "Plugin %s declares Python dependencies that are not "
-                "installed: %s. For an enabled plugin, run hermes pm repair, "
-                "then restart Hermes. Discovery does not install dependencies.",
+                "installed: %s. For an enabled plugin, run eir pm repair, "
+                "then restart Eir. Discovery does not install dependencies.",
                 key, ", ".join(missing),
             )
 
@@ -545,7 +545,7 @@ class PluginLoaderMixin:
         plugin_id = manifest_key(manifest)
         settings: Mapping[str, Any] = {}
         try:
-            from hermes_cli.config import load_config
+            from eir_cli.config import load_config
             entry = _plugin_settings_entry(load_config() or {}, plugin_id) or {}
             raw = entry.get("settings")
             if not isinstance(raw, Mapping):
@@ -563,7 +563,7 @@ class PluginLoaderMixin:
 
     def _load_plugin_scoped(self, manifest: PluginManifest) -> None:
         """Load one plugin with the manager's home bound as current."""
-        from hermes_cli.plugins import LoadedPlugin, PluginContext, _PLUGINS_DEBUG
+        from eir_cli.plugins import LoadedPlugin, PluginContext, _PLUGINS_DEBUG
         loaded = LoadedPlugin(manifest=manifest)
         plugin_key = manifest_key(manifest)
         logger.debug(
@@ -574,7 +574,7 @@ class PluginLoaderMixin:
             self._load_portable_plugin(manifest, loaded)
             return
         # Version gate: skip cleanly (no import, no traceback) on a version mismatch.
-        reason = hermes_fit_error(manifest)
+        reason = eir_fit_error(manifest)
         if reason:
             loaded.error = reason
             logger.warning("Plugin '%s' skipped: %s", plugin_key, reason)
@@ -625,7 +625,7 @@ class PluginLoaderMixin:
                 self._attribute_registrations(loaded, plugin_key, registration_start)
                 self._publish_staged_registrations(ctx)
                 loaded.enabled = True
-                from hermes_cli.plugins_ledger import _hook_source_of
+                from eir_cli.plugins_ledger import _hook_source_of
 
                 self._drop_fallback_hooks(_hook_source_of(manifest.name, loaded.module))
         except (Exception, SystemExit) as exc:
@@ -672,7 +672,7 @@ class PluginLoaderMixin:
 
     def _runs_in_plugin_host(self, manifest: PluginManifest) -> bool:
         """``plugins.isolation: host`` sends every non-bundled Python plugin to the profile's host."""
-        from hermes_cli.plugin_isolation import ISOLATION_HOST, isolation_mode
+        from eir_cli.plugin_isolation import ISOLATION_HOST, isolation_mode
         return manifest.source != "bundled" and isolation_mode() == ISOLATION_HOST
 
     def _plugin_host(self) -> Any:
@@ -681,7 +681,7 @@ class PluginLoaderMixin:
         failed creation stores nothing, and the next caller tries again."""
         host = getattr(self, "_plugin_host_instance", None)
         if host is None:
-            from hermes_cli.plugin_host import PluginHost
+            from eir_cli.plugin_host import PluginHost
             with _PLUGIN_HOST_CREATE_LOCK:
                 host = getattr(self, "_plugin_host_instance", None)
                 if host is None:
@@ -695,7 +695,7 @@ class PluginLoaderMixin:
 
     def _track_tool_override_policy(self, manifest: PluginManifest, module_name: str) -> None:
         """Install the plugin's tool-override policy in tools.registry as a ledger-owned lease."""
-        from hermes_cli.plugins import PluginContext
+        from eir_cli.plugins import PluginContext
         from tools.registry import registry as _registry
         scope = self.scope_key
         with replacement_coordinator.transaction():
@@ -724,7 +724,7 @@ class PluginLoaderMixin:
         def _keys(kind: str) -> list[str]:
             return [r.key for r in registrations if r.kind == kind]
 
-        # Discovery-time tools predate registration_start; credit them back or `hermes plugins list`
+        # Discovery-time tools predate registration_start; credit them back or `eir plugins list`
         # under-reports once the deferred adapter materializes.
         predeclared = [t for t in self._predeclared_tools.pop(plugin_key, []) if t in self._plugin_tool_names]
         loaded.tools_registered = predeclared + [k for k in _keys("tool") if k not in predeclared]
@@ -740,12 +740,12 @@ class PluginLoaderMixin:
 
     def _load_portable_plugin(self, manifest: PluginManifest, loaded: LoadedPlugin) -> None:
         """Load validated portable components without importing Python code."""
-        from hermes_cli.plugins import PluginContext
+        from eir_cli.plugins import PluginContext
         lookup_key = manifest_key(manifest)
         try:
-            from hermes_cli.agent_plugins import load_agent_plugin
+            from eir_cli.agent_plugins import load_agent_plugin
             package = load_agent_plugin(
-                Path(manifest.path), get_hermes_home() / "plugin-data" / manifest.data_namespace)
+                Path(manifest.path), get_eir_home() / "plugin-data" / manifest.data_namespace)
             ctx = PluginContext(manifest, self)
             for diagnostic in package.diagnostics:
                 logger.warning("Agent Plugin '%s' [%s]: %s", lookup_key, diagnostic.scope, diagnostic.message)
@@ -754,8 +754,8 @@ class PluginLoaderMixin:
                     ctx.register_skill(skill.name, skill.skill_md, skill.description, skill.frontmatter)
                 except Exception as exc:
                     logger.warning("Agent Plugin '%s' skill '%s' skipped: %s", lookup_key, skill.name, exc)
-            from hermes_cli.agent_plugins import _clear_liveness, _set_liveness
-            from hermes_platform import declaration
+            from eir_cli.agent_plugins import _clear_liveness, _set_liveness
+            from eir_platform import declaration
             registered: list[str] = []
             try:
                 for server_name, config in package.mcp_servers.items():
@@ -793,7 +793,7 @@ class PluginLoaderMixin:
         self._plugins[lookup_key] = loaded
 
     def _directory_module_name(self, manifest: PluginManifest) -> str:
-        """Profile-safe import namespace for a directory plugin: the bare ``hermes_plugins.<slug>`` for the
+        """Profile-safe import namespace for a directory plugin: the bare ``eir_plugins.<slug>`` for the
         first scope that claims it, a ``__home_<digest>`` suffix for any other scope."""
         slug = manifest_key(manifest).replace("/", "__").replace("-", "_")
         bare_name = f"{_NS_PARENT}.{slug}"
@@ -814,7 +814,7 @@ class PluginLoaderMixin:
     def _load_directory_module(
         self, manifest: PluginManifest, *, module_name: Optional[str] = None,
     ) -> types.ModuleType:
-        """Import a directory plugin as ``hermes_plugins.<slug>`` (slug from ``manifest.key`` so
+        """Import a directory plugin as ``eir_plugins.<slug>`` (slug from ``manifest.key`` so
         ``image_gen/openai`` cannot collide with ``tts/openai``)."""
         plugin_dir = Path(manifest.path)  # type: ignore[arg-type]
         init_file = plugin_dir / "__init__.py"
@@ -826,7 +826,7 @@ class PluginLoaderMixin:
             ns_pkg.__package__ = _NS_PARENT
             sys.modules[_NS_PARENT] = ns_pkg
         module_name = module_name or self._directory_module_name(manifest)
-        # Evict stale entries for this slug (same slug cached from another Hermes home, or an earlier force
+        # Evict stale entries for this slug (same slug cached from another Eir home, or an earlier force
         # reload). Replacing only sys.modules[module_name] is not enough: the plugin's relative imports are
         # cached as "module_name.sub" and resolve from sys.modules first, so a stale submodule would keep
         # serving the previous load's code/state.

@@ -12,9 +12,9 @@ from pathlib import Path
 
 import pytest
 
-import hermes_cli.plugins as plugins_mod
-from hermes_cli.plugins import PluginManager
-from hermes_cli.web_routers.models import get_auxiliary_models
+import eir_cli.plugins as plugins_mod
+from eir_cli.plugins import PluginManager
+from eir_cli.web_routers.models import get_auxiliary_models
 
 PROVIDER = "scope-fixture"
 PIN = {"provider": PROVIDER, "model": "m", "base_url": "process://scope-fixture"}
@@ -22,7 +22,7 @@ PIN = {"provider": PROVIDER, "model": "m", "base_url": "process://scope-fixture"
 
 @pytest.fixture
 def plugin_only_in_b(tmp_path, monkeypatch):
-    home_a = tmp_path / ".hermes"
+    home_a = tmp_path / ".eir"
     home_b = home_a / "profiles" / "b"
     plugin = home_b / "plugins" / PROVIDER
     plugin.mkdir(parents=True)
@@ -36,7 +36,7 @@ def plugin_only_in_b(tmp_path, monkeypatch):
     for home in (home_a, home_b):
         (home / "config.yaml").write_text(json.dumps({"auxiliary": {"compression": PIN}}))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(home_a))
+    monkeypatch.setenv("EIR_HOME", str(home_a))
     monkeypatch.setattr(plugins_mod, "get_bundled_plugins_dir", lambda: tmp_path / "empty-bundled")
     monkeypatch.setattr(PluginManager, "_scan_entry_points", lambda self: [])
     plugins_mod._reset_plugin_managers_for_tests()

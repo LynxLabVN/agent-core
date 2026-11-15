@@ -1,4 +1,4 @@
-import { coarseElapsed } from '@hermes/plugin-sdk'
+import { coarseElapsed } from '@eir/plugin-sdk'
 
 import type { SidebarRowLabels } from './types'
 

@@ -1,6 +1,6 @@
 """Tests for `--resume latest` and `--in DIR` launch sugar.
 
-`hermes --tui --resume latest --in ./dir` (and the classic-CLI equivalents)
+`eir --tui --resume latest --in ./dir` (and the classic-CLI equivalents)
 resolve "latest" through the same workspace-scoped MRU lookup as `-c`, with
 `--in` re-homing the process before any session resolution happens.
 """
@@ -34,7 +34,7 @@ def _args(**overrides):
 
 @pytest.fixture
 def main_mod(monkeypatch):
-    import hermes_cli.main as mod
+    import eir_cli.main as mod
 
     monkeypatch.setattr(mod, "_has_any_provider_configured", lambda: True)
     monkeypatch.setattr(mod, "_sync_bundled_skills_for_startup", lambda: False)
@@ -62,7 +62,7 @@ def launched(main_mod, monkeypatch):
 
 
 def test_top_level_parser_accepts_in_and_resume_latest():
-    from hermes_cli._parser import build_top_level_parser
+    from eir_cli._parser import build_top_level_parser
 
     parser, _subparsers, _chat = build_top_level_parser()
     args = parser.parse_args(["--tui", "--resume", "latest", "--in", "./dir"])
@@ -72,7 +72,7 @@ def test_top_level_parser_accepts_in_and_resume_latest():
 
 
 def test_chat_subparser_accepts_in_flag():
-    from hermes_cli._parser import build_top_level_parser
+    from eir_cli._parser import build_top_level_parser
 
     parser, _subparsers, _chat = build_top_level_parser()
     args = parser.parse_args(["chat", "--in", "/tmp", "--resume", "latest"])
@@ -81,12 +81,12 @@ def test_chat_subparser_accepts_in_flag():
 
 
 def test_top_level_in_value_not_mistaken_for_subcommand(monkeypatch):
-    # `hermes --in chat` — "chat" is the flag's value, not the subcommand.
+    # `eir --in chat` — "chat" is the flag's value, not the subcommand.
     import sys
 
-    import hermes_cli.main as mod
+    import eir_cli.main as mod
 
-    monkeypatch.setattr(sys, "argv", ["hermes", "--in", "chat", "--resume", "latest"])
+    monkeypatch.setattr(sys, "argv", ["eir", "--in", "chat", "--resume", "latest"])
     assert mod._first_positional_argv() is None
 
 
@@ -238,7 +238,7 @@ def test_in_dir_expands_user_home(main_mod, launched, monkeypatch, tmp_path):
 
 
 def test_in_dir_replaces_inherited_terminal_cwd(main_mod, monkeypatch, tmp_path):
-    """A parent Hermes surface, the shell or .env can export TERMINAL_CWD before
+    """A parent Eir surface, the shell or .env can export TERMINAL_CWD before
     the CLI starts. Every cwd consumer prefers that variable over the process
     cwd, so a bare chdir left the Codex app-server thread, the terminal tool and
     context-file discovery in the inherited directory."""

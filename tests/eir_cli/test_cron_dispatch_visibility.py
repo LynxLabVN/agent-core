@@ -1,7 +1,7 @@
 """CLI rendering of missed-run dispatch visibility (#99879).
 
-`hermes cron list` shows a Dispatch line (scheduled vs actual, lateness,
-disposition) and `hermes cron status` calls out jobs whose last dispatch
+`eir cron list` shows a Dispatch line (scheduled vs actual, lateness,
+disposition) and `eir cron status` calls out jobs whose last dispatch
 was a late/missed-fire catch-up.
 """
 
@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone, UTC
 import pytest
 
 from cron.jobs import create_job, load_jobs, save_jobs
-from hermes_cli.cron import (
+from eir_cli.cron import (
     _dispatch_display,
     _format_lateness,
     _print_active_jobs_summary,
@@ -43,7 +43,7 @@ def _catch_up_stamp(late_seconds=1860.0, kind="catch_up"):
 class TestCronListDispatchLine:
     def test_catch_up_dispatch_rendered(self, tmp_cron_dir, capsys, monkeypatch):
         monkeypatch.setattr(
-            "hermes_cli.cron._warn_if_gateway_not_running", lambda: None
+            "eir_cli.cron._warn_if_gateway_not_running", lambda: None
         )
         job = create_job(prompt="daily report", schedule="0 9 * * *")
         _stamp_last_dispatch(job["id"], _catch_up_stamp())
@@ -58,7 +58,7 @@ class TestCronListDispatchLine:
 
     def test_on_time_dispatch_rendered_quietly(self, tmp_cron_dir, capsys, monkeypatch):
         monkeypatch.setattr(
-            "hermes_cli.cron._warn_if_gateway_not_running", lambda: None
+            "eir_cli.cron._warn_if_gateway_not_running", lambda: None
         )
         job = create_job(prompt="daily report", schedule="0 9 * * *")
         _stamp_last_dispatch(job["id"], _catch_up_stamp(30.0, kind="on_time"))
@@ -72,7 +72,7 @@ class TestCronListDispatchLine:
 
     def test_no_stamp_no_dispatch_line(self, tmp_cron_dir, capsys, monkeypatch):
         monkeypatch.setattr(
-            "hermes_cli.cron._warn_if_gateway_not_running", lambda: None
+            "eir_cli.cron._warn_if_gateway_not_running", lambda: None
         )
         create_job(prompt="daily report", schedule="0 9 * * *")
 

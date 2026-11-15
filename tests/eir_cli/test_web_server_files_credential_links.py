@@ -10,15 +10,15 @@ import base64
 import pytest
 from starlette.testclient import TestClient
 
-from hermes_cli import web_server
+from eir_cli import web_server
 
 
 @pytest.fixture
 def home_client(monkeypatch, tmp_path):
     home = tmp_path / "home"
     home.mkdir()
-    monkeypatch.delenv("HERMES_DASHBOARD_FILES_ROOT", raising=False)
-    monkeypatch.delenv("HERMES_HOME", raising=False)
+    monkeypatch.delenv("EIR_DASHBOARD_FILES_ROOT", raising=False)
+    monkeypatch.delenv("EIR_HOME", raising=False)
     monkeypatch.setenv("HOME", str(home))
     previous = getattr(web_server.app.state, "auth_required", None)
     web_server.app.state.auth_required = False
@@ -100,11 +100,11 @@ def test_file_credential_check_runs_off_the_event_loop(home_client, monkeypatch,
     import time
     from concurrent.futures import ThreadPoolExecutor
 
-    from hermes_cli.web_routers import files
+    from eir_cli.web_routers import files
 
     client, home = home_client
     if locked_root:  # _hosted_fs_read_guard runs the same store check on a locked files root
-        monkeypatch.setenv("HERMES_DASHBOARD_FILES_ROOT", str(home))
+        monkeypatch.setenv("EIR_DASHBOARD_FILES_ROOT", str(home))
     (home / "clip.mp3").write_bytes(b"ID3")  # /api/files/stream serves media only
     entered, release = threading.Event(), threading.Event()
     real_stores = files.resolved_home_credential_stores

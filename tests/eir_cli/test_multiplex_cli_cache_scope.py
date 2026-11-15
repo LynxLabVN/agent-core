@@ -1,7 +1,7 @@
-"""Multiplexed gateway: hermes_cli's process-wide caches must not hand profile A's value to profile B.
+"""Multiplexed gateway: eir_cli's process-wide caches must not hand profile A's value to profile B.
 
 Every test builds two real profile homes (config.yaml / .env / cache files that differ), warms a
-cache under ``set_hermes_home_override(A)`` and reads under B. Only the HTTP transport is canned —
+cache under ``set_eir_home_override(A)`` and reads under B. Only the HTTP transport is canned —
 its payload depends on the Authorization header or URL so a leaked entry is observable.
 """
 
@@ -18,7 +18,7 @@ import httpx
 import pytest
 
 from agent.secret_scope import build_profile_secret_scope, reset_secret_scope, set_secret_scope
-from hermes_constants import get_hermes_home, reset_hermes_home_override, set_hermes_home_override
+from eir_constants import get_eir_home, reset_eir_home_override, set_eir_home_override
 
 
 class _Resp(io.BytesIO):
@@ -40,22 +40,22 @@ class _Scoped:
         self.home = home
 
     def __enter__(self):
-        self._t = set_hermes_home_override(self.home)
+        self._t = set_eir_home_override(self.home)
         self._s = set_secret_scope(build_profile_secret_scope(self.home))
         return self
 
     def __exit__(self, *a):
         reset_secret_scope(self._s)
-        reset_hermes_home_override(self._t)
+        reset_eir_home_override(self._t)
 
 
 @pytest.fixture
 def homes(tmp_path, monkeypatch):
-    a = tmp_path / "hermes"
+    a = tmp_path / "eir"
     b = a / "profiles" / "B"
     for home in (a, b):
         (home / "cache").mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(a))
+    monkeypatch.setenv("EIR_HOME", str(a))
     for var in ("DEEPINFRA_API_KEY", "DEEPINFRA_BASE_URL", "NOUS_INFERENCE_BASE_URL"):
         monkeypatch.delenv(var, raising=False)
     return a, b
@@ -65,7 +65,7 @@ def test_deepinfra_catalog_is_fetched_with_each_profiles_key(homes, monkeypatch)
     a, b = homes
     (a / ".env").write_text("DEEPINFRA_API_KEY=key-A\n", encoding="utf-8")
     (b / ".env").write_text("DEEPINFRA_API_KEY=key-B\n", encoding="utf-8")
-    from hermes_cli import models
+    from eir_cli import models
 
     monkeypatch.setattr(models, "_deepinfra_catalog_cache", {})
     monkeypatch.setattr(models, "_deepinfra_catalog_neg_cache", {})
@@ -85,8 +85,8 @@ def test_nous_reasoning_caps_follow_each_profiles_portal(homes, monkeypatch):
     a, b = homes
     (a / ".env").write_text("NOUS_INFERENCE_BASE_URL=https://portal-a.example/v1\n", encoding="utf-8")
     (b / ".env").write_text("NOUS_INFERENCE_BASE_URL=https://portal-b.example/v1\n", encoding="utf-8")
-    from hermes_cli import models
-    import hermes_cli.models_reasoning_caps as caps
+    from eir_cli import models
+    import eir_cli.models_reasoning_caps as caps
 
     for attr, value in (("_nous_reasoning_caps_cache", None), ("_nous_reasoning_caps_failed_at", None),
                         ("_nous_caps_disk_checked", False), ("_nous_caps_warm_started", False)):
@@ -106,13 +106,13 @@ def test_nous_reasoning_caps_follow_each_profiles_portal(homes, monkeypatch):
 
 def test_swr_refresh_runs_as_the_profile_that_spawned_it(homes):
     a, b = homes
-    from hermes_cli import models
+    from eir_cli import models
 
     seen: dict[str, str] = {}
     done = threading.Event()
 
     def refresh():
-        seen["home"] = str(get_hermes_home())
+        seen["home"] = str(get_eir_home())
         done.set()
         return {"fp": "fp", "at": time.time(), "models": ["m"]}
 
@@ -136,7 +136,7 @@ def _write_manifest(home, model_id: str, mtime: float) -> None:
 
 def test_model_catalog_in_process_copy_is_bound_to_its_cache_file(homes, monkeypatch):
     a, b = homes
-    import hermes_cli.model_catalog as mc
+    import eir_cli.model_catalog as mc
 
     for home in (a, b):
         (home / "config.yaml").write_text("model_catalog:\n  ttl_minutes: 600\n", encoding="utf-8")
@@ -153,7 +153,7 @@ def test_model_catalog_in_process_copy_is_bound_to_its_cache_file(homes, monkeyp
 
 def test_openrouter_curated_list_is_per_profile(homes, monkeypatch):
     a, b = homes
-    from hermes_cli import models
+    from eir_cli import models
 
     for home in (a, b):
         (home / "config.yaml").write_text("model_catalog:\n  ttl_minutes: 600\n", encoding="utf-8")
@@ -170,7 +170,7 @@ def test_openrouter_curated_list_is_per_profile(homes, monkeypatch):
 
 def test_banner_skills_are_the_routed_profiles(homes):
     a, b = homes
-    from hermes_cli import banner
+    from eir_cli import banner
 
     for home, tag in ((a, "a"), (b, "b")):
         skill = home / "skills" / f"skill_{tag}"
@@ -188,9 +188,9 @@ def test_banner_skills_are_the_routed_profiles(homes):
 
 def test_failed_guest_mint_only_suppresses_that_profile(homes, monkeypatch, tmp_path):
     a, b = homes
-    monkeypatch.setenv("HERMES_SHARED_AUTH_DIR", str(tmp_path / "shared"))
-    import hermes_cli.anon_auth as anon
-    from hermes_cli import auth_nous
+    monkeypatch.setenv("EIR_SHARED_AUTH_DIR", str(tmp_path / "shared"))
+    import eir_cli.anon_auth as anon
+    from eir_cli import auth_nous
 
     anon.reset_mint_memo_for_tests()
     status = {"code": 429}
@@ -198,7 +198,7 @@ def test_failed_guest_mint_only_suppresses_that_profile(homes, monkeypatch, tmp_
 
     def client(timeout_seconds, verify):
         def handler(request):
-            attempts.append(str(get_hermes_home()))
+            attempts.append(str(get_eir_home()))
             if status["code"] == 429:
                 return httpx.Response(429, json={"error": "rate"})
             return httpx.Response(201, json={"token": "anon_b", "user_id": "u", "org_id": "o"})
@@ -216,7 +216,7 @@ def test_failed_guest_mint_only_suppresses_that_profile(homes, monkeypatch, tmp_
 
 def test_active_skin_is_per_profile_and_leaves_launch_slot_alone(homes):
     a, b = homes
-    from hermes_cli import skin_engine
+    from eir_cli import skin_engine
 
     (a / "config.yaml").write_text("display:\n  skin: ares\n", encoding="utf-8")
     (b / "config.yaml").write_text("display:\n  skin: mono\n", encoding="utf-8")

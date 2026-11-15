@@ -1,4 +1,4 @@
-"""``hermes skin`` — list, switch, and tweak skins from the CLI.
+"""``eir skin`` — list, switch, and tweak skins from the CLI.
 
 ``set`` is the load-bearing verb: it changes ONE color of the ACTIVE skin **in place**, so tweaking
 (say) the tool marker never disturbs the rest of the look — background included. Editing the file
@@ -12,29 +12,29 @@ import re
 import sys
 from pathlib import Path
 
-from hermes_constants import display_hermes_home, get_hermes_home
+from eir_constants import display_eir_home, get_eir_home
 
 _HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 
 def _skins_dir() -> Path:
-    return get_hermes_home() / "skins"
+    return get_eir_home() / "skins"
 
 
 def _active_skin() -> str:
-    from hermes_cli.config import load_config
+    from eir_cli.config import load_config
     display = (load_config() or {}).get("display") or {}
     return str(display.get("skin") or "default")
 
 
 def _use(name: str) -> None:
     """Activate a skin (persists display.skin via the shared config writer)."""
-    from hermes_cli.config import config_command
+    from eir_cli.config import config_command
     config_command(argparse.Namespace(config_command="set", key="display.skin", value=name, force=True))
 
 
 def _skin_set(key: str, value: str, skin: str | None) -> int:
-    import hermes_yaml as yaml
+    import eir_yaml as yaml
     if not _HEX_RE.match(value):
         print(f"✗ {value!r} is not a #rrggbb hex color", file=sys.stderr)
         return 1
@@ -48,7 +48,7 @@ def _skin_set(key: str, value: str, skin: str | None) -> int:
     else:
         # Built-in (or missing): fork into an editable copy that keeps its full palette, under a
         # fresh name so the built-in stays intact for revert.
-        from hermes_cli.skin_engine import load_skin
+        from eir_cli.skin_engine import load_skin
         resolved = load_skin(name)
         target = f"{name}-custom"
         path = _skins_dir() / f"{target}.yaml"
@@ -66,12 +66,12 @@ def _skin_set(key: str, value: str, skin: str | None) -> int:
     atomic_yaml_write(path, data, sort_keys=False)
     if target != name:
         _use(target)
-    print(f"✓ {key} = {value} in {display_hermes_home()}/skins/{target}.yaml (live within ~1s)")
+    print(f"✓ {key} = {value} in {display_eir_home()}/skins/{target}.yaml (live within ~1s)")
     return 0
 
 
 def _skin_list() -> int:
-    from hermes_cli.skin_engine import list_skins
+    from eir_cli.skin_engine import list_skins
     active = _active_skin()
     for s in list_skins():
         mark = "*" if s["name"] == active else " "
@@ -80,7 +80,7 @@ def _skin_list() -> int:
 
 
 def skin_command(args) -> None:
-    """Dispatch ``hermes skin <verb>``."""
+    """Dispatch ``eir skin <verb>``."""
     verb = getattr(args, "skin_command", None)
     if verb == "set":
         sys.exit(_skin_set(args.key, args.value, getattr(args, "skin", None)))

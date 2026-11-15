@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-import hermes_cli.sqlite_safe_read as safe_read
+import eir_cli.sqlite_safe_read as safe_read
 
 
 @pytest.fixture
@@ -94,15 +94,15 @@ def test_spillover_reference_scan_is_tracked(state_db, tracked):
 
 
 def test_doctor_session_count_and_damage_check_are_tracked(state_db, tracked):
-    from hermes_cli.doctor_state import _session_count
-    from hermes_state_repair import state_db_has_structural_damage
+    from eir_cli.doctor_state import _session_count
+    from eir_state_repair import state_db_has_structural_damage
     assert _session_count(state_db) == 1
     state_db_has_structural_damage(state_db)
     assert tracked.count(_key(state_db)) >= 2
 
 
 def test_shared_metrics_first_session_read_is_tracked(state_db, tracked):
-    import hermes_cli.observability.shared_metrics_snapshot as snap
+    import eir_cli.observability.shared_metrics_snapshot as snap
     with sqlite3.connect(state_db) as conn:
         conn.execute("ALTER TABLE sessions ADD COLUMN started_at REAL")
         conn.execute("UPDATE sessions SET started_at = 1.0")
@@ -114,7 +114,7 @@ def test_shared_metrics_first_session_read_is_tracked(state_db, tracked):
 
 def test_worktree_liveness_reads_are_tracked(state_db, tracked, tmp_path):
     """Cron's worktree sweep runs these inside the gateway process, not only from the CLI."""
-    from hermes_cli.worktree_ops import _retained_tree_is_live, _tree_still_served
+    from eir_cli.worktree_ops import _retained_tree_is_live, _tree_still_served
     tree = tmp_path / "tree"
     tree.mkdir()
     _retained_tree_is_live(str(state_db), str(tree))
@@ -123,20 +123,20 @@ def test_worktree_liveness_reads_are_tracked(state_db, tracked, tmp_path):
 
 
 def test_backup_integrity_query_is_tracked(state_db, tracked):
-    from hermes_cli.backup import _query_ro_sqlite
+    from eir_cli.backup import _query_ro_sqlite
     value, exc = _query_ro_sqlite(state_db, lambda c: c.execute("SELECT count(*) FROM sessions").fetchone()[0])
     assert (value, exc) == (1, None)
     assert _key(state_db) in tracked
 
 
 def test_approvals_suggest_scan_is_tracked(state_db, tracked):
-    from hermes_cli.approvals_suggest import _connect_readonly
+    from eir_cli.approvals_suggest import _connect_readonly
     _connect_readonly(state_db).close()
     assert _key(state_db) in tracked
 
 
 def test_restore_destination_connection_is_tracked(state_db, tracked, tmp_path):
-    from hermes_cli.backup_restore import _restore_db_pages
+    from eir_cli.backup_restore import _restore_db_pages
     snapshot = tmp_path / "snapshot.db"
     with sqlite3.connect(snapshot) as conn:
         conn.execute("CREATE TABLE sessions (id TEXT PRIMARY KEY)")
@@ -147,8 +147,8 @@ def test_restore_destination_connection_is_tracked(state_db, tracked, tmp_path):
 
 def test_set_journal_mode_switch_connection_is_tracked(state_db, tracked, monkeypatch):
     import argparse
-    from hermes_cli.sessions_cmd_journal_mode import cmd_set_journal_mode
-    monkeypatch.setattr("hermes_state.DEFAULT_DB_PATH", state_db)
+    from eir_cli.sessions_cmd_journal_mode import cmd_set_journal_mode
+    monkeypatch.setattr("eir_state.DEFAULT_DB_PATH", state_db)
     args = argparse.Namespace(sessions_action="set-journal-mode", mode="delete", db=None, force=True)
     assert cmd_set_journal_mode(args) == 0
     assert _key(state_db) in tracked

@@ -1,4 +1,4 @@
-"""Regression for #117276: ``hermes doctor``'s exit status must agree with its unresolved findings."""
+"""Regression for #117276: ``eir doctor``'s exit status must agree with its unresolved findings."""
 from types import SimpleNamespace
 
 import pytest
@@ -12,9 +12,9 @@ import pytest
     ([], ["remaining repair"], 1, True, 1),
 ])
 def test_doctor_command_reports_remaining_findings(monkeypatch, capsys, issues, manual, fixed, fix, expected):
-    from hermes_cli import doctor
-    from hermes_cli.main import cmd_doctor
-    from hermes_cli.doctor_report import Finding
+    from eir_cli import doctor
+    from eir_cli.main import cmd_doctor
+    from eir_cli.doctor_report import Finding
 
     def check(should_fix):
         assert should_fix is fix
@@ -36,12 +36,12 @@ def test_doctor_cli_process_status_matches_summary(unresolved):
 
     program = f"""
 import sys
-import hermes_cli.doctor as doctor
-from hermes_cli.doctor_report import Finding
-from hermes_cli.main import main
+import eir_cli.doctor as doctor
+from eir_cli.doctor_report import Finding
+from eir_cli.main import main
 issues = ['fixture unresolved problem'] if {unresolved!r} else []
 doctor.DOCTOR_CHECKS = ((None, lambda fix: Finding(issues=issues)),)
-sys.argv = ['hermes', 'doctor']
+sys.argv = ['eir', 'doctor']
 main()
 """
     result = subprocess.run(

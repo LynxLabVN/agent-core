@@ -8,7 +8,7 @@ import math
 from copy import deepcopy
 from typing import Any
 
-MOA_MARKER_PREFIX = "__HERMES_MOA_TURN_V1__"
+MOA_MARKER_PREFIX = "__EIR_MOA_TURN_V1__"
 DEFAULT_MOA_PRESET_NAME = "default"
 
 DEFAULT_MOA_REFERENCE_MODELS: list[dict[str, str]] = [
@@ -104,7 +104,7 @@ def coerce_privacy_filter(value: Any) -> str:
 
 def _clean_reasoning_effort(value: Any) -> str | None:
     """Canonical per-slot reasoning effort, or None when unset/invalid."""
-    from hermes_constants import parse_reasoning_effort
+    from eir_constants import parse_reasoning_effort
     parsed = None if value is None or value is True else parse_reasoning_effort(value)
     if parsed is None:
         return None
@@ -310,7 +310,7 @@ def resolve_moa_preset(config: Any, name: str | None = None) -> dict[str, Any]:
         available = ", ".join(cfg["presets"]) or "(none)"
         raise MoAPresetNotFoundError(
             f"MoA preset '{preset_name}' was not found. Available presets: "
-            f"{available}. Run `hermes moa list`.")
+            f"{available}. Run `eir moa list`.")
     return deepcopy(preset)
 
 

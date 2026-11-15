@@ -2,8 +2,8 @@
 
 import pytest
 
-from hermes_cli.nous_account import NousPortalAccountInfo, NousToolAccessInfo
-from hermes_cli import nous_subscription as ns
+from eir_cli.nous_account import NousPortalAccountInfo, NousToolAccessInfo
+from eir_cli import nous_subscription as ns
 from tools import tool_backend_helpers
 from tools.image_generation_catalog import DEFAULT_MODEL as FAL_DEFAULT_MODEL
 
@@ -134,7 +134,7 @@ def _stub_browser_probes(monkeypatch, *, harness, chromium):
     monkeypatch.setattr(ns, "has_direct_modal_credentials", lambda: False)
     monkeypatch.setattr(ns, "is_managed_tool_gateway_ready", lambda vendor: False)
     monkeypatch.setattr(
-        "hermes_cli.browser_runtime.chromium_executable", lambda **_kw: "/pm/chromium/chrome" if chromium else None
+        "eir_cli.browser_runtime.chromium_executable", lambda **_kw: "/pm/chromium/chrome" if chromium else None
     )
 
 
@@ -183,11 +183,11 @@ def _capture_checklist(monkeypatch, *, selected_idx):
         captured["pre_selected"] = list(pre_selected or [])
         return list(selected_idx)
 
-    import hermes_cli.setup as setup_mod
+    import eir_cli.setup as setup_mod
 
     monkeypatch.setattr(setup_mod, "prompt_checklist", _fake_checklist, raising=False)
     monkeypatch.setattr(
-        "hermes_cli.config.save_config", lambda cfg: None, raising=False
+        "eir_cli.config.save_config", lambda cfg: None, raising=False
     )
     return captured
 
@@ -196,7 +196,7 @@ def test_logged_in_entitled_account_yields_a_state_for_every_feature(monkeypatch
     """The logged-in + entitled branch must produce a state for EVERY feature, including
     those with no config selection field (modal). Regression: the managed-availability
     table indexed the selection map by every feature key and raised KeyError('modal'),
-    crashing `hermes status`, `hermes tools`, and the dashboard toolsets API."""
+    crashing `eir status`, `eir tools`, and the dashboard toolsets API."""
     monkeypatch.setattr(ns, "get_nous_portal_account_info", lambda **kw: _pool_account())
     monkeypatch.setattr(ns, "is_managed_tool_gateway_ready", lambda gateway: True)
     monkeypatch.setattr(ns, "get_env_value", lambda name: "")
@@ -250,7 +250,7 @@ def test_get_gateway_eligible_tools_treats_explicit_backend_as_configured(monkey
     """A keyless local backend (e.g. searxng) has no credentials to detect,
     but an explicit non-nous selection must still keep it out of
     'unconfigured' — regression for #92647, where it was pre-checked and a
-    single Enter during `hermes model` overwrote it to `web.backend: nous`.
+    single Enter during `eir model` overwrote it to `web.backend: nous`.
     """
     monkeypatch.setattr(ns, "get_nous_portal_account_info", lambda **kw: _account(logged_in=True, paid=True))
     monkeypatch.setattr(
@@ -356,7 +356,7 @@ def test_prompt_enable_tool_gateway_persists_decline(monkeypatch):
     saved = []
     captured = _capture_checklist(monkeypatch, selected_idx=[])
     monkeypatch.setattr(
-        "hermes_cli.config.save_config", lambda cfg: saved.append(dict(cfg)), raising=False
+        "eir_cli.config.save_config", lambda cfg: saved.append(dict(cfg)), raising=False
     )
 
     config = {"model": {"provider": "nous"}}
@@ -371,7 +371,7 @@ def test_prompt_enable_tool_gateway_persists_decline(monkeypatch):
     # Second offer with the recorded declines: nothing is pre-checked.
     captured2 = _capture_checklist(monkeypatch, selected_idx=[])
     monkeypatch.setattr(
-        "hermes_cli.config.save_config", lambda cfg: saved.append(dict(cfg)), raising=False
+        "eir_cli.config.save_config", lambda cfg: saved.append(dict(cfg)), raising=False
     )
     ns.prompt_enable_tool_gateway(config)
     assert captured2["pre_selected"] == []
@@ -446,7 +446,7 @@ def test_pool_account_keeps_the_fal_image_default(monkeypatch):
 
 
 def test_first_run_gateway_acceptance_writes_the_krea_image_model():
-    """`hermes setup --portal` stores selections through apply_gateway_defaults, not the managed-defaults
+    """`eir setup --portal` stores selections through apply_gateway_defaults, not the managed-defaults
     pass, so the Krea default must apply there too; an existing model and the free pool are left on FAL."""
     paid, pool = _account(logged_in=True, paid=True), _pool_account()
     fresh = {}
@@ -467,5 +467,5 @@ def test_configured_image_section_is_left_alone(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# ensure_nous_portal_access — inline login gate for `hermes tools`
+# ensure_nous_portal_access — inline login gate for `eir tools`
 # ---------------------------------------------------------------------------

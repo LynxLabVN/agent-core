@@ -5,7 +5,7 @@ import subprocess
 
 import pytest
 
-from hermes_cli import web_git
+from eir_cli import web_git
 
 
 def git(repo, *args):

@@ -1,4 +1,4 @@
-"""Shared constants for Hermes Agent.
+"""Shared constants for Eir Agent.
 
 Import-safe, stdlib-only — importable from anywhere without circular-import risk.
 """
@@ -19,24 +19,24 @@ _profile_fallback_warned: bool = False
 INDICATOR_STYLES: tuple[str, ...] = ("ascii", "emoji", "kaomoji", "unicode")
 DEFAULT_INDICATOR_STYLE: str = "kaomoji"
 
-# Browser-hosted attachments are staged on the Hermes host and then read back
+# Browser-hosted attachments are staged on the Eir host and then read back
 # as a base64 data URL for the normal remote attachment RPC. Keep the upload
 # and read-back boundaries identical so a successful picker/drop can always be
 # attached afterward.
 WEBAPP_ATTACHMENT_MAX_BYTES: int = 16 * 1024 * 1024
 
 
-def set_hermes_home_override(path: str | Path | None):
-    """Set a context-local Hermes home override (``None``: the process home); returns a token for
-    :func:`reset_hermes_home_override`.
+def set_eir_home_override(path: str | Path | None):
+    """Set a context-local Eir home override (``None``: the process home); returns a token for
+    :func:`reset_eir_home_override`.
 
     Deliberately does not mutate ``os.environ`` (shared by every thread in the process). The
-    override is one field of the runtime scope state (``hermes_scope``), so with a scope bound a
+    override is one field of the runtime scope state (``eir_scope``), so with a scope bound a
     call naming another profile moves the whole scope (local) or raises ``ScopeSwitchRefused``
     (hosted); see ``agent.runtime_scope.legacy_switch``. New code binds a scope instead
     (``agent.runtime_scope.bind_profile_scope``).
     """
-    from hermes_scope import current_scope, push_state
+    from eir_scope import current_scope, push_state
     if current_scope() is not None:
         from agent.runtime_scope import legacy_switch
         switched = legacy_switch(path)
@@ -45,40 +45,40 @@ def set_hermes_home_override(path: str | Path | None):
     return push_state(home=None if path is None else str(path))
 
 
-def reset_hermes_home_override(token) -> None:
-    """Undo the ``set_hermes_home_override`` that returned *token*."""
+def reset_eir_home_override(token) -> None:
+    """Undo the ``set_eir_home_override`` that returned *token*."""
     token.reset()
 
 
-def get_hermes_home_override() -> str | None:
-    """Return the active context-local Hermes home override, if any.
+def get_eir_home_override() -> str | None:
+    """Return the active context-local Eir home override, if any.
 
     Read through ``sys.modules``, not an import: this module is on the boot path (launchers,
-    ``hermes_bootstrap``, ``pm``) and must work alone, including in a checkout an update left
-    half-written. Nothing can be bound before ``hermes_scope`` has finished importing, so while
+    ``eir_bootstrap``, ``pm``) and must work alone, including in a checkout an update left
+    half-written. Nothing can be bound before ``eir_scope`` has finished importing, so while
     it is absent or still initialising (another thread's first import) there is no override."""
-    current_state = getattr(sys.modules.get("hermes_scope"), "current_state", None)
+    current_state = getattr(sys.modules.get("eir_scope"), "current_state", None)
     return (current_state().home or None) if current_state is not None else None
 
 
-def _expand_hermes_home(path: str) -> Path:
-    """Expand environment and user-home syntax in a Hermes home path."""
+def _expand_eir_home(path: str) -> Path:
+    """Expand environment and user-home syntax in a Eir home path."""
     return Path(os.path.expanduser(os.path.expandvars(path)))
 
 
-def _platform_default_hermes_home(environ: Mapping[str, str], user_home: Callable[[], Path]) -> Path:
+def _platform_default_eir_home(environ: Mapping[str, str], user_home: Callable[[], Path]) -> Path:
     """The platform default that *environ* names, with the literal data-directory suffix."""
-    suffix = environ.get("HERMES_DATA_DIR_SUFFIX", "")
+    suffix = environ.get("EIR_DATA_DIR_SUFFIX", "")
     if sys.platform == "win32":
         local_appdata = environ.get("LOCALAPPDATA", "").strip()
         base = Path(local_appdata) if local_appdata else user_home() / "AppData" / "Local"
-        return base / ("hermes" + suffix)
-    return user_home() / (".hermes" + suffix)
+        return base / ("eir" + suffix)
+    return user_home() / (".eir" + suffix)
 
 
-def _get_platform_default_hermes_home() -> Path:
+def _get_platform_default_eir_home() -> Path:
     """Return the platform default with the literal data-directory suffix."""
-    return _platform_default_hermes_home(os.environ, Path.home)
+    return _platform_default_eir_home(os.environ, Path.home)
 
 
 def _account_home() -> Path:
@@ -92,12 +92,12 @@ def _account_home() -> Path:
         return Path(get_real_home())
 
 
-def account_default_hermes_home() -> Path:
+def account_default_eir_home() -> Path:
     """The platform default of the OS ACCOUNT, never of a foreign process ``HOME``.
 
     Host service identities (``systemctl --user`` units, LaunchAgents) belong to the account, and their
     definitions are found under the account home. A process started with ``HOME=<scratch>`` used to call
-    ``<scratch>/.hermes`` native, name the bare ``hermes-gateway`` unit, and stop the account's real
+    ``<scratch>/.eir`` native, name the bare ``eir-gateway`` unit, and stop the account's real
     gateway through it. When the process HOME is the account home the two answers are the same home.
     """
     account = _account_home()
@@ -105,16 +105,16 @@ def account_default_hermes_home() -> Path:
         same = Path.home().resolve() == account.resolve()
     except (OSError, RuntimeError):
         same = False
-    return _get_platform_default_hermes_home() if same else _platform_default_hermes_home(os.environ, lambda: account)
+    return _get_platform_default_eir_home() if same else _platform_default_eir_home(os.environ, lambda: account)
 
 
-def _hermes_root_of(native_home: Path, env_path: Path | None) -> Path:
+def _eir_root_of(native_home: Path, env_path: Path | None) -> Path:
     """The root that holds *env_path*: the native home, a custom root, or *env_path* itself."""
     if env_path is None:
         return native_home
     try:
-        env_path.resolve().relative_to(native_home.resolve())  # under ~/.hermes (normal or profile mode)
-    except ValueError:  # Docker/custom root: <root>/profiles/<name> -> <root>, else HERMES_HOME itself
+        env_path.resolve().relative_to(native_home.resolve())  # under ~/.eir (normal or profile mode)
+    except ValueError:  # Docker/custom root: <root>/profiles/<name> -> <root>, else EIR_HOME itself
         return env_path.parent.parent if env_path.parent.name == "profiles" else env_path
     return native_home
 
@@ -122,14 +122,14 @@ def _hermes_root_of(native_home: Path, env_path: Path | None) -> Path:
 _ENV_REFERENCE = re.compile(r"%([^%]+)%|\$\{([^}]+)\}|\$([A-Za-z0-9_-]+)")
 
 
-def hermes_root_for_environment(environ: Mapping[str, str]) -> Path | None:
-    """The Hermes root that a process started with *environ* resolves, or None.
+def eir_root_for_environment(environ: Mapping[str, str]) -> Path | None:
+    """The Eir root that a process started with *environ* resolves, or None.
 
-    Applies the root rules of ``get_default_hermes_root`` to another process's
+    Applies the root rules of ``get_default_eir_root`` to another process's
     environment. ``%NAME%``, ``${NAME}`` and ``$NAME`` references and a leading
     ``~`` expand from *environ* alone, never from this process. Returns None
     when the answer depends on anything outside *environ*: a relative
-    HERMES_HOME, an undefined variable, or a missing user profile folder.
+    EIR_HOME, an undefined variable, or a missing user profile folder.
     """
     names = {key.upper(): value for key, value in environ.items()}
     profile = names.get("USERPROFILE" if sys.platform == "win32" else "HOME", "").strip()
@@ -139,9 +139,9 @@ def hermes_root_for_environment(environ: Mapping[str, str]) -> Path | None:
             raise LookupError("no user profile folder")
         return Path(profile)
 
-    raw = names.get("HERMES_HOME", "").strip()
+    raw = names.get("EIR_HOME", "").strip()
     try:
-        native_home = _platform_default_hermes_home(names, user_home)
+        native_home = _platform_default_eir_home(names, user_home)
         if not raw:
             return native_home
         expanded = _ENV_REFERENCE.sub(lambda match: names[match.group(match.lastindex).upper()], raw)
@@ -150,13 +150,13 @@ def hermes_root_for_environment(environ: Mapping[str, str]) -> Path | None:
     except LookupError:
         return None
     env_path = Path(expanded)
-    return _hermes_root_of(native_home, env_path) if env_path.is_absolute() else None
+    return _eir_root_of(native_home, env_path) if env_path.is_absolute() else None
 
 
 def sudo_invoker_default_home() -> Path | None:
-    """The invoking user's native ``~/.hermes`` when this process is root under ``sudo``, else None.
+    """The invoking user's native ``~/.eir`` when this process is root under ``sudo``, else None.
 
-    sudo strips HERMES_HOME and sets HOME=/root, so the process's own default is root's; the profile
+    sudo strips EIR_HOME and sets HOME=/root, so the process's own default is root's; the profile
     store and the system service being operated on belong to SUDO_USER.
     """
     if not hasattr(os, "geteuid") or os.geteuid() != 0:
@@ -167,22 +167,22 @@ def sudo_invoker_default_home() -> Path | None:
     import pwd
 
     try:
-        return Path(pwd.getpwnam(sudo_user).pw_dir) / ".hermes"
+        return Path(pwd.getpwnam(sudo_user).pw_dir) / ".eir"
     except KeyError:  # SUDO_USER not in passwd (chroot/container)
         return None
 
 
 def _warn_profile_fallback_once() -> None:
-    """Warn once when HERMES_HOME is unset but a non-default profile is sticky-active (wrong fallback)."""
+    """Warn once when EIR_HOME is unset but a non-default profile is sticky-active (wrong fallback)."""
     global _profile_fallback_warned
     if _profile_fallback_warned:
         return
     # Latch on the FIRST check regardless of outcome (one-shot contract). Previously the latch
     # was only set on the warning branch, so with no active_profile (or "default") the stat +
-    # read re-ran on every get_hermes_home() call (#90065).
+    # read re-ran on every get_eir_home() call (#90065).
     _profile_fallback_warned = True
     try:
-        fallback_home = _get_platform_default_hermes_home()
+        fallback_home = _get_platform_default_eir_home()
         active_path = fallback_home / "active_profile"
         active = active_path.read_text(encoding="utf-8").strip() if active_path.exists() else ""
     except (UnicodeDecodeError, OSError):
@@ -191,11 +191,11 @@ def _warn_profile_fallback_once() -> None:
         # Direct stderr, not logging: runs at import time (often before logging is
         # configured) and root-logger propagation would double-emit.
         msg = (
-            f"[HERMES_HOME fallback] HERMES_HOME is unset but active "
+            f"[EIR_HOME fallback] EIR_HOME is unset but active "
             f"profile is {active!r}. Falling back to {fallback_home}, which "
             f"is the DEFAULT profile — not {active!r}. Any data this "
             f"process writes will land in the wrong profile. The "
-            f"subprocess spawner should pass HERMES_HOME explicitly "
+            f"subprocess spawner should pass EIR_HOME explicitly "
             f"(see issue #18594)."
         )
         with contextlib.suppress(Exception):
@@ -203,14 +203,14 @@ def _warn_profile_fallback_once() -> None:
             sys.stderr.flush()
 
 
-def get_hermes_home() -> Path:
-    """Hermes home: context-local override → ``HERMES_HOME`` env var → platform default."""
-    override = get_hermes_home_override()
+def get_eir_home() -> Path:
+    """Eir home: context-local override → ``EIR_HOME`` env var → platform default."""
+    override = get_eir_home_override()
     if override:
-        return _expand_hermes_home(override)
-    if not os.environ.get("HERMES_HOME", "").strip():
+        return _expand_eir_home(override)
+    if not os.environ.get("EIR_HOME", "").strip():
         _warn_profile_fallback_once()
-    return get_process_hermes_home()
+    return get_process_eir_home()
 
 
 # Resolved keys, keyed by the path string that was handed in. Path.resolve()
@@ -221,8 +221,8 @@ def get_hermes_home() -> Path:
 _HOME_KEY_CACHE: dict[str, str] = {}
 
 
-def hermes_home_key(path: str | Path | None = None) -> str:
-    """Stable registry key for a Hermes home/profile dir.
+def eir_home_key(path: str | Path | None = None) -> str:
+    """Stable registry key for a Eir home/profile dir.
 
     ``strict=False`` so profiles whose directories don't exist yet still get a key.
 
@@ -230,7 +230,7 @@ def hermes_home_key(path: str | Path | None = None) -> str:
     not exist yet is resolved without touching the cache, because the answer
     can change once it is created (e.g. part of the path turns out to be a symlink).
     """
-    candidate = Path(path) if path is not None else get_hermes_home()
+    candidate = Path(path) if path is not None else get_eir_home()
     raw = str(candidate)
     cached = _HOME_KEY_CACHE.get(raw)
     if cached is not None:
@@ -247,109 +247,109 @@ def hermes_home_key(path: str | Path | None = None) -> str:
     return key
 
 
-def reset_hermes_home_key_cache() -> None:
+def reset_eir_home_key_cache() -> None:
     """Forget every remembered home key (for tests that move a home dir on disk)."""
     _HOME_KEY_CACHE.clear()
 
 
-def get_process_hermes_home() -> Path:
-    """Hermes home of the running process, ignoring task overrides.
+def get_process_eir_home() -> Path:
+    """Eir home of the running process, ignoring task overrides.
 
     For process-level assets (theme YAML, dashboard plugin manifests) that must stay visible while a
     request is scoped to another profile (e.g. embedded ``/chat`` under ``--open-profile``). Follows
-    ``HERMES_HOME`` live on purpose: routed-profile DECISIONS compare against
-    :func:`get_routing_process_hermes_home` instead (#119242).
+    ``EIR_HOME`` live on purpose: routed-profile DECISIONS compare against
+    :func:`get_routing_process_eir_home` instead (#119242).
     """
-    val = os.environ.get("HERMES_HOME", "").strip()
-    return _expand_hermes_home(val) if val else _get_platform_default_hermes_home()
+    val = os.environ.get("EIR_HOME", "").strip()
+    return _expand_eir_home(val) if val else _get_platform_default_eir_home()
 
 
-# Host-pinned identity of the profile this process serves as its own (None: follow HERMES_HOME).
-_PINNED_PROCESS_HERMES_HOME: str | None = None
+# Host-pinned identity of the profile this process serves as its own (None: follow EIR_HOME).
+_PINNED_PROCESS_EIR_HOME: str | None = None
 
 
-def pin_process_hermes_home(path: str | Path | None) -> None:
+def pin_process_eir_home(path: str | Path | None) -> None:
     """Pin the home this process serves as its own profile, for "is this task routed?" decisions.
 
     An embedding host that serves several profiles and mirrors the active turn's profile into
-    ``os.environ["HERMES_HOME"]`` for legacy readers (Hermes WebUI) otherwise makes every turn's own
+    ``os.environ["EIR_HOME"]`` for legacy readers (Eir WebUI) otherwise makes every turn's own
     profile look like the launch profile: ``agent.secret_scope.serves_routed_profile()`` turns
     False and that turn's MCP connections fall back to bare, cross-profile names; the sibling
     launch-home checks (``secret_scope._is_process_home``, ``tools.environments.local._is_routed_home``,
-    ``hermes_cli.env_loader._process_hermes_home``) misjudge the same way. ``None`` clears the pin.
+    ``eir_cli.env_loader._process_eir_home``) misjudge the same way. ``None`` clears the pin.
 
     Process-global on purpose: it names the process's own identity, not a per-task value. It is NOT
-    folded into :func:`get_process_hermes_home`: :func:`get_hermes_home` falls back to that for
+    folded into :func:`get_process_eir_home`: :func:`get_eir_home` falls back to that for
     tasks carrying no override, and the host's mirror exists precisely so those readers see the
-    served profile. Hosts that never mutate ``HERMES_HOME`` need not call this (no-op).
+    served profile. Hosts that never mutate ``EIR_HOME`` need not call this (no-op).
     """
-    global _PINNED_PROCESS_HERMES_HOME
-    _PINNED_PROCESS_HERMES_HOME = None if path is None else str(path)
+    global _PINNED_PROCESS_EIR_HOME
+    _PINNED_PROCESS_EIR_HOME = None if path is None else str(path)
 
 
-def process_hermes_home_is_pinned() -> bool:
-    return _PINNED_PROCESS_HERMES_HOME is not None
+def process_eir_home_is_pinned() -> bool:
+    return _PINNED_PROCESS_EIR_HOME is not None
 
 
-def get_routing_process_hermes_home() -> Path:
-    """Launch home for routed-profile decisions: the pinned home, else :func:`get_process_hermes_home`."""
-    pinned = _PINNED_PROCESS_HERMES_HOME
-    return _expand_hermes_home(pinned) if pinned else get_process_hermes_home()
+def get_routing_process_eir_home() -> Path:
+    """Launch home for routed-profile decisions: the pinned home, else :func:`get_process_eir_home`."""
+    pinned = _PINNED_PROCESS_EIR_HOME
+    return _expand_eir_home(pinned) if pinned else get_process_eir_home()
 
 
-# Hermes-managed runtime downloads at the root of a home (GGUF models, llama.cpp runtimes,
+# Eir-managed runtime downloads at the root of a home (GGUF models, llama.cpp runtimes,
 # managed Node): re-downloadable on demand and routinely tens to hundreds of GB. Shared by
-# ``hermes backup`` (excludes them) and ``profile create --clone-all`` (skips them from the
+# ``eir backup`` (excludes them) and ``profile create --clone-all`` (skips them from the
 # default profile) so the two lists cannot drift apart.
 LOCAL_RUNTIME_ROOT_DIRS: frozenset[str] = frozenset({"models", "runtimes", "node"})
 
 # Where connector tool results save the files they return, under each profile's home.
 CONNECTOR_DOWNLOADS_SUBDIR = Path("downloads", "connectors")
 
-# get_default_hermes_root() memo keyed on (native home, expanded HERMES_HOME) so it stays
+# get_default_eir_root() memo keyed on (native home, expanded EIR_HOME) so it stays
 # fresh when a test or plugin mutates either input; saves ~80us/call at 31+ sites.
-_default_hermes_root_memo: tuple[str, str, Path] | None = None
+_default_eir_root_memo: tuple[str, str, Path] | None = None
 
 
-def get_default_hermes_root(*, home: str | Path | None = None) -> Path:
+def get_default_eir_root(*, home: str | Path | None = None) -> Path:
     """Root of an explicit home, or the process home when none is supplied."""
-    global _default_hermes_root_memo
-    native_home = _get_platform_default_hermes_home()
-    env_home = str(home).strip() if home is not None else os.environ.get("HERMES_HOME", "").strip()
-    env_path = _expand_hermes_home(env_home) if env_home else None
+    global _default_eir_root_memo
+    native_home = _get_platform_default_eir_home()
+    env_home = str(home).strip() if home is not None else os.environ.get("EIR_HOME", "").strip()
+    env_path = _expand_eir_home(env_home) if env_home else None
     memo_key = (str(native_home), str(env_path) if env_path is not None else "")
-    memo = _default_hermes_root_memo
+    memo = _default_eir_root_memo
     if memo is not None and memo[:2] == memo_key:
         return memo[2]
-    result = _hermes_root_of(native_home, env_path)
-    _default_hermes_root_memo = (*memo_key, result)
+    result = _eir_root_of(native_home, env_path)
+    _default_eir_root_memo = (*memo_key, result)
     return result
 
 
 # Tombstone lives beside the profile dir (not inside) so a stale mkdir or rmtree cannot erase it.
 _DELETED_PROFILES_DIR = ".deleted"
-# Files marking a real Hermes home; arbitrary dirs with a ``profiles`` segment lack them.
-_HERMES_HOME_MARKERS = ("config.yaml", ".env", "state.db")
+# Files marking a real Eir home; arbitrary dirs with a ``profiles`` segment lack them.
+_EIR_HOME_MARKERS = ("config.yaml", ".env", "state.db")
 
 
-def _is_hermes_profiles_root(profiles_dir: Path) -> bool:
-    """True when *profiles_dir* is provably ``<hermes-home>/profiles``.
+def _is_eir_profiles_root(profiles_dir: Path) -> bool:
+    """True when *profiles_dir* is provably ``<eir-home>/profiles``.
 
-    Accepts the classic ``~/.hermes`` layout, a root carrying Hermes-home marker files, a
+    Accepts the classic ``~/.eir`` layout, a root carrying Eir-home marker files, a
     ``profiles/.deleted`` tombstone dir (only ``profile delete`` creates it), or the default root.
     """
     root = profiles_dir.parent
-    if root.name == ".hermes":
+    if root.name == ".eir":
         return True
     try:
         if (profiles_dir / _DELETED_PROFILES_DIR).is_dir() or any(
-            (root / marker).exists() for marker in _HERMES_HOME_MARKERS
+            (root / marker).exists() for marker in _EIR_HOME_MARKERS
         ):
             return True
     except OSError:
         pass
     try:
-        return root.resolve(strict=False) == get_default_hermes_root().resolve(strict=False)
+        return root.resolve(strict=False) == get_default_eir_root().resolve(strict=False)
     except OSError:
         return False
 
@@ -357,15 +357,15 @@ def _is_hermes_profiles_root(profiles_dir: Path) -> bool:
 def named_profile_home(path: str | Path) -> Path | None:
     """Return ``<root>/profiles/<name>`` when *path* is that home or under it.
 
-    Requires ``<name>`` not to start with ``.`` and the ``profiles`` parent to be a real Hermes home;
+    Requires ``<name>`` not to start with ``.`` and the ``profiles`` parent to be a real Eir home;
     a default home whose path merely contains a ``profiles`` segment is not a named profile.
     """
     current = Path(path)
     for candidate in (current, *current.parents):
         if (candidate.parent.name == "profiles" and not candidate.name.startswith(".")
-                and _is_hermes_profiles_root(candidate.parent)):
+                and _is_eir_profiles_root(candidate.parent)):
             return candidate
-        if candidate.name == ".hermes":  # default home: a coincidental profiles/ ancestor is not a root
+        if candidate.name == ".eir":  # default home: a coincidental profiles/ ancestor is not a root
             return None
     return None
 
@@ -373,14 +373,14 @@ def named_profile_home(path: str | Path) -> Path | None:
 def profile_name_for_home(path: str | Path | None) -> str | None:
     """Return the canonical profile id owning *path*, or ``None`` when it is not a profile home.
 
-    The default home is the Hermes root itself, so its basename is an installation detail (``.hermes``
-    on POSIX and commonly ``hermes`` on Windows), not the profile id ``default``.
+    The default home is the Eir root itself, so its basename is an installation detail (``.eir``
+    on POSIX and commonly ``eir`` on Windows), not the profile id ``default``.
     """
     if path is None or not str(path).strip():
         return None
     current = Path(path).expanduser()
     try:
-        default_root = get_default_hermes_root()
+        default_root = get_default_eir_root()
         for candidate in (current, current.resolve(strict=False)):
             if candidate == default_root or candidate == default_root.resolve(strict=False):
                 return "default"
@@ -424,7 +424,7 @@ def named_profile_has_servable_identity(profile_home: str | Path) -> bool:
     """Stricter than :func:`named_profile_has_identity`: is this dir a profile a host should change
     its own posture for?
 
-    An EMPTY ``.env`` is all a crashed ``hermes profile create`` leaves behind, and it is enough for
+    An EMPTY ``.env`` is all a crashed ``eir profile create`` leaves behind, and it is enough for
     ``named_profile_has_identity``. Listing such a shell is harmless; counting it as a second tenant
     is not — it flips the whole host's credential reads fail-closed at the next boot. Every other
     marker, and a non-empty or symlinked ``.env``, still counts.
@@ -445,7 +445,7 @@ def named_profile_has_servable_identity(profile_home: str | Path) -> bool:
 def named_profile_is_live(profile_home: str | Path) -> bool:
     """A resolvable named profile: an existing dir with identity that has not been deleted.
     ``-p``/``--profile`` resolution and ``profile_exists`` share this so a stale ghost shell can
-    never be started as a backend (whose ``ensure_hermes_home`` would rebuild the full tree)."""
+    never be started as a backend (whose ``ensure_eir_home`` would rebuild the full tree)."""
     home = Path(profile_home)
     return home.is_dir() and named_profile_has_identity(home) and not named_profile_is_deleted(home)
 
@@ -470,14 +470,14 @@ def assert_named_profile_home_live(path: str | Path) -> None:
         )
 
 
-def mkdir_under_hermes_home(path: str | Path) -> Path:
+def mkdir_under_eir_home(path: str | Path) -> Path:
     """Create *path*, but never materialize a deleted/missing named profile."""
     target = Path(path)
     assert_named_profile_home_live(target)
-    # Lazy so this module still imports alone; hermes_dir_acl (stdlib only) ships beside it in every
+    # Lazy so this module still imports alone; eir_dir_acl (stdlib only) ships beside it in every
     # closure that creates home dirs, and a missing copy fails loudly instead of silently skipping the
     # elevated grant (tests/pm/test_bootstrap_import_closure.py).
-    from hermes_dir_acl import make_user_dir
+    from eir_dir_acl import make_user_dir
     make_user_dir(target, parents=True, exist_ok=True)
     return target
 
@@ -486,29 +486,29 @@ def _packaged_dir(env_var: str, default: Path | None, subdir: str) -> Path:
     """Resolve a package-manager-relocatable directory.
 
     Order: *env_var* (Nix wrapper / explicit override) → caller ``default`` (source checkout) →
-    ``<HERMES_HOME>/<subdir>``.
+    ``<EIR_HOME>/<subdir>``.
     """
     override = os.getenv(env_var, "").strip()
-    return Path(override) if override else default if default is not None else get_hermes_home() / subdir
+    return Path(override) if override else default if default is not None else get_eir_home() / subdir
 
 
 def get_optional_skills_dir(default: Path | None = None) -> Path:
     """Return the optional-skills directory, honoring package-manager wrappers."""
-    return _packaged_dir("HERMES_OPTIONAL_SKILLS", default, "optional-skills")
+    return _packaged_dir("EIR_OPTIONAL_SKILLS", default, "optional-skills")
 
 
 def get_optional_mcps_dir(default: Path | None = None) -> Path:
-    """Return the optional-mcps directory, honoring package-manager wrappers (``HERMES_OPTIONAL_MCPS``)."""
-    return _packaged_dir("HERMES_OPTIONAL_MCPS", default, "optional-mcps")
+    """Return the optional-mcps directory, honoring package-manager wrappers (``EIR_OPTIONAL_MCPS``)."""
+    return _packaged_dir("EIR_OPTIONAL_MCPS", default, "optional-mcps")
 
 
 def get_bundled_skills_dir(default: Path | None = None) -> Path:
-    """Return the bundled skills directory, honoring package-manager wrappers (``HERMES_BUNDLED_SKILLS``)."""
-    return _packaged_dir("HERMES_BUNDLED_SKILLS", default, "skills")
+    """Return the bundled skills directory, honoring package-manager wrappers (``EIR_BUNDLED_SKILLS``)."""
+    return _packaged_dir("EIR_BUNDLED_SKILLS", default, "skills")
 
 
-def get_hermes_dir(new_subpath: str, old_name: str, *, home: Path | None = None) -> Path:
-    """Resolve a Hermes subdirectory, honouring a populated legacy ``<old_name>/`` (no migration).
+def get_eir_dir(new_subpath: str, old_name: str, *, home: Path | None = None) -> Path:
+    """Resolve a Eir subdirectory, honouring a populated legacy ``<old_name>/`` (no migration).
 
     An empty legacy dir does NOT count (install scaffolds, manual mkdir) so it cannot shadow the new path.
 
@@ -517,14 +517,14 @@ def get_hermes_dir(new_subpath: str, old_name: str, *, home: Path | None = None)
     otherwise silently shadow real data populated at ``<new_subpath>/``. See #27602 for the pairing-store
     regression where a dormant empty ``pairing/`` orphaned approved-user data in ``platforms/pairing/``.
     """
-    home = home or get_hermes_home()
+    home = home or get_eir_home()
     old_path = home / old_name
     return old_path if _legacy_path_has_content(old_path) else home / new_subpath
 
 
-def iter_hermes_node_dirs(home: Path | None = None) -> list[Path]:
+def iter_eir_node_dirs(home: Path | None = None) -> list[Path]:
     """Historical layout for old-updater diagnostics, never runtime selection."""
-    node_dir = (home or get_hermes_home()) / "node"
+    node_dir = (home or get_eir_home()) / "node"
     return [node_dir, node_dir / "bin"] if sys.platform == "win32" else [node_dir / "bin", node_dir]
 
 
@@ -544,7 +544,7 @@ def _run_version_probe(argv: list[str], **kwargs):
     """Run a hidden ``--version`` probe; ``None`` when it cannot run."""
     import subprocess
     try:
-        from hermes_cli._subprocess_compat import windows_hide_flags
+        from eir_cli._subprocess_compat import windows_hide_flags
         return subprocess.run(  # noqa: PLW1510 -- forwarding wrapper: callers pass subprocess kwargs via **kwargs (check may arrive through it); an explicit check=False would raise TypeError
             argv, capture_output=True, timeout=10, creationflags=windows_hide_flags(), **kwargs,
         
@@ -554,13 +554,13 @@ def _run_version_probe(argv: list[str], **kwargs):
 
 
 def _version_probe_ok(path: str) -> bool:
-    """True when ``<path> --version`` exits 0 under the Hermes-managed Node PATH."""
-    result = _run_version_probe([path, "--version"], env=with_hermes_node_path())
+    """True when ``<path> --version`` exits 0 under the Eir-managed Node PATH."""
+    result = _run_version_probe([path, "--version"], env=with_eir_node_path())
     return result is not None and result.returncode == 0
 
 
-# Install tree root (this file lives at <install_root>/hermes_constants.py). Used by secure_parent_dir() to
-# skip chmod on the install dir — chmodding it 0700 breaks hermes-user traversal in Docker (UID 10000). See
+# Install tree root (this file lives at <install_root>/eir_constants.py). Used by secure_parent_dir() to
+# skip chmod on the install dir — chmodding it 0700 breaks eir-user traversal in Docker (UID 10000). See
 # #25821, #93050.
 _INSTALL_ROOT = Path(__file__).resolve().parent
 
@@ -578,10 +578,10 @@ def node_tool_runnable(path: str | None) -> bool:
     return present and _version_probe_ok(path)
 
 
-def hermes_managed_node_tree_present(home: Path | None = None) -> bool:
+def eir_managed_node_tree_present(home: Path | None = None) -> bool:
     """Read-only legacy artifact detection for already-running old updaters."""
     names = [n for c in ("node", "npm", "npx") for n in _candidate_node_command_names(c)]
-    return any((directory / name).is_file() for directory in iter_hermes_node_dirs(home) for name in names)
+    return any((directory / name).is_file() for directory in iter_eir_node_dirs(home) for name in names)
 
 
 def find_node_executable(command: str) -> str | None:
@@ -590,7 +590,7 @@ def find_node_executable(command: str) -> str | None:
     Never falls back to the user's PATH copy (callers ``pm.ensure`` on ``None``):
     mixing toolchains breaks native-addon ABIs and npm caches. Explicit
     executable paths remain caller-owned. Discovery never installs, probes,
-    repairs, or activates the retired ``HERMES_HOME/node`` layout.
+    repairs, or activates the retired ``EIR_HOME/node`` layout.
     """
     command = str(command)
     if any(sep in command for sep in ("/", "\\")):
@@ -625,7 +625,7 @@ def find_node_executable(command: str) -> str | None:
     return None
 
 
-def with_hermes_node_path(env: dict[str, str] | None = None) -> dict[str, str]:
+def with_eir_node_path(env: dict[str, str] | None = None) -> dict[str, str]:
     """Compose installed PM npm and its Node dependency without provisioning."""
     from pm import env_for
 
@@ -657,44 +657,44 @@ def _legacy_path_has_content(path: Path) -> bool:
     return True
 
 
-def display_hermes_home(home: Path | None = None) -> str:
-    """User-facing ``~/`` display string for HERMES_HOME (``~/.hermes/profiles/coder``).
+def display_eir_home(home: Path | None = None) -> str:
+    """User-facing ``~/`` display string for EIR_HOME (``~/.eir/profiles/coder``).
 
     ``home`` overrides the lookup for callers that run before the CLI has applied the sticky
-    ``active_profile`` (``get_hermes_home()`` would emit the wrong-profile fallback warning there).
+    ``active_profile`` (``get_eir_home()`` would emit the wrong-profile fallback warning there).
     """
     if home is None:
-        home = get_hermes_home()
-    try:  # as_posix(): str() on Windows yields chimeras like ~/AppData\Local\hermes/skills/
+        home = get_eir_home()
+    try:  # as_posix(): str() on Windows yields chimeras like ~/AppData\Local\eir/skills/
         return "~/" + home.relative_to(Path.home()).as_posix()
     except ValueError:
         return str(home)
 
 
 def profile_cli_selector() -> str:
-    """``-p <name> `` (trailing space) pinning copy-pasteable ``hermes ...`` guidance to the
-    active NAMED profile, else ``""``: a bare ``hermes`` follows the sticky ``active_profile``
+    """``-p <name> `` (trailing space) pinning copy-pasteable ``eir ...`` guidance to the
+    active NAMED profile, else ``""``: a bare ``eir`` follows the sticky ``active_profile``
     file, which can name a different database than the one that failed (#105887). A custom
-    home outside the profile tree has no selector (only HERMES_HOME names it)."""
-    name = profile_name_for_home(get_hermes_home())
+    home outside the profile tree has no selector (only EIR_HOME names it)."""
+    name = profile_name_for_home(get_eir_home())
     return f"-p {name} " if name and name != "default" else ""
 
 
 def secure_parent_dir(path: Path) -> None:
-    """Chmod ``0o700`` on *path*'s parent, refusing ``/`` and top-level dirs (misresolved HERMES_HOME)."""
+    """Chmod ``0o700`` on *path*'s parent, refusing ``/`` and top-level dirs (misresolved EIR_HOME)."""
     parent = path.parent.resolve()
     if parent == Path("/") or len(parent.parts) < 3:
         return
-    # Refuse the install tree: chmod 0700 breaks hermes-user traversal in Docker (UID 10000).
-    # A credential file here means HERMES_HOME misresolved; surface it (caused production lockouts).
+    # Refuse the install tree: chmod 0700 breaks eir-user traversal in Docker (UID 10000).
+    # A credential file here means EIR_HOME misresolved; surface it (caused production lockouts).
     # See #25821, #93050.
     if parent == _INSTALL_ROOT or _INSTALL_ROOT in parent.parents:
         import logging
 
         logging.getLogger(__name__).warning(
             "Not restricting permissions on %s: it is inside the "
-            "hermes-agent install directory (%s). Credential files are "
-            "normally stored under the hermes home directory instead.", parent, _INSTALL_ROOT,
+            "eir-agent install directory (%s). Credential files are "
+            "normally stored under the eir home directory instead.", parent, _INSTALL_ROOT,
         )
         return
     with contextlib.suppress(OSError):
@@ -713,11 +713,11 @@ def _norm_home_path(path: str | None) -> str:
 
 
 def _profile_home_path(env: dict[str, str] | None = None) -> str | None:
-    """Return ``{HERMES_HOME}/home`` when the profile-home directory exists."""
-    hermes_home = get_hermes_home_override() or (env or {}).get("HERMES_HOME") or os.getenv("HERMES_HOME")
-    if not hermes_home:
+    """Return ``{EIR_HOME}/home`` when the profile-home directory exists."""
+    eir_home = get_eir_home_override() or (env or {}).get("EIR_HOME") or os.getenv("EIR_HOME")
+    if not eir_home:
         return None
-    profile_home = str(_expand_hermes_home(hermes_home) / "home")
+    profile_home = str(_expand_eir_home(eir_home) / "home")
     return profile_home if os.path.isdir(profile_home) else None
 
 
@@ -733,7 +733,7 @@ def _env_get(env: dict[str, str], key: str, default: str = "") -> str:
 def _iter_real_home_candidates(env: dict[str, str] | None = None) -> list[str]:
     """Return likely OS-user home candidates in trust order."""
     env = env or {}
-    candidates = [_env_get(env, "HERMES_REAL_HOME"), _env_get(env, "HOME")]
+    candidates = [_env_get(env, "EIR_REAL_HOME"), _env_get(env, "HOME")]
     with contextlib.suppress(Exception):
         import pwd
         candidates.append(pwd.getpwuid(os.getuid()).pw_dir.strip())  # windows-footgun: ok — POSIX-only module inside try/except
@@ -748,10 +748,10 @@ def _iter_real_home_candidates(env: dict[str, str] | None = None) -> list[str]:
 
 
 def get_real_home(env: dict[str, str] | None = None) -> str:
-    """The OS user's real home, avoiding the Hermes profile HOME.
+    """The OS user's real home, avoiding the Eir profile HOME.
 
     ``HOME`` belongs to the OS account and external CLIs keeping credentials under ``~``; a parent
-    already running with ``HOME={HERMES_HOME}/home`` is repaired back when possible.
+    already running with ``HOME={EIR_HOME}/home`` is repaired back when possible.
     """
     profile_home = _profile_home_path(env)
     seen: set[str] = set()
@@ -779,7 +779,7 @@ def _bound_terminal_home_mode() -> str | None:
     without the key: a session policy frozen before ``home_mode`` was projected keeps the process value
     it ran with, not ``auto``. A served profile's turn must not read the LAUNCH profile's bridged value
     from ``os.environ`` (#146103). Read through ``sys.modules`` for the same boot-path reason as
-    ``get_hermes_home_override``: no scope can be bound before ``tools.terminal_scope`` is imported."""
+    ``get_eir_home_override``: no scope can be bound before ``tools.terminal_scope`` is imported."""
     get_terminal_scope = getattr(sys.modules.get("tools.terminal_scope"), "get_terminal_scope", None)
     policy = get_terminal_scope() if get_terminal_scope is not None else None
     mode = None if policy is None else policy.get("TERMINAL_HOME_MODE")
@@ -790,7 +790,7 @@ def get_subprocess_home(env: dict[str, str] | None = None) -> str | None:
     """Subprocess ``HOME`` override, or ``None``.
 
     ``auto``: hosts keep real HOME (repairing a profile-home parent), containers use
-    ``{HERMES_HOME}/home``; ``real``: always real HOME; ``profile``: always the profile home.
+    ``{EIR_HOME}/home``; ``real``: always real HOME; ``profile``: always the profile home.
     """
     env = env or {}
     profile_home = _profile_home_path(env)
@@ -813,28 +813,28 @@ def get_subprocess_home(env: dict[str, str] | None = None) -> str | None:
 
 
 def apply_subprocess_home_env(env: MutableMapping[str, str]) -> None:
-    """Apply Hermes' subprocess HOME contract to *env* in-place: ``HOME``/``HERMES_REAL_HOME``
-    per the home mode, and the temp vars re-pointed at ``env["HERMES_HOME"]``'s scratch dir."""
+    """Apply Eir' subprocess HOME contract to *env* in-place: ``HOME``/``EIR_REAL_HOME``
+    per the home mode, and the temp vars re-pointed at ``env["EIR_HOME"]``'s scratch dir."""
     real_home = get_real_home(env)
     if real_home:
-        env["HERMES_REAL_HOME"] = real_home
+        env["EIR_REAL_HOME"] = real_home
     home = get_subprocess_home(env)
     if home:
         env["HOME"] = home
     apply_scratch_tmp_env(env)
 
 
-# --- Scratch dir: Hermes' own temp space, never the system /tmp ---
+# --- Scratch dir: Eir' own temp space, never the system /tmp ---
 # System temp is tmpfs on most Linux distros and containers, so browser profiles, PTY probes,
-# download spools and every ``tempfile.mkdtemp()`` a Hermes-launched script performs eat RAM
-# and vanish on reboot. ``HERMES_HOME/cache/scratch`` is real storage with an IDLE retention:
+# download spools and every ``tempfile.mkdtemp()`` a Eir-launched script performs eat RAM
+# and vanish on reboot. ``EIR_HOME/cache/scratch`` is real storage with an IDLE retention:
 # an entry lives while anything inside it is still being written and goes 24h after the last
 # write anywhere in its subtree. A fixed age was wrong both ways — a directory's own mtime only
 # moves when a direct child is added or removed, so a lane writing deep inside a tree looked
 # untouched and lost its worktree at the deadline, while finished trees (a 7 GB clone with its
 # own venv per campaign lane) sat for three days and filled the disk.
 SCRATCH_TMP_ENV_VARS = ("TMPDIR", "TMP", "TEMP")
-SCRATCH_DIR_MARKER_ENV = "HERMES_SCRATCH_DIR"
+SCRATCH_DIR_MARKER_ENV = "EIR_SCRATCH_DIR"
 SCRATCH_MAX_IDLE_HOURS = 24
 _SCRATCH_PRUNE_STAMP = ".last_prune"
 _SCRATCH_PRUNE_INTERVAL_SECONDS = 3600
@@ -842,7 +842,7 @@ _scratch_pruned_once = False
 
 # AF_UNIX socket paths cap at 104 bytes (macOS) / 108 (Linux). Chrome appends
 # ``com.google.Chrome.XXXXXX/SingletonSocket`` (~45) and the code kernel
-# ``hermes_rpc_<32 hex>.sock`` (~49) to the temp root, so a root longer than this budget
+# ``eir_rpc_<32 hex>.sock`` (~49) to the temp root, so a root longer than this budget
 # makes the bind fail (Chrome: "Socket path too long" at startup).
 SOCKET_TMPDIR_MAX_LEN = 50
 
@@ -862,27 +862,27 @@ def socket_safe_tmpdir() -> str:
 
 # ---- Launch-only env vars ----
 # Only the real launch environment (service unit ``Environment=``, container image, operator
-# export) may set these. Every Hermes user-writable layer skips them, so a user ``.env`` or a
-# user-configured secret source cannot repoint a deployment bootstrap value. ``HERMES_MANAGED_DIR``
-# would void administrator policy at a directory the user controls (#135200); ``HERMES_HOME``
-# moves identity, policy and plugin scope wholesale — one write to ``~/.hermes/.env`` would
+# export) may set these. Every Eir user-writable layer skips them, so a user ``.env`` or a
+# user-configured secret source cannot repoint a deployment bootstrap value. ``EIR_MANAGED_DIR``
+# would void administrator policy at a directory the user controls (#135200); ``EIR_HOME``
+# moves identity, policy and plugin scope wholesale — one write to ``~/.eir/.env`` would
 # otherwise relocate SOUL.md, config.yaml, plugins, skills and cron on the next start (#144685).
-# Skipped by ``hermes_cli.env_loader._load_dotenv_with_fallback``,
-# ``hermes_cli.config.reload_env``, ``agent.secret_sources.registry.apply_all`` (reported as
+# Skipped by ``eir_cli.env_loader._load_dotenv_with_fallback``,
+# ``eir_cli.config.reload_env``, ``agent.secret_sources.registry.apply_all`` (reported as
 # ``skipped_protected``) and ``onepassword.apply_onepassword_secrets``; refused by the ``.env``
 # writers (``validate_env_var_name_for_write``) and never mirrored by ``_publish_env_value``.
-LAUNCH_ONLY_ENV_KEYS = frozenset({"HERMES_MANAGED_DIR", "HERMES_HOME"})
+LAUNCH_ONLY_ENV_KEYS = frozenset({"EIR_MANAGED_DIR", "EIR_HOME"})
 
 
 def is_launch_only_env_key(name: str) -> bool:
     """True when ``name`` is a launch-only key in any letter case. Windows env names are
-    case-insensitive, so ``hermes_managed_dir=`` in a ``.env`` would set ``HERMES_MANAGED_DIR``;
+    case-insensitive, so ``eir_managed_dir=`` in a ``.env`` would set ``EIR_MANAGED_DIR``;
     folding on POSIX too is harmless (a lowercase name there is a distinct var nothing reads)."""
     return name.upper() in LAUNCH_ONLY_ENV_KEYS
 
 
 # ---- Managed mode (NixOS declarative config) ----
-# Canonical home of "is this install package-manager managed": ``hermes_cli.config`` re-exports
+# Canonical home of "is this install package-manager managed": ``eir_cli.config`` re-exports
 # these, and :func:`apply_secure_dir_policy` below reads them. Lives here because constants
 # must stay import-safe from the CLI.
 _MANAGED_TRUE_VALUES = ("true", "1", "yes")
@@ -891,22 +891,22 @@ _LEGACY_MANAGED_SYSTEM = "nixos"
 # Homebrew is no longer a supported distribution: these markers fall through to git/unknown
 # detection instead of blocking config writes.
 _IGNORED_MANAGED_VALUES = frozenset({"brew", "homebrew"})
-# Explicit opt-out (``HERMES_MANAGED=false``): without this a bool-shaped value became a package
-# manager literally named "false" and is_managed() blocked `hermes update` (#12864).
+# Explicit opt-out (``EIR_MANAGED=false``): without this a bool-shaped value became a package
+# manager literally named "false" and is_managed() blocked `eir update` (#12864).
 _MANAGED_FALSE_VALUES = frozenset({"false", "0", "no", "off"})
 
 
 def get_managed_system(home: str | Path | None = None) -> str | None:
     """Return the package manager owning this install, if any.
-    Signals: HERMES_MANAGED env var (systemd service) or a ``.managed`` marker file in
-    HERMES_HOME (NixOS activation script — interactive shells don't see the service env).
+    Signals: EIR_MANAGED env var (systemd service) or a ``.managed`` marker file in
+    EIR_HOME (NixOS activation script — interactive shells don't see the service env).
     An unreadable or empty marker still counts as managed (the legacy NixOS shape).
 
     ``home`` names the home whose marker file is read, for callers that already resolved it
     (:func:`get_scratch_dir` at boot, before ``--profile`` re-homes the process).
     Defaults to the effective home."""
-    marker = os.getenv("HERMES_MANAGED", "").strip().lower() or None
-    managed_marker = (Path(home) if home is not None else get_hermes_home()) / ".managed"
+    marker = os.getenv("EIR_MANAGED", "").strip().lower() or None
+    managed_marker = (Path(home) if home is not None else get_eir_home()) / ".managed"
     if marker is None and managed_marker.exists():
         try:
             marker = managed_marker.read_text(encoding="utf-8", errors="replace").strip().lower()
@@ -920,24 +920,24 @@ def get_managed_system(home: str | Path | None = None) -> str | None:
 
 
 def _container_or_chmod_skipped() -> bool:
-    """Container/chmod-skip detection: the ``HERMES_CONTAINER``/``HERMES_SKIP_CHMOD`` operator
+    """Container/chmod-skip detection: the ``EIR_CONTAINER``/``EIR_SKIP_CHMOD`` operator
     overrides on top of the canonical :func:`_detect_container` signals (same breadth as
     :func:`is_container` — Docker/Podman/LXC/Kubernetes, cgroup and root-mountinfo). The cached
     :func:`is_container` itself is deliberately avoided: it ignores these env overrides and is
     computed only once per process, so tests could not flip it. Volume-mounted config is not
     forced to owner-only in containers: gateway and dashboard may run as different UIDs, or
     the mount itself needs broader permissions."""
-    if os.environ.get("HERMES_CONTAINER") or os.environ.get("HERMES_SKIP_CHMOD"):
+    if os.environ.get("EIR_CONTAINER") or os.environ.get("EIR_SKIP_CHMOD"):
         return True
     return _detect_container()
 
 
-def _resolve_hermes_uid_gid() -> tuple[int | None, int | None]:
-    """Read HERMES_UID / HERMES_GID (set by Docker deployments); (None, None) if unset/invalid/Windows.
-    The entrypoint chowns HERMES_HOME once, but subdirs created at runtime (``profiles/<name>/``)
+def _resolve_eir_uid_gid() -> tuple[int | None, int | None]:
+    """Read EIR_UID / EIR_GID (set by Docker deployments); (None, None) if unset/invalid/Windows.
+    The entrypoint chowns EIR_HOME once, but subdirs created at runtime (``profiles/<name>/``)
     need the same chown or they land root:root and block later uid-mapped workers.
 
-    Docker containers running Hermes commonly set these to map the in-container user to a host user so
+    Docker containers running Eir commonly set these to map the in-container user to a host user so
     volume-mounted state files end up with the right ownership. See #34107.
     """
     if sys.platform == "win32":
@@ -949,17 +949,17 @@ def _resolve_hermes_uid_gid() -> tuple[int | None, int | None]:
         except (TypeError, ValueError):
             return None
 
-    return _env_int("HERMES_UID"), _env_int("HERMES_GID")
+    return _env_int("EIR_UID"), _env_int("EIR_GID")
 
 
-def _chown_to_hermes_uid(path) -> None:
-    """Chown ``path`` to ``HERMES_UID:HERMES_GID`` when set; EPERM/ENOENT are non-fatal (the
+def _chown_to_eir_uid(path) -> None:
+    """Chown ``path`` to ``EIR_UID:EIR_GID`` when set; EPERM/ENOENT are non-fatal (the
     entrypoint's startup chown -R fixes ownership on the next restart).
 
     Used by :func:`apply_secure_dir_policy` to keep ownership consistent across all directories
-    created by ``ensure_hermes_home`` on Docker deployments. See #34107.
+    created by ``ensure_eir_home`` on Docker deployments. See #34107.
     """
-    uid, gid = _resolve_hermes_uid_gid()
+    uid, gid = _resolve_eir_uid_gid()
     if uid is None and gid is None:
         return
     try:
@@ -969,29 +969,29 @@ def _chown_to_hermes_uid(path) -> None:
 
 
 def apply_secure_dir_policy(path, *, home: str | Path | None = None) -> None:
-    """Apply the canonical Hermes home-directory permission policy to *path*.
+    """Apply the canonical Eir home-directory permission policy to *path*.
 
     Owner-only ``0700`` by default, but the operator's explicit and managed sharing choices
     win (#117347): managed installs are left exactly as the package manager / activation
-    script set them (#77579); in a container only an explicit ``HERMES_HOME_MODE`` is applied
+    script set them (#77579); in a container only an explicit ``EIR_HOME_MODE`` is applied
     (a bind-mounted data dir is often shared with sibling containers, #10757); elsewhere
-    ``HERMES_HOME_MODE`` (e.g. ``0701``, ``2770``) is passed to the host's ``chmod``. Special
+    ``EIR_HOME_MODE`` (e.g. ``0701``, ``2770``) is passed to the host's ``chmod``. Special
     bits may be cleared by the host filesystem (macOS commonly clears setgid on directories
-    whose group the caller does not belong to). ``HERMES_UID`` / ``HERMES_GID`` ownership is
+    whose group the caller does not belong to). ``EIR_UID`` / ``EIR_GID`` ownership is
     applied when those env vars are set (#34107).
 
     ``home`` (keyword-only: both arguments are path-likes) names the home whose managed-mode
     marker is read, for callers that already resolved it; without it the effective home is
     consulted.
 
-    Import-safe twin of ``hermes_cli.config._secure_dir`` (which delegates here), so callers
+    Import-safe twin of ``eir_cli.config._secure_dir`` (which delegates here), so callers
     outside the CLI package — like :func:`get_scratch_dir` — share one policy implementation.
     """
     if get_managed_system(home) is not None:
         return
-    explicit_mode = os.environ.get("HERMES_HOME_MODE", "").strip()
+    explicit_mode = os.environ.get("EIR_HOME_MODE", "").strip()
     if _container_or_chmod_skipped() and not explicit_mode:
-        _chown_to_hermes_uid(path)
+        _chown_to_eir_uid(path)
         return
     try:
         mode = int(explicit_mode or "700", 8)
@@ -1001,7 +1001,7 @@ def apply_secure_dir_policy(path, *, home: str | Path | None = None) -> None:
         os.chmod(path, mode)
     except (OSError, NotImplementedError):
         pass
-    _chown_to_hermes_uid(path)
+    _chown_to_eir_uid(path)
 
 
 def ensure_private_store(path: str | Path, *, home: str | Path | None = None) -> int:
@@ -1011,12 +1011,12 @@ def ensure_private_store(path: str | Path, *, home: str | Path | None = None) ->
     cannot otherwise reach). An existing store is tightened too: files written before this policy
     keep their mode, so the directory is what closes them off.
 
-    Managed installs (group-share by design, #77579) and containers / ``HERMES_SKIP_CHMOD``
+    Managed installs (group-share by design, #77579) and containers / ``EIR_SKIP_CHMOD``
     (mounts shared across UIDs) keep the inherited modes and get ``-1`` (inherit the umask): the
-    carve-outs ``hermes_cli.config._secure_file`` makes. ``HERMES_HOME_MODE`` is not applied: it
+    carve-outs ``eir_cli.config._secure_file`` makes. ``EIR_HOME_MODE`` is not applied: it
     opens the home for traversal to a served subdirectory, never to a credential store.
     """
-    from hermes_dir_acl import make_user_dir
+    from eir_dir_acl import make_user_dir
 
     private = get_managed_system(home) is None and not _container_or_chmod_skipped()
     target = make_user_dir(path, mode=0o700 if private else 0o777, parents=True, exist_ok=True)
@@ -1028,21 +1028,21 @@ def ensure_private_store(path: str | Path, *, home: str | Path | None = None) ->
 
 
 def get_scratch_dir(home: str | Path | None = None, *, prune: bool = True) -> Path:
-    """``<home>/cache/scratch`` (created, owner-only); *home* defaults to the active Hermes home.
+    """``<home>/cache/scratch`` (created, owner-only); *home* defaults to the active Eir home.
 
-    Every Hermes process and child gets ``TMPDIR``/``TMP``/``TEMP`` pointed here at boot (see
+    Every Eir process and child gets ``TMPDIR``/``TMP``/``TEMP`` pointed here at boot (see
     :func:`export_scratch_tmp_env`), so ``tempfile`` defaults land here without call sites
     knowing. Entries idle for ``SCRATCH_MAX_IDLE_HOURS`` are pruned at most once per process
     and once per hour across processes (stamp file), so a fan-out of children stays cheap.
-    The pass itself runs in a detached child process (``hermes_constants_scratch_detach``): the
+    The pass itself runs in a detached child process (``eir_constants_scratch_detach``): the
     directory is created and permissioned before this returns, no caller (the boot hook
     included) waits on the idle scan or the ``rmtree`` of a multi-GB entry, and the pass still
-    finishes when the caller is a ``hermes`` command that exits a moment later.
+    finishes when the caller is a ``eir`` command that exits a moment later.
 
-    Permissions follow :func:`apply_secure_dir_policy`, so an explicit ``HERMES_HOME_MODE`` or
+    Permissions follow :func:`apply_secure_dir_policy`, so an explicit ``EIR_HOME_MODE`` or
     a managed/shared home is honored instead of a blanket ``0700`` (#117347).
     """
-    base = Path(home) if home is not None else get_hermes_home()
+    base = Path(home) if home is not None else get_eir_home()
     scratch = base / "cache" / "scratch"
     try:
         scratch.mkdir(parents=True, exist_ok=True)
@@ -1060,10 +1060,10 @@ def get_scratch_dir(home: str | Path | None = None, *, prune: bool = True) -> Pa
 def prune_scratch_dir(scratch: Path | None = None, max_idle_hours: float = SCRATCH_MAX_IDLE_HOURS) -> int:
     """Delete top-level scratch entries with no write anywhere in their subtree for
     *max_idle_hours*, reaping processes and git worktree registrations rooted in them
-    first (``hermes_constants_scratch``); return the count removed. Each removal, each
+    first (``eir_constants_scratch``); return the count removed. Each removal, each
     kill and each entry rescued mid-prune is recorded in ``<home>/logs/scratch-prune.log``
     (*scratch* is ``<home>/cache/scratch``)."""
-    from hermes_constants_scratch import prune_idle_entries
+    from eir_constants_scratch import prune_idle_entries
 
     root = scratch if scratch is not None else get_scratch_dir(prune=False)
     log_file = root.parent.parent / "logs" / "scratch-prune.log"
@@ -1084,13 +1084,13 @@ def _prune_scratch_dir_once(scratch: Path) -> None:
         pass
     with contextlib.suppress(Exception):
         stamp.touch()
-        from hermes_constants_scratch_detach import spawn_prune
+        from eir_constants_scratch_detach import spawn_prune
 
         spawn_prune(scratch)
 
 
 def scratch_dir_usage_bytes(scratch: Path | None = None) -> int:
-    """Total bytes under the scratch dir (for ``hermes doctor``); 0 when unreadable."""
+    """Total bytes under the scratch dir (for ``eir doctor``); 0 when unreadable."""
     root = scratch if scratch is not None else get_scratch_dir(prune=False)
     total = 0
     for dirpath, _dirnames, filenames in os.walk(root, onerror=lambda _e: None):
@@ -1101,11 +1101,11 @@ def scratch_dir_usage_bytes(scratch: Path | None = None) -> int:
 
 
 def apply_scratch_tmp_env(env: MutableMapping[str, str]) -> bool:
-    """Point ``TMPDIR``/``TMP``/``TEMP`` in *env* at the scratch dir of ``env["HERMES_HOME"]``.
+    """Point ``TMPDIR``/``TMP``/``TEMP`` in *env* at the scratch dir of ``env["EIR_HOME"]``.
 
     A temp var the user (or the OS: macOS ``/var/folders``, Windows ``%TEMP%``) set is
-    respected and nothing changes. A value Hermes itself exported earlier — recognisable
-    because it equals ``HERMES_SCRATCH_DIR`` — is re-derived, so a child running under another
+    respected and nothing changes. A value Eir itself exported earlier — recognisable
+    because it equals ``EIR_SCRATCH_DIR`` — is re-derived, so a child running under another
     profile's home gets that home's scratch dir rather than its parent's. Returns True when
     the vars were (re)written.
     """
@@ -1114,11 +1114,11 @@ def apply_scratch_tmp_env(env: MutableMapping[str, str]) -> bool:
         value = env.get(key, "").strip()
         if value and value != ours:
             return False
-    home = env.get("HERMES_HOME", "").strip()
+    home = env.get("EIR_HOME", "").strip()
     try:
-        scratch = str(get_scratch_dir(_expand_hermes_home(home) if home else get_process_hermes_home()))
+        scratch = str(get_scratch_dir(_expand_eir_home(home) if home else get_process_eir_home()))
     except (RuntimeError, OSError):
-        # No HERMES_HOME and no resolvable user home (a child env built from nothing on
+        # No EIR_HOME and no resolvable user home (a child env built from nothing on
         # Windows): there is no scratch dir to point at; the child keeps the OS default.
         return False
     for key in SCRATCH_TMP_ENV_VARS:
@@ -1281,28 +1281,28 @@ def resolve_reasoning_config(cfg: dict | None, model: str = "") -> dict | None:
 
 def is_termux() -> bool:
     """Delegate Termux detection without making the bootstrap constants module depend on the full package."""
-    from hermes_platform.host.runtime import is_termux as detect
+    from eir_platform.host.runtime import is_termux as detect
 
     return detect()
 
 
 def is_wsl() -> bool:
     """Delegate WSL detection without making the bootstrap constants module depend on the full package."""
-    from hermes_platform.host.runtime import is_wsl as detect
+    from eir_platform.host.runtime import is_wsl as detect
 
     return detect()
 
 
 def is_container() -> bool:
     """Delegate container detection without making the bootstrap constants module depend on the full package."""
-    from hermes_platform.host.runtime import is_container as detect
+    from eir_platform.host.runtime import is_container as detect
 
     return detect()
 
 
 def _detect_container() -> bool:
     """Keep the historical test seam while delegating canonical detection."""
-    from hermes_platform.host.runtime import _detect_container as detect
+    from eir_platform.host.runtime import _detect_container as detect
 
     return detect()
 
@@ -1321,7 +1321,7 @@ def wsl_unc_path_to_posix(path: str) -> str | None:
 
 
 def translate_cwd_for_wsl_backend(cwd: str) -> str:
-    """Map a Windows-host cwd (drive path or ``\\\\wsl.localhost\\`` UNC) to POSIX when Hermes runs in WSL.
+    """Map a Windows-host cwd (drive path or ``\\\\wsl.localhost\\`` UNC) to POSIX when Eir runs in WSL.
 
     No-op off WSL and for paths already POSIX.
     """
@@ -1335,18 +1335,18 @@ def translate_cwd_for_wsl_backend(cwd: str) -> str:
 
 
 def get_config_path() -> Path:
-    """Return the path to ``config.yaml`` under HERMES_HOME."""
-    return get_hermes_home() / "config.yaml"
+    """Return the path to ``config.yaml`` under EIR_HOME."""
+    return get_eir_home() / "config.yaml"
 
 
 def get_skills_dir() -> Path:
-    """Return the path to the skills directory under HERMES_HOME."""
-    return get_hermes_home() / "skills"
+    """Return the path to the skills directory under EIR_HOME."""
+    return get_eir_home() / "skills"
 
 
 def get_env_path() -> Path:
-    """Return the path to the ``.env`` file under HERMES_HOME."""
-    return get_hermes_home() / ".env"
+    """Return the path to the ``.env`` file under EIR_HOME."""
+    return get_eir_home() / ".env"
 
 
 def apply_ipv4_preference(force: bool = False) -> None:
@@ -1360,7 +1360,7 @@ def apply_ipv4_preference(force: bool = False) -> None:
 
     import socket
 
-    if getattr(socket.getaddrinfo, "_hermes_ipv4_patched", False):
+    if getattr(socket.getaddrinfo, "_eir_ipv4_patched", False):
         return
     _original_getaddrinfo = socket.getaddrinfo
 
@@ -1371,7 +1371,7 @@ def apply_ipv4_preference(force: bool = False) -> None:
             except socket.gaierror:  # no A record — pure-IPv6 host
                 return _original_getaddrinfo(host, port, family, type, proto, flags)
         return _original_getaddrinfo(host, port, family, type, proto, flags)
-    _ipv4_getaddrinfo._hermes_ipv4_patched = True  # type: ignore[attr-defined]
+    _ipv4_getaddrinfo._eir_ipv4_patched = True  # type: ignore[attr-defined]
     socket.getaddrinfo = _ipv4_getaddrinfo  # type: ignore[assignment]
 
 
@@ -1401,7 +1401,7 @@ def openrouter_variant_base(model_id: str) -> str | None:
     OpenRouter routing-variant suffix (e.g. ``x-ai/grok-4:nitro`` →
     ``x-ai/grok-4``), else ``None``.
 
-    Lives here rather than in ``hermes_cli.models`` so the metadata layer
+    Lives here rather than in ``eir_cli.models`` so the metadata layer
     (``agent.model_metadata``) can share one definition without importing the
     CLI — this module is dependency-free by contract.
 
@@ -1439,10 +1439,10 @@ def project_venv_dir(project_root) -> Path | None:
     Windows shim-lock preflight skipped itself entirely (#79542). ``venv`` wins when both exist, matching
     what the installers write.
 
-    Installers that keep the interpreter out of the checkout (``$HERMES_HOME/venvs/<name>``, the layout the
+    Installers that keep the interpreter out of the checkout (``$EIR_HOME/venvs/<name>``, the layout the
     shipped Windows launchers assume) have neither, and the ``project_venv_dir(root) or root / "venv"``
     idiom those call sites share then handed ``uv`` a ``VIRTUAL_ENV`` that does not exist: that one invented
-    path skipped the import probe, reclassified every ``hermes tools`` dependency as missing and failed the
+    path skipped the import probe, reclassified every ``eir tools`` dependency as missing and failed the
     reinstall with interpreter errors (#116148). The interpreter running this module is the only truthful
     answer to "which venv is live", so fall back to it — but only for the checkout it was loaded from. A
     foreign root (test temp dir, another clone) still resolves to ``None``: handing it someone else's venv
@@ -1464,7 +1464,7 @@ def project_venv_dir(project_root) -> Path | None:
 
 
 def _venv_installs_checkout(venv: Path, root: Path) -> bool:
-    """Is *venv*'s own ``hermes-agent`` installed from *root*?
+    """Is *venv*'s own ``eir-agent`` installed from *root*?
 
     Where this module was loaded from does not answer that: ``PYTHONPATH=<checkout>
     <other install>/bin/python`` runs one checkout's code on another install's interpreter,
@@ -1479,7 +1479,7 @@ def _venv_installs_checkout(venv: Path, root: Path) -> bool:
 
     from pm.environments import site_packages
 
-    for dist in distributions(name="hermes-agent", path=[str(site_packages(venv))]):
+    for dist in distributions(name="eir-agent", path=[str(site_packages(venv))]):
         try:
             raw = dist.read_text("direct_url.json")  # windows-footgun: ok — importlib.metadata API, reads utf-8, no encoding=
             url = json.loads(raw or "{}").get("url", "")
@@ -1501,14 +1501,14 @@ def venv_python_path(venv_dir, *, windows: bool | None = None) -> Path:
 # update post-probe shares this set so the guard that BLOCKS and the hint that EXPLAINS agree.
 FIRST_PARTY_MODULE_ROOTS = frozenset({
     "agent", "acp_adapter", "cli", "cron", "gateway", "model_tools", "plugins",
-    "providers", "tools", "toolsets", "run_agent", "tui_gateway", "utils", "hermes_agent",
+    "providers", "tools", "toolsets", "run_agent", "tui_gateway", "utils", "eir_agent",
 })
 
 
 def is_first_party_module(name: str | None) -> bool:
-    """True when *name* ships with Hermes (exact first segment; ``startswith`` would claim ``agentops``)."""
+    """True when *name* ships with Eir (exact first segment; ``startswith`` would claim ``agentops``)."""
     root = str(name).split(".")[0] if name else ""
-    return bool(root) and (root in FIRST_PARTY_MODULE_ROOTS or root.startswith("hermes_"))
+    return bool(root) and (root in FIRST_PARTY_MODULE_ROOTS or root.startswith("eir_"))
 
 
 def partial_update_hint(exc: BaseException) -> list[str]:
@@ -1522,7 +1522,7 @@ def partial_update_hint(exc: BaseException) -> list[str]:
         "This looks like a partially-updated install: one module was refreshed "
         "and a related one was not.",
         "Re-run the update to bring the whole tree to the same version:",
-        "    hermes update",
+        "    eir update",
         "If that also fails, reinstall: https://hermes-agent.nousresearch.com",
     ]
 
@@ -1546,7 +1546,7 @@ def normalize_scope(scope: str | Path | None) -> str | None:
       ``restore_registration``, tool-registry slot lookup): ``None`` means
       the process-global layer and must stay ``None``. Use this function.
     * **Read paths** (``list_providers``, ``get_provider``): ``None`` means
-      "the active home's scope" and must go through :func:`hermes_home_key`
+      "the active home's scope" and must go through :func:`eir_home_key`
       (falsy input resolves to the active default home). Using this
       function there hides every scoped registration — the exact bug
       fixed after e66a627aa5.
@@ -1554,5 +1554,5 @@ def normalize_scope(scope: str | Path | None) -> str | None:
     Both normalize non-None values identically (resolved absolute path,
     normcase on Windows) so writes and reads agree on the key.
     """
-    return hermes_home_key(scope) if scope is not None else None
+    return eir_home_key(scope) if scope is not None else None
 

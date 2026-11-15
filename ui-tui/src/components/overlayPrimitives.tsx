@@ -1,7 +1,7 @@
-import type { Key } from '@hermes/ink'
-import { Text, useInput } from '@hermes/ink'
-import { mix } from '@hermes/shared/color'
-import type { UsageModelData } from '@hermes/shared/gateway-types'
+import type { Key } from '@eir/ink'
+import { Text, useInput } from '@eir/ink'
+import { mix } from '@eir/shared/color'
+import type { UsageModelData } from '@eir/shared/gateway-types'
 import { type ReactNode, useState } from 'react'
 
 import { liftForContrast } from '../lib/color.js'

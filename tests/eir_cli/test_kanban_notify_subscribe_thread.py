@@ -8,22 +8,22 @@ from pathlib import Path
 
 import pytest
 
-from hermes_cli import kanban as kc
-from hermes_cli import kanban_db as kb
-from hermes_cli import kanban_db_connect as kbc
-from hermes_cli import kanban_db_notify as kbn
+from eir_cli import kanban as kc
+from eir_cli import kanban_db as kb
+from eir_cli import kanban_db_connect as kbc
+from eir_cli import kanban_db_notify as kbn
 
 DM = "8631530276"
 
 
 @pytest.fixture
 def task(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     for name in ("PLATFORM", "CHAT_ID", "THREAD_ID", "USER_ID", "USER_ID_ALT"):
-        monkeypatch.delenv(f"HERMES_SESSION_{name}", raising=False)
+        monkeypatch.delenv(f"EIR_SESSION_{name}", raising=False)
     kb.init_db()
     with kbc.connect() as conn:
         return kb.create_task(conn, title="dm topic card", assignee="worker")
@@ -42,7 +42,7 @@ def _threads(task):
 
 def test_a_subscribe_from_the_topic_session_targets_that_topic(task, monkeypatch, capsys):
     for name, value in (("PLATFORM", "telegram"), ("CHAT_ID", DM), ("THREAD_ID", "42"), ("USER_ID", DM)):
-        monkeypatch.setenv(f"HERMES_SESSION_{name}", value)
+        monkeypatch.setenv(f"EIR_SESSION_{name}", value)
     _subscribe(task, "--platform", "telegram", "--chat-id", DM)
     assert _threads(task) == ["42"]
     assert "Subscribed telegram:8631530276:42" in capsys.readouterr().out
@@ -77,7 +77,7 @@ def _unsubscribe(*argv):
 
 def test_unsubscribe_with_the_same_arguments_removes_the_inferred_topic(task, monkeypatch):
     for name, value in (("PLATFORM", "telegram"), ("CHAT_ID", DM), ("THREAD_ID", "42"), ("USER_ID", DM)):
-        monkeypatch.setenv(f"HERMES_SESSION_{name}", value)
+        monkeypatch.setenv(f"EIR_SESSION_{name}", value)
     _subscribe(task, "--platform", "telegram", "--chat-id", DM)
     assert _unsubscribe(task, "--platform", "telegram", "--chat-id", DM) == 0
     assert _threads(task) == []

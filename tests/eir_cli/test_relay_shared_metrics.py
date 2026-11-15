@@ -1,4 +1,4 @@
-"""Focused tests for the Hermes shared-metrics durable store."""
+"""Focused tests for the Eir shared-metrics durable store."""
 
 from __future__ import annotations
 
@@ -20,9 +20,9 @@ from typing import Any
 
 import pytest
 from agent import relay_runtime
-from hermes_cli.observability import shared_metrics as shared_metrics_module
-from hermes_cli.observability.shared_metrics import SharedMetricsStore
-from hermes_cli.observability.shared_metrics_contract import (
+from eir_cli.observability import shared_metrics as shared_metrics_module
+from eir_cli.observability.shared_metrics import SharedMetricsStore
+from eir_cli.observability.shared_metrics_contract import (
     CLIENT_ACTIVE_METRIC,
     CLIENT_ARCHITECTURES,
     CLIENT_INSTALL_METHODS,
@@ -75,12 +75,12 @@ from hermes_cli.observability.shared_metrics_contract import (
 
 SCHEMA_PATH = (
     Path(__file__).resolve().parents[2]
-    / "hermes_cli"
+    / "eir_cli"
     / "observability"
     / "schemas"
-    / "hermes.shared_metrics.v4.schema.json"
+    / "eir.shared_metrics.v4.schema.json"
 )
-LEGACY_SCHEMA_PATH = SCHEMA_PATH.with_name("hermes.shared_metrics.v1.schema.json")
+LEGACY_SCHEMA_PATH = SCHEMA_PATH.with_name("eir.shared_metrics.v1.schema.json")
 
 
 def _schema_validator(path: Path = SCHEMA_PATH):
@@ -118,7 +118,7 @@ def _dimensions() -> dict[str, str]:
 
 
 def _resource(
-    hermes_version: str = "test-version",
+    eir_version: str = "test-version",
     *,
     os_family: str = "linux",
     architecture: str = "x86_64",
@@ -126,7 +126,7 @@ def _resource(
 ) -> dict[str, str]:
     return {
         "architecture": architecture,
-        "hermes_version": hermes_version,
+        "eir_version": eir_version,
         "install_method": install_method,
         "os_family": os_family,
     }
@@ -178,7 +178,7 @@ def test_model_call_counter_survives_restart_and_exports_only_new_deltas(tmp_pat
     _schema_validator().validate(first_package)
     uuid.UUID(first_package["package_id"])
     uuid.UUID(first_package["install_id"])
-    assert first_package["schema_version"] == "hermes.shared_metrics.v4"
+    assert first_package["schema_version"] == "eir.shared_metrics.v4"
     assert first_package["resource"] == _resource()
     assert first_package["metrics"] == [
         {
@@ -223,7 +223,7 @@ def test_v2_package_preserves_pending_v1_model_counters(tmp_path):
             INSERT INTO counter_aggregates(
                 period_start,
                 metric_name,
-                hermes_version,
+                eir_version,
                 os_family,
                 architecture,
                 install_method,
@@ -256,7 +256,7 @@ def test_v2_package_preserves_pending_v1_model_counters(tmp_path):
     package = json.loads(package_path.read_text(encoding="utf-8"))
     _schema_validator().validate(package)
 
-    assert package["schema_version"] == "hermes.shared_metrics.v4"
+    assert package["schema_version"] == "eir.shared_metrics.v4"
     assert package["metrics"] == [
         {
             "name": LEGACY_MODEL_CALL_METRIC,
@@ -282,13 +282,13 @@ def test_v1_outbox_package_exports_unchanged_after_upgrade(tmp_path):
     store = SharedMetricsStore(database_path, outbox_directory)
     package_id = str(uuid.uuid4())
     payload = {
-        "schema_version": "hermes.shared_metrics.v1",
+        "schema_version": "eir.shared_metrics.v1",
         "package_id": package_id,
         "install_id": str(uuid.uuid4()),
         "period_start": "2026-07-28T00:00:00Z",
         "period_end": "2026-07-29T00:00:00Z",
         "generated_at": "2026-07-29T01:00:00Z",
-        "resource": {"hermes_version": "legacy-version"},
+        "resource": {"eir_version": "legacy-version"},
         "metrics": [
             {
                 "name": LEGACY_MODEL_CALL_METRIC,
@@ -502,7 +502,7 @@ def test_package_schema_matches_the_model_call_contract():
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
     properties = _package_dimension_schema()["properties"]
 
-    assert schema["properties"]["schema_version"]["const"] == "hermes.shared_metrics.v4"
+    assert schema["properties"]["schema_version"]["const"] == "eir.shared_metrics.v4"
     assert set(properties) == {"call_role", "error_class", "model", "outcome", "provider", "ttft_bucket"}
     # Rows counted before the v3 upgrade carry only model/provider and must still drain.
     assert set(_package_dimension_schema()["required"]) == {"model", "provider"}
@@ -537,9 +537,9 @@ def test_client_resource_classification_is_bounded():
 
 def test_microsoft_store_stamp_reports_its_own_install_method(tmp_path, monkeypatch):
     """The Store build's stamp is the only place it is named; ``detect_install_method`` has no word for it."""
-    from hermes_cli.observability.shared_metrics_install import detect_client_install_method
+    from eir_cli.observability.shared_metrics_install import detect_client_install_method
 
-    monkeypatch.setattr("hermes_cli.config.get_project_root", lambda: tmp_path)
+    monkeypatch.setattr("eir_cli.config.get_project_root", lambda: tmp_path)
     stamp = tmp_path / "install-stamp.json"
     stamp.write_text(json.dumps({"updateMechanism": "microsoft-store"}), encoding="utf-8")
     assert detect_client_install_method() == "microsoft-store"
@@ -555,13 +555,13 @@ def test_package_schema_matches_the_client_resource_contract():
     # Every v2 package records the complete bounded client resource.
     assert set(resource["required"]) == {
         "architecture",
-        "hermes_version",
+        "eir_version",
         "install_method",
         "os_family",
     }
     assert set(resource["properties"]) == {
         "architecture",
-        "hermes_version",
+        "eir_version",
         "install_method",
         "os_family",
     }
@@ -577,10 +577,10 @@ def test_client_active_mark_accepts_only_an_empty_allowlisted_payload():
         kind="mark",
         category=None,
         category_profile=None,
-        name="hermes.client.active",
+        name="eir.client.active",
         scope_category=None,
         metadata={
-            "hermes.metrics.schema_version": "hermes.metrics.event.v4",
+            "eir.metrics.schema_version": "eir.metrics.event.v4",
         },
         data={},
     )
@@ -592,7 +592,7 @@ def test_client_active_mark_accepts_only_an_empty_allowlisted_payload():
     assert client_active_counter(with_payload) is None
 
     wrong_schema = deepcopy(event)
-    wrong_schema.metadata["hermes.metrics.schema_version"] = "unknown"
+    wrong_schema.metadata["eir.metrics.schema_version"] = "unknown"
     assert client_active_counter(wrong_schema) is None
 
 
@@ -614,7 +614,7 @@ def test_v1_package_schema_retains_the_legacy_model_contract():
     schema = json.loads(LEGACY_SCHEMA_PATH.read_text(encoding="utf-8"))
     model_counter = schema["$defs"]["model_call_counter"]
 
-    assert schema["properties"]["schema_version"]["const"] == "hermes.shared_metrics.v1"
+    assert schema["properties"]["schema_version"]["const"] == "eir.shared_metrics.v1"
     assert model_counter["properties"]["name"]["const"] == LEGACY_MODEL_CALL_METRIC
     assert set(model_counter["properties"]["dimensions"]["properties"]) == {
         "call_role",
@@ -752,7 +752,7 @@ def test_model_call_fields_report_terminal_model_and_shipped_provider():
         "model": "nvidia/nemotron-3-ultra",
         "provider": "openrouter",
     }
-    # A provider Hermes does not ship is user-named (a custom endpoint key): neither it nor
+    # A provider Eir does not ship is user-named (a custom endpoint key): neither it nor
     # the model id it serves leaves the machine.
     assert model_call_fields({
         "model": "ZAI/GLM-5.2",
@@ -778,7 +778,7 @@ def test_auxiliary_logical_scope_projects_one_normalized_terminal_route():
         metadata={
             relay_runtime.RUNTIME_SCHEMA_KEY: relay_runtime.RUNTIME_SCHEMA_VERSION,
             relay_runtime.RUNTIME_INSTANCE_KEY: "runtime-1",
-            "hermes.call_role": "auxiliary:compression",
+            "eir.call_role": "auxiliary:compression",
         },
     )
 
@@ -804,7 +804,7 @@ def test_auxiliary_logical_scope_projects_one_normalized_terminal_route():
         "ttft_bucket": "unknown",
     }
 
-    event.metadata["hermes.call_role"] = "primary"
+    event.metadata["eir.call_role"] = "primary"
     assert model_call_dimensions(event) is None
 
 
@@ -853,9 +853,9 @@ def test_tool_subscriber_contract_accepts_only_bounded_events():
         kind="scope",
         category="tool",
         category_profile={},
-        name="hermes.tool_call",
+        name="eir.tool_call",
         scope_category="end",
-        metadata={"hermes.metrics.schema_version": "hermes.metrics.event.v4"},
+        metadata={"eir.metrics.schema_version": "eir.metrics.event.v4"},
         data={
             "approval_outcome": "approved",
             "error_class": "none",
@@ -893,13 +893,13 @@ def test_tool_subscriber_contract_accepts_only_bounded_events():
         kind="mark",
         category=None,
         category_profile=None,
-        name="hermes.tool_approval",
+        name="eir.tool_approval",
         scope_category=None,
-        metadata={"hermes.metrics.schema_version": "hermes.metrics.event.v4"},
+        metadata={"eir.metrics.schema_version": "eir.metrics.event.v4"},
         data={"attribution": "unattributed", "outcome": "denied"},
     )
     assert tool_approval_counter(approval) == (
-        "hermes.tool_approval.count",
+        "eir.tool_approval.count",
         approval.data,
     )
     approval.data["command"] = "must-not-pass"
@@ -907,24 +907,24 @@ def test_tool_subscriber_contract_accepts_only_bounded_events():
 
 
 def test_skill_subscriber_contract_accepts_only_bounded_marks():
-    metadata = {"hermes.metrics.schema_version": "hermes.metrics.event.v4"}
+    metadata = {"eir.metrics.schema_version": "eir.metrics.event.v4"}
     lifecycle = SimpleNamespace(
         kind="mark",
         category=None,
         category_profile=None,
-        name="hermes.skill.lifecycle",
+        name="eir.skill.lifecycle",
         scope_category=None,
         metadata=metadata,
         data={"action": "patched", "provenance": "agent_created"},
     )
     assert skill_counter(lifecycle) == (
-        "hermes.skill.lifecycle.count",
+        "eir.skill.lifecycle.count",
         lifecycle.data,
     )
 
     load = SimpleNamespace(**{
         **lifecycle.__dict__,
-        "name": "hermes.skill.load",
+        "name": "eir.skill.load",
         "data": {
             "post_patch_state": "reused_after_patch",
             "provenance": "agent_created",
@@ -933,7 +933,7 @@ def test_skill_subscriber_contract_accepts_only_bounded_marks():
             "use_count_bucket": "3_to_5",
         },
     })
-    assert skill_counter(load) == ("hermes.skill.load.count", load.data)
+    assert skill_counter(load) == ("eir.skill.load.count", load.data)
 
     # Only bundled/optional skill names (public) may appear; a local name is refused.
     load.data["skill_name"] = "privacy-canary"
@@ -1021,14 +1021,14 @@ def test_store_migrates_v1_counters_with_unknown_client_dimensions(tmp_path):
             CREATE TABLE counter_aggregates (
                 period_start TEXT NOT NULL,
                 metric_name TEXT NOT NULL,
-                hermes_version TEXT NOT NULL,
+                eir_version TEXT NOT NULL,
                 dimensions_json TEXT NOT NULL,
                 value INTEGER NOT NULL,
                 packaged_value INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY (
                     period_start,
                     metric_name,
-                    hermes_version,
+                    eir_version,
                     dimensions_json
                 )
             )
@@ -1039,7 +1039,7 @@ def test_store_migrates_v1_counters_with_unknown_client_dimensions(tmp_path):
             INSERT INTO counter_aggregates(
                 period_start,
                 metric_name,
-                hermes_version,
+                eir_version,
                 dimensions_json,
                 value,
                 packaged_value
@@ -1097,7 +1097,7 @@ def test_pending_metrics_keep_the_client_resource_recorded_at_event_time(tmp_pat
 def test_store_exports_task_started_and_terminal_counters(tmp_path):
     store = SharedMetricsStore(tmp_path / "metrics.sqlite3", tmp_path / "outbox")
     store.record_counter(
-        "hermes.task_run.started",
+        "eir.task_run.started",
         {"entrypoint": "interactive", "execution_surface": "cli"},
         _resource(),
     )
@@ -1113,8 +1113,8 @@ def test_store_exports_task_started_and_terminal_counters(tmp_path):
         retry_count=0,
     )
     end = SimpleNamespace(
-        kind="scope", category="function", category_profile=None, name="hermes.task_run",
-        scope_category="end", metadata={"hermes.metrics.schema_version": "hermes.metrics.event.v4"},
+        kind="scope", category="function", category_profile=None, name="eir.task_run",
+        scope_category="end", metadata={"eir.metrics.schema_version": "eir.metrics.event.v4"},
         data=terminal,
     )
     for counter in (task_counter(end), task_duration_counter(end)):
@@ -1125,19 +1125,19 @@ def test_store_exports_task_started_and_terminal_counters(tmp_path):
     _schema_validator().validate(package)
 
     assert {metric["name"] for metric in package["metrics"]} == {
-        "hermes.task_run.duration",
-        "hermes.task_run.finished",
-        "hermes.task_run.started",
+        "eir.task_run.duration",
+        "eir.task_run.finished",
+        "eir.task_run.started",
     }
 
 def test_v2_task_and_tool_rows_recorded_before_an_upgrade_still_package(tmp_path):
     store = SharedMetricsStore(tmp_path / "metrics.sqlite3", tmp_path / "outbox")
-    store.record_counter("hermes.task_run.finished", {
+    store.record_counter("eir.task_run.finished", {
         "duration_bucket": "1s_to_5s", "end_reason": "completed", "entrypoint": "interactive",
         "execution_surface": "cli", "model_call_count_bucket": "1", "outcome": "success",
         "retry_count_bucket": "0", "termination": "none", "tool_call_count_bucket": "2",
     }, _resource())
-    store.record_counter("hermes.tool_call.count", {
+    store.record_counter("eir.tool_call.count", {
         "approval_outcome": "not_required", "latency_bucket": "lt_100ms", "outcome": "success",
         "retry_count_bucket": "0", "tool_category": "file",
     }, _resource())
@@ -1146,19 +1146,19 @@ def test_v2_task_and_tool_rows_recorded_before_an_upgrade_still_package(tmp_path
     package = json.loads(package_path.read_text(encoding="utf-8"))
     _schema_validator().validate(package)
     assert {metric["name"] for metric in package["metrics"]} == {
-        "hermes.task_run.finished", "hermes.tool_call.count",
+        "eir.task_run.finished", "eir.tool_call.count",
     }
 
 
 def test_failure_class_rows_validate_and_v3_rows_still_drain(tmp_path, monkeypatch):
     """v4 adds failure_class to compression and memory rows: a free-form compressor class collapses to
     a closed name before it is stored, and rows counted before the upgrade (v3 shape) still package."""
-    from hermes_cli.observability.shared_metrics_fields import compression_fields
+    from eir_cli.observability.shared_metrics_fields import compression_fields
 
     store = SharedMetricsStore(tmp_path / "metrics.sqlite3", tmp_path / "outbox")
     legacy = {
-        "hermes.compression.count": {"context_fill_bucket": "lt_50", "outcome": "failed", "trigger": "auto"},
-        "hermes.memory.op.count": {"op": "add", "origin": "foreground", "outcome": "failed", "provider": "builtin"},
+        "eir.compression.count": {"context_fill_bucket": "lt_50", "outcome": "failed", "trigger": "auto"},
+        "eir.memory.op.count": {"op": "add", "origin": "foreground", "outcome": "failed", "provider": "builtin"},
     }
     for name, dimensions in legacy.items():
         store.record_counter(name, dimensions, _resource())
@@ -1167,13 +1167,13 @@ def test_failure_class_rows_validate_and_v3_rows_still_drain(tmp_path, monkeypat
         fields = compression_fields(trigger="auto", outcome="failed", tokens_before=1, context_length=10,
                                     failure_class=raw)
         classes[raw] = fields["failure_class"]
-        store.record_counter("hermes.compression.count", fields, _resource())
+        store.record_counter("eir.compression.count", fields, _resource())
     assert classes == {
         "exception:AcmeCorpSecretError": "exception", "rollback:KeyboardInterrupt": "rollback",
         "acme_engine_reason": "other", None: "unknown",
     }
     # The skip/fail verdict reads the same normalized class that is stored, so they cannot disagree.
-    from hermes_cli.observability import shared_metrics_events as events
+    from eir_cli.observability import shared_metrics_events as events
 
     recorded = []
     monkeypatch.setattr(events, "record_compression", lambda **kw: recorded.append(kw))
@@ -1273,13 +1273,13 @@ def test_package_builder_rejects_tampered_dimensions(tmp_path):
 
 
 @pytest.mark.parametrize(("metric_name", "dimensions"), [
-    ("hermes.tool_enabled_unused.count", {"toolset": "start_chat", "used": "yes"}),
-    ("hermes.tool.usage.count", {"error_class": "none", "outcome": "success", "tool_name": "setup_choose"}),
+    ("eir.tool_enabled_unused.count", {"toolset": "start_chat", "used": "yes"}),
+    ("eir.tool.usage.count", {"error_class": "none", "outcome": "success", "tool_name": "setup_choose"}),
     # Spotify left core after v0.21.6; the browser_vault_* tools became one browser_vault after v0.21.7.
-    ("hermes.tool_enabled_unused.count", {"toolset": "spotify", "used": "no"}),
-    ("hermes.tool.usage.count", {"error_class": "none", "outcome": "success", "tool_name": "spotify_search"}),
-    ("hermes.tool_unavailable.count", {"model": "custom", "provider": "custom", "tool_name": "spotify_playback"}),
-    ("hermes.tool_unavailable.count", {"model": "custom", "provider": "custom", "tool_name": "browser_vault_fill"}),
+    ("eir.tool_enabled_unused.count", {"toolset": "spotify", "used": "no"}),
+    ("eir.tool.usage.count", {"error_class": "none", "outcome": "success", "tool_name": "spotify_search"}),
+    ("eir.tool_unavailable.count", {"model": "custom", "provider": "custom", "tool_name": "spotify_playback"}),
+    ("eir.tool_unavailable.count", {"model": "custom", "provider": "custom", "tool_name": "browser_vault_fill"}),
 ])
 def test_a_saved_row_naming_a_retired_tool_or_toolset_still_packages(tmp_path, metric_name, dimensions):
     # A stable release recorded these names before core dropped them; v4 only adds values, so the
@@ -1325,8 +1325,8 @@ def test_package_builder_buckets_values_that_drifted_out_of_the_catalog(tmp_path
     """A catalog-backed value that left the catalog between the recording and packaging
     processes re-buckets to ``custom`` instead of aborting the whole period's package, and
     every other metric in the period still exports (#133017)."""
-    from hermes_cli.observability import shared_metrics_catalog as catalog_module
-    from hermes_cli.observability.shared_metrics_contract import EXTENSION_INSTALL_METRIC
+    from eir_cli.observability import shared_metrics_catalog as catalog_module
+    from eir_cli.observability.shared_metrics_contract import EXTENSION_INSTALL_METRIC
 
     database_path = tmp_path / "metrics.sqlite3"
     outbox_directory = tmp_path / "outbox"
@@ -1359,7 +1359,7 @@ def test_package_builder_settles_rows_an_earlier_build_stored_with_retired_value
     """A built-in toolset or tool an earlier build shipped (Spotify, Home Assistant) is no longer in
     the contract: rows holding it re-bucket (merged with their siblings) or, when the field has no
     bucket, stay out, and the rest of the period still exports instead of wedging every package."""
-    from hermes_cli.observability.shared_metrics_contract import (
+    from eir_cli.observability.shared_metrics_contract import (
         TOOL_ENABLED_UNUSED_METRIC, TOOL_UNAVAILABLE_METRIC,
     )
 
@@ -1410,7 +1410,7 @@ def test_retention_prunes_only_expired_exported_history(tmp_path):
             """
             UPDATE counter_aggregates
             SET period_start = '2026-05-01'
-            WHERE hermes_version = 'expired-version'
+            WHERE eir_version = 'expired-version'
             """
         )
         connection.execute(
@@ -1438,7 +1438,7 @@ def test_retention_prunes_only_expired_exported_history(tmp_path):
         aggregate_versions = {
             row[0]
             for row in connection.execute(
-                "SELECT hermes_version FROM counter_aggregates"
+                "SELECT eir_version FROM counter_aggregates"
             ).fetchall()
         }
     assert {row[0] for row in outbox_rows} == {

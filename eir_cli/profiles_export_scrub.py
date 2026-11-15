@@ -1,6 +1,6 @@
 """What a profile export scrubs from its staged copy, and the saved-gateways stores profiles never carry.
 
-Split out of :mod:`hermes_cli.profiles` (its facade over the clone/export paths).
+Split out of :mod:`eir_cli.profiles` (its facade over the clone/export paths).
 """
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import json
 import re
 from pathlib import Path
 
-# The machine's saved-gateways list and its OAuth sign-ins (``hermes_cli.gateway_connections``), with
+# The machine's saved-gateways list and its OAuth sign-ins (``eir_cli.gateway_connections``), with
 # their ``.lock`` dir and ``.corrupt-<ms>`` sidecars: machine-wide root state every profile reads at the
 # root, holding plaintext session tokens. A copy in a clone is dead weight, and an export must not ship it.
 GATEWAY_CONNECTION_STORES = ("gateway-connections.json", "gateway-connection-tokens.json")
@@ -47,7 +47,7 @@ def _masked_envelopes(node):
 
 
 def _mask_secret_envelopes(text: str) -> str:
-    """Hermes stores secrets as ``{"encoding": "plain", "value": ...}`` envelopes, whose key names
+    """Eir stores secrets as ``{"encoding": "plain", "value": ...}`` envelopes, whose key names
     no secret: the text redactor cannot see them, so JSON documents are masked structurally."""
     try:
         doc = json.loads(text)
@@ -58,7 +58,7 @@ def _mask_secret_envelopes(text: str) -> str:
 
 
 def scrub_export_secrets(staged: Path) -> None:
-    """Force-redact secret-shaped strings in a staged export tree (same pass as ``hermes
+    """Force-redact secret-shaped strings in a staged export tree (same pass as ``eir
     sessions export --redact``). Runs on the staged copy only; symlinks to text files are
     materialized when content changes so redaction never follows a link back into the source."""
     from agent.redact import redact_sensitive_text

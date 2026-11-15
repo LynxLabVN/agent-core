@@ -6,20 +6,20 @@ import os
 from pathlib import Path
 
 import pytest
-import hermes_yaml as yaml
+import eir_yaml as yaml
 from fastapi.testclient import TestClient
 
-from hermes_cli.web_server import _SESSION_TOKEN, app
+from eir_cli.web_server import _SESSION_TOKEN, app
 
 
-HEADERS = {"X-Hermes-Session-Token": _SESSION_TOKEN}
+HEADERS = {"X-Eir-Session-Token": _SESSION_TOKEN}
 
 
 @pytest.fixture
-def catalog_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _isolate_hermes_home):
+def catalog_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _isolate_eir_home):
     """Install one synthetic API-key catalog entry in the isolated test home."""
-    from hermes_constants import get_hermes_home
-    from hermes_cli.config import invalidate_env_cache
+    from eir_constants import get_eir_home
+    from eir_cli.config import invalidate_env_cache
 
     catalog = tmp_path / "optional-mcps"
     entry_dir = catalog / "demo"
@@ -49,9 +49,9 @@ def catalog_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _isolate_hermes
         ),
         encoding="utf-8",
     )
-    monkeypatch.setenv("HERMES_OPTIONAL_MCPS", str(catalog))
+    monkeypatch.setenv("EIR_OPTIONAL_MCPS", str(catalog))
     invalidate_env_cache()
-    return get_hermes_home()
+    return get_eir_home()
 
 
 @pytest.fixture
@@ -65,7 +65,7 @@ def test_catalog_rejects_undeclared_key_before_any_write_or_install(
     catalog_env: Path,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    from hermes_cli import mcp_catalog
+    from eir_cli import mcp_catalog
 
     installs: list[str] = []
     monkeypatch.setattr(
@@ -101,14 +101,14 @@ def test_catalog_cannot_declare_reserved_control_key(
     catalog_env: Path,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    from hermes_cli import mcp_catalog
+    from eir_cli import mcp_catalog
 
-    catalog_root = Path(os.environ["HERMES_OPTIONAL_MCPS"])
+    catalog_root = Path(os.environ["EIR_OPTIONAL_MCPS"])
     manifest_path = catalog_root / "demo" / "manifest.yaml"
     manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
     manifest["auth"]["env"].append(
         {
-            "name": "HERMES_YOLO_MODE",
+            "name": "EIR_YOLO_MODE",
             "prompt": "Unsafe control",
             "secret": False,
         }
@@ -125,14 +125,14 @@ def test_catalog_cannot_declare_reserved_control_key(
     response = client.post(
         "/api/mcp/catalog/install",
         headers=HEADERS,
-        json={"name": "demo", "env": {"HERMES_YOLO_MODE": "1"}},
+        json={"name": "demo", "env": {"EIR_YOLO_MODE": "1"}},
     )
 
     assert response.status_code == 400
     assert "denylist" in response.json()["detail"]
     assert installs == []
     env_path = catalog_env / ".env"
-    assert not env_path.exists() or "HERMES_YOLO_MODE" not in env_path.read_text(
+    assert not env_path.exists() or "EIR_YOLO_MODE" not in env_path.read_text(
         encoding="utf-8"
     )
 
@@ -142,7 +142,7 @@ def test_catalog_accepts_declared_credential(
     catalog_env: Path,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    from hermes_cli import mcp_config
+    from eir_cli import mcp_config
     from agent.secret_scope import get_secret
     from tools.connectors.mcp import _CatalogBackend
 
@@ -175,9 +175,9 @@ def test_catalog_non_secret_env_never_lands_in_env_file(
 ):
     """Non-secret declared env vars (e.g. a base URL) are not written to .env:
     install_entry inlines them into the server config instead."""
-    from hermes_cli import mcp_catalog
+    from eir_cli import mcp_catalog
 
-    catalog_root = Path(os.environ["HERMES_OPTIONAL_MCPS"])
+    catalog_root = Path(os.environ["EIR_OPTIONAL_MCPS"])
     manifest_path = catalog_root / "demo" / "manifest.yaml"
     manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
     manifest["auth"]["env"].append(
@@ -223,7 +223,7 @@ def test_catalog_non_secret_env_never_lands_in_env_file(
     assert "https://demo.example.test" not in env_text
     # The non-secret is inlined into config.yaml (server config carries the
     # literal; the raw file never stores it and never keeps a ${VAR} ref).
-    from hermes_cli.config import load_config
+    from eir_cli.config import load_config
 
     server = load_config()["mcp_servers"]["demo"]
     assert server["url"] == "https://demo.example.test"
@@ -235,10 +235,10 @@ def test_catalog_non_secret_env_never_lands_in_env_file(
 @pytest.mark.parametrize(
     "protected_key",
     [
-        "HERMES_YOLO_MODE",
-        "HERMES_OPTIONAL_MCPS",
-        "HERMES_COPILOT_ACP_COMMAND",
-        "HERMES_COPILOT_ACP_ARGS",
+        "EIR_YOLO_MODE",
+        "EIR_OPTIONAL_MCPS",
+        "EIR_COPILOT_ACP_COMMAND",
+        "EIR_COPILOT_ACP_ARGS",
     ],
 )
 def test_generic_env_endpoint_rejects_protected_key(
@@ -260,7 +260,7 @@ def test_generic_env_endpoint_rejects_protected_key(
 
 
 def test_process_supplied_catalog_root_remains_supported(catalog_env: Path):
-    from hermes_cli.mcp_catalog import get_entry
+    from eir_cli.mcp_catalog import get_entry
 
     assert get_entry("demo") is not None
 
@@ -274,8 +274,8 @@ def _acp_launch_resolvers(monkeypatch: pytest.MonkeyPatch):
     from providers.base import ProviderProfile
 
     acme = ProviderProfile(name="acme-acp", auth_type="external_process", base_url="acp://acme",
-                           process_command="acme", process_command_env_vars=("HERMES_ACME_ACP_COMMAND",),
-                           process_args_env_var="HERMES_ACME_ACP_ARGS")
+                           process_command="acme", process_command_env_vars=("EIR_ACME_ACP_COMMAND",),
+                           process_args_env_var="EIR_ACME_ACP_ARGS")
     real_list = providers.list_providers
     monkeypatch.setattr(providers, "list_providers", lambda: [*real_list(), acme])
 
@@ -298,14 +298,14 @@ def test_rejected_acp_launch_controls_do_not_change_live_resolvers(
 ):
     _resolve_command, _resolve_args = _acp_launch_resolvers(monkeypatch)
 
-    monkeypatch.setenv("HERMES_ACME_ACP_COMMAND", "/opt/trusted/acme")
-    monkeypatch.setenv("HERMES_ACME_ACP_ARGS", "--acp --stdio")
+    monkeypatch.setenv("EIR_ACME_ACP_COMMAND", "/opt/trusted/acme")
+    monkeypatch.setenv("EIR_ACME_ACP_ARGS", "--acp --stdio")
     expected_command = _resolve_command()
     expected_args = _resolve_args()
 
     attempts = {
-        "HERMES_ACME_ACP_COMMAND": "/tmp/attacker-command",
-        "HERMES_ACME_ACP_ARGS": "--malicious-transport",
+        "EIR_ACME_ACP_COMMAND": "/tmp/attacker-command",
+        "EIR_ACME_ACP_ARGS": "--malicious-transport",
     }
     for key, value in attempts.items():
         response = client.put(
@@ -329,18 +329,18 @@ def test_preexisting_acp_launch_controls_remain_usable(
     monkeypatch: pytest.MonkeyPatch,
 ):
     _resolve_command, _resolve_args = _acp_launch_resolvers(monkeypatch)
-    from hermes_cli.env_loader import load_hermes_dotenv
+    from eir_cli.env_loader import load_eir_dotenv
 
-    monkeypatch.setenv("HERMES_ACME_ACP_COMMAND", "parent-placeholder")
-    monkeypatch.setenv("HERMES_ACME_ACP_ARGS", "--parent-placeholder")
+    monkeypatch.setenv("EIR_ACME_ACP_COMMAND", "parent-placeholder")
+    monkeypatch.setenv("EIR_ACME_ACP_ARGS", "--parent-placeholder")
     (catalog_env / ".env").write_text(
-        "HERMES_ACME_ACP_COMMAND=/opt/operator/acme\n"
-        "HERMES_ACME_ACP_ARGS=--acp --stdio --operator-mode\n",
+        "EIR_ACME_ACP_COMMAND=/opt/operator/acme\n"
+        "EIR_ACME_ACP_ARGS=--acp --stdio --operator-mode\n",
         encoding="utf-8",
     )
 
-    load_hermes_dotenv(
-        hermes_home=catalog_env,
+    load_eir_dotenv(
+        eir_home=catalog_env,
         load_external_secrets=False,
     )
 
@@ -355,10 +355,10 @@ def test_connection_card_install_keeps_env_file_secrets_only(
 ):
     """The connector-card backend (Desktop/TUI/CLI setup card) makes the same secrets-only split
     as the terminal install: a declared non-secret lands in the server block, never in .env."""
-    from hermes_cli import mcp_config
+    from eir_cli import mcp_config
     from tools.connectors.mcp import _CatalogBackend
 
-    catalog_root = Path(os.environ["HERMES_OPTIONAL_MCPS"])
+    catalog_root = Path(os.environ["EIR_OPTIONAL_MCPS"])
     manifest_path = catalog_root / "demo" / "manifest.yaml"
     manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
     manifest["transport"]["env"] = {"DEMO_BASE_URL": "${DEMO_BASE_URL}"}

@@ -1,7 +1,7 @@
 """The dashboard idle/retirement routes must not retire a gateway through its own listener.
 
 The gateway mounts the dashboard app (``app.state.gateway_runner`` set). The idle proof reads a
-standalone ``hermes serve`` child's ledgers only, so with an agent running on the gateway runner it
+standalone ``eir serve`` child's ledgers only, so with an agent running on the gateway runner it
 used to answer ``idle: true`` and ``prepare``/``commit`` took the fence: every later dashboard RPC,
 cron tick and admission was refused while the gateway kept running. On the gateway listener the
 routes now refuse and the fence stays open; a standalone serve keeps its permit protocol.
@@ -9,11 +9,11 @@ routes now refuse and the fence stays open; a standalone serve keeps its permit 
 
 from fastapi.testclient import TestClient
 
-from tests.hermes_cli.native_gateway_client import native_desktop_client
+from tests.eir_cli.native_gateway_client import native_desktop_client
 
 
 def _fresh_fence(monkeypatch):
-    from hermes_cli import backend_retirement
+    from eir_cli import backend_retirement
     from tui_gateway import server
 
     fence = backend_retirement.RetirementFence()
@@ -48,12 +48,12 @@ def test_gateway_listener_is_never_idle_and_refuses_retirement(monkeypatch):
 
 def test_standalone_serve_keeps_the_permit_protocol(monkeypatch):
     fence, server = _fresh_fence(monkeypatch)
-    from hermes_cli import web_server
+    from eir_cli import web_server
 
     monkeypatch.setattr(web_server.app.state, "gateway_runner", None, raising=False)
     monkeypatch.setattr(web_server, "_SESSION_TOKEN", "standalone-retirement-token")
     client = TestClient(web_server.app)
-    headers = {"X-Hermes-Session-Token": "standalone-retirement-token"}
+    headers = {"X-Eir-Session-Token": "standalone-retirement-token"}
 
     assert client.get("/api/health/idle", headers=headers).json() == {"ok": True, "idle": True, "reason": None}
     permit = client.post("/api/health/retirement", json={"action": "prepare"}, headers=headers).json()

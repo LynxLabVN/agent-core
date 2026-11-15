@@ -31,13 +31,13 @@ def signal_stale_fleet_survivors(fleet: list, restart, drain_budget: float) -> l
     Bookkeeping lands in ``restart.killed_pids`` so the receipt and the survivor sweep see them.
     Never raises: verification must still finalize the receipt (with an owed restart).
     """
-    from hermes_cli.update_cmd_fleet import _drain_or_signal_gateway_for_update, _restart_left_pending, _signalled_identity
+    from eir_cli.update_cmd_fleet import _drain_or_signal_gateway_for_update, _restart_left_pending, _signalled_identity
 
     pids = stale_fleet_survivor_pids(fleet, set(restart.killed_pids))
     if not pids:
         return []
     try:
-        from hermes_cli.gateway import _get_service_pids
+        from eir_cli.gateway import _get_service_pids
         service_pids = set(_get_service_pids(all_profiles=True))
     except Exception:
         service_pids = set()
@@ -68,7 +68,7 @@ def signal_stale_fleet_survivors(fleet: list, restart, drain_budget: float) -> l
         if isinstance(stopped, set):
             stopped.update(manual)
         print(f"  → Stopped {len(manual)} manual gateway process(es) that had no supervisor to respawn them")
-        print("    Restart manually: hermes gateway run")
+        print("    Restart manually: eir gateway run")
         if len(manual) > 1:
-            print("    (or: hermes -p <profile> gateway run  for each profile)")
+            print("    (or: eir -p <profile> gateway run  for each profile)")
     return signalled

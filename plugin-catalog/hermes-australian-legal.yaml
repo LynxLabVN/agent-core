@@ -24,7 +24,7 @@ description: >-
 maintainer: drfinlaymccall
 tier: community
 category: tools
-requires_hermes: ">=0.22.5"
+requires_eir: ">=0.22.5"
 docs_url: https://github.com/drfinlaymccall/hermes-australian-legal#readme
 platforms: [linux]
 capabilities:

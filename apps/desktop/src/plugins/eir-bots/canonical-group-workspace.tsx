@@ -1,4 +1,4 @@
-import { Button, host, LruCache, randomUuid } from '@hermes/plugin-sdk'
+import { Button, host, LruCache, randomUuid } from '@eir/plugin-sdk'
 import { type ClipboardEvent, type DragEvent, useEffect, useRef, useState } from 'react'
 
 import { type CanonicalDriverStatus, CanonicalGroupCycle, CanonicalGroupNotices, CanonicalGroupTyping, canonicalMemberName, useCanonicalRoomLive, useSameValue } from './canonical-group-activity'

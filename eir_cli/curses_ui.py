@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Callable, List, Optional, Sequence, Set, Tuple, Union
 
-from hermes_cli.colors import Colors, color
+from eir_cli.colors import Colors, color
 
 # Rich radiolist rows: (text, style). style is None | "yellow" | "dim" | "green" | "red". Plain ``str`` works too.
 RadioItem = str | Sequence[tuple[str, str | None]]
@@ -36,8 +36,8 @@ class MenuNavigationEvent(str, Enum):
 # Scoped flow controller: ``handler(event, value=None) -> MenuNavigationStart | None``.
 MenuNavigationHandler = Callable[..., "MenuNavigationStart | None"]
 _MENU_NAVIGATION_HANDLER: ContextVar[MenuNavigationHandler | None] = ContextVar(
-    "hermes_menu_navigation_handler", default=None)
-_NUMBERED_BACK_ENABLED: ContextVar[bool] = ContextVar("hermes_numbered_back_enabled", default=False)
+    "eir_menu_navigation_handler", default=None)
+_NUMBERED_BACK_ENABLED: ContextVar[bool] = ContextVar("eir_numbered_back_enabled", default=False)
 
 
 def set_menu_navigation_handler(handler: MenuNavigationHandler) -> Token:
@@ -92,7 +92,7 @@ def _read_numbered_input(prompt_text: str) -> str | _NumberedNavigation:
     from prompt_toolkit.keys import Keys
 
     # Setup may run without the classic CLI, which normally installs CSI-u aliases at startup.
-    from hermes_cli.pt_input_extras import install_modify_other_keys_aliases
+    from eir_cli.pt_input_extras import install_modify_other_keys_aliases
     install_modify_other_keys_aliases()
     bindings = KeyBindings()
 

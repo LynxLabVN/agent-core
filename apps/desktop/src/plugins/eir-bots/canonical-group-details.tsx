@@ -1,4 +1,4 @@
-import { atom, Button, Codicon, Tip } from '@hermes/plugin-sdk'
+import { atom, Button, Codicon, Tip } from '@eir/plugin-sdk'
 import { type ReactNode, useLayoutEffect, useRef } from 'react'
 
 import { canonicalMemberName } from './canonical-group-activity'

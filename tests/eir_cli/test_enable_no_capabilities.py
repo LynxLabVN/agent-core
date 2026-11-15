@@ -2,9 +2,9 @@
 from unittest.mock import MagicMock
 
 import pytest
-import hermes_yaml as yaml
+import eir_yaml as yaml
 
-from tests.hermes_cli.plugin_worker_support import (
+from tests.eir_cli.plugin_worker_support import (
     isolated_python as isolated_python,  # noqa: PLC0414 -- the self-alias is load-bearing: it suppresses F811 for the pytest fixture parameter shadowing this import
     plugin_world as plugin_world,  # noqa: PLC0414 -- the self-alias is load-bearing: it suppresses F811 for the pytest fixture parameter shadowing this import
 )
@@ -34,7 +34,7 @@ def test_enable_consent(plugin_world, monkeypatch, caps, flag, existing, answer,
         "plugins": {"entries": {"hook-only-probe": {"allow_tool_override": existing}}}
     }
     (home / "config.yaml").write_text(yaml.safe_dump(initial), encoding="utf-8")
-    from hermes_cli import plugins_cmd
+    from eir_cli import plugins_cmd
 
     console = MagicMock()
     console.input.return_value = answer

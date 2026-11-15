@@ -1,4 +1,4 @@
-"""Tests for hermes_cli.gui_uninstall — GUI-only uninstall + install discovery.
+"""Tests for eir_cli.gui_uninstall — GUI-only uninstall + install discovery.
 
 Covers the cross-platform artifact discovery, the agent/GUI detection the
 desktop UI gates options on, and that ``uninstall_gui`` removes only GUI
@@ -11,43 +11,43 @@ from pathlib import Path
 
 import pytest
 
-import hermes_cli.gui_uninstall as gu
+import eir_cli.gui_uninstall as gu
 
 
-def _make_agent(hermes_home: Path) -> Path:
+def _make_agent(eir_home: Path) -> Path:
     """Create a fake agent install: source package + venv."""
-    agent_root = hermes_home / "hermes-agent"
-    (agent_root / "hermes_cli").mkdir(parents=True)
-    (agent_root / "hermes_cli" / "__init__.py").write_text("")
+    agent_root = eir_home / "eir-agent"
+    (agent_root / "eir_cli").mkdir(parents=True)
+    (agent_root / "eir_cli" / "__init__.py").write_text("")
     (agent_root / "venv" / "bin").mkdir(parents=True)
     return agent_root
 
 
-def _make_gui_build(hermes_home: Path) -> None:
-    """Create the source-built GUI artifacts a `hermes desktop` run produces."""
-    desktop = hermes_home / "hermes-agent" / "apps" / "desktop"
+def _make_gui_build(eir_home: Path) -> None:
+    """Create the source-built GUI artifacts a `eir desktop` run produces."""
+    desktop = eir_home / "eir-agent" / "apps" / "desktop"
     (desktop / "dist").mkdir(parents=True)
     (desktop / "dist" / "index.html").write_text("<html>")
     (desktop / "release" / "linux-unpacked").mkdir(parents=True)
     (desktop / "node_modules").mkdir(parents=True)
-    (hermes_home / "hermes-agent" / "node_modules").mkdir(parents=True)
-    (hermes_home / "desktop-build-stamp.json").write_text("{}")
+    (eir_home / "eir-agent" / "node_modules").mkdir(parents=True)
+    (eir_home / "desktop-build-stamp.json").write_text("{}")
 
 
 def test_gui_install_summary_shape(tmp_path, monkeypatch):
-    hermes_home = tmp_path / ".hermes"
-    _make_agent(hermes_home)
-    _make_gui_build(hermes_home)
+    eir_home = tmp_path / ".eir"
+    _make_agent(eir_home)
+    _make_gui_build(eir_home)
     monkeypatch.setattr(gu, "packaged_gui_app_paths", list)
     monkeypatch.setattr(gu, "desktop_userdata_dir", lambda: tmp_path / "none")
 
-    summary = gu.gui_install_summary(hermes_home)
+    summary = gu.gui_install_summary(eir_home)
     # JSON-serializable primitives the desktop UI gates on.
     assert summary["agent_installed"] is True
     assert summary["gui_installed"] is True
     assert isinstance(summary["source_built_artifacts"], list)
     assert all(isinstance(p, str) for p in summary["source_built_artifacts"])
-    assert summary["hermes_home"] == str(hermes_home)
+    assert summary["eir_home"] == str(eir_home)
     assert summary["platform"] == sys.platform
 
 
@@ -55,7 +55,7 @@ def test_gui_install_summary_shape(tmp_path, monkeypatch):
 def test_uninstall_removes_launcher_entry_and_refreshes_cache(tmp_path, monkeypatch):
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg"))
 
-    from hermes_cli import linux_desktop_entry as lde
+    from eir_cli import linux_desktop_entry as lde
 
     entry = lde.desktop_entry_path()
     entry.parent.mkdir(parents=True, exist_ok=True)
@@ -70,22 +70,22 @@ def test_uninstall_removes_launcher_entry_and_refreshes_cache(tmp_path, monkeypa
         lde, "refresh_desktop_databases", lambda d: refreshed.append(d) or ["kbuildsycoca6"]
     )
 
-    hermes_home = tmp_path / ".hermes"
-    _make_agent(hermes_home)
-    icon = lde.icon_path(hermes_home / "hermes-agent")
+    eir_home = tmp_path / ".eir"
+    _make_agent(eir_home)
+    icon = lde.icon_path(eir_home / "eir-agent")
     icon.parent.mkdir(parents=True, exist_ok=True)
     icon.write_bytes(b"\x89PNG")
     monkeypatch.setattr(gu, "desktop_userdata_dir", lambda: tmp_path / "none")
 
-    removed = gu.uninstall_gui(hermes_home)
+    removed = gu.uninstall_gui(eir_home)
 
     assert entry in removed and not entry.exists()
     assert legacy_alias in removed and not legacy_alias.exists()
     assert refreshed == [entry.parent]
     # The icon lives in the checkout. A GUI uninstall must not delete it.
-    assert lde.icon_path(hermes_home / "hermes-agent").exists()
+    assert lde.icon_path(eir_home / "eir-agent").exists()
     # The agent itself survives a GUI uninstall.
-    assert (hermes_home / "hermes-agent" / "hermes_cli").is_dir()
+    assert (eir_home / "eir-agent" / "eir_cli").is_dir()
 
 
 @pytest.mark.platforms("posix")  # POSIX symlink semantics
@@ -102,7 +102,7 @@ def test_remove_path_handles_symlink(tmp_path):
 
 def test_uninstall_args_namespace_mode_mapping():
     """_UninstallArgs maps mode → the gui/full flags run_uninstall reads."""
-    from hermes_cli import uninstall
+    from eir_cli import uninstall
 
     gui = uninstall._UninstallArgs(mode="gui")
     assert gui.gui is True and gui.full is False and gui.yes is True

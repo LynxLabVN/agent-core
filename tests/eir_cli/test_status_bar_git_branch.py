@@ -2,13 +2,13 @@
 
 from datetime import datetime, timedelta
 
-from cli import HermesCLI
-from hermes_cli import status_bar_git
-from hermes_cli.status_bar_git import current_git_branch
+from cli import EirCLI
+from eir_cli import status_bar_git
+from eir_cli.status_bar_git import current_git_branch
 
 
 def _make_cli():
-    cli_obj = HermesCLI.__new__(HermesCLI)
+    cli_obj = EirCLI.__new__(EirCLI)
     cli_obj.model = "anthropic/claude-sonnet-4-20250514"
     cli_obj.session_start = datetime.now() - timedelta(minutes=3)
     cli_obj.conversation_history = [{"role": "user", "content": "hi"}]

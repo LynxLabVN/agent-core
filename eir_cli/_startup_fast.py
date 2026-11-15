@@ -1,8 +1,8 @@
 """Pre-import startup fast paths — THE canonical lightweight helpers.
 
-This module is imported by ``hermes_cli/main.py`` BEFORE its heavy import
+This module is imported by ``eir_cli/main.py`` BEFORE its heavy import
 wall (config, argparse tree, logging, providers). Everything here must stay
-**stdlib-only and cheap** (os/sys file probes; no yaml, no hermes_cli.config,
+**stdlib-only and cheap** (os/sys file probes; no yaml, no eir_cli.config,
 no argparse). A guard test (``test_startup_fast_import_weight``) subprocess-
 imports this module and fails if any heavy module sneaks into sys.modules.
 
@@ -16,7 +16,7 @@ noticed. One implementation, imported by both the fast path and the module
 constants, makes that drift structurally impossible; the parity guard test
 would have caught eb4040242 the day it landed.
 
-``hermes_cli/config.py``'s ``get_container_exec_info()`` reads the same
+``eir_cli/config.py``'s ``get_container_exec_info()`` reads the same
 ``.container-mode`` file; keep the file-format assumptions here and there in
 sync (this module deliberately only PROBES existence/typos cheaply and errs
 toward the slow path, which then does the authoritative parse).
@@ -34,7 +34,7 @@ __all__ = [
     "is_container_startup_environment",
     "is_desktop_ssh_backend_argv",
     "is_global_fast_version_argv",
-    "normalize_hermes_home_env",
+    "normalize_eir_home_env",
     "print_fast_version_info",
     "project_root_str",
     "read_install_method",
@@ -55,33 +55,33 @@ def _read_text(path: str) -> str | None:
 def project_root_str() -> str:
     """Repo root as a str — the single source for main.py's PROJECT_ROOT.
 
-    The root is the folder that holds ``hermes_agent/``: this package's parent today, one level higher
-    once this package moves into ``hermes_agent/``. Stdlib only: it also runs from its file (-I -S).
+    The root is the folder that holds ``eir_agent/``: this package's parent today, one level higher
+    once this package moves into ``eir_agent/``. Stdlib only: it also runs from its file (-I -S).
     """
     parent = os.path.dirname(os.path.realpath(os.path.dirname(__file__)))
     for folder in (parent, os.path.dirname(parent)):
-        if os.path.isdir(os.path.join(folder, "hermes_agent", "compat")):
+        if os.path.isdir(os.path.join(folder, "eir_agent", "compat")):
             return folder
     return parent
 
 
-def normalize_hermes_home_env() -> None:
-    """Expand ``~``/``$VAR`` in ``HERMES_HOME`` once, at process entry, and write it back.
+def normalize_eir_home_env() -> None:
+    """Expand ``~``/``$VAR`` in ``EIR_HOME`` once, at process entry, and write it back.
 
     fish does not expand ``~`` inside ``VAR=~/...`` and every shell passes a quoted value
-    through verbatim, so a literal tilde reaches the process. ``Path("~/.hermes")`` is
-    *relative*: the many raw ``os.environ["HERMES_HOME"]`` readers (this fast path, the
+    through verbatim, so a literal tilde reaches the process. ``Path("~/.eir")`` is
+    *relative*: the many raw ``os.environ["EIR_HOME"]`` readers (this fast path, the
     active_profile probe, profile re-home, the dotenv loader) would each resolve it against
-    cwd and scaffold a full home under ``<cwd>/~/.hermes``. One expansion here gives every
-    reader the same absolute spelling; ``hermes_constants`` expands as well for non-CLI
+    cwd and scaffold a full home under ``<cwd>/~/.eir``. One expansion here gives every
+    reader the same absolute spelling; ``eir_constants`` expands as well for non-CLI
     entry points. A relative value that is not tilde/variable-shaped is left alone.
     """
-    raw = os.environ.get("HERMES_HOME", "")
+    raw = os.environ.get("EIR_HOME", "")
     if not raw.strip():
         return
     expanded = os.path.expanduser(os.path.expandvars(raw.strip()))
     if expanded != raw:
-        os.environ["HERMES_HOME"] = expanded
+        os.environ["EIR_HOME"] = expanded
 
 
 def _realpath_or_self(path: str) -> str:
@@ -116,7 +116,7 @@ def is_desktop_ssh_backend_argv(argv: list[str]) -> bool:
 
     That child has a fixed identity: Desktop names the remote profile explicitly (or none for
     the root home) and hands its session token through a 0600 FILE, never the
-    ``HERMES_DASHBOARD_SESSION_TOKEN`` env var the local pool spawn uses. Every reader of
+    ``EIR_DASHBOARD_SESSION_TOKEN`` env var the local pool spawn uses. Every reader of
     "is this process Desktop's backend" needs both shapes; this is the argv half.
     """
     return "--ssh-session-token-file" in argv
@@ -130,18 +130,18 @@ def is_container_startup_environment() -> bool:
     return "docker" in cgroup or "podman" in cgroup or "/lxc/" in cgroup
 
 
-def active_profile_may_override_home(hermes_root: str) -> bool:
-    """Cheap probe: does an active non-default profile redirect HERMES_HOME?"""
-    active = (_read_text(os.path.join(hermes_root, "active_profile")) or "").strip()
+def active_profile_may_override_home(eir_root: str) -> bool:
+    """Cheap probe: does an active non-default profile redirect EIR_HOME?"""
+    active = (_read_text(os.path.join(eir_root, "active_profile")) or "").strip()
     return bool(active and active != "default")
 
 
 def _default_home() -> str:
-    return os.path.join(os.path.expanduser("~"), ".hermes")
+    return os.path.join(os.path.expanduser("~"), ".eir")
 
 
 def _resolved_home() -> str:
-    return os.environ.get("HERMES_HOME", "").strip() or _default_home()
+    return os.environ.get("EIR_HOME", "").strip() or _default_home()
 
 
 def container_mode_may_be_active() -> bool:
@@ -151,14 +151,14 @@ def container_mode_may_be_active() -> bool:
     they'd print the host's version instead of the container's — so any profile ambiguity means "may
     be active".
     """
-    if os.environ.get("HERMES_DEV") == "1" or is_container_startup_environment():
+    if os.environ.get("EIR_DEV") == "1" or is_container_startup_environment():
         return False
-    hermes_home = os.environ.get("HERMES_HOME", "").strip()
-    if hermes_home:
-        if os.path.exists(os.path.join(hermes_home, ".container-mode")):
+    eir_home = os.environ.get("EIR_HOME", "").strip()
+    if eir_home:
+        if os.path.exists(os.path.join(eir_home, ".container-mode")):
             return True
-        parent_name = os.path.basename(os.path.dirname(os.path.normpath(hermes_home)))
-        return parent_name != "profiles" and active_profile_may_override_home(hermes_home)
+        parent_name = os.path.basename(os.path.dirname(os.path.normpath(eir_home)))
+        return parent_name != "profiles" and active_profile_may_override_home(eir_home)
     default_home = _default_home()
     return active_profile_may_override_home(default_home) or os.path.exists(
         os.path.join(default_home, ".container-mode"))
@@ -193,7 +193,7 @@ def read_install_method() -> str | None:
 
 
 def print_fast_version_info(*, check_updates: bool = True) -> None:
-    """THE canonical ``hermes --version`` output (also used by /version).
+    """THE canonical ``eir --version`` output (also used by /version).
 
     Every lazy block degrades gracefully — a broken/heavy import can never take the basic version
     output down.
@@ -201,21 +201,21 @@ def print_fast_version_info(*, check_updates: bool = True) -> None:
     # Registry-owned banner label (includes "· upstream <sha>" for git installs); banner.py keeps
     # rich/prompt_toolkit lazy, so this import is light.
     try:
-        from hermes_cli.banner import format_banner_version_label
+        from eir_cli.banner import format_banner_version_label
 
         print(format_banner_version_label())
     except Exception:
-        from hermes_cli import __release_date__
-        from hermes_cli.version_info import get_version_info
+        from eir_cli import __release_date__
+        from eir_cli.version_info import get_version_info
 
-        print(f"Hermes Agent v{get_version_info().derived_version} ({__release_date__})")
+        print(f"Eir Agent v{get_version_info().derived_version} ({__release_date__})")
     print(f"Install directory: {project_root_str()}")
     # Authoritative resolver first (code-scoped stamp → managed → nix → git → pip; also self-heals
     # poisoned shared-home 'docker' stamps); cheap stdlib stamp probe only if it fails.
     try:
         from pathlib import Path
 
-        from hermes_cli.config import detect_install_method
+        from eir_cli.config import detect_install_method
 
         install_method = detect_install_method(Path(project_root_str()))
     except Exception:
@@ -230,8 +230,8 @@ def print_fast_version_info(*, check_updates: bool = True) -> None:
     # Synchronous update status — bounded by check_for_updates' own subprocess/network timeouts
     # and its 6-hour cache; any failure prints nothing.
     try:
-        from hermes_cli.source_check import UPDATE_AVAILABLE_NO_COUNT, check_for_updates
-        from hermes_cli.config import recommended_update_command
+        from eir_cli.source_check import UPDATE_AVAILABLE_NO_COUNT, check_for_updates
+        from eir_cli.config import recommended_update_command
 
         status = check_for_updates(passive=True)
         behind = status.get("behind")
@@ -250,7 +250,7 @@ def print_fast_version_info(*, check_updates: bool = True) -> None:
 
 
 def try_fast_version(argv: list[str] | None = None) -> bool:
-    """Handle ``hermes --version`` before the heavy import wall.
+    """Handle ``eir --version`` before the heavy import wall.
 
     Only ``--version``/``-V`` (the ``version`` subcommand was removed —
     ``--version`` now carries the full output incl. update status), and

@@ -14,8 +14,8 @@ import pytest
 ])
 def test_setup_refreshes_stale_dependencies_but_keeps_matching_install(
         tmp_path, monkeypatch, installed_version, installed_hash, mirror, refresh):
-    from hermes_cli import main_platform_setup as setup
-    import hermes_constants
+    from eir_cli import main_platform_setup as setup
+    import eir_constants
 
     dependency = "node_modules/@whiskeysockets/baileys"
     package_dir = tmp_path / dependency
@@ -42,8 +42,8 @@ def test_setup_refreshes_stale_dependencies_but_keeps_matching_install(
         return SimpleNamespace(returncode=0)
 
     monkeypatch.setenv("WHATSAPP_NPM_INSTALL_TIMEOUT", "450")
-    monkeypatch.setattr(hermes_constants, "find_node_executable", lambda name: "isolated-npm")
-    monkeypatch.setattr(hermes_constants, "with_hermes_node_path", dict)
+    monkeypatch.setattr(eir_constants, "find_node_executable", lambda name: "isolated-npm")
+    monkeypatch.setattr(eir_constants, "with_eir_node_path", dict)
     monkeypatch.setattr(setup.subprocess, "run", install)
     assert setup._whatsapp_install_bridge(tmp_path)
     assert bool(calls) is refresh

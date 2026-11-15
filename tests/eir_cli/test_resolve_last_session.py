@@ -1,20 +1,20 @@
-"""Verify `hermes -c` picks the session the user most recently used."""
+"""Verify `eir -c` picks the session the user most recently used."""
 
 from __future__ import annotations
 
-from hermes_cli.main import _resolve_last_session
+from eir_cli.main import _resolve_last_session
 
 
 def test_search_sessions_exposes_last_active_column(tmp_path, monkeypatch):
     # End-to-end: SessionDB must surface last_active and order by MRU.
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
 
-    import hermes_state
+    import eir_state
 
     from pathlib import Path
 
-    db = hermes_state.SessionDB(db_path=Path(tmp_path / "state.db"))
+    db = eir_state.SessionDB(db_path=Path(tmp_path / "state.db"))
     try:
         db.create_session("s_started_later", source="cli")
         db.create_session("s_active_later", source="cli")
@@ -53,16 +53,16 @@ def test_search_sessions_exposes_last_active_column(tmp_path, monkeypatch):
 def test_resolve_last_session_real_db_prefers_workspace(monkeypatch, tmp_path):
     # End-to-end through the real SessionDB + _resolve_last_session: -c from
     # repo A picks repo A's session even though repo B is globally newer.
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
 
-    import hermes_state
+    import eir_state
     from pathlib import Path
 
     repo_a = tmp_path / "repo-a"
     repo_a.mkdir()
     state_db = Path(tmp_path / "state.db")
-    real_db = hermes_state.SessionDB
+    real_db = eir_state.SessionDB
     db = real_db(db_path=state_db)
     try:
         db.create_session("repo_a", source="cli", cwd=str(repo_a), git_repo_root=str(repo_a))
@@ -77,25 +77,25 @@ def test_resolve_last_session_real_db_prefers_workspace(monkeypatch, tmp_path):
 
     monkeypatch.chdir(repo_a)
     monkeypatch.setattr(
-        "hermes_cli.main.subprocess.run",
+        "eir_cli.main.subprocess.run",
         lambda cmd, **kw: __import__("subprocess").CompletedProcess(
             cmd, 0, stdout=str(repo_a), stderr=""
         ),
     )
-    monkeypatch.setattr("hermes_cli.main.get_hermes_home", lambda: tmp_path)
+    monkeypatch.setattr("eir_cli.main.get_eir_home", lambda: tmp_path)
     assert _resolve_last_session("cli") == "repo_a"
 
 
 def test_resolve_last_session_cli_continues_a_oneshot(monkeypatch, tmp_path):
-    """`hermes -z … --resume latest` / `hermes -c` chain on the previous one-shot: its distinct `oneshot`
+    """`eir -z … --resume latest` / `eir -c` chain on the previous one-shot: its distinct `oneshot`
     source hides it from pickers but it is still CLI history (#112550)."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
 
-    import hermes_state
+    import eir_state
     from pathlib import Path
 
-    db = hermes_state.SessionDB(db_path=Path(tmp_path / "state.db"))
+    db = eir_state.SessionDB(db_path=Path(tmp_path / "state.db"))
     try:
         db.create_session("interactive", source="cli")
         db.create_session("oneshot_run", source="oneshot")
@@ -107,9 +107,9 @@ def test_resolve_last_session_cli_continues_a_oneshot(monkeypatch, tmp_path):
     finally:
         db.close()
 
-    monkeypatch.setattr("hermes_cli.main._resolve_workspace_key", lambda: None)
+    monkeypatch.setattr("eir_cli.main._resolve_workspace_key", lambda: None)
     # The lookup opens the active home's store by explicit path (a served-profile process has no
     # single default home), so the home is the seam — same as the workspace test above.
-    monkeypatch.setattr("hermes_cli.main.get_hermes_home", lambda: tmp_path)
+    monkeypatch.setattr("eir_cli.main.get_eir_home", lambda: tmp_path)
     assert _resolve_last_session("cli") == "oneshot_run"
     assert _resolve_last_session("tui") == "tui_chat"

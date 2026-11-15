@@ -7,12 +7,12 @@ import shutil
 import sys
 import threading
 from pathlib import Path
-from hermes_cli import source_check
+from eir_cli import source_check
 # Historical updater import (tests/compat/old_updater_surface.json). In-tree callers use the owner.
-from hermes_cli.source_check import _github_compare_behind
-from hermes_constants import get_hermes_home
+from eir_cli.source_check import _github_compare_behind
+from eir_constants import get_eir_home
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
-from hermes_cli._startup_fast import project_root_str
+from eir_cli._startup_fast import project_root_str
 
 # rich and prompt_toolkit are imported lazily: this module sits on the TUI gateway's critical
 # startup path purely for the lightweight update-check helpers, and eager rich/prompt_toolkit
@@ -57,7 +57,7 @@ def cprint(text: str):
 
 def _active_skin():
     """The active skin object (raises when the skin engine is unavailable)."""
-    from hermes_cli.skin_engine import get_active_skin
+    from eir_cli.skin_engine import get_active_skin
     return get_active_skin()
 
 
@@ -68,17 +68,17 @@ def _skin_color(key: str, fallback: str) -> str:
 
 # === ASCII Art & Branding ===
 
-from hermes_cli import __release_date__ as RELEASE_DATE
-from hermes_cli.version_info import get_version_info
+from eir_cli import __release_date__ as RELEASE_DATE
+from eir_cli.version_info import get_version_info
 
-HERMES_AGENT_LOGO = """[bold #FFD700]██╗  ██╗███████╗██████╗ ███╗   ███╗███████╗███████╗       █████╗  ██████╗ ███████╗███╗   ██╗████████╗[/]
+EIR_AGENT_LOGO = """[bold #FFD700]██╗  ██╗███████╗██████╗ ███╗   ███╗███████╗███████╗       █████╗  ██████╗ ███████╗███╗   ██╗████████╗[/]
 [bold #FFD700]██║  ██║██╔════╝██╔══██╗████╗ ████║██╔════╝██╔════╝      ██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝[/]
 [#FFBF00]███████║█████╗  ██████╔╝██╔████╔██║█████╗  ███████╗█████╗███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║[/]
 [#FFBF00]██╔══██║██╔══╝  ██╔══██╗██║╚██╔╝██║██╔══╝  ╚════██║╚════╝██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║[/]
 [#CD7F32]██║  ██║███████╗██║  ██║██║ ╚═╝ ██║███████╗███████║      ██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║[/]
 [#CD7F32]╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝╚══════╝      ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝[/]"""
 
-HERMES_CADUCEUS = """[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⡀⠀⣀⣀⠀⢀⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
+EIR_CADUCEUS = """[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⡀⠀⣀⣀⠀⢀⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
 [#CD7F32]⠀⠀⠀⠀⠀⠀⢀⣠⣴⣾⣿⣿⣇⠸⣿⣿⠇⣸⣿⣿⣷⣦⣄⡀⠀⠀⠀⠀⠀⠀[/]
 [#FFBF00]⠀⢀⣠⣴⣶⠿⠋⣩⡿⣿⡿⠻⣿⡇⢠⡄⢸⣿⠟⢿⣿⢿⣍⠙⠿⣶⣦⣄⡀⠀[/]
 [#FFBF00]⠀⠀⠉⠉⠁⠶⠟⠋⠀⠉⠀⢀⣈⣁⡈⢁⣈⣁⡀⠀⠉⠀⠙⠻⠶⠈⠉⠉⠀⠀[/]
@@ -97,7 +97,7 @@ HERMES_CADUCEUS = """[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⡀⠀⣀⣀�
 # === Skills scanning ===
 
 # Per-process caches: ``None`` until computed, then a 1-tuple ``(value,)`` so a computed ``None``
-# is distinguishable from "not yet computed". Reset by assigning ``None`` (tests, ``hermes skills``).
+# is distinguishable from "not yet computed". Reset by assigning ``None`` (tests, ``eir skills``).
 _available_skills_cache: Optional[tuple] = None
 _git_banner_state_cache: Optional[tuple] = None
 _latest_release_cache: Optional[tuple] = None
@@ -108,10 +108,10 @@ _UNCACHED = object()  # compute() result that must not be memoized
 def _memo(cache_name: str, compute):
     """Return the cached value under module global ``cache_name``, computing (and storing) it once.
 
-    Not consulted under a routed profile (HERMES_HOME override): every memo here is derived from the
+    Not consulted under a routed profile (EIR_HOME override): every memo here is derived from the
     launch home (its skills tree, its checkout), and the TUI gateway calls these per profile."""
-    from hermes_constants import get_hermes_home_override
-    if get_hermes_home_override() is not None:
+    from eir_constants import get_eir_home_override
+    if get_eir_home_override() is not None:
         return compute()
     cached = globals()[cache_name]
     if cached is not None:
@@ -145,14 +145,14 @@ def get_available_skills() -> dict[str, list[str]]:
 
 
 def _resolve_repo_dir() -> Optional[Path]:
-    """The active Hermes git checkout, or None if this isn't a git install.
+    """The active Eir git checkout, or None if this isn't a git install.
 
-    Prefers the running code's location: ``$HERMES_HOME/hermes-agent/`` may be a stale copy
+    Prefers the running code's location: ``$EIR_HOME/eir-agent/`` may be a stale copy
     carried over by ``--clone-all``.
     """
     repo_dir = Path(project_root_str())
     if not (repo_dir / ".git").exists():
-        repo_dir = get_hermes_home() / "hermes-agent"
+        repo_dir = get_eir_home() / "eir-agent"
     return repo_dir if (repo_dir / ".git").exists() else None
 
 
@@ -170,7 +170,7 @@ def get_git_banner_state(repo_dir: Optional[Path] = None) -> Optional[dict]:
 def _baked_banner_state() -> Optional[dict]:
     """Banner state from the baked build SHA (Docker image path), or None."""
     def _baked():
-        from hermes_cli.version_info import get_code_identity
+        from eir_cli.version_info import get_code_identity
         return get_code_identity().get("short_sha")
     baked = _quiet(_baked)
     return {"upstream": baked, "local": baked, "ahead": 0} if baked else None
@@ -194,7 +194,7 @@ _RELEASE_URL_BASE = "https://github.com/NousResearch/hermes-agent/releases/tag"
 def get_latest_release_tag(repo_dir: Optional[Path] = None) -> Optional[tuple]:
     """Return ``(tag, release_url)`` for the latest local git tag, or None (a miss is cached too).
 
-    Release URL always points at the canonical NousResearch/hermes-agent repo (forks get no link).
+    Release URL always points at the canonical NousResearch/eir-agent repo (forks get no link).
     """
     def _compute():
         rd = repo_dir or _resolve_repo_dir()
@@ -205,13 +205,13 @@ def get_latest_release_tag(repo_dir: Optional[Path] = None) -> Optional[tuple]:
 
 def format_banner_version_label() -> str:
     """Return the version label shown in the startup banner title."""
-    from hermes_cli.config import get_project_root
-    from hermes_cli.steward import read_install_stamp
-    from hermes_cli.update_channel import is_canary_tag
+    from eir_cli.config import get_project_root
+    from eir_cli.steward import read_install_stamp
+    from eir_cli.update_channel import is_canary_tag
 
     stamp = read_install_stamp(get_project_root())
     if stamp.get("distribution") == "desktop-app":
-        label = f"Hermes Agent v{get_version_info().derived_version}"
+        label = f"Eir Agent v{get_version_info().derived_version}"
         if stamp.get("source") == "commit-build":
             return f"{label} · commit-build · {str(stamp.get('commit') or '')[:12]}"
         if stamp.get("tag"):
@@ -224,9 +224,9 @@ def format_banner_version_label() -> str:
             return f"{label} · installer"
         return label
 
-    base = f"Hermes Agent v{get_version_info().derived_version} ({RELEASE_DATE})"
-    from hermes_cli.config import load_config
-    from hermes_cli.update_channel import resolve_update_channel
+    base = f"Eir Agent v{get_version_info().derived_version} ({RELEASE_DATE})"
+    from eir_cli.config import load_config
+    from eir_cli.update_channel import resolve_update_channel
 
     channel = resolve_update_channel(_quiet(load_config), get_project_root())
     if channel != "main":
@@ -321,7 +321,7 @@ def get_update_result(timeout: float = 0.5) -> Optional[int]:
 
 def _format_update_notice(behind: int) -> str:
     """Render the update warning line for a non-zero ``behind`` result."""
-    from hermes_cli.config import get_managed_update_command, recommended_update_command
+    from eir_cli.config import get_managed_update_command, recommended_update_command
     if behind > 0:
         return (
             f"[bold yellow]⚠ {behind} {_plural(behind, 'commit')} behind[/]"
@@ -404,15 +404,15 @@ _BANNER_SNAPSHOT_VERSION = 1
 
 
 def _banner_snapshot_path() -> Path:
-    return get_hermes_home() / "cache" / "banner_snapshot.json"
+    return get_eir_home() / "cache" / "banner_snapshot.json"
 
 
 def banner_snapshot_fingerprint() -> Optional[str]:
     """Fingerprint the inputs the banner tool panel depends on."""
     import hashlib
     def _inputs():
-        from hermes_cli.config import get_config_path
-        return (get_config_path(), get_hermes_home() / ".env")
+        from eir_cli.config import get_config_path
+        return (get_config_path(), get_eir_home() / ".env")
     paths = _quiet(_inputs)
     if paths is None:
         return None
@@ -517,8 +517,8 @@ def _mcp_failed_line(name: str, transport: str, error: Optional[str]) -> str:
     exact next command, so 'failed' is never the whole story."""
     from rich.markup import escape
     reason = escape(" ".join(str(error or "").split())[:120]) or "no details recorded"
-    next_cmd = (f"hermes mcp login {name}" if re.search(r"\b401\b|unauthori[sz]ed", reason, re.IGNORECASE)
-                else f"hermes mcp test {name}")
+    next_cmd = (f"eir mcp login {name}" if re.search(r"\b401\b|unauthori[sz]ed", reason, re.IGNORECASE)
+                else f"eir mcp test {name}")
     return (f"[red]{name}[/] [dim]({transport})[/] [red]— could not connect:[/] {reason} "
             f"[dim]— run `{next_cmd}`[/]")
 
@@ -556,8 +556,8 @@ def _pack_skill_names(skill_names: list[str], avail: int) -> str:
 
 def _moa_aggregator_label(preset_name: str) -> str:
     """Short aggregator-model label for a MoA preset ("" when the preset has none)."""
-    from hermes_cli.config import load_config
-    from hermes_cli.moa_config import normalize_moa_config
+    from eir_cli.config import load_config
+    from eir_cli.moa_config import normalize_moa_config
     preset = normalize_moa_config(load_config().get("moa") or {}).get("presets", {}).get(preset_name)
     model = str(((preset or {}).get("aggregator") or {}).get("model") or "")
     return model.split("/")[-1]
@@ -571,11 +571,11 @@ def _mcp_configured() -> bool:
     When either probe can't tell, take the full path.
     """
     def _native():
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
         return bool((load_config() or {}).get("mcp_servers"))
 
     def _portable():
-        from hermes_cli.plugins import get_portable_mcp_server_names_nowait
+        from eir_cli.plugins import get_portable_mcp_server_names_nowait
         return bool(get_portable_mcp_server_names_nowait())
     return _quiet(_native, True) or _quiet(_portable, True)
 
@@ -587,13 +587,13 @@ def _probe_mcp_status() -> list:
 
 def _codex_runtime_active() -> bool:
     """True when the codex_app_server runtime is active (tool counts then live inside codex)."""
-    from hermes_cli.codex_runtime_switch import get_current_runtime
-    from hermes_cli.config import load_config
+    from eir_cli.codex_runtime_switch import get_current_runtime
+    from eir_cli.config import load_config
     return get_current_runtime(load_config()) == "codex_app_server"
 
 
 def _active_profile_name() -> Optional[str]:
-    from hermes_cli.profiles import get_active_profile_name
+    from eir_cli.profiles import get_active_profile_name
     return get_active_profile_name()
 
 
@@ -616,11 +616,11 @@ def _banner_left_lines(model: str, cwd: str, session_id, context_length, provide
         lines.append(f"[{accent}]MoA: {_short_label(model)}[/]{agg_str}{ctx_str}{nous_str}")
     elif not (model or "").strip() or (model or "").strip().lower() == "unknown":
         # Unconfigured install: the clearest place to say what is wrong and how to fix it.
-        lines.append(f"[bold red]no model configured[/] [dim {dim}]— run /model or hermes setup[/]")
+        lines.append(f"[bold red]no model configured[/] [dim {dim}]— run /model or eir setup[/]")
     else:
         model_short = model.split("/")[-1].removesuffix(".gguf")
         lines.append(f"[{accent}]{_short_label(model_short)}[/]{ctx_str}{nous_str}")
-    if os.getenv("HERMES_YOLO_MODE"):
+    if os.getenv("EIR_YOLO_MODE"):
         lines.append(f"[bold red]⚠ YOLO mode[/] [dim {dim}]— all approval prompts bypassed[/]")
     lines.append(f"[dim {dim}]{cwd}[/]")
     if session_id:
@@ -700,7 +700,7 @@ def build_welcome_banner(
     text = _skin_color("banner_text", "#FFF8DC")
     # Use skin's custom caduceus art if provided
     _bskin = _quiet(_active_skin)
-    left_lines = ["", getattr(_bskin, "banner_hero", None) or HERMES_CADUCEUS, ""]
+    left_lines = ["", getattr(_bskin, "banner_hero", None) or EIR_CADUCEUS, ""]
     left_lines += _banner_left_lines(model, cwd, session_id, context_length, provider, accent=accent, dim=dim,
                                      context_pinned=context_pinned, context_marker=context_marker)
     right_lines = _banner_tool_lines(
@@ -762,6 +762,6 @@ def build_welcome_banner(
         border_style=_skin_color("banner_border", "#CD7F32"), padding=(0, 2))
     console.print()
     if shutil.get_terminal_size().columns >= 95:
-        console.print(getattr(_bskin, "banner_logo", None) or HERMES_AGENT_LOGO)
+        console.print(getattr(_bskin, "banner_logo", None) or EIR_AGENT_LOGO)
         console.print()
     console.print(outer_panel)

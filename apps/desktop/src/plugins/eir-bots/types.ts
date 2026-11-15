@@ -9,7 +9,7 @@
  * required is a claim that every one of those paths supplies it.
  */
 
-import type { ProfileSessionPreview } from '@hermes/plugin-sdk'
+import type { ProfileSessionPreview } from '@eir/plugin-sdk'
 
 import type { GroupEngine } from './group-engine'
 
@@ -106,10 +106,10 @@ export interface RosterRow {
   /** An offline twin of a selected bot, kept visible so the row doesn't vanish. */
   ghost?: boolean
   handle?: string
-  /** A default row whose source also has a real (pre-reservation) `hermes`
-   *  profile: that profile keeps @hermes and this row answers to @default.
+  /** A default row whose source also has a real (pre-reservation) `eir`
+   *  profile: that profile keeps @eir and this row answers to @default.
    *  Set by `claimDefaultHandles`. */
-  hermesHandleTaken?: boolean
+  eirHandleTaken?: boolean
   has_avatar?: boolean
   /** The connection's backend identity (/api/status `install_id`) when the
    *  roster source has seen it — stable across Desktops, unlike `connectionId`
@@ -132,12 +132,12 @@ export interface RosterRow {
   /** Nullable: the gateway sends `null` for a profile with no configured role,
    *  and the create form threads its own optional title through the same shape. */
   title?: null | string
-  /** Canonical ids this profile was previously known by (`hermes profile
+  /** Canonical ids this profile was previously known by (`eir profile
    *  rename` records them in profile.yaml; the gateway surfaces them on
    *  profiles.list). Lets group chats re-link persisted member descriptors
    *  after a rename (#110200). */
   previous_names?: string[]
-  ui_meta?: Record<string, unknown> & { 'hermes-bots'?: BotMeta }
+  ui_meta?: Record<string, unknown> & { 'eir-bots'?: BotMeta }
   /** Compare-and-swap revisions, per ui_meta key. */
   ui_meta_revisions?: Record<string, number>
   worker_session?: { last_active?: number } | null
@@ -152,7 +152,7 @@ export type GroupMember = Pick<
   | 'display_name'
   | 'ghost'
   | 'handle'
-  | 'hermesHandleTaken'
+  | 'eirHandleTaken'
   | 'installId'
   | 'name'
   | 'previous_names'

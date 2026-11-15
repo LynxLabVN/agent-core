@@ -1,6 +1,6 @@
 """Streaming output, reasoning preview, tool progress callbacks, and busy-command spinner for the interactive CLI
 
-Mixin split out of ``cli.py``; bound onto ``HermesCLI`` via the MRO. cli.py-internal
+Mixin split out of ``cli.py``; bound onto ``EirCLI`` via the MRO. cli.py-internal
 symbols are imported LAZILY inside each method (``from cli import ...``) — the mixin
 never imports ``cli`` at module load time (import cycle).
 """
@@ -185,7 +185,7 @@ class CLIStreamMixin:
             f" [dim]{datetime.now().strftime(getattr(self, 'timestamp_format', '%H:%M'))}[/]"
             if getattr(self, "show_timestamps", False) else "")
         lines = user_input.split("\n")
-        from hermes_cli.cli_modern_layout import is_modern, prompt_glyph
+        from eir_cli.cli_modern_layout import is_modern, prompt_glyph
         mark = _escape(prompt_glyph()) if is_modern(self) else "●"
         if len(lines) <= 1:
             return f"[bold {_accent_hex()}]{mark}[/] [bold]{_escape(user_input)}[/]{ts_suffix}"
@@ -239,7 +239,7 @@ class CLIStreamMixin:
             return
         modern = getattr(self, "_modern_layout", False)
         if modern:
-            from hermes_cli.cli_modern_layout import separator
+            from eir_cli.cli_modern_layout import separator
             _cprint("\n" + separator(True))
         else:
             ChatConsole().print(f"[{_accent_hex()}]{'─' * 40}[/]")
@@ -248,12 +248,12 @@ class CLIStreamMixin:
             # soft_wrap in the glyph layout: the terminal wraps a long prompt, so a resize re-flows it.
             ChatConsole().print(self._format_submitted_user_message_preview(text), soft_wrap=modern)
         elif modern:
-            from hermes_cli.cli_modern_layout import user_echo_markup
+            from eir_cli.cli_modern_layout import user_echo_markup
             ChatConsole().print(user_echo_markup(text, _accent_hex()), soft_wrap=True)
         else:
             ChatConsole().print(f"[bold {_accent_hex()}]●[/] [bold]{_escape(text)}[/]")
         if modern:
-            from hermes_cli.cli_modern_layout import closing_separator
+            from eir_cli.cli_modern_layout import closing_separator
             _cprint(closing_separator(True))
 
     def _stream_reasoning_delta(self, text: str) -> None:
@@ -270,7 +270,7 @@ class CLIStreamMixin:
         if getattr(self, "_stream_box_opened", False):
             return
         if getattr(self, "_modern_layout", False):
-            from hermes_cli.cli_modern_layout import reasoning_text_line, separator
+            from eir_cli.cli_modern_layout import reasoning_text_line, separator
             if not getattr(self, "_reasoning_box_opened", False):
                 self._reasoning_box_opened, self._reasoning_started_at = True, time.monotonic()
                 self._reasoning_buf = ""
@@ -326,7 +326,7 @@ class CLIStreamMixin:
         if not getattr(self, "_reasoning_box_opened", False):
             return
         if getattr(self, "_modern_layout", False):
-            from hermes_cli.cli_modern_layout import closing_separator, reasoning_text_line, thought_line
+            from eir_cli.cli_modern_layout import closing_separator, reasoning_text_line, thought_line
             if getattr(self, "_reasoning_buf", ""):
                 _cprint(reasoning_text_line(self._reasoning_buf))
             started = getattr(self, "_reasoning_started_at", 0.0)
@@ -462,7 +462,7 @@ class CLIStreamMixin:
         """Emit filtered text to the streaming display."""
         from agent.markdown_tables import is_table_divider, looks_like_table_row
         from cli import (
-            HermesCLI, _ACCENT, _RST, _STREAM_PARTIAL_PREVIEW_LEN, _cprint, _strip_markdown_syntax, datetime)
+            EirCLI, _ACCENT, _RST, _STREAM_PARTIAL_PREVIEW_LEN, _cprint, _strip_markdown_syntax, datetime)
         if not text:
             return
         # Close a still-open reasoning box on the first content token so the answer streams
@@ -477,12 +477,12 @@ class CLIStreamMixin:
             self._stream_box_opened = True
             self._stream_box_live = True  # header drawn; cleared at the footer
             try:
-                from hermes_cli.skin_engine import get_active_skin
+                from eir_cli.skin_engine import get_active_skin
                 _skin = get_active_skin()
-                label = _skin.get_branding("response_label", "☤ Hermes")
+                label = _skin.get_branding("response_label", "☤ Eir")
                 _text_hex = _skin.get_color("banner_text", "#FFF8DC")
             except Exception:
-                label = "☤ Hermes"
+                label = "☤ Eir"
                 _text_hex = "#FFF8DC"
             try:  # true-color escape so streamed text matches the Rich Panel appearance
                 _r, _g, _b = (int(_text_hex[i:i + 2], 16) for i in (1, 3, 5))
@@ -492,12 +492,12 @@ class CLIStreamMixin:
             if self.show_timestamps:
                 label = f"{label} {datetime.now().strftime(getattr(self, 'timestamp_format', '%H:%M'))}"
             if getattr(self, "_modern_layout", False):
-                from hermes_cli.cli_modern_layout import answer_label
+                from eir_cli.cli_modern_layout import answer_label
                 _cprint(answer_label(datetime.now().strftime(getattr(self, 'timestamp_format', '%H:%M'))
                                      if self.show_timestamps else ""))
             else:
                 w = self._scrollback_box_width()
-                fill = w - 2 - HermesCLI._status_bar_display_width(label)
+                fill = w - 2 - EirCLI._status_bar_display_width(label)
                 _cprint(f"\n{_ACCENT}╭─{label}{'─' * max(fill - 1, 0)}╮{_RST}")
 
         # Turn-level record of what actually reached the screen; survives _reset_stream_state at
@@ -566,7 +566,7 @@ class CLIStreamMixin:
             self._stream_buf = ""
         if self._stream_box_opened and getattr(self, "_stream_box_live", False):
             if getattr(self, "_modern_layout", False):
-                from hermes_cli.cli_modern_layout import closing_separator
+                from eir_cli.cli_modern_layout import closing_separator
                 _cprint(closing_separator(True))
             else:
                 w = self._scrollback_box_width()
@@ -722,7 +722,7 @@ class CLIStreamMixin:
         Drives the TUI spinner (tool.started stamps the elapsed timer); in "all"/"new"/"verbose"
         progress modes tool.completed also commits a stacked scrollback line (tool history).
         """
-        from cli import CLI_CONFIG, _DIM, _RST, _cprint, _hermes_home
+        from cli import CLI_CONFIG, _DIM, _RST, _cprint, _eir_home
         # MoA reference outputs (display-only events from the MoA facade): render each answer
         # as a labelled thinking-style block BEFORE the aggregator acts.
         if event_type == "moa.reference":
@@ -786,7 +786,7 @@ class CLIStreamMixin:
                     return
                 self._last_scrollback_tool = function_name
                 try:
-                    from hermes_cli.cli_modern_layout import completed_tool_line
+                    from eir_cli.cli_modern_layout import completed_tool_line
                     _cprint(completed_tool_line(self, function_name, stored_args, duration, kwargs.get("result"),
                                                 kwargs.get("is_error", False)))
                 except Exception:
@@ -804,7 +804,7 @@ class CLIStreamMixin:
                         if not is_seen(CLI_CONFIG, TOOL_PROGRESS_FLAG):
                             self._long_tool_hint_fired = True
                             _cprint(f"  {_DIM}{tool_progress_hint_cli()}{_RST}")
-                            mark_seen(_hermes_home / "config.yaml", TOOL_PROGRESS_FLAG)
+                            mark_seen(_eir_home / "config.yaml", TOOL_PROGRESS_FLAG)
                             CLI_CONFIG.setdefault("onboarding", {}).setdefault("seen", {})[TOOL_PROGRESS_FLAG] = True
                 except Exception:
                     pass
@@ -858,7 +858,7 @@ class CLIStreamMixin:
     def _print_tool_image(self, function_name, args, result, is_error) -> None:
         """Show the local image a finished tool produced or looked at (``display.inline_images``)."""
         from agent.terminal_image import tool_image_path
-        from hermes_cli.cli_inline_images import print_inline_images
+        from eir_cli.cli_inline_images import print_inline_images
         if path := tool_image_path(function_name, args, result, is_error=bool(is_error)):
             print_inline_images(self, [path])
 
@@ -882,7 +882,7 @@ class CLIStreamMixin:
         snapshot = self._pending_edit_snapshots.pop(tool_call_id, None)
         try:
             from agent.display import render_edit_diff_with_delta
-            from hermes_cli.cli_modern_layout import diff_printer
+            from eir_cli.cli_modern_layout import diff_printer
             render_edit_diff_with_delta(
                 function_name, function_result, function_args=function_args, snapshot=snapshot,
                 print_fn=diff_printer(_cprint))

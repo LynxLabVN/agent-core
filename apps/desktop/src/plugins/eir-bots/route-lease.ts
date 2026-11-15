@@ -1,4 +1,4 @@
-import { host } from '@hermes/plugin-sdk'
+import { host } from '@eir/plugin-sdk'
 
 /** Hold `route`'s pooled gateway socket open until the returned release runs, so the events that follow a
  *  request (pushes, display leases, a turn's stream) keep arriving. The SDK disposes an inactive socket once its

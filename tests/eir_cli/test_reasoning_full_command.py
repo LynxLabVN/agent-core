@@ -7,9 +7,9 @@ These assert the toggle sets the instance flag, persists to config.yaml,
 and that the clamp gate honours the flag.
 """
 
-import hermes_yaml as yaml
+import eir_yaml as yaml
 
-from hermes_cli.cli_commands_mixin import CLICommandsMixin
+from eir_cli.cli_commands_mixin import CLICommandsMixin
 
 class _Stub(CLICommandsMixin):
     """Minimal carrier for the attributes `_handle_reasoning_command` reads."""
@@ -24,14 +24,14 @@ class _Stub(CLICommandsMixin):
         return None
 
 def _seed_config(tmp_path, monkeypatch):
-    hh = tmp_path / ".hermes"
+    hh = tmp_path / ".eir"
     hh.mkdir()
     (hh / "config.yaml").write_text("display:\n  show_reasoning: true\n")
-    monkeypatch.setenv("HERMES_HOME", str(hh))
-    # cli captures _hermes_home at import; force it to the temp home.
+    monkeypatch.setenv("EIR_HOME", str(hh))
+    # cli captures _eir_home at import; force it to the temp home.
     import cli
 
-    monkeypatch.setattr(cli, "_hermes_home", hh, raising=False)
+    monkeypatch.setattr(cli, "_eir_home", hh, raising=False)
     return hh
 
 def test_reasoning_full_sets_and_persists(tmp_path, monkeypatch):

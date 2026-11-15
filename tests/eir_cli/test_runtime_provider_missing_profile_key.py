@@ -16,7 +16,7 @@ from agent import secret_scope
 
 
 def _named_profile(tmp_path, monkeypatch, *, key_env: bool, dotenv: str = "", model_extra=None):
-    home = tmp_path / ".hermes" / "profiles" / "beta"
+    home = tmp_path / ".eir" / "profiles" / "beta"
     home.mkdir(parents=True)
     model = {"default": "fake-model", "provider": "custom", "base_url": "http://127.0.0.1:18991/v1", **(model_extra or {})}
     entry = {"name": "FakeUp", "base_url": "http://127.0.0.1:18991/v1"}
@@ -25,7 +25,7 @@ def _named_profile(tmp_path, monkeypatch, *, key_env: bool, dotenv: str = "", mo
     (home / "config.yaml").write_text(json.dumps({"model": model, "custom_providers": [entry]}))
     (home / ".env").write_text(dotenv)
     monkeypatch.setenv("HOME", str(tmp_path))
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     # The key lives only in the server's process environment: invisible to a routed profile.
     monkeypatch.setenv("CANARY_KEY", "canary-process-env")
     return home
@@ -48,15 +48,15 @@ def multiplexed():
 
 
 def test_declared_key_missing_from_profile_scope_fails_before_the_request(tmp_path, monkeypatch, multiplexed):
-    from hermes_cli.auth import AuthError
-    from hermes_cli.runtime_provider import resolve_runtime_provider
+    from eir_cli.auth import AuthError
+    from eir_cli.runtime_provider import resolve_runtime_provider
 
     multiplexed(_named_profile(tmp_path, monkeypatch, key_env=True))
     with pytest.raises(AuthError) as excinfo:
         resolve_runtime_provider()
     message = str(excinfo.value)
     assert excinfo.value.code == "missing_api_key"
-    for needle in ("FakeUp", "CANARY_KEY", "'beta'", "hermes -p beta config set CANARY_KEY"):
+    for needle in ("FakeUp", "CANARY_KEY", "'beta'", "eir -p beta config set CANARY_KEY"):
         assert needle in message
     assert "server's environment" in message  # the key the user exported is named as unreadable here
     assert "canary-process-env" not in message
@@ -68,7 +68,7 @@ def test_declared_key_missing_from_profile_scope_fails_before_the_request(tmp_pa
 ], ids=["keyless-local-endpoint", "key-in-profile-dotenv"])
 def test_keyless_endpoint_and_profile_key_still_resolve(tmp_path, monkeypatch, multiplexed, key_env, dotenv,
                                                         expected_key):
-    from hermes_cli.runtime_provider import resolve_runtime_provider
+    from eir_cli.runtime_provider import resolve_runtime_provider
 
     multiplexed(_named_profile(tmp_path, monkeypatch, key_env=key_env, dotenv=dotenv))
     runtime = resolve_runtime_provider()
@@ -86,8 +86,8 @@ def test_keyless_endpoint_and_profile_key_still_resolve(tmp_path, monkeypatch, m
 ], ids=["codex-app-server-owns-auth", "explicit-placeholder", "explicit-base-url-keeps-entry"])
 def test_only_a_synthesized_placeholder_for_the_selected_entry_is_refused(tmp_path, monkeypatch, multiplexed,
                                                                          model_extra, kwargs, expect):
-    from hermes_cli.auth import AuthError
-    from hermes_cli.runtime_provider import resolve_runtime_provider
+    from eir_cli.auth import AuthError
+    from eir_cli.runtime_provider import resolve_runtime_provider
 
     multiplexed(_named_profile(tmp_path, monkeypatch, key_env=True, model_extra=model_extra))
     if expect == "missing_api_key":

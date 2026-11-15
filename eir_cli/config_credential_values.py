@@ -3,7 +3,7 @@
 The agent only ever sees credentials through the redactor (``agent.redact``) and the display
 maskers (``mask_secret``): ``sk-pro...WXYZ``, ``***``, ``«redacted:sk-…»``. A writer that persists
 one of those as the credential turns a working key into a dead string and the next provider call
-fails with 401 (#42727). Recognising Hermes's own mask outputs at the write edge keeps a redacted
+fails with 401 (#42727). Recognising Eir's own mask outputs at the write edge keeps a redacted
 display value from ever becoming the stored secret. This is hardening at the edge of a heuristic
 (the redactor), not a boundary.
 """
@@ -85,7 +85,7 @@ def _is_password_name(key: str) -> bool:
 
 
 def _masks_of(stored: Any) -> set[str]:
-    """Every display value Hermes's redactor/maskers produce for the secret ``stored``."""
+    """Every display value Eir's redactor/maskers produce for the secret ``stored``."""
     if not isinstance(stored, str) or not stored or _ENV_REF_RE.fullmatch(stored.strip()):
         return set()
     from agent.redact import _mask_token, _mask_token_nonreusable, mask_secret
@@ -114,7 +114,7 @@ def _is_mask_write_back(key: str, value: Any, stored: Iterable[Any]) -> bool:
 
 
 def _is_credential_env_name(key: str) -> bool:
-    from hermes_cli.config import OPTIONAL_ENV_VARS, _is_secret_config_key
+    from eir_cli.config import OPTIONAL_ENV_VARS, _is_secret_config_key
 
     meta = OPTIONAL_ENV_VARS.get(key.upper())
     return _is_secret_config_key(key) or (isinstance(meta, dict) and meta.get("password") is True)
@@ -124,7 +124,7 @@ def _stored_env_values(key: str) -> tuple[Any, ...]:
     """What ``key`` holds now (``.env``, then this profile's environment): the values whose
     masks the agent can have been shown."""
     from agent.secret_scope import UnscopedSecretError
-    from hermes_cli.config import _scoped_environ_get, load_env
+    from eir_cli.config import _scoped_environ_get, load_env
 
     try:
         scoped = _scoped_environ_get(key)
@@ -156,7 +156,7 @@ def _credential_leaves(doc: Any, path: tuple[str, ...] = (),
                        where: tuple[str, ...] = ()) -> Iterator[tuple[str, tuple[str, ...], Any]]:
     """Yield ``(display_path, location, value)`` for each scalar credential leaf, where
     ``location`` replaces list indexes with the entry's identity."""
-    from hermes_cli.config import _is_secret_config_key
+    from eir_cli.config import _is_secret_config_key
 
     if isinstance(doc, dict):
         items = ((str(k), str(k), v) for k, v in doc.items())
@@ -189,7 +189,7 @@ def refuse_redacted_config_credentials(new: Any, read_old: Callable[[], Any]) ->
     bad = [path for path, where, value in masked
            if value not in on_disk.get(where, ()) and _is_mask_write_back(path, value, on_disk.get(where, ()))]
     if bad:
-        from hermes_cli.config_backend import ConfigValueError
+        from eir_cli.config_backend import ConfigValueError
 
         shown = ", ".join(bad[:5]) + (f", +{len(bad) - 5} more" if len(bad) > 5 else "")
         raise ConfigValueError(
@@ -209,8 +209,8 @@ def refuse_redacted_config_sets(sets: Mapping[str, Any], read_old: Callable[[], 
     """:func:`refuse_redacted_config_credentials` for a keyed write (``write_config_keys``,
     ``Changes.set``): the dotted ``sets`` are checked as the nested document they write."""
     if not any(_holds_mask(value, key) for key, value in sets.items()):
-        return  # no hermes_cli.config import for ordinary keyed writes (PM runtime)
-    from hermes_cli.config import _split_key_path
+        return  # no eir_cli.config import for ordinary keyed writes (PM runtime)
+    from eir_cli.config import _split_key_path
 
     doc: dict[str, Any] = {}
     for dotted, value in sets.items():

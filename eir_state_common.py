@@ -1,4 +1,4 @@
-"""Shared constants and helpers for the SessionDB family of modules.  Lives outside hermes_state so
+"""Shared constants and helpers for the SessionDB family of modules.  Lives outside eir_state so
 the mixin modules can import it without a cycle."""
 
 import contextlib
@@ -11,9 +11,9 @@ import time
 from pathlib import Path
 from typing import Any
 
-from hermes_cli.timefmt import EPOCH_MAX, EPOCH_MIN
-from hermes_state_keys import CRON_PRINCIPAL_ID
-from hermes_state_pidns import persistent_record_pidns_checkable, pid_namespace_id
+from eir_cli.timefmt import EPOCH_MAX, EPOCH_MIN
+from eir_state_keys import CRON_PRINCIPAL_ID
+from eir_state_pidns import persistent_record_pidns_checkable, pid_namespace_id
 from agent.skill_commands import AUTO_LOAD_SCAFFOLD_SQL_LIKE, SKILL_EXCERPT_JOINT, SKILL_SCAFFOLD_SQL_LIKE, describe_skill_invocation
 from agent.context_compressor import (LEGACY_SUMMARY_PREFIX, SUMMARY_PREFIX, _MERGED_PRIOR_CONTEXT_HEADER,
     _MERGED_SUMMARY_DELIMITER, _SUMMARY_END_MARKER)
@@ -37,16 +37,16 @@ def routed_sessions_setting(key: str, env_var: str) -> Any:
     """``sessions.<key>`` for the profile whose state.db this process is touching.
 
     ``gateway/run.py`` bridges the LAUNCH profile's ``sessions.*`` into ``env_var`` (the cross-process
-    carrier CLI/cron children read). Under a multiplexer a routed turn runs with a HERMES_HOME override
+    carrier CLI/cron children read). Under a multiplexer a routed turn runs with a EIR_HOME override
     and that env slot holds the default profile's value, so a served profile with different
     ``sessions.*`` settings must read its own config.yaml. Unscoped: the env bridge, as before.
     Returns ``None`` when neither source sets the key.
     """
-    from hermes_constants import get_hermes_home_override
+    from eir_constants import get_eir_home_override
 
-    if get_hermes_home_override():
+    if get_eir_home_override():
         try:
-            from hermes_cli.config import load_config_readonly
+            from eir_cli.config import load_config_readonly
             return (load_config_readonly().get("sessions") or {}).get(key)
         except Exception:
             return None
@@ -185,7 +185,7 @@ _COMPRESSION_CHILD_SQL = ("EXISTS (SELECT 1 FROM sessions p        WHERE p.id = 
 _RESET_END_REASONS = ("session_reset", "session_switch", "idle", "daily", "suspended", "resume_pending_expired")
 _RESET_END_REASONS_SQL = ", ".join(f"'{reason}'" for reason in _RESET_END_REASONS)
 # Deliberate conversation boundaries: the reset set plus CLI /new, which ends the predecessor as
-# 'new_session' (hermes_cli/cli_session_mixin.py) without a reset child row.  A compression rotation must
+# 'new_session' (eir_cli/cli_session_mixin.py) without a reset child row.  A compression rotation must
 # never heal one of these (#106459); tools/session_search_tool.py derives its fresh-reset set from it.
 _BOUNDARY_END_REASONS = frozenset(_RESET_END_REASONS) | {"new_session"}
 
@@ -306,7 +306,7 @@ AUTO_VACUUM_MIN_FREELIST_RATIO = 0.25
 # state_meta key ``fts_storage_version``. The main schema version advances
 # freely on open (so future migrations always land); the FTS *layout* only
 # reaches the current version when a DB is either born fresh or explicitly
-# optimized via ``hermes sessions optimize-storage``. A legacy DB sits at
+# optimized via ``eir sessions optimize-storage``. A legacy DB sits at
 # layout 0 (marker absent) with a working inline index until the user opts in.
 #   1 = v23 external-content layout with a tool-row-excluded trigram
 #   2 = trigram also excludes structured tool_calls JSON
@@ -429,9 +429,9 @@ def emit_session_deleted(db, deleted_ids, *, reason, primary=None, sessions_dir=
     if not ids:
         return
     try:
-        from hermes_cli.lifecycle import invoke_hook
-        from hermes_constants import (
-            get_hermes_home, profile_name_for_home, reset_hermes_home_override, set_hermes_home_override,
+        from eir_cli.lifecycle import invoke_hook
+        from eir_constants import (
+            get_eir_home, profile_name_for_home, reset_eir_home_override, set_eir_home_override,
         )
 
         home = os.path.dirname(os.path.abspath(os.fspath(db.db_path)))
@@ -441,13 +441,13 @@ def emit_session_deleted(db, deleted_ids, *, reason, primary=None, sessions_dir=
             payload["deleted_ids"] = ids
         if sessions_dir is not None:
             payload["sessions_dir"] = str(sessions_dir)
-        rebind = profile is not None and os.path.realpath(home) != os.path.realpath(get_hermes_home())
-        token = set_hermes_home_override(home) if rebind else None
+        rebind = profile is not None and os.path.realpath(home) != os.path.realpath(get_eir_home())
+        token = set_eir_home_override(home) if rebind else None
         try:
             invoke_hook("on_session_delete", **payload)
         finally:
             if token is not None:
-                reset_hermes_home_override(token)
+                reset_eir_home_override(token)
     except Exception:
         logger.warning("on_session_delete dispatch failed", exc_info=True)
 
@@ -664,7 +664,7 @@ CREATE TABLE IF NOT EXISTS gateway_hygiene_state (
 
 -- Monotonic conversation generation per routing peer (#96811).
 --
--- A host-declared conversation key (X-Hermes-Session-Key / build_session_key)
+-- A host-declared conversation key (X-Eir-Session-Key / build_session_key)
 -- is per-CHAT and outlives any single conversation on it, so the prompt-cache
 -- affinity scope derived from it must be qualified by which conversation is
 -- currently live. Deriving that from the session rows themselves
@@ -804,7 +804,7 @@ BEFORE DELETE ON sessions
 WHEN EXISTS (SELECT 1 FROM session_admissions WHERE target_session_id = old.id)
   OR EXISTS (SELECT 1 FROM worker_executions WHERE session_id = old.id)
 BEGIN
-    SELECT RAISE(ABORT, 'Refused to delete a session that has gateway runtime history: state.db was upgraded by a newer Hermes, and this older Hermes cannot delete such sessions. Downgrading is unsupported. Run hermes update to go back to the newer release, or restore the pre-update snapshot: https://hermes-agent.nousresearch.com/docs/getting-started/updating#rolling-back-to-an-older-release');
+    SELECT RAISE(ABORT, 'Refused to delete a session that has gateway runtime history: state.db was upgraded by a newer Eir, and this older Eir cannot delete such sessions. Downgrading is unsupported. Run eir update to go back to the newer release, or restore the pre-update snapshot: https://hermes-agent.nousresearch.com/docs/getting-started/updating#rolling-back-to-an-older-release');
 END;
 DROP TRIGGER IF EXISTS messages_transcript_revision_update;
 CREATE TRIGGER IF NOT EXISTS messages_transcript_revision_update
@@ -1168,7 +1168,7 @@ FTS_REBUILD_DEFERRAL_KEY = "fts_rebuild_deferral"
 
 # ── Legacy (v22 / inline-content) FTS DDL ──────────────────────────────
 # Used ONLY to keep an existing pre-v23 install's search working and its
-# triggers repairable UNTIL the user opts into `hermes db optimize`. This is
+# triggers repairable UNTIL the user opts into `eir db optimize`. This is
 # the exact inline shape v11..v22 shipped: each virtual table stores its own
 # copy of ``content || tool_name || tool_calls`` and the trigram table indexes
 # every row (including role='tool'). We never CREATE these on a fresh install —
@@ -1239,13 +1239,13 @@ END;
 # structural rebuild (FTS5 'rebuild' or `_recover_stale_fts`'s drop/recreate) must run in ONE at a time —
 # concurrent rebuilds corrupted state.db in production.  Gates `rebuild_fts()`, `_rebuild_fts_indexes()`,
 # `_recover_stale_fts()`; the chunked backfill (`fts_rebuild_step`) is deliberately NOT routed through it (it
-# claims progress under SQLite transaction authority).  Mirrors `hermes_state_repair._cross_process_repair_lock`:
+# claims progress under SQLite transaction authority).  Mirrors `eir_state_repair._cross_process_repair_lock`:
 # portable (msvcrt/flock), bounded wait, FAIL CLOSED; orphaned-fd holders (see `_acquire_db_flock`) are broken
 # only when provably dead, indeterminate liveness defers.  `<db>.fts_rebuild.lock` is distinct from
-# `<db>.repair.lock` (offline schema surgery, minutes in VACUUM).  Lives here: mixins cannot import hermes_state.
+# `<db>.repair.lock` (offline schema surgery, minutes in VACUUM).  Lives here: mixins cannot import eir_state.
 
-# ── Cross-process full-FTS-rebuild admission (single authority) ────────────── Several independent Hermes
-# processes routinely share one state.db (gateway service, the Desktop app's `hermes serve` backend,
+# ── Cross-process full-FTS-rebuild admission (single authority) ────────────── Several independent Eir
+# processes routinely share one state.db (gateway service, the Desktop app's `eir serve` backend,
 # interactive CLI sessions, the TUI slash worker). A full structural FTS rebuild — the FTS5 'rebuild'
 # command or the drop/recreate script in `_recover_stale_fts` — must only ever run in ONE of them at a time:
 # two concurrent rebuilds collide on write and have structurally corrupted state.db in production (PR
@@ -1254,19 +1254,19 @@ END;
 # `SessionSchemaMixin._rebuild_fts_indexes()` (via `_init_schema`), and
 # `SessionSchemaMixin._recover_stale_fts()`. The chunked deferred backfill (`fts_rebuild_step`) is
 # deliberately NOT routed through it — it claims progress under `_execute_write`'s SQLite transaction
-# authority and is intentionally multi-process. Semantics mirror `hermes_state_repair._cross_process_repair_lock`
+# authority and is intentionally multi-process. Semantics mirror `eir_state_repair._cross_process_repair_lock`
 # (the schema- surgery authority): portable (msvcrt on Windows, flock elsewhere), bounded wait, and FAIL
 # CLOSED — a caller that cannot acquire the lock must NOT rebuild. The kernel drops both lock types when the
 # holder dies — UNLESS a forked child inherited the lock fd (flock rides the open file description, which
 # fork() duplicates), in which case the orphaned descriptor holds the lock forever (issue #100108).
 # `_acquire_db_flock` therefore records the holder's pid + start time under the lock and, when the recorded
 # holder is provably dead, breaks the orphaned lock by unlinking and retaking it on a fresh inode;
-# indeterminate liveness still defers. It lives here (not hermes_state) because the search/schema mixins
-# cannot import hermes_state (cycle). The lock file is `<db>.fts_rebuild.lock`, distinct from
+# indeterminate liveness still defers. It lives here (not eir_state) because the search/schema mixins
+# cannot import eir_state (cycle). The lock file is `<db>.fts_rebuild.lock`, distinct from
 # `<db>.repair.lock`: schema surgery runs on an EXCLUSIVE offline connection and can legitimately take
 # minutes in VACUUM, while runtime rebuilds run on live connections. The timeout is sized for a full
 # 'rebuild' of both indexes on a large DB.
-logger = logging.getLogger("hermes_state")
+logger = logging.getLogger("eir_state")
 
 _FTS_REBUILD_LOCK_TIMEOUT_SECONDS = 120.0
 _FTS_REBUILD_LOCK_POLL_SECONDS = 0.1
@@ -1322,7 +1322,7 @@ def _write_lock_holder_record(handle) -> None:
 
     Written under the flock so contenders that time out can tell an orphaned-fd holder (recorded process
     dead, flock inherited by a forked child — issue #100108) from a live wedged holder.  ``pidns``: see
-    ``hermes_state_pidns``.
+    ``eir_state_pidns``.
     """
     record = {"pid": os.getpid(), "pidns": pid_namespace_id(),
               "start_ticks": _proc_start_ticks(os.getpid()), "acquired_at": time.time()}
@@ -1337,7 +1337,7 @@ def _clear_lock_holder_record(handle) -> None:
 def _lock_holder_provably_dead(record) -> bool:
     """True ONLY when the recorded holder is provably dead or PID-recycled.  Anything indeterminate
     (no/malformed record, PID owned by another user, /proc unavailable, foreign PID namespace)
-    is False: FAIL CLOSED and defer.  Unstamped records keep probing: see ``hermes_state_pidns``."""
+    is False: FAIL CLOSED and defer.  Unstamped records keep probing: see ``eir_state_pidns``."""
     try:
         pid = int(record["pid"])
     except (KeyError, TypeError, ValueError):
@@ -1426,7 +1426,7 @@ def _acquire_db_flock(lock_path, handle, timeout_seconds, poll_seconds, descript
 def _describe_lock_holder(record) -> str:
     """Human-readable holder identity for deferral warnings."""
     if not isinstance(record, dict) or "pid" not in record:
-        return "unknown (no holder record; pre-fix writer or non-Hermes)"
+        return "unknown (no holder record; pre-fix writer or non-Eir)"
     age = ""
     with contextlib.suppress(TypeError, ValueError):
         if record.get("acquired_at") is not None:

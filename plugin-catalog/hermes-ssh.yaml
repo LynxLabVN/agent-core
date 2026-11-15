@@ -1,7 +1,7 @@
 name: hermes-ssh
 repo: https://github.com/Adolanium/hermes-ssh
 sha: 5d3c64781bca1090a8051ce31927c512c4265d2d
-description: Manage SSH connections and remote workspaces in Hermes Desktop.
+description: Manage SSH connections and remote workspaces in Eir Desktop.
 maintainer: Adolanium
 tier: community
 category: desktop

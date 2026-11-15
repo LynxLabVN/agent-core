@@ -1,6 +1,6 @@
-"""``hermes clipboard image``: the clipboard image extractor as a device-local command.
+"""``eir clipboard image``: the clipboard image extractor as a device-local command.
 
-Runs ``hermes_cli.clipboard.save_clipboard_image`` (the extractor the CLI and Ink use) and reports
+Runs ``eir_cli.clipboard.save_clipboard_image`` (the extractor the CLI and Ink use) and reports
 the outcome. It reads this machine's clipboard only: no gateway, no session store, no profile
 files, so a client whose gateway is remote still reads the clipboard where it runs.
 """
@@ -33,8 +33,8 @@ def _mime(head: bytes) -> str:
 
 def extract_clipboard_image(dest: Path) -> tuple[int, dict]:
     """Write the clipboard image to *dest*; ``(exit code, JSON reply)``."""
-    from hermes_cli import clipboard
-    from hermes_platform.resolver import locate_command
+    from eir_cli import clipboard
+    from eir_platform.resolver import locate_command
 
     dest = dest.expanduser().absolute()
     written = None
@@ -46,7 +46,7 @@ def extract_clipboard_image(dest: Path) -> tuple[int, dict]:
             raise PermissionError("file is not writable")
         # Extract into a private directory beside dest, then rename over it: the extractor
         # deletes its target on failure, so dest itself is only ever replaced by a full image.
-        with tempfile.TemporaryDirectory(prefix=".hermes-clipboard-", dir=dest.parent) as tmp:
+        with tempfile.TemporaryDirectory(prefix=".eir-clipboard-", dir=dest.parent) as tmp:
             staged = Path(tmp) / dest.name
             if clipboard.save_clipboard_image(staged):
                 with staged.open("rb") as f:
@@ -69,7 +69,7 @@ def extract_clipboard_image(dest: Path) -> tuple[int, dict]:
 
 
 def cmd_clipboard(args) -> int:
-    """``hermes clipboard image --out PATH [--json]``."""
+    """``eir clipboard image --out PATH [--json]``."""
     code, reply = extract_clipboard_image(Path(args.out))
     if args.json:
         print(json.dumps(reply))

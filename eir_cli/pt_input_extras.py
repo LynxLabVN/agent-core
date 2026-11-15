@@ -75,7 +75,7 @@ def install_keypress_data_normalization() -> int:
         return 0
 
     _orig_call_handler = _vt100_mod.Vt100Parser._call_handler
-    if getattr(_orig_call_handler, "_hermes_char_data_normalized", False):
+    if getattr(_orig_call_handler, "_eir_char_data_normalized", False):
         return 0
 
     def _patched_call_handler(self, key, insert_text):
@@ -86,7 +86,7 @@ def install_keypress_data_normalization() -> int:
             insert_text = key
         return _orig_call_handler(self, key, insert_text)
 
-    _patched_call_handler._hermes_char_data_normalized = True
+    _patched_call_handler._eir_char_data_normalized = True
     _vt100_mod.Vt100Parser._call_handler = _patched_call_handler
     return 1
 
@@ -332,7 +332,7 @@ def _install_probe_reply_filter() -> int:
     from prompt_toolkit.keys import Keys
 
     get_match = vt100.Vt100Parser._get_match
-    if getattr(get_match, "_hermes_probe_replies", False):
+    if getattr(get_match, "_eir_probe_replies", False):
         return 0
     is_prefix = vt100._IsPrefixOfLongerMatchCache.__missing__
 
@@ -345,7 +345,7 @@ def _install_probe_reply_filter() -> int:
             return True
         return is_prefix(self, prefix)
 
-    _get_match._hermes_probe_replies = True
+    _get_match._eir_probe_replies = True
     vt100.Vt100Parser._get_match = _get_match
     vt100._IsPrefixOfLongerMatchCache.__missing__ = _missing
     _clear_vt100_prefix_cache()

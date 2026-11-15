@@ -3,14 +3,14 @@
  * speaker's OWN machine reports it, also once the speaker has left the room
  * (or before its source has painted after a relaunch). An unseated remote
  * `default` used to fall back to a bare `{ name: 'default' }` row and read as
- * this device's "Hermes".
+ * this device's "Eir".
  *
  * Drives the real `routing` + `labels` modules; only the SDK `host` is mocked.
  */
 
 import { describe, expect, it, vi } from 'vitest'
 
-vi.mock('@hermes/plugin-sdk', () => ({ host: { state: {} } }))
+vi.mock('@eir/plugin-sdk', () => ({ host: { state: {} } }))
 
 import { displayName } from './labels'
 import { groupTranscriptSpeaker, groupTranscriptSpeakerMeta } from './routing'
@@ -26,9 +26,9 @@ const label = (entry: typeof remoteLine | typeof localLine, members: RosterRow[]
   displayName(groupTranscriptSpeaker(entry, members, roster)!, groupTranscriptSpeakerMeta(entry, members, allMeta, roster))
 
 describe('group transcript speaker', () => {
-  it('names a seated remote default by its machine, the local one as Hermes', () => {
+  it('names a seated remote default by its machine, the local one as Eir', () => {
     expect(label(remoteLine, [localDefault, homelabDefault])).toBe('Homelab')
-    expect(label(localLine, [localDefault, homelabDefault])).toBe('Hermes')
+    expect(label(localLine, [localDefault, homelabDefault])).toBe('Eir')
   })
 
   it('keeps a removed remote member owner-qualified instead of reading as this device', () => {

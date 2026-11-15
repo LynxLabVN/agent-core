@@ -6,7 +6,7 @@ the auth-bootstrap routes and static assets through unauthenticated; for
 everything else demands a bearer token or a valid session cookie and attaches
 the verified :class:`Session` to ``request.state.session``. On the gateway's
 Webapp a cookie session also needs its sign-in binding to the browser credential
-(``hermes_cli.webapp_sign_in``), and its cookie writes, sign-out included, must come
+(``eir_cli.webapp_sign_in``), and its cookie writes, sign-out included, must come
 from the Webapp's own origin; elsewhere a cookie write the browser marks as another page's
 (``Sec-Fetch-Site``) is refused. HTML routes are
 redirected to ``/login``; ``/api/*`` routes get a 401 JSON envelope.
@@ -21,18 +21,18 @@ from fastapi import Request
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 from starlette.concurrency import run_in_threadpool
 
-from hermes_cli import webapp_sign_in
-from hermes_cli.dashboard_auth import list_interactive_providers, list_session_providers
-from hermes_cli.dashboard_auth.audit import AuditEvent, audit_log
-from hermes_cli.dashboard_auth.base import ProviderError
-from hermes_cli.dashboard_auth.cookies import (
+from eir_cli import webapp_sign_in
+from eir_cli.dashboard_auth import list_interactive_providers, list_session_providers
+from eir_cli.dashboard_auth.audit import AuditEvent, audit_log
+from eir_cli.dashboard_auth.base import ProviderError
+from eir_cli.dashboard_auth.cookies import (
     clear_session_cookies, clear_sso_attempt_cookie, detect_https, read_session_cookies,
     read_session_provider, read_sso_attempt_cookie, set_session_cookies,
     set_session_provider_cookie, set_sso_attempt_cookie)
-from hermes_cli.dashboard_auth.prefix import prefix_from_request
-from hermes_cli.dashboard_auth.public_paths import PUBLIC_API_PATHS
-from hermes_cli.dashboard_auth.refresh_singleflight import refresh_session_coalesced
-from hermes_cli.dashboard_auth.request_utils import (
+from eir_cli.dashboard_auth.prefix import prefix_from_request
+from eir_cli.dashboard_auth.public_paths import PUBLIC_API_PATHS
+from eir_cli.dashboard_auth.refresh_singleflight import refresh_session_coalesced
+from eir_cli.dashboard_auth.request_utils import (
     access_token_max_age as _expires_in_seconds, client_ip as _client_ip,
     cookie_origin_is_allowed, extract_bearer as _extract_bearer, is_safe_next_path,
     scan_session_providers, unreachable_response)
@@ -66,11 +66,11 @@ def _path_is_public(path: str) -> bool:
 def _safe_next_target(request: Request) -> str:
     """URL-encoded ``next`` value for the login redirect, or ``""``. Only same-origin paths outside
     the auth flow and ``/api`` are kept (query preserved); dropped deep links fall back to the
-    SPA's ``sessionStorage["hermes.lastLocation"]``.
+    SPA's ``sessionStorage["eir.lastLocation"]``.
 
-    Behind a reverse proxy at a sub-path (``X-Forwarded-Prefix``, e.g. ``/hermes``), the prefix
+    Behind a reverse proxy at a sub-path (``X-Forwarded-Prefix``, e.g. ``/eir``), the prefix
     is prepended AFTER validation so the post-login redirect lands within the mount
-    (``/hermes/sessions`` rather than bare ``/sessions``)."""
+    (``/eir/sessions`` rather than bare ``/sessions``)."""
     path = request.url.path
     if not path or not is_safe_next_path(path):
         return ""
@@ -95,7 +95,7 @@ _OTHER_PAGE_FETCH_SITES = frozenset({"same-site", "cross-site"})
 
 
 def _own_origin_writes(request: Request) -> bool:
-    from hermes_cli.web_server_surface import policy
+    from eir_cli.web_server_surface import policy
     return policy(request.app.state).own_origin_cookie_writes
 
 
@@ -171,14 +171,14 @@ def _verify_access_token(
         phase="verify" if audit else "bearer verify", log=_log, on_unreachable=_audit_unreachable)
 
 
-#: The header Hermes Desktop's "Session token" connection presents its token in, and the provider
-#: that alone may verify it there: the deployment session token (``HERMES_DASHBOARD_SESSION_TOKEN``).
-_SESSION_TOKEN_HEADER = "x-hermes-session-token"
+#: The header Eir Desktop's "Session token" connection presents its token in, and the provider
+#: that alone may verify it there: the deployment session token (``EIR_DASHBOARD_SESSION_TOKEN``).
+_SESSION_TOKEN_HEADER = "x-eir-session-token"
 _SESSION_TOKEN_PROVIDER = "session-token"
 
 
 def _session_token_header_session(request: Request):
-    """The Session for the deployment session token in ``X-Hermes-Session-Token``, or ``None``.
+    """The Session for the deployment session token in ``X-Eir-Session-Token``, or ``None``.
 
     The gate consults it only when no bearer was sent (a bearer wins). Only the registered
     session-token provider verifies the value (constant time), so no other provider's token opens
@@ -316,7 +316,7 @@ async def gated_auth_middleware(
     if cookie_logout:
         return await call_next(request)
     if not at and not _rt:
-        # Hermes Desktop's "Session token" connection sends the deployment session token in its
+        # Eir Desktop's "Session token" connection sends the deployment session token in its
         # own header, not as a bearer. It is tried only with no session cookie at all, so a cookie
         # session is served exactly as before; anything else gets main's no-cookie handling.
         header_session = _session_token_header_session(request)

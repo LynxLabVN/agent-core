@@ -1,7 +1,7 @@
 """Status bar, spinner, turn-summary, pet pane, and prompt-stash rendering for the
 interactive CLI.
 
-Mixin bound onto ``HermesCLI`` via the MRO. cli.py-internal symbols are imported LAZILY
+Mixin bound onto ``EirCLI`` via the MRO. cli.py-internal symbols are imported LAZILY
 inside each method (``from cli import ...``) — never at module load time (import cycle).
 """
 
@@ -15,7 +15,7 @@ import time
 from agent.i18n import t
 from agent import terminal_image
 from agent.pet import render as pet_render
-from hermes_cli.banner import _format_context_length
+from eir_cli.banner import _format_context_length
 from typing import Any, Dict, Optional
 
 _SB = "class:status-bar"
@@ -201,7 +201,7 @@ class CLIStatusBarMixin:
         if model_short == model_name:
             model_short = model_name.split("/")[-1] if "/" in model_name else model_name
             # Shared RID-prefix stripper so this and ModelSwitchResult can't drift.
-            from hermes_cli.model_switch import format_model_for_display
+            from eir_cli.model_switch import format_model_for_display
             model_short = format_model_for_display(model_short)
         model_short = model_short.removesuffix(".gguf")
         if len(model_short) > 26:
@@ -236,7 +236,7 @@ class CLIStatusBarMixin:
             "goal_max_turns": 0}
 
         try:
-            from hermes_cli.focus_view import focus_statusbar_segment
+            from eir_cli.focus_view import focus_statusbar_segment
 
             snapshot["focus_label"] = focus_statusbar_segment(
                 bool(getattr(self, "_focus_view_enabled", False)))
@@ -248,7 +248,7 @@ class CLIStatusBarMixin:
         try:
             _fields = self._get_status_bar_field_set()
             if _fields is not None and "git_branch" in _fields:
-                from hermes_cli.status_bar_git import current_git_branch
+                from eir_cli.status_bar_git import current_git_branch
 
                 snapshot["git_branch"] = current_git_branch()
         except Exception:
@@ -274,7 +274,7 @@ class CLIStatusBarMixin:
         except Exception:
             pass
         try:
-            from hermes_cli.gateway_tools import background_counts
+            from eir_cli.gateway_tools import background_counts
             snapshot.update(background_counts())
         except Exception:
             pass
@@ -643,7 +643,7 @@ class CLIStatusBarMixin:
             started = getattr(self, "_turn_summary_start", 0.0) or 0.0
             line = collector.render(max(0.0, time.monotonic() - started) if started else 0.0)
             if line and getattr(self, "_modern_layout", False):
-                from hermes_cli.cli_modern_layout import turn_footer
+                from eir_cli.cli_modern_layout import turn_footer
                 _cprint(turn_footer(line))
             elif line:
                 _cprint(f"  {_D}{line}{_RST}")
@@ -662,11 +662,11 @@ class CLIStatusBarMixin:
         self._pet_kitty_image_id = 0
 
     def _pet_resolve_config(self) -> None:
-        """(Re)resolve the active pet from config so ``/pet`` / ``hermes pets`` changes apply
+        """(Re)resolve the active pet from config so ``/pet`` / ``eir pets`` changes apply
         without a restart (mirrors the TUI's steady poll). Fail-open: any problem disables."""
         try:
             from agent.pet import constants, store
-            from hermes_cli.config import load_config
+            from eir_cli.config import load_config
             from utils import is_truthy_value
 
             cfg = load_config()
@@ -957,7 +957,7 @@ class CLIStatusBarMixin:
         """Populate the voice label cache from a raw ``voice.record_key``; called after the
         prompt_toolkit binding is registered so the label matches the live binding."""
         try:
-            from hermes_cli.voice import format_voice_record_key_for_status
+            from eir_cli.voice import format_voice_record_key_for_status
             self._voice_record_key_display_cache = format_voice_record_key_for_status(raw_key)
         except Exception:
             self._voice_record_key_display_cache = "Ctrl+B"
@@ -1131,7 +1131,7 @@ class CLIStatusBarMixin:
                 text = (" · " if width < 76 else " │ ").join(parts)
             return self._right_align_status_title(text, session_title, width)
         except Exception:
-            return f"☤ {self.model if getattr(self, 'model', None) else 'Hermes'}"
+            return f"☤ {self.model if getattr(self, 'model', None) else 'Eir'}"
 
     def _get_status_bar_fragments(self):
         if (
@@ -1140,7 +1140,7 @@ class CLIStatusBarMixin:
             or getattr(self, "_command_palette_state", None)):
             return []
         if getattr(self, "_modern_layout", False):
-            from hermes_cli.cli_modern_layout import status_line_fragments
+            from eir_cli.cli_modern_layout import status_line_fragments
             return status_line_fragments(self)
         try:
             snapshot = self._get_status_bar_snapshot()

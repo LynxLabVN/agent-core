@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 
-vi.mock('@hermes/plugin-sdk', async () => (await import('./group-test-utils')).pluginSdkMock({}))
+vi.mock('@eir/plugin-sdk', async () => (await import('./group-test-utils')).pluginSdkMock({}))
 
 import { useStickToBottom } from './canonical-group-details'
 

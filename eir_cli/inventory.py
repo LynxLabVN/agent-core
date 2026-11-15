@@ -40,7 +40,7 @@ class ConfigContext:
 
 def load_picker_context() -> ConfigContext:
     """Load the disk-config snapshot every consumer needs."""
-    from hermes_cli.config import (
+    from eir_cli.config import (
         coerce_provider_id, get_compatible_custom_providers, load_config, stringify_provider_map,
     )
     cfg = load_config()
@@ -90,7 +90,7 @@ def build_models_payload(
     cannot stall the response (GUI picker opens). ``fast_custom_probe`` overrides the
     custom-endpoint discovery budget ``for_picker`` otherwise implies (1.5s vs 5s) — ``None`` keeps
     the coupling, ``False`` retains the full 5s budget (#103843)."""
-    from hermes_cli.model_switch import list_authenticated_providers
+    from eir_cli.model_switch import list_authenticated_providers
 
     rows = list_authenticated_providers(
         current_provider=ctx.current_provider, current_base_url=ctx.current_base_url,
@@ -137,7 +137,7 @@ def build_models_payload(
     metadata_config = None
     if capabilities or featured:
         try:
-            from hermes_cli.config import load_config_readonly
+            from eir_cli.config import load_config_readonly
 
             metadata_config = load_config_readonly()
         except Exception:
@@ -147,7 +147,7 @@ def build_models_payload(
     if featured:
         _apply_featured(rows, metadata_config=metadata_config)
     _apply_custom_aliases(rows)
-    from hermes_cli.models_validate import drop_unofferable_model_ids
+    from eir_cli.models_validate import drop_unofferable_model_ids
 
     drop_unofferable_model_ids(rows)
 
@@ -160,7 +160,7 @@ def _strip_aggregator_overlaps(rows: list[dict]) -> None:
     custom:* slug, so without it the dedup would empty a user's own custom row. Flat-namespace
     resellers (opencode-go/zen) serve every model first-party and keep shared names."""
     try:
-        from hermes_cli.providers import is_routing_aggregator
+        from eir_cli.providers import is_routing_aggregator
     except Exception:
         return
 
@@ -248,7 +248,7 @@ def _apply_limits(rows: list[dict]) -> None:
     from datetime import datetime, timezone
 
     from agent.credential_pool import load_pool
-    from hermes_cli.auth import read_credential_pool
+    from eir_cli.auth import read_credential_pool
 
     def iso(epoch: float) -> str:
         return datetime.fromtimestamp(epoch, UTC).isoformat()
@@ -288,7 +288,7 @@ def _apply_usage(rows: list[dict]) -> None:
         cached_account_usage, has_account_usage, refresh_account_usage_async,
         refresh_account_usage_entries_async, snapshot_is_stale,
     )
-    from hermes_cli.auth import read_credential_pool
+    from eir_cli.auth import read_credential_pool
 
     def _wire_windows(snapshot) -> list[dict]:
         return [
@@ -437,7 +437,7 @@ def _pool_entry_host(slug: str, entry) -> str:
     from agent.credential_pool import _norm_url
 
     if slug == "openai-codex":
-        from hermes_cli.auth_codex import _codex_pool_route_base_url
+        from eir_cli.auth_codex import _codex_pool_route_base_url
 
         return _norm_url(_codex_pool_route_base_url(entry.runtime_base_url))
     return _norm_url(getattr(entry, "runtime_base_url", None))
@@ -446,7 +446,7 @@ def _pool_entry_host(slug: str, entry) -> str:
 def _pool_entry_route_base_url(slug: str, entry) -> Optional[str]:
     """The base URL a usage fetch for *entry* must target (its own route, never a sibling's)."""
     if slug == "openai-codex":
-        from hermes_cli.auth_codex import _codex_pool_route_base_url
+        from eir_cli.auth_codex import _codex_pool_route_base_url
 
         return _codex_pool_route_base_url(entry.runtime_base_url)
     return getattr(entry, "runtime_base_url", None) or None
@@ -503,7 +503,7 @@ def _reasoning_catalog_reader(slug: str):
     """Per-model reasoning-capability reader for aggregators that publish one. Cache-only — the picker
     must never block on HTTP; a cold cache warms in the background and reports no restriction until then."""
     try:
-        from hermes_cli.models_reasoning_caps import (
+        from eir_cli.models_reasoning_caps import (
             nous_model_reasoning_capabilities,
             openrouter_model_reasoning_capabilities,
             warm_nous_reasoning_caps_async,
@@ -529,7 +529,7 @@ def _apply_capabilities(rows: list[dict], *, metadata_config: dict | None = None
     serving aggregator's detail overrides models.dev (adds ``can_disable_reasoning``). ``supported_efforts``
     is deliberately NOT forwarded — it under-reports levels that work."""
     from agent.codex_service_tiers import daybreak_offered, ultrafast_offered
-    from hermes_cli.models import model_supports_ultrafast, resolve_fast_mode_overrides
+    from eir_cli.models import model_supports_ultrafast, resolve_fast_mode_overrides
 
     try:
         from agent.models_dev import get_model_capabilities
@@ -602,7 +602,7 @@ def _apply_featured(rows: list[dict], *, metadata_config: dict | None = None) ->
     # contain "/" and span >= 2 prefixes?) misread every Org/Model-shaped user provider as a
     # multi-lab aggregator and hid the models its owner configured by hand (#120217).
     try:
-        from hermes_cli.providers import is_routing_aggregator
+        from eir_cli.providers import is_routing_aggregator
     except Exception:
         is_routing_aggregator = None  # type: ignore[assignment]
 
@@ -646,9 +646,9 @@ def _apply_custom_aliases(rows: list[dict]) -> None:
 
     GUI pickers compare the two to decide which row is active; exact equality never matches for custom
     providers (#87035). Exposing ``aliases`` — every current and legacy spelling from
-    :func:`hermes_cli.providers.custom_provider_aliases` — lets the frontend do a membership check instead.
+    :func:`eir_cli.providers.custom_provider_aliases` — lets the frontend do a membership check instead.
     """
-    from hermes_cli.providers import custom_provider_aliases
+    from eir_cli.providers import custom_provider_aliases
 
     for row in rows:
         if not row.get("is_user_defined"):
@@ -665,7 +665,7 @@ def _apply_custom_aliases(rows: list[dict]) -> None:
 
 def _provider_auth_hint(slug: str) -> tuple[str, str]:
     """``(auth_type, key_env)`` for a canonical provider (``("api_key", "")`` when unregistered)."""
-    from hermes_cli.auth import PROVIDER_REGISTRY
+    from eir_cli.auth import PROVIDER_REGISTRY
 
     cfg = PROVIDER_REGISTRY.get(slug)
     auth_type = cfg.auth_type if cfg else "api_key"
@@ -678,7 +678,7 @@ def _row(slug: str, name: str, is_current: bool, **extra: Any) -> dict:
 
 
 def _canonical_row(entry, cur: str, **extra: Any) -> dict:
-    from hermes_cli.models import _PROVIDER_LABELS
+    from eir_cli.models import _PROVIDER_LABELS
 
     return _row(entry.slug, _PROVIDER_LABELS.get(entry.slug, entry.label), entry.slug.lower() == cur, **extra)
 
@@ -689,8 +689,8 @@ def _append_unconfigured_rows(
     """Empty setup skeletons for canonical providers missing from ``rows`` — except the *current* one:
     if config.yaml still points at it but credentials are gone, keep a row carrying the saved model so
     GUI pickers don't silently snap to another provider."""
-    from hermes_cli.models import _PROVIDER_ALIASES, _model_requires_account_discovery
-    from hermes_cli.models_catalog_static import listed_canonical_providers
+    from eir_cli.models import _PROVIDER_ALIASES, _model_requires_account_discovery
+    from eir_cli.models_catalog_static import listed_canonical_providers
 
     seen = {r["slug"].lower() for r in rows}
     cur = (ctx.current_provider or "").lower()
@@ -722,7 +722,7 @@ def _append_unconfigured_rows(
             warning = (
                 f"Configured provider missing usable credentials; paste {key_env} to reactivate. {tail}"
                 if auth_type == "api_key" and key_env
-                else f"Configured provider is not authenticated; run `hermes model` to reactivate. {tail}"
+                else f"Configured provider is not authenticated; run `eir model` to reactivate. {tail}"
             )
             extras.append(_canonical_row(
                 entry, cur, models=[saved_model] if saved_model else [], total_models=1 if saved_model else 0,
@@ -735,12 +735,12 @@ def _append_unconfigured_rows(
 
 
 def _anthropic_oauth_credentials_present() -> bool:
-    """True when the user explicitly authenticated Anthropic via OAuth (Hermes device flow or Claude Code
+    """True when the user explicitly authenticated Anthropic via OAuth (Eir device flow or Claude Code
     login) — those leave no trace in active_provider / model.provider / API-key env vars."""
     try:
-        from agent.anthropic_credentials import read_claude_code_credentials, read_hermes_oauth_credentials
+        from agent.anthropic_credentials import read_claude_code_credentials, read_eir_oauth_credentials
 
-        readers = (read_hermes_oauth_credentials, read_claude_code_credentials)
+        readers = (read_eir_oauth_credentials, read_claude_code_credentials)
         if any((read() or {}).get("accessToken") for read in readers):
             return True
     except Exception:
@@ -750,7 +750,7 @@ def _anthropic_oauth_credentials_present() -> bool:
     # silently dropped. Read-only (no load_pool) so a picker open never mutates auth.json.
     try:
         from agent.credential_pool import AUTH_TYPE_OAUTH
-        from hermes_cli.auth import read_credential_pool
+        from eir_cli.auth import read_credential_pool
 
         for entry in read_credential_pool("anthropic"):
             if (isinstance(entry, dict) and entry.get("auth_type") == AUTH_TYPE_OAUTH
@@ -764,7 +764,7 @@ def _anthropic_oauth_credentials_present() -> bool:
 def _filter_explicit_provider_rows(rows: list[dict], ctx: ConfigContext) -> list[dict]:
     """Keep only rows backed by explicit user configuration — ``list_authenticated_providers`` also
     discovers ambient credentials (e.g. another CLI's login token) Desktop chat pickers must not show."""
-    from hermes_cli.auth import is_provider_explicitly_configured
+    from eir_cli.auth import is_provider_explicitly_configured
 
     current_slug = str(ctx.current_provider or "").strip().lower()
 
@@ -794,7 +794,7 @@ def _filter_explicit_provider_rows(rows: list[dict], ctx: ConfigContext) -> list
 def _external_process_signed_in(slug: str) -> bool:
     """True when an external-process provider has verified CLI credentials."""
     try:
-        from hermes_cli.auth import PROVIDER_REGISTRY, get_external_process_provider_status
+        from eir_cli.auth import PROVIDER_REGISTRY, get_external_process_provider_status
         pconfig = PROVIDER_REGISTRY.get(slug)
         return bool(pconfig and pconfig.auth_type == "external_process"
                     and get_external_process_provider_status(slug).get("auth_verified"))
@@ -806,7 +806,7 @@ def _raw_config_has_enabled_moa_preset() -> bool:
     """True when the user's RAW config enables MoA: ``load_config()`` merges the DEFAULT_CONFIG preset for
     everyone, which is not a user choice; visible once one enabled preset (or legacy flat config) is saved."""
     try:
-        from hermes_cli.config import read_raw_config
+        from eir_cli.config import read_raw_config
 
         raw = read_raw_config()
     except Exception:
@@ -842,13 +842,13 @@ def _apply_picker_hints(rows: list[dict]) -> None:
         row["auth_type"] = auth_type
         row["key_env"] = key_env
         row["warning"] = (f"paste {key_env} to activate" if auth_type == "api_key" and key_env
-                          else f"run `hermes model` to configure ({auth_type})")
+                          else f"run `eir model` to configure ({auth_type})")
 
 
 def _reorder_canonical(rows: list[dict]) -> list[dict]:
     """Canonical slugs in ``CANONICAL_PROVIDERS`` order, truly-custom rows last. Keys on slug membership,
     NOT ``is_user_defined`` — ``providers:`` config rows carry that flag even for canonical slugs."""
-    from hermes_cli.models import CANONICAL_PROVIDERS
+    from eir_cli.models import CANONICAL_PROVIDERS
 
     order = {e.slug: i for i, e in enumerate(CANONICAL_PROVIDERS)}
     canon = sorted((r for r in rows if r["slug"] in order), key=lambda r: order[r["slug"]])
@@ -861,7 +861,7 @@ def _attach_nous_plan_usage(row: dict, *, warm: bool):
     None). A cache-only open reads the last snapshot at any age: the 60s account cache has usually lapsed
     by the time someone opens the composer menu. Accounts without a window plan get nothing."""
     try:
-        from hermes_cli.model_picker_usage import nous_picker_usage
+        from eir_cli.model_picker_usage import nous_picker_usage
         usage = nous_picker_usage(warm=warm, any_age=not warm)
     except Exception:
         logging.getLogger(__name__).debug("Nous plan usage unavailable", exc_info=True)
@@ -880,7 +880,7 @@ def _attach_nous_plan_usage(row: dict, *, warm: bool):
 
 
 def _plan_usage_window(g) -> dict:
-    """One window-plan allowance in main's ``ProviderUsageWindow`` shape. The label is Hermes's row title
+    """One window-plan allowance in main's ``ProviderUsageWindow`` shape. The label is Eir's row title
     (``Today``), like the other providers' English window labels."""
     from datetime import datetime
     from agent.usage_gauges import WindowGauge, gauge_title
@@ -898,12 +898,12 @@ def _apply_pricing(rows: list[dict], *, force_fresh_nous_tier: bool = False, cac
     ``free_tier`` (account is free-tier) and ``unavailable_models`` (paid models a free user can't pick).
     ``cached_only`` never hits the network: unknown Nous entitlement fails closed (``free_tier_pending``,
     all models locked) and missing pricing is marked ``pricing_pending``."""
-    from hermes_cli.models_pricing import (
+    from eir_cli.models_pricing import (
         _format_price_per_mtok,
         compute_sale_discount,
         get_pricing_for_provider,
     )
-    from hermes_cli.models import (
+    from eir_cli.models import (
         check_nous_free_tier,
         get_cached_nous_free_tier,
         partition_nous_models_by_tier,
@@ -989,7 +989,7 @@ def _apply_pricing(rows: list[dict], *, force_fresh_nous_tier: bool = False, cac
                 row["free_tier"] = False
                 row["unavailable_models"] = []
             if plan_usage is not None:
-                from hermes_cli.model_picker_usage import usage_levels
+                from eir_cli.model_picker_usage import usage_levels
                 # The gateway's per-plan word per model (free / low / medium / top_tier).
                 row["usage_levels"] = usage_levels(list(models), raw_pricing)
                 # Top-tier marks from the gateway (it decides, not the client).
@@ -1028,7 +1028,7 @@ def inject_local_runtime_row(rows: list[dict], ctx: ConfigContext) -> tuple[list
 
 
 def _local_runtime_excluded(ctx: ConfigContext) -> bool:
-    from hermes_cli.providers import LLAMACPP_ALIASES
+    from eir_cli.providers import LLAMACPP_ALIASES
 
     excluded = {str(p).strip().lower() for p in (ctx.excluded_providers or []) if p}
     return bool(excluded & set(LLAMACPP_ALIASES))
@@ -1037,7 +1037,7 @@ def _local_runtime_excluded(ctx: ConfigContext) -> bool:
 def _managed_runtime_url() -> str:
     """The running managed server's base URL (normalized), ``""`` when none is recorded."""
     try:
-        from hermes_cli.local_runtime.endpoint import _state_endpoint
+        from eir_cli.local_runtime.endpoint import _state_endpoint
 
         managed = _state_endpoint()
     except Exception:  # health: allow BLE001 -- a torn/legacy runtime state file must degrade to "no managed server" (as _local_runtime_row does), never break the picker
@@ -1051,8 +1051,8 @@ def _local_runtime_row(ctx: ConfigContext) -> dict | None:
     the provider registry's own definition, never a local literal: a row the resolver can't resolve is
     the bug this row's offline-first contract depends on not having."""
     try:
-        from hermes_cli.local_runtime.bootstrap import staged_model_ids
-        from hermes_cli.providers import LLAMACPP_ALIASES, LLAMACPP_PROVIDER_ID
+        from eir_cli.local_runtime.bootstrap import staged_model_ids
+        from eir_cli.providers import LLAMACPP_ALIASES, LLAMACPP_PROVIDER_ID
 
         staged = staged_model_ids()
         if not staged:
@@ -1062,7 +1062,7 @@ def _local_runtime_row(ctx: ConfigContext) -> dict | None:
             # A LIVE session on the managed server reports provider "custom" with the managed base_url;
             # match on the endpoint so the session being chatted in still shows a selection.
             try:
-                from hermes_cli.local_runtime.endpoint import _state_endpoint
+                from eir_cli.local_runtime.endpoint import _state_endpoint
 
                 managed = _state_endpoint()
                 current = bool(managed and (ctx.current_base_url or "").strip().rstrip("/")
@@ -1081,8 +1081,8 @@ def _prewarm_pricing_async(
 ) -> Optional[Thread]:
     """Warm picker pricing caches without delaying the current payload (one worker per
     profile + endpoint scope; a live worker is reused)."""
-    from hermes_constants import hermes_home_key
-    from hermes_cli.models_pricing import pricing_cache_scope
+    from eir_constants import eir_home_key
+    from eir_cli.models_pricing import pricing_cache_scope
 
     slugs = {
         (
@@ -1096,7 +1096,7 @@ def _prewarm_pricing_async(
             slug, base_url=base_url, current_provider=current_provider, current_base_url=current_base_url,
         ))
         for slug, base_url in slugs))
-    prewarm_key = (hermes_home_key(), endpoint_scope)
+    prewarm_key = (eir_home_key(), endpoint_scope)
 
     with _pricing_prewarm_lock:
         current = _pricing_prewarm_threads.get(prewarm_key)
@@ -1114,7 +1114,7 @@ def _prewarm_pricing_async(
                         _pricing_prewarm_threads.pop(prewarm_key, None)
 
         thread = Thread(target=copy_context().run, args=(_worker,),
-                        name="hermes-picker-pricing-prewarm", daemon=True)
+                        name="eir-picker-pricing-prewarm", daemon=True)
         _pricing_prewarm_threads[prewarm_key] = thread
         thread.start()
         return thread
@@ -1131,8 +1131,8 @@ def _moa_provider_row(current_provider: str = "") -> dict | None:
         return None
 
     try:
-        from hermes_cli.config import load_config
-        from hermes_cli.moa_config import normalize_moa_config
+        from eir_cli.config import load_config
+        from eir_cli.moa_config import normalize_moa_config
 
         cfg = normalize_moa_config(load_config().get("moa") or {})
         models = list(cfg.get("presets", {}).keys())

@@ -22,7 +22,7 @@ from typing import Any
 logger = logging.getLogger("cli")
 
 if TYPE_CHECKING:
-    from cli import HermesCLI
+    from cli import EirCLI
 
 
 def _int_or(value, default: int) -> int:
@@ -34,7 +34,7 @@ def _int_or(value, default: int) -> int:
 
 
 def _interrupt_agent_for_signal(agent, signum) -> None:
-    """Hard-interrupt ``agent`` for a shutdown signal, then sleep ``HERMES_SIGTERM_GRACE`` (1.5 s).
+    """Hard-interrupt ``agent`` for a shutdown signal, then sleep ``EIR_SIGTERM_GRACE`` (1.5 s).
 
     The grace lets the agent thread kill the tool's setsid subprocess group before the
     main thread unwinds (else an orphan child). Never raises.
@@ -43,14 +43,14 @@ def _interrupt_agent_for_signal(agent, signum) -> None:
     try:
         if agent is not None:
             request_hard_interrupt(agent, f"received signal {signum}")
-            _grace = _float_env("HERMES_SIGTERM_GRACE", 1.5)
+            _grace = _float_env("EIR_SIGTERM_GRACE", 1.5)
             if _grace > 0:
                 time.sleep(_grace)
     except Exception:
         pass  # never block signal handling
 
 
-def _run_kanban_goal_loop_q(cli: HermesCLI, first_response: str, run_turn=None, log=None) -> None:
+def _run_kanban_goal_loop_q(cli: EirCLI, first_response: str, run_turn=None, log=None) -> None:
     """Drive a kanban goal_mode worker through ``goals.run_kanban_goal_loop`` after its first turn.
 
     ``run_turn`` defaults to the bare ``-Q`` turn (final answer only). The ``-q`` worker path
@@ -58,17 +58,17 @@ def _run_kanban_goal_loop_q(cli: HermesCLI, first_response: str, run_turn=None, 
     worker log is made of. The caller swallows all errors: a broken loop must never wedge a worker.
     """
     from cli import _int_or, _sync_cli_session_id_from_agent
-    task_id = (os.environ.get("HERMES_KANBAN_TASK") or "").strip()
+    task_id = (os.environ.get("EIR_KANBAN_TASK") or "").strip()
     if not task_id:
         return
-    raw_run_id = (os.environ.get("HERMES_KANBAN_RUN_ID") or "").strip()
+    raw_run_id = (os.environ.get("EIR_KANBAN_RUN_ID") or "").strip()
     worker_run_id = _int_or(raw_run_id, None) if raw_run_id else None
     if raw_run_id and worker_run_id is None:
-        logger.warning("invalid HERMES_KANBAN_RUN_ID=%r", raw_run_id)
+        logger.warning("invalid EIR_KANBAN_RUN_ID=%r", raw_run_id)
 
-    from hermes_cli import kanban_db as _kb
-    from hermes_cli import kanban_db_connect as _kbc
-    from hermes_cli.goals import run_kanban_goal_loop as _run_loop, DEFAULT_MAX_TURNS as _DEF_TURNS
+    from eir_cli import kanban_db as _kb
+    from eir_cli import kanban_db_connect as _kbc
+    from eir_cli.goals import run_kanban_goal_loop as _run_loop, DEFAULT_MAX_TURNS as _DEF_TURNS
 
     # Goal text = title + body (the acceptance criteria the judge evaluates against).
     with _kbc.connect_closing() as conn:
@@ -110,7 +110,7 @@ def _run_kanban_goal_loop_q(cli: HermesCLI, first_response: str, run_turn=None, 
     )
 
 
-def _run_kanban_goal_loop_chat(cli: HermesCLI, first_response: str) -> None:
+def _run_kanban_goal_loop_chat(cli: EirCLI, first_response: str) -> None:
     """``-q`` worker variant: follow-up turns go through ``cli.chat`` (tool feed stays on stdout,
     which is the Kanban worker log) and judge verdicts are printed there too, so a goal_mode card's
     log reads like any other worker's instead of staying blank until the final answer."""
@@ -132,7 +132,7 @@ def _sync_cli_session_id_from_agent(cli) -> None:
 # ``failure_reason`` values that say nothing about the task itself: the provider is walled,
 # down or unreachable, or the account is out of credit, so a Kanban worker signals "try
 # later" instead of "I failed" and the dispatcher does not spend the task's retry budget on it.
-from hermes_cli.turn_exit import TRANSIENT_PROVIDER_REASONS as _TRANSIENT_PROVIDER_REASONS
+from eir_cli.turn_exit import TRANSIENT_PROVIDER_REASONS as _TRANSIENT_PROVIDER_REASONS
 
 
 # ``failure_reason`` values a retry can never heal: the credential was rejected, the model does
@@ -142,7 +142,7 @@ from hermes_cli.turn_exit import TRANSIENT_PROVIDER_REASONS as _TRANSIENT_PROVID
 # ``kanban.failure_limit`` is spent. ``billing`` stays transient: credit comes back.
 # ``upstream_blocked`` (a WAF/CDN refusing the SDK's User-Agent) is terminal too: only a
 # header change heals it, never a retry.
-from hermes_cli.turn_exit import TERMINAL_PROVIDER_REASONS as _TERMINAL_PROVIDER_REASONS
+from eir_cli.turn_exit import TERMINAL_PROVIDER_REASONS as _TERMINAL_PROVIDER_REASONS
 
 
 def _single_query_exit_code(result, *, credentials_rate_limited: bool = False,
@@ -151,7 +151,7 @@ def _single_query_exit_code(result, *, credentials_rate_limited: bool = False,
 
     0 only when the turn completed; 130 when it was interrupted; 1 when it failed, stopped
     partway (`partial`, `completed: False`) or never ran at all (credentials / agent init
-    failed, so ``result`` is not a dict). A Kanban worker (``HERMES_KANBAN_TASK`` set) that
+    failed, so ``result`` is not a dict). A Kanban worker (``EIR_KANBAN_TASK`` set) that
     failed purely on a provider rate-limit / billing wall exits ``KANBAN_RATE_LIMIT_EXIT_CODE``
     (EX_TEMPFAIL): the dispatcher books that run ``rate_limited`` and requeues the task
     WITHOUT counting a failure, so a quota window or a provider outage cannot trip the breaker.
@@ -170,7 +170,7 @@ def _single_query_exit_code(result, *, credentials_rate_limited: bool = False,
     from cli import _TERMINAL_PROVIDER_REASONS as terminal_reasons
     from cli import _TRANSIENT_PROVIDER_REASONS as transient_reasons
     from agent.kanban_turn_recovery import kanban_task_id
-    from hermes_cli.turn_exit import turn_exit_code
+    from eir_cli.turn_exit import turn_exit_code
     return turn_exit_code(
         result, kanban_worker=kanban_task_id() is not None,
         credentials_rate_limited=credentials_rate_limited,
@@ -183,14 +183,14 @@ def _single_query_exit_code(result, *, credentials_rate_limited: bool = False,
 def _run_quiet_single_query(cli, effective_query, emitter=None):
     """Quiet (-Q) one-shot turn: run, print the response (stderr for errors/session_id), then sys.exit with the automation exit code.
     With a ``StreamJsonEmitter`` the final answer and the exit line become the terminal ``result`` JSONL record instead.
-    HERMES_TURN_AUTHOR (set only by a bot-to-bot dispatcher) is consumed here so tool subprocesses do not inherit it.
+    EIR_TURN_AUTHOR (set only by a bot-to-bot dispatcher) is consumed here so tool subprocesses do not inherit it.
     Nested Bot Mode notifies bind this session's key (not the dispatcher's) and resume in-process
     before stdout is printed, so a teammate reply is the quiet run's final answer rather than a
     stranded receipt."""
     from cli import _emit_interrupted_session_end, _run_kanban_goal_loop_q, _single_query_exit_code, _sync_cli_session_id_from_agent
     from agent.interrupt_compat import _accepts_keyword
     from agent.turn_author import take_turn_author_from_env
-    from hermes_cli.quiet_single_query import (
+    from eir_cli.quiet_single_query import (
         bind_quiet_session_key, continue_quiet_notify_completions, exit_single_query, quiet_notify_linger_seconds, take_turn_report_path, write_turn_report,
     )
 
@@ -312,7 +312,7 @@ def _run_quiet_single_query(cli, effective_query, emitter=None):
     # not the claim lock or either expiry, so an unreaped expired-lease row still
     # reports "running" and a continue verdict would re-enter the model under an
     # authority this process can no longer prove (round-3 finding).
-    if os.environ.get("HERMES_KANBAN_GOAL_MODE") == "1" and _exit_code == 0:
+    if os.environ.get("EIR_KANBAN_GOAL_MODE") == "1" and _exit_code == 0:
         try:
             _run_kanban_goal_loop_q(cli, response)
         except Exception as _goal_exc:
@@ -339,7 +339,7 @@ def _route_single_query_images(cli, query, effective_query, single_query_images,
     try:
         from agent.image_routing import build_native_content_parts as _build_parts
         from agent.image_routing import decide_image_input_mode
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
 
         _img_mode = decide_image_input_mode(
             (cli.provider or "").strip(), (cli.model or "").strip(), load_config(),
@@ -373,12 +373,12 @@ def _route_single_query_images(cli, query, effective_query, single_query_images,
 def _collect_kanban_task_images(single_query_images):
     """Kanban workers: image paths/URLs in the task body join the first turn's attachments."""
     single_query_image_urls: list[str] = []
-    _kanban_task_id = os.environ.get("HERMES_KANBAN_TASK", "").strip()
+    _kanban_task_id = os.environ.get("EIR_KANBAN_TASK", "").strip()
     if not _kanban_task_id:
         return single_query_image_urls
     try:
-        from hermes_cli import kanban_db as _kb
-        from hermes_cli import kanban_db_connect as _kbc
+        from eir_cli import kanban_db as _kb
+        from eir_cli import kanban_db_connect as _kbc
         from agent.image_routing import extract_image_refs as _extract_refs
 
         with _kbc.connect_closing() as _conn:
@@ -431,7 +431,7 @@ def _install_single_query_signal_handlers(cli):
         # + stdout/stderr first so the final debug trace isn't lost; SIGALRM deadman guards the flush
         # against any rare blocking-I/O case (the reporter measured flush in <1ms; the alarm is a failsafe,
         # not the common path).
-        if os.environ.get("HERMES_KANBAN_TASK"):
+        if os.environ.get("EIR_KANBAN_TASK"):
             with suppress(Exception):
                 if hasattr(_signal, "SIGALRM"):
                     _signal.signal(_signal.SIGALRM, _kill_foreground_and_exit)
@@ -444,7 +444,7 @@ def _install_single_query_signal_handlers(cli):
                 # #50881 class). Best-effort under the SIGALRM deadman above.
                 _flush_one_shot_session_store(cli)
             # The one-shot exit's shared_metrics shutdown_runtimes is skipped too: bounded inside the deadman.
-            from hermes_cli.observability.shared_metrics_process import flush_before_hard_exit
+            from eir_cli.observability.shared_metrics_process import flush_before_hard_exit
             flush_before_hard_exit()
             _flush_logging_and_stdio()
             _kill_foreground_and_exit()
@@ -488,14 +488,14 @@ def _run_single_query_mode(cli, query, image, quiet, oneshot, stream_json: bool 
     # No user can answer approval prompts: the approval gate takes the deterministic path.
     # One-shot mode: no between-turns MCP late-binding refresh, so the agent must wait the full MCP
     # cold-start bound before its first (and only) tool snapshot. See #51316.
-    # Mark single-query for the approval gate. cli.py sets HERMES_INTERACTIVE earlier for interactive sudo
+    # Mark single-query for the approval gate. cli.py sets EIR_INTERACTIVE earlier for interactive sudo
     # prompts, but a -q run has NO user waiting to answer approval prompts. The gate reads this marker (via
     # gateway.session_context.get_session_env, which falls back to os.environ when the session-context layer
     # isn't engaged) and takes the deterministic approvals.single_query_mode path instead of waiting the
     # full timeout. See #86878.
-    os.environ["HERMES_SINGLE_QUERY_SESSION"] = "1"
-    from hermes_cli.quiet_single_query import exit_single_query
-    if os.environ.get("HERMES_KANBAN_TASK"):
+    os.environ["EIR_SINGLE_QUERY_SESSION"] = "1"
+    from eir_cli.quiet_single_query import exit_single_query
+    if os.environ.get("EIR_KANBAN_TASK"):
         from tools.kanban_tools import register_current_worker_from_env
         if not register_current_worker_from_env():
             # No exit trailer: the task log now belongs to the run that replaced this one.
@@ -506,7 +506,7 @@ def _run_single_query_mode(cli, query, image, quiet, oneshot, stream_json: bool 
     try:
         query, single_query_images = _collect_query_images(query, image)
         single_query_image_urls = _collect_kanban_task_images(single_query_images)
-        from hermes_cli.observability.shared_metrics_startup import record_cli_one_shot_ready
+        from eir_cli.observability.shared_metrics_startup import record_cli_one_shot_ready
         record_cli_one_shot_ready()
         if quiet:
             # Quiet mode: suppress banner, spinner, tool previews.
@@ -515,7 +515,7 @@ def _run_single_query_mode(cli, query, image, quiet, oneshot, stream_json: bool 
             if stream_json:
                 # Built BEFORE credentials/agent init so a failed start still closes the protocol
                 # (init + result) instead of exiting 1 with an empty stdout.
-                from hermes_cli.stream_json import StreamJsonEmitter
+                from eir_cli.stream_json import StreamJsonEmitter
                 emitter = StreamJsonEmitter(model=getattr(cli, "model", "") or "", session_id=cli.session_id or "")
             if cli._ensure_runtime_credentials():
                 effective_query: Any = _route_single_query_images(
@@ -546,7 +546,7 @@ def _run_single_query_mode(cli, query, image, quiet, oneshot, stream_json: bool 
         if _query_label:
             cli.console.print(f"[bold blue]{t('cli.single_query.query_label')}[/] {_query_label}")
         cli._show_security_advisories()
-        # Same author contract as `-Q`: a spawner that sets HERMES_TURN_AUTHOR names who wrote this run's
+        # Same author contract as `-Q`: a spawner that sets EIR_TURN_AUTHOR names who wrote this run's
         # prompts. Consumed before the first turn so tool subprocesses never inherit it; every turn of
         # the run (recovery and goal follow-ups included) carries it to memory providers.
         from agent.turn_author import take_turn_author_from_env
@@ -578,7 +578,7 @@ def _run_single_query_mode(cli, query, image, quiet, oneshot, stream_json: bool 
         # interrupt, terminal settlement) — must reach the shared exit path below with zero
         # further model entry, because goal_run_status() checks run identity only and would
         # otherwise continue under an authority this process can no longer prove.
-        if os.environ.get("HERMES_KANBAN_GOAL_MODE") == "1" and _single_query_exit_code(cli._last_turn_result) == 0:
+        if os.environ.get("EIR_KANBAN_GOAL_MODE") == "1" and _single_query_exit_code(cli._last_turn_result) == 0:
             try:
                 _run_kanban_goal_loop_chat(cli, response or "")
             except Exception as _goal_exc:

@@ -60,7 +60,7 @@ def provider_owns_route(provider: Any, base_url: Any, config: Any = None) -> Opt
     host (a proxy, a LAN server) — nothing here can say whose it is. Offline: the registry lookup
     never fetches the models.dev catalog.
     """
-    from hermes_cli.providers import get_provider, normalize_provider, resolve_custom_provider, resolve_user_provider
+    from eir_cli.providers import get_provider, normalize_provider, resolve_custom_provider, resolve_user_provider
     from utils import base_url_hostname
 
     host = base_url_hostname(str(base_url or ""))
@@ -91,7 +91,7 @@ def provider_owns_route(provider: Any, base_url: Any, config: Any = None) -> Opt
 
 def drop_stale_model_route(model_cfg: Any, provider: Any, config: Any = None) -> tuple[dict[str, Any], bool]:
     """Pop the route keys (``base_url``, ``api_mode``) a previous provider left in ``model:``
-    when the block is re-pointed at *provider* without a fresh route (``hermes config set
+    when the block is re-pointed at *provider* without a fresh route (``eir config set
     model.provider``). Mirrors what a persisted ``/model`` switch writes: the route is synced to
     the target, never carried over. Returns ``(popped {key: old value}, unverified)`` where
     ``unverified`` is True when a base_url of unknown ownership was kept — the caller should say so.
@@ -138,7 +138,7 @@ def drop_credentials_of_other_route(model_cfg: dict[str, Any], prior_model_cfg: 
     A custom endpoint's ``model.api_key`` / ``key_env`` belongs to that ONE endpoint: when the user
     switches to another endpoint without typing a key, keeping it sends endpoint A's secret to B.
     Same rule as ``model_switch.model_selection_config_updates`` (same provider and base_url)."""
-    from hermes_cli.config import clear_model_endpoint_credentials
+    from eir_cli.config import clear_model_endpoint_credentials
     prior = prior_model_cfg if isinstance(prior_model_cfg, dict) else {}
     same_route = (
         str(prior.get("provider") or "").strip().lower() == str(model_cfg.get("provider") or "").strip().lower()

@@ -4,16 +4,16 @@ name: hermes-eye-memory
 repo: https://github.com/isthatananya/hermes-eye-memory
 sha: "c26df0567195da0a6c8fe497d35e58bae1902b8e"
 subdir: ""
-description: "Local visual memory for Hermes: index a photo library, search by meaning, build albums, cull duplicates, extract receipts, and recall what the camera saw."
+description: "Local visual memory for Eir: index a photo library, search by meaning, build albums, cull duplicates, extract receipts, and recall what the camera saw."
 maintainer: isthatananya
 tier: community
 category: memory
-requires_hermes: ">=0.22.0"
+requires_eir: ">=0.22.0"
 docs_url: ""
 version: "0.1.0"
 readme: true
 platforms: [linux, macos, windows]
-title: Hermes Eye Memory
+title: Eir Eye Memory
 onboarding: false
 known_issues:
   - "CLIP semantic search downloads a model on first use; set embedding_backend to fallback for offline use."

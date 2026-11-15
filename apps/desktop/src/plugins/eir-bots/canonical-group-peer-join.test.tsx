@@ -1,4 +1,4 @@
-import { host } from '@hermes/plugin-sdk'
+import { host } from '@eir/plugin-sdk'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { atom } from 'nanostores'
 import type { ComponentProps } from 'react'
@@ -7,7 +7,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type * as DataModule from './data'
 
 const { request, union, notify, language } = vi.hoisted(() => ({ language: { value: 'en' }, request: vi.fn(), notify: vi.fn(), union: { profiles: [] as unknown[] } }))
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@eir/plugin-sdk', async () => {
   const { atom: createAtom } = await import('nanostores')
   const { useStore } = await import('@nanostores/react')
   const { pluginSdkMock, createGroupGateway } = await import('./group-test-utils')
@@ -38,7 +38,7 @@ import { translateBotsIn } from './i18n-test-helper'
 import { setPluginCtx } from './shared'
 
 const words = CANONICAL_GROUP_LOCALES.en
-const say = (text: string) => text.replace('{name}', 'Hermes · Mac Mini')
+const say = (text: string) => text.replace('{name}', 'Eir · Mac Mini')
 const binding = { connectionId: 'local', profile: 'default', roomId: 'linked' }
 const pinned = { kind: 'peer', peer_id: 'install:3f2a0000000000000000000000000000', installation_id: 'install:3f2a0000000000000000000000000000', profile: 'default', capability_digest: MINI.room_link.catalog.catalog_digest }
 const mini = peerRosterRow('mini', 'Mac Mini')
@@ -46,9 +46,9 @@ const mini = peerRosterRow('mini', 'Mac Mini')
 const room = {
   room_id: 'linked', name: 'Linked', authority_gateway_id: 'install:a18b0000000000000000000000000000', authority_epoch: 1, latest_seq: 0,
   members: [
-    { member_id: 'default', profile: 'default', handle: 'hermes', target: { kind: 'local', profile: 'default' } },
+    { member_id: 'default', profile: 'default', handle: 'eir', target: { kind: 'local', profile: 'default' } },
     { member_id: 'coder', profile: 'coder', handle: 'coder', target: { kind: 'local', profile: 'coder' } },
-    { member_id: 'hermes-mac-mini', profile: 'default', handle: 'hermes-mac-mini', display_name: 'Hermes · Mac Mini', target: pinned }
+    { member_id: 'eir-mac-mini', profile: 'default', handle: 'eir-mac-mini', display_name: 'Eir · Mac Mini', target: pinned }
   ]
 }
 
@@ -99,7 +99,7 @@ afterEach(() => { setPluginCtx(null); cleanup(); request.mockReset(); notify.moc
 it.each(['missing', 'unavailable'])('retries a %s peer through its matching connection without waiting on another offline computer', async status => {
   union.profiles = [peerRosterRow('offline', 'Old laptop'), mini]
 
-  const state = gateways({ routes: status === 'missing' ? [] : [{ room_id: 'linked', member_id: 'hermes-mac-mini', status }], home: (method, params) => method === 'groups.peer.register'
+  const state = gateways({ routes: status === 'missing' ? [] : [{ room_id: 'linked', member_id: 'eir-mac-mini', status }], home: (method, params) => method === 'groups.peer.register'
     ? (state.routes = [{ room_id: 'linked', member_id: params.member_id, status: 'ready' }], PEER_REGISTERED) : undefined })
 
   render(<CanonicalGroupWorkspace binding={binding} />)
@@ -113,7 +113,7 @@ it.each(['missing', 'unavailable'])('retries a %s peer through its matching conn
   expect(screen.queryByText(badge)).toBeNull()
   expect(steps()).toEqual(SEATED)
   expect(request.mock.calls.find(call => call[1] === 'groups.peer.invite')![2]).toEqual({
-    profile: 'default', room_id: 'linked', member_id: 'hermes-mac-mini', home_install_id: 'install:a18b0000000000000000000000000000',
+    profile: 'default', room_id: 'linked', member_id: 'eir-mac-mini', home_install_id: 'install:a18b0000000000000000000000000000',
     authority_gateway_id: 'install:a18b0000000000000000000000000000', authority_epoch: 1, ttl_seconds: 86400, status_ttl_seconds: 2592000 })
 })
 
@@ -135,7 +135,7 @@ it.each([
 })
 
 it('says when a joined Bot\'s access ended, and offers Retry', async () => {
-  gateways({ routes: [{ room_id: 'linked', member_id: 'hermes-mac-mini', status: 'needs_reauthorization' }] })
+  gateways({ routes: [{ room_id: 'linked', member_id: 'eir-mac-mini', status: 'needs_reauthorization' }] })
   render(<CanonicalGroupWorkspace binding={binding} />)
   const row = (await screen.findByText(say(words.peerRejoin))).closest('[role="status"]') as HTMLElement
   expect(within(row).getByRole('button', { name: 'Retry' })).toBeTruthy()
@@ -189,7 +189,7 @@ it.each(['confirmed', 'offline', 'unconfirmed', 'stop pending'])('starts the gro
   const confirmed = outcome === 'confirmed' || outcome === 'offline'
 
   if (outcome === 'offline') {union.profiles = []}
-  gateways({ routes: outcome === 'offline' ? [{ room_id: 'linked', member_id: 'hermes-mac-mini', status: 'unavailable' }] : [], home: method => method === 'groups.disband' ? confirmed ? { tombstone: { room_id: 'linked', disbanded_at: 1 } } : failure?.error ?? {} : undefined })
+  gateways({ routes: outcome === 'offline' ? [{ room_id: 'linked', member_id: 'eir-mac-mini', status: 'unavailable' }] : [], home: method => method === 'groups.disband' ? confirmed ? { tombstone: { room_id: 'linked', disbanded_at: 1 } } : failure?.error ?? {} : undefined })
   updateGroupChat('Linked', record => ({ ...record, roomId: binding.roomId, engine: { kind: 'gateway', ...binding } }), { sync: false })
   const original = structuredClone($groupChats.get().Linked)
   registerCanonicalGroup({ connectionId: 'local', profile: 'default' }, room)
@@ -198,7 +198,7 @@ it.each(['confirmed', 'offline', 'unconfirmed', 'stop pending'])('starts the gro
 
   if (outcome === 'offline') {expect(within(row).queryByRole('button', { name: 'Retry' })).toBeNull()}
   // The control says what it does: a new group without that Bot, earlier messages not copied.
-  fireEvent.click(within(row).getByRole('button', { name: 'Start new group chat without Hermes · Mac Mini' }))
+  fireEvent.click(within(row).getByRole('button', { name: 'Start new group chat without Eir · Mac Mini' }))
   const dialog = await screen.findByRole('dialog')
   expect(within(dialog).getByText(words.peerStartWithoutConfirm)).toBeTruthy()
   await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: words.startGatewayGroup })) })
@@ -224,7 +224,7 @@ it('shows the badge but no setup controls on a gateway that cannot register Bots
   render(<CanonicalGroupWorkspace binding={binding} />)
   await screen.findByText(words.peerNotJoinedBadge)
   await act(async () => {})
-  expect(screen.queryByText(words.peerNotJoined.replace('{name}', 'Hermes · Mac Mini'))).toBeNull()
+  expect(screen.queryByText(words.peerNotJoined.replace('{name}', 'Eir · Mac Mini'))).toBeNull()
 })
 
 const calls = (method: string) => request.mock.calls.filter(call => call[1] === method)
@@ -251,7 +251,7 @@ it.each(['desktop', 'gateway'])('retries a lost replacement create without takin
   const onReplaced = vi.fn()
   render(<CanonicalGroupWorkspace binding={binding} onReplaced={onReplaced} />)
 
-  await startWithout('Hermes · Mac Mini')
+  await startWithout('Eir · Mac Mini')
   expect(await screen.findByText('reply lost')).toBeTruthy()
   const payload = calls('groups.create')[0][2]
   updateGroupChat(payload.name, record => ({ ...record, roomId: 'unrelated',
@@ -266,7 +266,7 @@ it.each(['desktop', 'gateway'])('retries a lost replacement create without takin
   const created = Object.values($groupChats.get()).find(record => record.roomId === payload.room_id)
   expect(created?.engine).toEqual({ kind: 'gateway', ...binding, roomId: payload.room_id })
   expect(created?.log).toEqual([])
-  await startWithout('Hermes · Mac Mini')
+  await startWithout('Eir · Mac Mini')
   expect(rooms.size).toBe(2)
   expect(calls('groups.create')[2][2].room_id).not.toBe(payload.room_id)
   expect($groupChats.get()[payload.name]).toEqual(other)
@@ -284,7 +284,7 @@ it.each(['missing', 'refused'])('keeps A+B+C when removing B cannot seat C (%s),
   union.profiles = failure === 'missing' ? [] : [mini]
   gateways({ home: (method, params) => {
     if (method === 'groups.state') {return { room: created.get(params.room_id) ?? original,
-      driver_status: { running: true, peer_routes: [{ member_id: 'hermes-mac-mini', status: recovered ? 'ready' : 'unavailable' }] } }}
+      driver_status: { running: true, peer_routes: [{ member_id: 'eir-mac-mini', status: recovered ? 'ready' : 'unavailable' }] } }}
 
     if (method === 'groups.create') {return create(params)}
 
@@ -307,7 +307,7 @@ it.each(['missing', 'refused'])('keeps A+B+C when removing B cannot seat C (%s),
   expect(notify).toHaveBeenCalledWith({ kind: 'error', message: labels.peerStartWithoutKept.replace('{reason}', reason + ' ' + labels.peerStartWithoutRetry) })
   expect(created.size).toBe(1)
   const next = [...created.values()][0]
-  expect(next.members.map(member => member.member_id)).toEqual(['default', 'hermes-mac-mini'])
+  expect(next.members.map(member => member.member_id)).toEqual(['default', 'eir-mac-mini'])
   expect($groupChats.get()[next.name].engine).toEqual({ kind: 'gateway', ...binding, roomId: next.room_id })
   union.profiles = [mini]
   view.unmount()
@@ -339,7 +339,7 @@ it.each(['ready', 'unreadable', 'another room'])('checks the new group after a l
       if (registered && outcome === 'unreadable') {throw new Error('read lost')}
 
       return { room: registered && outcome === 'another room' ? original : rooms.get(params.room_id) ?? original, driver_status: { running: true,
-        peer_routes: registered ? [{ member_id: 'hermes-mac-mini', status: 'ready' }] : [] } }
+        peer_routes: registered ? [{ member_id: 'eir-mac-mini', status: 'ready' }] : [] } }
     }
 
     if (method === 'groups.peer.register') {registered = true; throw new Error('reply lost')}
@@ -381,26 +381,26 @@ it.each(['acknowledgement', 'refusal'])('replays an uncertain replacement throug
   } })
   const onReplaced = vi.fn()
   render(<CanonicalGroupWorkspace binding={binding} onReplaced={onReplaced} />)
-  await startWithout('Hermes · Mac Mini')
+  await startWithout('Eir · Mac Mini')
   expect(await screen.findByText('reply lost')).toBeTruthy()
   const payload = calls('groups.create')[0][2]
   await act(async () => { (host.state.gateway as ReturnType<typeof atom<string>>).set('closed') })
   expect(screen.queryByRole('dialog')).toBeNull()
   await act(async () => { (host.state.gateway as ReturnType<typeof atom<string>>).set('open') })
-  await startWithout('Hermes · Mac Mini')
+  await startWithout('Eir · Mac Mini')
   expect(calls('groups.create')[1][2]).toEqual(payload)
   expect(rooms.size).toBe(1)
   expect(onReplaced).toHaveBeenCalledTimes(outcome === 'refusal' ? 0 : 1)
 
   if (outcome === 'refusal') {
     await act(async () => { fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: words.startGatewayGroup })) })
-  } else {await startWithout('Hermes · Mac Mini')}
+  } else {await startWithout('Eir · Mac Mini')}
 
   expect(calls('groups.create')[2][2].room_id).not.toBe(payload.room_id)
   expect(rooms.size).toBe(2)
 })
 
-const joined = [{ room_id: 'linked', member_id: 'hermes-mac-mini', status: 'ready' }]
+const joined = [{ room_id: 'linked', member_id: 'eir-mac-mini', status: 'ready' }]
 const sent = (params: Record<string, any>) => ({ event: {}, client_event_id: params.event_id, accepted: true, driver_started: true })
 const textbox = () => screen.getByRole('textbox') as HTMLTextAreaElement
 
@@ -473,7 +473,7 @@ it.each([
   const loading = { ...binding, roomId: `roster-${first.length}` }
   renewPeers(loading, room, joined, first)
   await peerRenewalSettled(loading)
-  expect(($peerJoinErrors.get()[peerJoinKey(loading, 'hermes-mac-mini')] as { reason?: string } | undefined)?.reason).toBe(noted)
+  expect(($peerJoinErrors.get()[peerJoinKey(loading, 'eir-mac-mini')] as { reason?: string } | undefined)?.reason).toBe(noted)
   renewPeers(loading, room, joined, [...first, mini])
   await waitFor(() => expect(steps()).toEqual(SEATED))
 })
@@ -552,10 +552,10 @@ it.each(['create', 'disband'])('keeps a newer replacement request when an older 
   } })
   const onReplaced = vi.fn()
   const first = render(<CanonicalGroupWorkspace binding={binding} onReplaced={onReplaced} />)
-  await startWithout('Hermes · Mac Mini')
+  await startWithout('Eir · Mac Mini')
   first.unmount()
   render(<CanonicalGroupWorkspace binding={binding} onReplaced={onReplaced} />)
-  await startWithout('Hermes · Mac Mini')
+  await startWithout('Eir · Mac Mini')
   expect(calls('groups.create')[1][2]).toEqual(calls('groups.create')[0][2])
   await act(async () => pendingCreates[1]())
 
@@ -566,7 +566,7 @@ it.each(['create', 'disband'])('keeps a newer replacement request when an older 
 
   expect(onReplaced).toHaveBeenCalledTimes(1)
   loseNewReply = true
-  await startWithout('Hermes · Mac Mini')
+  await startWithout('Eir · Mac Mini')
   expect(await screen.findByText('new reply lost')).toBeTruthy()
   const newer = calls('groups.create')[2][2]
   await act(async () => heldStep === 'disband' ? pendingDisbands[1]() : pendingCreates[0]())
@@ -591,7 +591,7 @@ it('keeps a replacement that finishes after its view closed registered, without 
     : method === 'groups.disband' ? { tombstone: { room_id: 'linked', disbanded_at: 1 } } : undefined })
   const onReplaced = vi.fn()
   const view = render(<CanonicalGroupWorkspace binding={binding} onReplaced={onReplaced} />)
-  await startWithout('Hermes · Mac Mini')
+  await startWithout('Eir · Mac Mini')
   await waitFor(() => expect(calls('groups.create')).toHaveLength(1))
   // The person closes the group chat (or the socket resets) while the new group is being made.
   view.unmount()

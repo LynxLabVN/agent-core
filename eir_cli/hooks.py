@@ -1,4 +1,4 @@
-"""hermes hooks — inspect and manage shell-script hooks."""
+"""eir hooks — inspect and manage shell-script hooks."""
 
 from __future__ import annotations
 
@@ -8,11 +8,11 @@ from typing import Any, Dict, List
 
 
 def hooks_command(args) -> None:
-    """Entry point for ``hermes hooks`` — dispatches to the requested action."""
+    """Entry point for ``eir hooks`` — dispatches to the requested action."""
     sub = getattr(args, "hooks_action", None)
     if not sub:
-        print("Usage: hermes hooks {list|test|revoke|doctor}")
-        print("Run 'hermes hooks --help' for details.")
+        print("Usage: eir hooks {list|test|revoke|doctor}")
+        print("Run 'eir hooks --help' for details.")
         return
     handler = _ACTIONS.get(sub)
     if handler is None:
@@ -26,7 +26,7 @@ def hooks_command(args) -> None:
 # ---------------------------------------------------------------------------
 
 def _cmd_list(_args) -> None:
-    from hermes_cli.config import load_config
+    from eir_cli.config import load_config
     from agent import outbound_webhooks, shell_hooks
 
     cfg = load_config()
@@ -34,14 +34,14 @@ def _cmd_list(_args) -> None:
     outbound = outbound_webhooks.iter_configured_targets(cfg)
 
     if not specs and not outbound:
-        print("No shell hooks or outbound webhooks configured in ~/.hermes/config.yaml.")
-        print("See `hermes hooks --help` or")
+        print("No shell hooks or outbound webhooks configured in ~/.eir/config.yaml.")
+        print("See `eir hooks --help` or")
         print("    website/docs/user-guide/features/hooks.md")
         print("for the config schema and worked examples.")
         return
 
     if not specs:
-        print("No shell hooks configured in ~/.hermes/config.yaml.")
+        print("No shell hooks configured in ~/.eir/config.yaml.")
     else:
         by_event: dict[str, list] = {}
         for spec in specs:
@@ -62,7 +62,7 @@ def _cmd_list(_args) -> None:
                         print(
                             f"      ⚠ script modified since approval "
                             f"(was {mtime_at}, now {mtime_now}) — "
-                            f"run `hermes hooks doctor` to re-validate"
+                            f"run `eir hooks doctor` to re-validate"
                         )
             print()
 
@@ -168,9 +168,9 @@ _DEFAULT_PAYLOADS = {
         "assistant_content_chars": 40, "assistant_tool_call_count": 0, "error": None, "error_type": None,
     },
     "post_curator_run": {
-        "run_dir": "/home/user/.hermes/logs/curator/20260101-000000",
-        "run_json_path": "/home/user/.hermes/logs/curator/20260101-000000/run.json",
-        "report_md_path": "/home/user/.hermes/logs/curator/20260101-000000/REPORT.md",
+        "run_dir": "/home/user/.eir/logs/curator/20260101-000000",
+        "run_json_path": "/home/user/.eir/logs/curator/20260101-000000/run.json",
+        "report_md_path": "/home/user/.eir/logs/curator/20260101-000000/REPORT.md",
         "dry_run": False,
     },
     "subagent_stop": {
@@ -187,8 +187,8 @@ _DEFAULT_PAYLOADS = {
 
 
 def _cmd_test(args) -> None:
-    from hermes_cli.config import load_config
-    from hermes_cli.plugins import VALID_HOOKS
+    from eir_cli.config import load_config
+    from eir_cli.plugins import VALID_HOOKS
     from agent import shell_hooks
 
     event = args.event
@@ -245,7 +245,7 @@ def _print_run_result(result: dict[str, Any]) -> None:
     # to show — failed-open and failed-closed must not render identically (#115968).
     parsed = result.get("parsed")
     if parsed:
-        print(f"      parsed (Hermes wire shape): {json.dumps(parsed)}")
+        print(f"      parsed (Eir wire shape): {json.dumps(parsed)}")
     else:
         print("      parsed: <none — hook contributed nothing to the dispatcher>")
 
@@ -268,13 +268,13 @@ def _cmd_revoke(args) -> None:
     print(f"Removed {removed} allowlist entry/entries for: {args.command}")
     print(
         "Note: a running gateway stops running it within about 30 seconds (unless "
-        "--accept-hooks / HERMES_ACCEPT_HOOKS / hooks_auto_accept approves every hook there); "
+        "--accept-hooks / EIR_ACCEPT_HOOKS / hooks_auto_accept approves every hook there); "
         "other running processes keep it until they restart."
     )
 
 
 def _cmd_doctor(_args) -> None:
-    from hermes_cli.config import load_config
+    from eir_cli.config import load_config
     from agent import shell_hooks
 
     specs = shell_hooks.iter_configured_hooks(load_config())
@@ -314,7 +314,7 @@ def _doctor_one(spec, shell_hooks) -> int:
             problems += 1
             print(f"      ⚠ script modified since approval "
                   f"(was {mtime_at}, now {mtime_now}) — review changes, "
-                  f"then `hermes hooks revoke` + re-approve to refresh")
+                  f"then `eir hooks revoke` + re-approve to refresh")
         elif drift is False:
             print("      ✓ script unchanged since approval")
     # 4. JSON smoke test on a synthetic payload — ONLY when already allowlisted. Otherwise doctor
@@ -323,7 +323,7 @@ def _doctor_one(spec, shell_hooks) -> int:
     if not entry:
         print("      ℹ skipped JSON smoke test — not allowlisted yet. "
               "Approve the hook first (via TTY prompt or --accept-hooks), "
-              "then re-run `hermes hooks doctor`.")
+              "then re-run `eir hooks doctor`.")
     elif shell_hooks.script_is_executable(spec.command):
         result = shell_hooks.run_once(spec, _DEFAULT_PAYLOADS.get(spec.event, {"extra": {}}))
         if result.get("timed_out"):

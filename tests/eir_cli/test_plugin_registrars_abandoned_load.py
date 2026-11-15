@@ -9,14 +9,14 @@ from types import SimpleNamespace
 
 import pytest
 
-from hermes_cli import plugins_load_guard
-from hermes_cli.plugins import PluginContext, PluginManager, PluginManifest
-from hermes_cli.plugins_idle_tasks import registered_idle_tasks, run_plugin_idle_tasks
+from eir_cli import plugins_load_guard
+from eir_cli.plugins import PluginContext, PluginManager, PluginManifest
+from eir_cli.plugins_idle_tasks import registered_idle_tasks, run_plugin_idle_tasks
 
 
 @pytest.fixture
 def home(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     return tmp_path
 
 

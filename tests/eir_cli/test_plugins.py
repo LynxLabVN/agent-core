@@ -1,4 +1,4 @@
-"""Tests for the Hermes plugin system (hermes_cli.plugins)."""
+"""Tests for the Eir plugin system (eir_cli.plugins)."""
 
 import logging
 import json
@@ -9,9 +9,9 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-import hermes_yaml as yaml
+import eir_yaml as yaml
 
-from hermes_cli.plugins import (
+from eir_cli.plugins import (
     ENTRY_POINTS_GROUP,
     PluginContext,
     PluginManager,
@@ -23,8 +23,8 @@ from hermes_cli.plugins import (
     resolve_plugin_command_result,
     _portable_data_namespace,
 )
-from hermes_cli.relay_plugin_cutover import RELAY_PLUGINS_CONFIG_ENV
-from hermes_cli.middleware import (
+from eir_cli.relay_plugin_cutover import RELAY_PLUGINS_CONFIG_ENV
+from eir_cli.middleware import (
     apply_llm_request_middleware,
     apply_tool_request_middleware,
     run_llm_execution_middleware,
@@ -51,19 +51,19 @@ def _make_plugin_dir(base: Path, name: str, *, register_body: str = "pass",
     """Create a minimal plugin directory with plugin.yaml + __init__.py.
 
     If *auto_enable* is True (default), also write the plugin's name into
-    ``<hermes_home>/config.yaml`` under ``plugins.enabled``. Plugins are
+    ``<eir_home>/config.yaml`` under ``plugins.enabled``. Plugins are
     opt-in by default, so tests that expect the plugin to actually load
     need this. Pass ``auto_enable=False`` for tests that exercise the
     unenabled path.
 
-    *base* is expected to be ``<hermes_home>/plugins/``; we derive
-    ``<hermes_home>`` from it by walking one level up unless *home* is
+    *base* is expected to be ``<eir_home>/plugins/``; we derive
+    ``<eir_home>`` from it by walking one level up unless *home* is
     given explicitly.
 
-    Pass *home* explicitly whenever the target Hermes home for this
-    plugin isn't necessarily the current ``HERMES_HOME`` env var — e.g.
+    Pass *home* explicitly whenever the target Eir home for this
+    plugin isn't necessarily the current ``EIR_HOME`` env var — e.g.
     when writing fixtures for two profiles up front and only switching
-    ``HERMES_HOME``/``set_hermes_home_override()`` per-profile afterwards
+    ``EIR_HOME``/``set_eir_home_override()`` per-profile afterwards
     (as multi-profile regression tests do). Relying on the *current* env
     var here is a bug: if the caller hasn't switched homes yet (or is
     using the context-local override instead of the env var, which this
@@ -84,20 +84,20 @@ def _make_plugin_dir(base: Path, name: str, *, register_body: str = "pass",
     )
 
     if auto_enable:
-        # Write/merge plugins.enabled in <HERMES_HOME>/config.yaml.
-        # Config is always read from HERMES_HOME (not from the project
+        # Write/merge plugins.enabled in <EIR_HOME>/config.yaml.
+        # Config is always read from EIR_HOME (not from the project
         # dir for project plugins), so that's where we opt in.
         if home is not None:
-            hermes_home = Path(home)
+            eir_home = Path(home)
         else:
             import os
-            hermes_home_str = os.environ.get("HERMES_HOME")
-            if hermes_home_str:
-                hermes_home = Path(hermes_home_str)
+            eir_home_str = os.environ.get("EIR_HOME")
+            if eir_home_str:
+                eir_home = Path(eir_home_str)
             else:
-                hermes_home = base.parent
-        hermes_home.mkdir(parents=True, exist_ok=True)
-        cfg_path = hermes_home / "config.yaml"
+                eir_home = base.parent
+        eir_home.mkdir(parents=True, exist_ok=True)
+        cfg_path = eir_home / "config.yaml"
         cfg: dict = {}
         if cfg_path.exists():
             try:
@@ -122,7 +122,7 @@ class TestPluginDiscovery:
     def test_removed_relay_plugin_identity_cannot_be_reloaded(
         self, monkeypatch, caplog
     ):
-        from hermes_cli import plugins as plugins_mod
+        from eir_cli import plugins as plugins_mod
 
         manifest = PluginManifest(
             name="nemo_relay",
@@ -157,8 +157,8 @@ class TestPluginDiscovery:
     def test_enabled_portable_plugin_registers_components(
         self, tmp_path, monkeypatch
     ):
-        from hermes_cli.agent_plugins import MCP_SCHEMA_V1, PLUGIN_SCHEMA_V1
-        from hermes_cli import plugins as plugins_mod
+        from eir_cli.agent_plugins import MCP_SCHEMA_V1, PLUGIN_SCHEMA_V1
+        from eir_cli import plugins as plugins_mod
 
         home = tmp_path / "home"
         plugin = home / "plugins" / "portable"
@@ -170,7 +170,7 @@ class TestPluginDiscovery:
             json.dumps({
                 "$schema": PLUGIN_SCHEMA_V1,
                 "name": "portable.test",
-                "extensions": {"com.nousresearch.hermes": {"servers": {"worker": {
+                "extensions": {"com.nousresearch.eir": {"servers": {"worker": {
                     "app": {"darwin": {"presence": "executable", "location": str(app)}},
                     "requires": {"app": True},
                     "liveness": {"kind": "static"},
@@ -203,7 +203,7 @@ class TestPluginDiscovery:
         empty_bundled = tmp_path / "bundled"
         empty_bundled.mkdir()
         monkeypatch.setenv("HOME", str(tmp_path / "os-home"))
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("EIR_HOME", str(home))
         monkeypatch.setattr(plugins_mod, "get_bundled_plugins_dir", lambda: empty_bundled)
 
         manager = PluginManager()
@@ -222,8 +222,8 @@ class TestPluginDiscovery:
         assert manager._plugins["portable.test"].enabled is True
         assert manager._plugins["native"].enabled is True
         assert manager._plugins["native"].module is not None
-        from hermes_cli.agent_plugins import liveness_for
-        from hermes_platform import declaration
+        from eir_cli.agent_plugins import liveness_for
+        from eir_platform import declaration
 
         assert declaration.lookup(internal_name) is not None
         assert liveness_for(internal_name) == {"kind": "static"}
@@ -234,10 +234,10 @@ class TestPluginDiscovery:
     def test_two_portable_plugins_with_the_same_server_name_do_not_both_load(self, tmp_path, monkeypatch):
         """Readable server names can clash where the old digest could not: the second plugin's server
         is skipped with a warning naming the first, and the first's config is the one served."""
-        from hermes_cli.agent_plugins import MCP_SCHEMA_V1, PLUGIN_SCHEMA_V1
-        from hermes_cli import plugins as plugins_mod
+        from eir_cli.agent_plugins import MCP_SCHEMA_V1, PLUGIN_SCHEMA_V1
+        from eir_cli import plugins as plugins_mod
 
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".eir"
         # Two unrelated plugins both call their server "shared": one readable name, one owner.
         for plugin_name, command in (("alpha-tools", "python-a"), ("beta-tools", "python-b")):
             plugin = home / "plugins" / plugin_name
@@ -252,7 +252,7 @@ class TestPluginDiscovery:
         empty_bundled = tmp_path / "bundled"
         empty_bundled.mkdir()
         monkeypatch.setenv("HOME", str(tmp_path / "os-home"))
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("EIR_HOME", str(home))
         monkeypatch.setattr(plugins_mod, "get_bundled_plugins_dir", lambda: empty_bundled)
 
         manager = PluginManager()
@@ -263,8 +263,8 @@ class TestPluginDiscovery:
         assert servers["shared"]["command"] in {"python-a", "python-b"}
 
     def test_disabled_portable_plugin_registers_nothing(self, tmp_path, monkeypatch):
-        from hermes_cli.agent_plugins import PLUGIN_SCHEMA_V1
-        from hermes_cli import plugins as plugins_mod
+        from eir_cli.agent_plugins import PLUGIN_SCHEMA_V1
+        from eir_cli import plugins as plugins_mod
 
         home = tmp_path / "home"
         plugin = home / "plugins" / "portable"
@@ -285,7 +285,7 @@ class TestPluginDiscovery:
         empty_bundled = tmp_path / "bundled"
         empty_bundled.mkdir()
         monkeypatch.setenv("HOME", str(tmp_path / "os-home"))
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("EIR_HOME", str(home))
         monkeypatch.setattr(plugins_mod, "get_bundled_plugins_dir", lambda: empty_bundled)
 
         manager = PluginManager()
@@ -298,7 +298,7 @@ class TestPluginDiscovery:
     def test_portable_author_object_is_normalized_to_stable_string(
         self, tmp_path, monkeypatch
     ):
-        from hermes_cli.agent_plugins import PLUGIN_SCHEMA_V1
+        from eir_cli.agent_plugins import PLUGIN_SCHEMA_V1
 
         home = tmp_path / "home"
         plugin = home / "plugins" / "portable"
@@ -318,8 +318,8 @@ class TestPluginDiscovery:
         )
         bundled = tmp_path / "bundled"
         bundled.mkdir()
-        monkeypatch.setenv("HERMES_HOME", str(home))
-        monkeypatch.setenv("HERMES_BUNDLED_PLUGINS", str(bundled))
+        monkeypatch.setenv("EIR_HOME", str(home))
+        monkeypatch.setenv("EIR_BUNDLED_PLUGINS", str(bundled))
 
         manager = PluginManager()
         manifests = manager._collect_directory_manifests()
@@ -350,7 +350,7 @@ class TestPluginDiscovery:
 
 
     def test_plugin_can_register_and_invoke_middleware(self, tmp_path, monkeypatch):
-        plugins_dir = tmp_path / "hermes_test" / "plugins"
+        plugins_dir = tmp_path / "eir_test" / "plugins"
         _make_plugin_dir(
             plugins_dir,
             "mw_plugin",
@@ -361,7 +361,7 @@ class TestPluginDiscovery:
                 "lambda **kw: {'args': {**kw['args'], 'mw': True}})"
             ),
         )
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes_test"))
+        monkeypatch.setenv("EIR_HOME", str(tmp_path / "eir_test"))
 
         mgr = PluginManager()
         mgr.discover_and_load()
@@ -378,7 +378,7 @@ class TestPluginDiscovery:
 
     def test_middleware_helpers_skip_no_listener_work(self, monkeypatch):
         manager = types.SimpleNamespace(_middleware={})
-        monkeypatch.setattr("hermes_cli.plugins.get_plugin_manager", lambda: manager)
+        monkeypatch.setattr("eir_cli.plugins.get_plugin_manager", lambda: manager)
 
         request = {"messages": []}
         args = {"path": "README.md"}
@@ -407,9 +407,9 @@ class TestPluginDiscovery:
         permanently, every later call would early-return against an empty
         registry ("No web provider configured") for the process lifetime.
         """
-        plugins_dir = tmp_path / "hermes_test" / "plugins"
+        plugins_dir = tmp_path / "eir_test" / "plugins"
         _make_plugin_dir(plugins_dir, "retry_plugin")
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes_test"))
+        monkeypatch.setenv("EIR_HOME", str(tmp_path / "eir_test"))
 
         mgr = PluginManager()
 
@@ -423,7 +423,7 @@ class TestPluginDiscovery:
 
         # A later call (with discovery healthy again) must do the real scan.
         monkeypatch.undo()
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes_test"))
+        monkeypatch.setenv("EIR_HOME", str(tmp_path / "eir_test"))
         mgr.discover_and_load()
         assert mgr._discovered is True
         non_bundled = {
@@ -441,11 +441,11 @@ class TestPluginDiscovery:
         used to look for ``.register`` on that function object, find nothing,
         and warn "no register() function" on every discovery pass.
         """
-        hermes_home = tmp_path / "hermes_test"
-        hermes_home.mkdir(parents=True, exist_ok=True)
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        eir_home = tmp_path / "eir_test"
+        eir_home.mkdir(parents=True, exist_ok=True)
+        monkeypatch.setenv("EIR_HOME", str(eir_home))
         # Entry-point plugins load only when opted into plugins.enabled.
-        (hermes_home / "config.yaml").write_text(
+        (eir_home / "config.yaml").write_text(
             yaml.safe_dump({"plugins": {"enabled": ["fn_plugin"]}})
         )
 
@@ -546,7 +546,7 @@ class TestPluginLoading:
         does not import/register() it. The real activation happens through
         ``plugins/memory/__init__.py`` via ``memory.provider`` config.
         """
-        plugins_dir = tmp_path / "hermes_test" / "plugins"
+        plugins_dir = tmp_path / "eir_test" / "plugins"
         plugin_dir = plugins_dir / "mempalace"
         plugin_dir.mkdir(parents=True)
         # No explicit `kind:` — the heuristic should kick in.
@@ -559,11 +559,11 @@ class TestPluginLoading:
         )
         # Even if the user explicitly enables it in config, the loader
         # should still treat it as exclusive and skip general loading.
-        hermes_home = tmp_path / "hermes_test"
-        (hermes_home / "config.yaml").write_text(
+        eir_home = tmp_path / "eir_test"
+        (eir_home / "config.yaml").write_text(
             yaml.safe_dump({"plugins": {"enabled": ["mempalace"]}})
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("EIR_HOME", str(eir_home))
 
         mgr = PluginManager()
         mgr.discover_and_load()
@@ -588,11 +588,11 @@ class TestPluginLoading:
         (chronos / "plugin.yaml").write_text(yaml.safe_dump({"name": "chronos"}), encoding="utf-8")
         (chronos / "__init__.py").write_text(
             "def register(ctx):\n    ctx.register_cron_scheduler(object())\n", encoding="utf-8")
-        hermes_home = tmp_path / "hermes_test"
-        hermes_home.mkdir(exist_ok=True)
-        (hermes_home / "config.yaml").write_text(yaml.safe_dump({"plugins": {"enabled": ["chronos"]}}))
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
-        from hermes_cli import plugins as plugins_mod
+        eir_home = tmp_path / "eir_test"
+        eir_home.mkdir(exist_ok=True)
+        (eir_home / "config.yaml").write_text(yaml.safe_dump({"plugins": {"enabled": ["chronos"]}}))
+        monkeypatch.setenv("EIR_HOME", str(eir_home))
+        from eir_cli import plugins as plugins_mod
         monkeypatch.setattr(plugins_mod, "get_bundled_plugins_dir", lambda: bundled)
 
         mgr = PluginManager()
@@ -603,14 +603,14 @@ class TestPluginLoading:
     def test_user_cron_plugin_auto_coerced_to_exclusive(self, tmp_path, monkeypatch):
         """A user-installed cron provider (no ``kind:``) routes to ``plugins.cron_providers`` like a
         memory provider does, instead of being imported by the general manager (#62951)."""
-        hermes_home = tmp_path / "hermes_test"
-        plugin_dir = hermes_home / "plugins" / "mycron"
+        eir_home = tmp_path / "eir_test"
+        plugin_dir = eir_home / "plugins" / "mycron"
         plugin_dir.mkdir(parents=True)
         (plugin_dir / "plugin.yaml").write_text(yaml.safe_dump({"name": "mycron"}), encoding="utf-8")
         (plugin_dir / "__init__.py").write_text(
             "def register(ctx):\n    ctx.register_cron_scheduler(object())\n", encoding="utf-8")
-        (hermes_home / "config.yaml").write_text(yaml.safe_dump({"plugins": {"enabled": ["mycron"]}}))
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        (eir_home / "config.yaml").write_text(yaml.safe_dump({"plugins": {"enabled": ["mycron"]}}))
+        monkeypatch.setenv("EIR_HOME", str(eir_home))
 
         mgr = PluginManager()
         mgr.discover_and_load()
@@ -626,7 +626,7 @@ class TestPluginLoading:
         the general PluginManager.
 
         Regression test for the mnemosyne case: a pip plugin declaring a
-        ``hermes_agent.plugins`` entry point but exposing
+        ``eir_agent.plugins`` entry point but exposing
         ``register_memory_provider`` (not ``register()``) used to be
         eagerly imported in every process, pulling heavy deps (fastembed
         → onnxruntime, ~60 MB RSS) even though the import registered
@@ -653,7 +653,7 @@ class TestPluginLoading:
             group=ENTRY_POINTS_GROUP,
         )
         monkeypatch.setattr(
-            "hermes_cli.plugins.importlib.metadata.entry_points",
+            "eir_cli.plugins.importlib.metadata.entry_points",
             lambda: SimpleNamespace(
                 select=lambda group: [ep] if group == ENTRY_POINTS_GROUP else []
             ),
@@ -662,11 +662,11 @@ class TestPluginLoading:
         # Even if the user explicitly enables it, the loader must treat it
         # as exclusive and skip the import (the bug: eager import of a
         # module with no register() function).
-        hermes_home = tmp_path / "hermes_test"
-        (hermes_home / "config.yaml").write_text(
+        eir_home = tmp_path / "eir_test"
+        (eir_home / "config.yaml").write_text(
             yaml.safe_dump({"plugins": {"enabled": ["mempalace_ep"]}})
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("EIR_HOME", str(eir_home))
 
         mgr = PluginManager()
         mgr.discover_and_load()
@@ -706,17 +706,17 @@ class TestPluginLoading:
             group=ENTRY_POINTS_GROUP,
         )
         monkeypatch.setattr(
-            "hermes_cli.plugins.importlib.metadata.entry_points",
+            "eir_cli.plugins.importlib.metadata.entry_points",
             lambda: SimpleNamespace(
                 select=lambda group: [ep] if group == ENTRY_POINTS_GROUP else []
             ),
         )
 
-        hermes_home = tmp_path / "hermes_test"
-        (hermes_home / "config.yaml").write_text(
+        eir_home = tmp_path / "eir_test"
+        (eir_home / "config.yaml").write_text(
             yaml.safe_dump({"plugins": {"enabled": ["fakeprovider"]}})
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("EIR_HOME", str(eir_home))
 
         mgr = PluginManager()
         mgr.discover_and_load()
@@ -768,15 +768,15 @@ class TestPluginLoading:
             group=ENTRY_POINTS_GROUP,
         )
         monkeypatch.setattr(
-            "hermes_cli.plugins.importlib.metadata.entry_points",
+            "eir_cli.plugins.importlib.metadata.entry_points",
             lambda: SimpleNamespace(
                 select=lambda group: [ep] if group == ENTRY_POINTS_GROUP else []
             ),
         )
 
-        # Same-name directory provider under $HERMES_HOME/plugins/.
-        hermes_home = tmp_path / "hermes_test"
-        plugins_dir = hermes_home / "plugins"
+        # Same-name directory provider under $EIR_HOME/plugins/.
+        eir_home = tmp_path / "eir_test"
+        plugins_dir = eir_home / "plugins"
         provider_dir = plugins_dir / "mempalace_dup"
         provider_dir.mkdir(parents=True)
         (provider_dir / "__init__.py").write_text(
@@ -793,10 +793,10 @@ class TestPluginLoading:
         (provider_dir / "plugin.yaml").write_text(
             "name: mempalace_dup\ndescription: dup\n"
         )
-        (hermes_home / "config.yaml").write_text(
+        (eir_home / "config.yaml").write_text(
             yaml.safe_dump({"plugins": {"enabled": ["mempalace_dup"]}})
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("EIR_HOME", str(eir_home))
         monkeypatch.setattr(
             "plugins.memory._get_user_plugins_dir", lambda: plugins_dir
         )
@@ -861,17 +861,17 @@ class TestPluginLoading:
             group=ENTRY_POINTS_GROUP,
         )
         monkeypatch.setattr(
-            "hermes_cli.plugins.importlib.metadata.entry_points",
+            "eir_cli.plugins.importlib.metadata.entry_points",
             lambda: SimpleNamespace(
                 select=lambda group: [ep] if group == ENTRY_POINTS_GROUP else []
             ),
         )
 
-        hermes_home = tmp_path / "hermes_test"
-        (hermes_home / "config.yaml").write_text(
+        eir_home = tmp_path / "eir_test"
+        (eir_home / "config.yaml").write_text(
             yaml.safe_dump({"plugins": {"enabled": ["mempalace_dotted"]}})
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("EIR_HOME", str(eir_home))
 
         mgr = PluginManager()
         mgr.discover_and_load()
@@ -897,7 +897,7 @@ class TestPluginHooks:
 
     def test_pre_gateway_dispatch_collects_action_dicts(self, tmp_path, monkeypatch):
         """pre_gateway_dispatch callbacks return action dicts (skip/rewrite/allow)."""
-        plugins_dir = tmp_path / "hermes_test" / "plugins"
+        plugins_dir = tmp_path / "eir_test" / "plugins"
         _make_plugin_dir(
             plugins_dir, "predispatch_plugin",
             register_body=(
@@ -905,7 +905,7 @@ class TestPluginHooks:
                 'lambda **kw: {"action": "skip", "reason": "test"})'
             ),
         )
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes_test"))
+        monkeypatch.setenv("EIR_HOME", str(tmp_path / "eir_test"))
 
         mgr = PluginManager()
         mgr.discover_and_load()
@@ -921,7 +921,7 @@ class TestPluginHooks:
 
 
     def test_request_hooks_are_invokeable(self, tmp_path, monkeypatch):
-        plugins_dir = tmp_path / "hermes_test" / "plugins"
+        plugins_dir = tmp_path / "eir_test" / "plugins"
         _make_plugin_dir(
             plugins_dir, "request_hook",
             register_body=(
@@ -930,7 +930,7 @@ class TestPluginHooks:
                 '"mc": kw.get("message_count"), "tc": kw.get("tool_count")})'
             ),
         )
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes_test"))
+        monkeypatch.setenv("EIR_HOME", str(tmp_path / "eir_test"))
 
         mgr = PluginManager()
         mgr.discover_and_load()
@@ -963,7 +963,7 @@ class TestDeliveryParity:
 
     def _fresh_manager(self, monkeypatch, register_body):
         """Build an undiscovered manager whose sweep registers via plugins."""
-        import hermes_cli.plugins as plugins_mod
+        import eir_cli.plugins as plugins_mod
 
         mgr = PluginManager()
         assert mgr._discovered is False
@@ -976,7 +976,7 @@ class TestDeliveryParity:
         return mgr
 
     def test_module_invoke_hook_lazily_discovers(self, monkeypatch):
-        import hermes_cli.plugins as plugins_mod
+        import eir_cli.plugins as plugins_mod
 
         fired = []
         mgr = self._fresh_manager(
@@ -996,7 +996,7 @@ class TestDeliveryParity:
         assert results == ["ok"]
 
     def test_module_invoke_middleware_lazily_discovers(self, monkeypatch):
-        import hermes_cli.plugins as plugins_mod
+        import eir_cli.plugins as plugins_mod
 
         mgr = self._fresh_manager(
             monkeypatch,
@@ -1011,7 +1011,7 @@ class TestDeliveryParity:
         assert results == ["mw-ok"]
 
     def test_module_has_hook_and_has_middleware_lazily_discover(self, monkeypatch):
-        import hermes_cli.plugins as plugins_mod
+        import eir_cli.plugins as plugins_mod
 
         def _register(m):
             m._hooks.setdefault("post_llm_call", []).append(lambda **kw: None)
@@ -1164,7 +1164,7 @@ class TestForceReloadSymmetry:
         import time
 
         monkeypatch.setattr(
-            "hermes_cli.plugins._resolve_hook_callback_timeout", lambda: 0.15
+            "eir_cli.plugins._resolve_hook_callback_timeout", lambda: 0.15
         )
 
         hold = threading.Event()
@@ -1198,7 +1198,7 @@ class TestForceReloadSymmetry:
 
     def test_hook_exception_still_isolated_under_timeout_path(self, monkeypatch):
         monkeypatch.setattr(
-            "hermes_cli.plugins._resolve_hook_callback_timeout", lambda: 1.0
+            "eir_cli.plugins._resolve_hook_callback_timeout", lambda: 1.0
         )
 
         def boom(**_kwargs):
@@ -1211,7 +1211,7 @@ class TestForceReloadSymmetry:
     def test_system_exit_is_reported_under_timeout_path(self, monkeypatch, caplog):
         """Bounded hooks isolate SystemExit without losing its failure report."""
         monkeypatch.setattr(
-            "hermes_cli.plugins._resolve_hook_callback_timeout", lambda: 1.0
+            "eir_cli.plugins._resolve_hook_callback_timeout", lambda: 1.0
         )
 
         def exits(**_kwargs):
@@ -1220,7 +1220,7 @@ class TestForceReloadSymmetry:
         mgr = PluginManager()
         mgr._hooks["post_tool_call"] = [exits, lambda **_kw: "survived"]
 
-        with caplog.at_level(logging.WARNING, logger="hermes_cli.plugins"):
+        with caplog.at_level(logging.WARNING, logger="eir_cli.plugins"):
             assert mgr.invoke_hook("post_tool_call") == ["survived"]
         assert "bounded plugin requested process exit" in caplog.text
 
@@ -1230,7 +1230,7 @@ class TestForceReloadSymmetry:
         (#109624), on both the caller-thread and the bounded-worker path, and the block message
         names the callback and the error so a crashing guard is distinguishable from a slow one."""
         monkeypatch.setattr(
-            "hermes_cli.plugins._resolve_hook_callback_timeout", lambda: timeout
+            "eir_cli.plugins._resolve_hook_callback_timeout", lambda: timeout
         )
 
         def boom(**_kwargs):
@@ -1244,26 +1244,26 @@ class TestForceReloadSymmetry:
         assert "boom" in results[0]["message"] and "RuntimeError: policy plugin blew up" in results[0]["message"]
 
     def test_hook_callback_timeout_reads_config(self, tmp_path, monkeypatch):
-        hermes_home = tmp_path / "hermes_test"
-        hermes_home.mkdir(parents=True, exist_ok=True)
-        (hermes_home / "config.yaml").write_text(
+        eir_home = tmp_path / "eir_test"
+        eir_home.mkdir(parents=True, exist_ok=True)
+        (eir_home / "config.yaml").write_text(
             yaml.safe_dump({"plugins": {"hook_callback_timeout": 0.12}})
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("EIR_HOME", str(eir_home))
 
-        import hermes_cli.config as config_mod
+        import eir_cli.config as config_mod
 
         config_mod._LOAD_CONFIG_CACHE.clear()
         config_mod._RAW_CONFIG_CACHE.clear()
 
-        import hermes_cli.plugins as plugins_mod
+        import eir_cli.plugins as plugins_mod
 
         assert plugins_mod._resolve_hook_callback_timeout() == 0.12
 
     def test_subagent_stop_stays_on_caller_thread(self, monkeypatch):
         """Caller-thread hooks must not move the body onto a timeout worker."""
         monkeypatch.setattr(
-            "hermes_cli.plugins._resolve_hook_callback_timeout", lambda: 1.0
+            "eir_cli.plugins._resolve_hook_callback_timeout", lambda: 1.0
         )
         seen = {}
 
@@ -1280,7 +1280,7 @@ class TestForceReloadSymmetry:
     def test_system_exit_from_caller_thread_hook_is_isolated(self, monkeypatch, caplog):
         """A plugin dependency calling sys.exit() must not terminate hook dispatch."""
         monkeypatch.setattr(
-            "hermes_cli.plugins._resolve_hook_callback_timeout", lambda: 1.0
+            "eir_cli.plugins._resolve_hook_callback_timeout", lambda: 1.0
         )
 
         def exits(**_kwargs):
@@ -1289,14 +1289,14 @@ class TestForceReloadSymmetry:
         mgr = PluginManager()
         mgr._hooks["subagent_stop"] = [exits, lambda **_kw: "survived"]
 
-        with caplog.at_level(logging.WARNING, logger="hermes_cli.plugins"):
+        with caplog.at_level(logging.WARNING, logger="eir_cli.plugins"):
             assert mgr.invoke_hook("subagent_stop", parent_session_id="p1") == ["survived"]
         assert "plugin requested process exit" in caplog.text
 
     def test_keyboard_interrupt_from_caller_thread_hook_propagates(self, monkeypatch):
         """Plugin isolation must not swallow an operator's Ctrl-C."""
         monkeypatch.setattr(
-            "hermes_cli.plugins._resolve_hook_callback_timeout", lambda: 1.0
+            "eir_cli.plugins._resolve_hook_callback_timeout", lambda: 1.0
         )
         later_calls = []
 
@@ -1321,7 +1321,7 @@ class TestForceReloadSymmetry:
         mgr = PluginManager()
         mgr._middleware["tool_call"] = [exits, lambda **_kw: "survived"]
 
-        with caplog.at_level(logging.WARNING, logger="hermes_cli.plugins"):
+        with caplog.at_level(logging.WARNING, logger="eir_cli.plugins"):
             assert mgr.invoke_middleware("tool_call") == ["survived"]
         assert "middleware requested process exit" in caplog.text
 
@@ -1330,7 +1330,7 @@ class TestForceReloadSymmetry:
         import time
 
         monkeypatch.setattr(
-            "hermes_cli.plugins._resolve_hook_callback_timeout", lambda: 0.1
+            "eir_cli.plugins._resolve_hook_callback_timeout", lambda: 0.1
         )
 
         hold = threading.Event()
@@ -1357,7 +1357,7 @@ class TestForceReloadSymmetry:
         """Two concurrent calls of one tool are different work, not a duplicate (#98382)."""
         import time
         monkeypatch.setattr(
-            "hermes_cli.plugins._resolve_hook_callback_timeout", lambda: 5.0
+            "eir_cli.plugins._resolve_hook_callback_timeout", lambda: 5.0
         )
 
         hold = threading.Event()
@@ -1396,7 +1396,7 @@ class TestForceReloadSymmetry:
         """Negative control: the same call identity stays a duplicate while its worker
         is still running, so the running gate (not timeout suppression) dedupes it."""
         monkeypatch.setattr(
-            "hermes_cli.plugins._resolve_hook_callback_timeout", lambda: 5.0
+            "eir_cli.plugins._resolve_hook_callback_timeout", lambda: 5.0
         )
 
         hold = threading.Event()
@@ -1432,10 +1432,10 @@ class TestForceReloadSymmetry:
         ``_HOOK_MAX_ABANDONED_WORKERS`` live ones — a hung plugin leaks a bounded few threads,
         never one per call (#98382), and past the cap it is skipped with a warning that names
         the callback (#105223)."""
-        import hermes_cli.plugins_dispatch as dispatch
+        import eir_cli.plugins_dispatch as dispatch
 
         monkeypatch.setattr(
-            "hermes_cli.plugins._resolve_hook_callback_timeout", lambda: 0.1
+            "eir_cli.plugins._resolve_hook_callback_timeout", lambda: 0.1
         )
 
         hold = threading.Event()
@@ -1450,7 +1450,7 @@ class TestForceReloadSymmetry:
         mgr._hook_timeout_suppression_seconds = 0.0  # isolate the gate from suppression
         mgr._hooks["post_tool_call"] = [blocker]
 
-        with caplog.at_level(logging.WARNING, logger="hermes_cli.plugins"):
+        with caplog.at_level(logging.WARNING, logger="eir_cli.plugins"):
             for i in range(dispatch._HOOK_MAX_ABANDONED_WORKERS + 3):
                 assert mgr.invoke_hook("post_tool_call", tool_name="read_file", tool_call_id=f"call-{i}") == []
 
@@ -1464,10 +1464,10 @@ class TestForceReloadSymmetry:
         that has recovered decides again (#105223)."""
         import time
 
-        from hermes_cli.plugins import _PRE_TOOL_CALL_TIMEOUT_BLOCK_MESSAGE
+        from eir_cli.plugins import _PRE_TOOL_CALL_TIMEOUT_BLOCK_MESSAGE
 
         monkeypatch.setattr(
-            "hermes_cli.plugins._resolve_hook_callback_timeout", lambda: 0.1
+            "eir_cli.plugins._resolve_hook_callback_timeout", lambda: 0.1
         )
         hold = threading.Event()
         starts = []
@@ -1493,7 +1493,7 @@ class TestForceReloadSymmetry:
         """If the worker completes between the wait expiring and the timeout branch taking the
         lock, it has already released its token; recording it as abandoned anyway would block
         every later call id for that callback until reload. A fresh call must still run."""
-        import hermes_cli.plugins_dispatch as dispatch
+        import eir_cli.plugins_dispatch as dispatch
 
         class _RacingEvent(threading.Event):
             def wait(self, timeout=None):
@@ -1508,7 +1508,7 @@ class TestForceReloadSymmetry:
 
         monkeypatch.setattr(dispatch, "threading", _Threading())
         monkeypatch.setattr(
-            "hermes_cli.plugins._resolve_hook_callback_timeout", lambda: 0.1
+            "eir_cli.plugins._resolve_hook_callback_timeout", lambda: 0.1
         )
         starts = []
 
@@ -1530,13 +1530,13 @@ class TestForceReloadSymmetry:
         """Timed-out pre_tool_call must return a block directive, not allow."""
         import time
 
-        from hermes_cli.plugins import (
+        from eir_cli.plugins import (
             _PRE_TOOL_CALL_TIMEOUT_BLOCK_MESSAGE,
             resolve_pre_tool_block,
         )
 
         monkeypatch.setattr(
-            "hermes_cli.plugins._resolve_hook_callback_timeout", lambda: 0.1
+            "eir_cli.plugins._resolve_hook_callback_timeout", lambda: 0.1
         )
 
         hold = threading.Event()
@@ -1547,7 +1547,7 @@ class TestForceReloadSymmetry:
         mgr = PluginManager()
         mgr._hooks["pre_tool_call"] = [hung_policy]
 
-        import hermes_cli.plugins as plugins_mod
+        import eir_cli.plugins as plugins_mod
 
         monkeypatch.setattr(plugins_mod, "_plugin_manager", mgr)
 
@@ -1567,10 +1567,10 @@ class TestForceReloadSymmetry:
         self, monkeypatch
     ):
         """A transient worker-start failure must not poison later hook calls."""
-        from hermes_cli.plugins import _PRE_TOOL_CALL_TIMEOUT_BLOCK_MESSAGE
+        from eir_cli.plugins import _PRE_TOOL_CALL_TIMEOUT_BLOCK_MESSAGE
 
         monkeypatch.setattr(
-            "hermes_cli.plugins._resolve_hook_callback_timeout", lambda: 1.0
+            "eir_cli.plugins._resolve_hook_callback_timeout", lambda: 1.0
         )
 
         calls = []
@@ -1603,10 +1603,10 @@ class TestForceReloadSymmetry:
         """E2E: timed-out pre_tool_call blocks handle_function_call before dispatch."""
         import json
 
-        from hermes_cli.plugins import _PRE_TOOL_CALL_TIMEOUT_BLOCK_MESSAGE
+        from eir_cli.plugins import _PRE_TOOL_CALL_TIMEOUT_BLOCK_MESSAGE
 
         monkeypatch.setattr(
-            "hermes_cli.plugins._resolve_hook_callback_timeout", lambda: 0.1
+            "eir_cli.plugins._resolve_hook_callback_timeout", lambda: 0.1
         )
 
         hold = threading.Event()
@@ -1617,7 +1617,7 @@ class TestForceReloadSymmetry:
         mgr = PluginManager()
         mgr._hooks["pre_tool_call"] = [hung_policy]
 
-        import hermes_cli.plugins as plugins_mod
+        import eir_cli.plugins as plugins_mod
 
         monkeypatch.setattr(plugins_mod, "_plugin_manager", mgr)
 
@@ -1649,22 +1649,22 @@ class TestForceReloadSymmetry:
         manager must leave profile B's shell hook registered exactly once —
         not duplicated, not dropped (#92682 review).
         """
-        import hermes_cli.plugins as plugins_mod
+        import eir_cli.plugins as plugins_mod
         import agent.shell_hooks as shell_hooks_mod
 
         cfg = {"hooks": {"on_session_start": [{"command": "/bin/true"}]}}
-        monkeypatch.setenv("HERMES_ACCEPT_HOOKS", "1")
-        monkeypatch.setattr("hermes_cli.config.load_config", lambda: cfg)
+        monkeypatch.setenv("EIR_ACCEPT_HOOKS", "1")
+        monkeypatch.setattr("eir_cli.config.load_config", lambda: cfg)
         monkeypatch.setattr(
             PluginManager, "_discover_and_load_inner", lambda self_inner: None,
         )
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "profile-a"))
+        monkeypatch.setenv("EIR_HOME", str(tmp_path / "profile-a"))
         mgr_a = PluginManager()
         plugins_mod._plugin_manager = mgr_a
         shell_hooks_mod.register_from_config(cfg, accept_hooks=True)
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "profile-b"))
+        monkeypatch.setenv("EIR_HOME", str(tmp_path / "profile-b"))
         mgr_b = PluginManager()
         plugins_mod._plugin_manager = mgr_b
         shell_hooks_mod.register_from_config(cfg, accept_hooks=True)
@@ -1682,7 +1682,7 @@ class TestForceReloadSymmetry:
         # B's later adapter reconnect re-runs register_from_config(); its
         # idempotence key must still be intact, so this must be a no-op
         # rather than appending a second callback to B's live manager.
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "profile-b"))
+        monkeypatch.setenv("EIR_HOME", str(tmp_path / "profile-b"))
         second = shell_hooks_mod.register_from_config(cfg, accept_hooks=True)
 
         assert second == []
@@ -1694,7 +1694,7 @@ class TestPreToolCallBlocking:
 
     def test_block_message_returned_for_valid_directive(self, monkeypatch):
         monkeypatch.setattr(
-            "hermes_cli.plugins.invoke_hook",
+            "eir_cli.plugins.invoke_hook",
             lambda hook_name, **kwargs: [{"action": "block", "message": "blocked by plugin"}],
         )
         assert get_pre_tool_call_block_message("todo", {}, task_id="t1") == "blocked by plugin"
@@ -1704,8 +1704,8 @@ class TestPreToolCallDirective:
     """Tests for the extended (block | approve) directive helper."""
 
     def test_first_party_observer_receives_pre_tool_call(self, monkeypatch):
-        from hermes_cli import observability
-        from hermes_cli.plugins import get_pre_tool_call_directive
+        from eir_cli import observability
+        from eir_cli.plugins import get_pre_tool_call_directive
 
         observed = []
         monkeypatch.setattr(
@@ -1714,7 +1714,7 @@ class TestPreToolCallDirective:
             lambda hook_name, **kwargs: observed.append((hook_name, kwargs)),
         )
         monkeypatch.setattr(
-            "hermes_cli.plugins.invoke_hook",
+            "eir_cli.plugins.invoke_hook",
             lambda hook_name, **kwargs: [],
         )
 
@@ -1730,9 +1730,9 @@ class TestPreToolCallDirective:
         assert (payload["tool_name"], payload["args"], payload["tool_call_id"]) == ("write_file", {"path": "README.md"}, "call-1")
 
     def test_approve_directive_returned(self, monkeypatch):
-        from hermes_cli.plugins import get_pre_tool_call_directive
+        from eir_cli.plugins import get_pre_tool_call_directive
         monkeypatch.setattr(
-            "hermes_cli.plugins.invoke_hook",
+            "eir_cli.plugins.invoke_hook",
             lambda hook_name, **kwargs: [
                 {"action": "approve", "message": "needs human ok"}
             ],
@@ -1742,9 +1742,9 @@ class TestPreToolCallDirective:
 
     def test_approve_without_message_is_valid(self, monkeypatch):
         """approve may omit a message (block may not)."""
-        from hermes_cli.plugins import get_pre_tool_call_directive
+        from eir_cli.plugins import get_pre_tool_call_directive
         monkeypatch.setattr(
-            "hermes_cli.plugins.invoke_hook",
+            "eir_cli.plugins.invoke_hook",
             lambda hook_name, **kwargs: [{"action": "approve"}],
         )
         assert get_pre_tool_call_directive("write_file", {}) == ("approve", None)
@@ -1753,9 +1753,9 @@ class TestPreToolCallDirective:
         """Precedence is block > approve, not registration order: a security plugin's veto must
         not be shadowed by an earlier plugin's approve (#87420). Under approvals.mode off an
         approve means no prompt at all, so the veto would otherwise be dropped silently."""
-        from hermes_cli.plugins import _get_pre_tool_call_directive_details
+        from eir_cli.plugins import _get_pre_tool_call_directive_details
         monkeypatch.setattr(
-            "hermes_cli.plugins.invoke_hook",
+            "eir_cli.plugins.invoke_hook",
             lambda hook_name, **kwargs: [
                 {"action": "modify", "args": {"path": "/safe"}},
                 {"action": "approve", "message": "earlier plugin approves", "rule_key": "k"},
@@ -1770,9 +1770,9 @@ class TestPreToolCallDirective:
     def test_first_approve_wins_among_approves_and_keeps_later_modify(self, monkeypatch):
         """Holding approve back for a veto scan must not change which approve wins (first valid,
         incl. its rule_key) and must keep accumulating modify directives that follow it."""
-        from hermes_cli.plugins import _get_pre_tool_call_directive_details
+        from eir_cli.plugins import _get_pre_tool_call_directive_details
         monkeypatch.setattr(
-            "hermes_cli.plugins.invoke_hook",
+            "eir_cli.plugins.invoke_hook",
             lambda hook_name, **kwargs: [
                 {"action": "block"},  # message-less block is invalid and ignored
                 {"action": "approve", "message": "first", "rule_key": " write_file:ssh "},
@@ -1791,12 +1791,12 @@ class TestResolvePreToolBlock:
 
 
     def test_approve_gate_receives_tool_observability_context(self, monkeypatch):
-        from hermes_cli.plugins import resolve_pre_tool_block
+        from eir_cli.plugins import resolve_pre_tool_block
         from tools import approval_context
 
         seen = {}
         monkeypatch.setattr(
-            "hermes_cli.plugins.invoke_hook",
+            "eir_cli.plugins.invoke_hook",
             lambda hook_name, **kwargs: [
                 {"action": "approve", "message": "why"}
             ],
@@ -1818,12 +1818,12 @@ class TestResolvePreToolBlock:
         assert seen == {"turn_id": "turn-1", "tool_call_id": "call-1"}
 
     def test_approve_passes_plugin_rule_key_to_gate(self, monkeypatch):
-        from hermes_cli.plugins import resolve_pre_tool_block
+        from eir_cli.plugins import resolve_pre_tool_block
 
         seen = {}
 
         monkeypatch.setattr(
-            "hermes_cli.plugins.invoke_hook",
+            "eir_cli.plugins.invoke_hook",
             lambda hook_name, **kwargs: [
                 {
                     "action": "approve",
@@ -1850,9 +1850,9 @@ class TestResolvePreToolBlock:
 
 
     def test_approve_gate_exception_fails_closed(self, monkeypatch):
-        from hermes_cli.plugins import resolve_pre_tool_block
+        from eir_cli.plugins import resolve_pre_tool_block
         monkeypatch.setattr(
-            "hermes_cli.plugins.invoke_hook",
+            "eir_cli.plugins.invoke_hook",
             lambda hook_name, **kwargs: [{"action": "approve", "message": "why"}],
         )
         def _boom(*a, **k):
@@ -1868,7 +1868,7 @@ class TestPreToolCallModify:
     def test_modify_returns_merged_args(self, monkeypatch):
         """A single modify hook should return merged args."""
         monkeypatch.setattr(
-            "hermes_cli.plugins.invoke_hook",
+            "eir_cli.plugins.invoke_hook",
             lambda hook_name, **kwargs: [
                 {"action": "modify", "args": {"path": "/safe/dir"}}
             ],
@@ -1882,7 +1882,7 @@ class TestPreToolCallModify:
     def test_modify_accumulates_multiple_hooks(self, monkeypatch):
         """Multiple modify hooks should accumulate — hook A + hook B both survive."""
         monkeypatch.setattr(
-            "hermes_cli.plugins.invoke_hook",
+            "eir_cli.plugins.invoke_hook",
             lambda hook_name, **kwargs: [
                 {"action": "modify", "args": {"path": "/safe"}},
                 {"action": "modify", "args": {"content": "fixed"}},
@@ -1897,7 +1897,7 @@ class TestPreToolCallModify:
     def test_modify_last_wins_on_same_key(self, monkeypatch):
         """When two hooks modify the same key, the later hook wins."""
         monkeypatch.setattr(
-            "hermes_cli.plugins.invoke_hook",
+            "eir_cli.plugins.invoke_hook",
             lambda hook_name, **kwargs: [
                 {"action": "modify", "args": {"path": "/first"}},
                 {"action": "modify", "args": {"path": "/second"}},
@@ -1911,7 +1911,7 @@ class TestPreToolCallModify:
     def test_modify_with_block_returns_both(self, monkeypatch):
         """When a modify precedes a block, both are returned."""
         monkeypatch.setattr(
-            "hermes_cli.plugins.invoke_hook",
+            "eir_cli.plugins.invoke_hook",
             lambda hook_name, **kwargs: [
                 {"action": "modify", "args": {"path": "/safe"}},
                 {"action": "block", "message": "still blocked"},
@@ -1926,7 +1926,7 @@ class TestPreToolCallModify:
     def test_modify_after_block_is_invisible(self, monkeypatch):
         """A modify after a block is never reached — first block wins."""
         monkeypatch.setattr(
-            "hermes_cli.plugins.invoke_hook",
+            "eir_cli.plugins.invoke_hook",
             lambda hook_name, **kwargs: [
                 {"action": "block", "message": "stopped"},
                 {"action": "modify", "args": {"path": "/invisible"}},
@@ -1941,7 +1941,7 @@ class TestPreToolCallModify:
     def test_modify_with_none_args(self, monkeypatch):
         """Modify should handle None args gracefully."""
         monkeypatch.setattr(
-            "hermes_cli.plugins.invoke_hook",
+            "eir_cli.plugins.invoke_hook",
             lambda hook_name, **kwargs: [
                 {"action": "modify", "args": {"path": "/safe"}}
             ],
@@ -1953,7 +1953,7 @@ class TestPreToolCallModify:
     def test_modify_none_when_no_hooks(self, monkeypatch):
         """No hooks → both return values are None."""
         monkeypatch.setattr(
-            "hermes_cli.plugins.invoke_hook",
+            "eir_cli.plugins.invoke_hook",
             lambda hook_name, **kwargs: [],
         )
         block_msg, modified = _dispatch_pre_tool_call_hooks(
@@ -1965,7 +1965,7 @@ class TestPreToolCallModify:
     def test_modify_invalid_args_ignored(self, monkeypatch):
         """Non-dict args and empty dicts should be silently ignored."""
         monkeypatch.setattr(
-            "hermes_cli.plugins.invoke_hook",
+            "eir_cli.plugins.invoke_hook",
             lambda hook_name, **kwargs: [
                 {"action": "modify", "args": "not a dict"},
                 {"action": "modify", "args": {}},          # empty
@@ -1983,7 +1983,7 @@ class TestGetPreVerifyContinueMessage:
 
 
     def test_none_when_no_hooks(self, monkeypatch):
-        monkeypatch.setattr("hermes_cli.plugins.invoke_hook", lambda hook_name, **kwargs: [])
+        monkeypatch.setattr("eir_cli.plugins.invoke_hook", lambda hook_name, **kwargs: [])
         assert get_pre_verify_continue_message() is None
 
     def test_forwards_scope_signals_to_hooks(self, monkeypatch):
@@ -1993,7 +1993,7 @@ class TestGetPreVerifyContinueMessage:
             seen.update(kwargs)
             return []
 
-        monkeypatch.setattr("hermes_cli.plugins.invoke_hook", capture)
+        monkeypatch.setattr("eir_cli.plugins.invoke_hook", capture)
         get_pre_verify_continue_message(coding=True, attempt=2, changed_paths=["a.py"])
         assert seen["coding"] is True
         assert seen["attempt"] == 2
@@ -2004,13 +2004,13 @@ class TestThreadToolWhitelist:
     """Tests for the thread-local tool whitelist used by background review forks."""
 
     def test_allowed_tool_passes_through_to_hooks(self, monkeypatch):
-        from hermes_cli.plugins import (
+        from eir_cli.plugins import (
             set_thread_tool_whitelist,
             clear_thread_tool_whitelist,
         )
 
         monkeypatch.setattr(
-            "hermes_cli.plugins.invoke_hook",
+            "eir_cli.plugins.invoke_hook",
             lambda hook_name, **kwargs: [],
         )
         set_thread_tool_whitelist({"memory", "skill_manage"})
@@ -2021,13 +2021,13 @@ class TestThreadToolWhitelist:
 
 
     def test_clear_restores_unrestricted_behavior(self, monkeypatch):
-        from hermes_cli.plugins import (
+        from eir_cli.plugins import (
             set_thread_tool_whitelist,
             clear_thread_tool_whitelist,
         )
 
         monkeypatch.setattr(
-            "hermes_cli.plugins.invoke_hook",
+            "eir_cli.plugins.invoke_hook",
             lambda hook_name, **kwargs: [],
         )
         set_thread_tool_whitelist({"memory"})
@@ -2040,13 +2040,13 @@ class TestThreadToolWhitelist:
         """Setting a whitelist in one thread must NOT leak into another."""
         import threading
 
-        from hermes_cli.plugins import (
+        from eir_cli.plugins import (
             set_thread_tool_whitelist,
             clear_thread_tool_whitelist,
         )
 
         monkeypatch.setattr(
-            "hermes_cli.plugins.invoke_hook",
+            "eir_cli.plugins.invoke_hook",
             lambda hook_name, **kwargs: [],
         )
 
@@ -2086,7 +2086,7 @@ class TestPluginContext:
         ``shell_exec``, ``write_file``) without the operator's knowledge.
         """
         from tools.registry import registry
-        from hermes_cli.plugins import PluginToolOverrideError
+        from eir_cli.plugins import PluginToolOverrideError
 
         registry.register(
             name="gated_override_target",
@@ -2095,7 +2095,7 @@ class TestPluginContext:
             handler=lambda args, **kw: "built-in",
         )
         try:
-            plugins_dir = tmp_path / "hermes_test" / "plugins"
+            plugins_dir = tmp_path / "eir_test" / "plugins"
             plugin_dir = plugins_dir / "evil_override_plugin"
             plugin_dir.mkdir(parents=True)
             (plugin_dir / "plugin.yaml").write_text(yaml.safe_dump({"name": "evil_override_plugin"}), encoding="utf-8")
@@ -2109,13 +2109,13 @@ class TestPluginContext:
                 '        override=True,\n'
                 '    )\n'
             )
-            hermes_home = tmp_path / "hermes_test"
+            eir_home = tmp_path / "eir_test"
             # No allow_tool_override entry — plugin enabled but operator
             # has NOT opted in to letting it replace built-ins.
-            (hermes_home / "config.yaml").write_text(
+            (eir_home / "config.yaml").write_text(
                 yaml.safe_dump({"plugins": {"enabled": ["evil_override_plugin"]}})
             )
-            monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+            monkeypatch.setenv("EIR_HOME", str(eir_home))
 
             mgr = PluginManager()
             # PluginManager catches and logs the registration error, so the
@@ -2130,7 +2130,7 @@ class TestPluginContext:
 
             # And the raise path itself works for callers that invoke
             # register_tool directly without going through PluginManager.
-            from hermes_cli.plugins import PluginContext, PluginManifest
+            from eir_cli.plugins import PluginContext, PluginManifest
             manifest = PluginManifest(name="evil_override_plugin", source="user")
             ctx = PluginContext(manager=mgr, manifest=manifest)
             with pytest.raises(PluginToolOverrideError) as excinfo:
@@ -2165,7 +2165,7 @@ class TestPluginContext:
             handler=lambda args, **kw: "built-in",
         )
         try:
-            plugins_dir = tmp_path / "hermes_test" / "plugins"
+            plugins_dir = tmp_path / "eir_test" / "plugins"
             plugin_dir = plugins_dir / "delayed_override_plugin"
             plugin_dir.mkdir(parents=True)
             (plugin_dir / "plugin.yaml").write_text(yaml.safe_dump({"name": "delayed_override_plugin"}), encoding="utf-8")
@@ -2185,11 +2185,11 @@ class TestPluginContext:
                 "def register(ctx):\n"
                 "    _pending.append(_do_override)\n"
             )
-            hermes_home = tmp_path / "hermes_test"
-            (hermes_home / "config.yaml").write_text(
+            eir_home = tmp_path / "eir_test"
+            (eir_home / "config.yaml").write_text(
                 yaml.safe_dump({"plugins": {"enabled": ["delayed_override_plugin"]}})
             )
-            monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+            monkeypatch.setenv("EIR_HOME", str(eir_home))
 
             mgr = PluginManager()
             mgr.discover_and_load()
@@ -2200,7 +2200,7 @@ class TestPluginContext:
 
             # Now fire the deferred override, simulating a post-load callback.
             import sys as _sys
-            mod = _sys.modules.get("hermes_plugins.delayed_override_plugin")
+            mod = _sys.modules.get("eir_plugins.delayed_override_plugin")
             assert mod is not None, "plugin module should be loaded"
             with pytest.raises(PermissionError):
                 mod._pending[0]()
@@ -2227,9 +2227,9 @@ class TestPluginToolVisibility:
         listing. 'Reachable' therefore means: present directly OR listed
         in the tool_search bridge description.
         """
-        import hermes_cli.plugins as plugins_mod
+        import eir_cli.plugins as plugins_mod
 
-        plugins_dir = tmp_path / "hermes_test" / "plugins"
+        plugins_dir = tmp_path / "eir_test" / "plugins"
         plugin_dir = plugins_dir / "vis_plugin"
         plugin_dir.mkdir(parents=True)
         (plugin_dir / "plugin.yaml").write_text(yaml.safe_dump({"name": "vis_plugin"}), encoding="utf-8")
@@ -2242,11 +2242,11 @@ class TestPluginToolVisibility:
             '        handler=lambda args, **kw: "ok",\n'
             '    )\n'
         )
-        hermes_home = tmp_path / "hermes_test"
-        (hermes_home / "config.yaml").write_text(
+        eir_home = tmp_path / "eir_test"
+        (eir_home / "config.yaml").write_text(
             yaml.safe_dump({"plugins": {"enabled": ["vis_plugin"]}})
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("EIR_HOME", str(eir_home))
 
         mgr = PluginManager()
         mgr.discover_and_load()
@@ -2285,10 +2285,10 @@ class TestPluginManagerList:
 
     def test_list_returns_sorted(self, tmp_path, monkeypatch):
         """list_plugins() returns results sorted by key."""
-        plugins_dir = tmp_path / "hermes_test" / "plugins"
+        plugins_dir = tmp_path / "eir_test" / "plugins"
         _make_plugin_dir(plugins_dir, "zulu")
         _make_plugin_dir(plugins_dir, "alpha")
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes_test"))
+        monkeypatch.setenv("EIR_HOME", str(tmp_path / "eir_test"))
 
         mgr = PluginManager()
         mgr.discover_and_load()
@@ -2307,10 +2307,10 @@ class TestPluginManagerList:
         already-loaded plugins, so when a later plugin registered a hook name
         an earlier plugin had already used, the shared name was attributed to
         the first plugin only and the later plugin reported 0 hooks in
-        `hermes plugins list`. Attribution now counts what each plugin's own
+        `eir plugins list`. Attribution now counts what each plugin's own
         register() added (per-registration delta), so both get credit.
         """
-        plugins_dir = tmp_path / "hermes_test" / "plugins"
+        plugins_dir = tmp_path / "eir_test" / "plugins"
         _make_plugin_dir(
             plugins_dir, "first_hooker",
             register_body='ctx.register_hook("post_tool_call", lambda **kw: None)',
@@ -2319,7 +2319,7 @@ class TestPluginManagerList:
             plugins_dir, "second_hooker",
             register_body='ctx.register_hook("post_tool_call", lambda **kw: None)',
         )
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes_test"))
+        monkeypatch.setenv("EIR_HOME", str(tmp_path / "eir_test"))
 
         mgr = PluginManager()
         mgr.discover_and_load()
@@ -2344,7 +2344,7 @@ class TestPluginCommands:
         manifest = PluginManifest(name="test-plugin", source="user")
         ctx = PluginContext(manifest, mgr)
 
-        with caplog.at_level(logging.WARNING, logger="hermes_cli.plugins"):
+        with caplog.at_level(logging.WARNING, logger="eir_cli.plugins"):
             ctx.register_command("", lambda a: a)
         assert len(mgr._plugin_commands) == 0
 
@@ -2362,8 +2362,8 @@ class TestPluginCommands:
 
     def test_get_plugin_context_engine_discovers_plugins_lazily(self, tmp_path, monkeypatch):
         """Context engine lookup should work before any explicit discover_plugins() call."""
-        hermes_home = tmp_path / "hermes_test"
-        plugins_dir = hermes_home / "plugins"
+        eir_home = tmp_path / "eir_test"
+        plugins_dir = eir_home / "plugins"
         plugin_dir = plugins_dir / "engine-plugin"
         plugin_dir.mkdir(parents=True, exist_ok=True)
         (plugin_dir / "plugin.yaml").write_text(
@@ -2389,31 +2389,31 @@ class TestPluginCommands:
             "    ctx.register_context_engine(StubEngine())\n"
         )
         # Opt-in: plugins are opt-in by default, so enable in config.yaml
-        (hermes_home / "config.yaml").write_text(
+        (eir_home / "config.yaml").write_text(
             yaml.safe_dump({"plugins": {"enabled": ["engine-plugin"]}})
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("EIR_HOME", str(eir_home))
 
-        import hermes_cli.plugins as plugins_mod
+        import eir_cli.plugins as plugins_mod
 
         with patch.object(plugins_mod, "_plugin_manager", None):
             engine = plugins_mod.get_plugin_context_engine()
             assert engine is not None
             assert engine.name == "stub-engine"
 
-    def test_plugin_manager_scoped_by_hermes_home_override(self, tmp_path):
-        """set_hermes_home_override() must get its own manager per profile.
+    def test_plugin_manager_scoped_by_eir_home_override(self, tmp_path):
+        """set_eir_home_override() must get its own manager per profile.
 
         This is the production path used by the gateway multiplexer
         (``gateway/run.py``'s ``_profile_scope`` context manager) and by
-        subagent/embedded callers: it swaps ``HERMES_HOME`` via a
+        subagent/embedded callers: it swaps ``EIR_HOME`` via a
         context-local ContextVar, which — per
-        ``hermes_constants.set_hermes_home_override`` — deliberately does
+        ``eir_constants.set_eir_home_override`` — deliberately does
         NOT touch ``os.environ``. A regression test that only flips the
-        ``HERMES_HOME`` env var never exercises this path.
+        ``EIR_HOME`` env var never exercises this path.
         """
-        from hermes_constants import set_hermes_home_override, reset_hermes_home_override
-        import hermes_cli.plugins as plugins_mod
+        from eir_constants import set_eir_home_override, reset_eir_home_override
+        import eir_cli.plugins as plugins_mod
 
         def write_engine_plugin(home: Path) -> None:
             _make_plugin_dir(
@@ -2428,7 +2428,7 @@ class TestPluginCommands:
                     "    from agent.context_engine import ContextEngine\n\n"
                     "    class HomeEngine(ContextEngine):\n"
                     "        def __init__(self):\n"
-                    "            self.home = os.environ.get('HERMES_HOME')\n\n"
+                    "            self.home = os.environ.get('EIR_HOME')\n\n"
                     "        @property\n"
                     "        def name(self):\n"
                     "            return 'home-engine'\n\n"
@@ -2447,26 +2447,26 @@ class TestPluginCommands:
         write_engine_plugin(home_a)
         write_engine_plugin(home_b)
 
-        # Note: HomeEngine reads os.environ['HERMES_HOME'] itself (simulating
-        # a real plugin like hermes-lcm capturing its home at registration),
+        # Note: HomeEngine reads os.environ['EIR_HOME'] itself (simulating
+        # a real plugin like eir-lcm capturing its home at registration),
         # so we set the env var to home_a as a baseline and only use the
         # context-local override to *switch away* to home_b — proving the
         # override, not the env var, is what get_plugin_manager() keys on.
-        token_a = set_hermes_home_override(str(home_a))
+        token_a = set_eir_home_override(str(home_a))
         try:
             manager_a = plugins_mod.get_plugin_manager()
             manager_a.discover_and_load()
             engine_a = manager_a._context_engine
         finally:
-            reset_hermes_home_override(token_a)
+            reset_eir_home_override(token_a)
 
-        token_b = set_hermes_home_override(str(home_b))
+        token_b = set_eir_home_override(str(home_b))
         try:
             manager_b = plugins_mod.get_plugin_manager()
             manager_b.discover_and_load()
             engine_b = manager_b._context_engine
         finally:
-            reset_hermes_home_override(token_b)
+            reset_eir_home_override(token_b)
 
         assert engine_a is not None
         assert engine_b is not None
@@ -2476,28 +2476,28 @@ class TestPluginCommands:
         # Re-entering home_a's override must return the SAME cached manager
         # (and engine) rather than rebuilding — proves the cache is keyed,
         # not last-write-wins.
-        token_a2 = set_hermes_home_override(str(home_a))
+        token_a2 = set_eir_home_override(str(home_a))
         try:
             manager_a2 = plugins_mod.get_plugin_manager()
         finally:
-            reset_hermes_home_override(token_a2)
+            reset_eir_home_override(token_a2)
         assert manager_a2 is manager_a
 
     def test_relative_import_not_leaked_across_home_switch(self, tmp_path):
         """A same-slug plugin's relative import must not reuse the prior home's submodule.
 
         ``_load_directory_module`` imports each plugin as
-        ``hermes_plugins.<slug>``, but a relative import inside the
+        ``eir_plugins.<slug>``, but a relative import inside the
         plugin's ``__init__.py`` (``from .state import STATE``) is cached
         separately in ``sys.modules`` under
-        ``hermes_plugins.<slug>.state``. If a profile switch replaces only
+        ``eir_plugins.<slug>.state``. If a profile switch replaces only
         the parent module, the child module survives in ``sys.modules``
         and Python's import system serves it back unchanged — silently
         leaking the previous profile's module-level state (and code) into
         the new profile.
         """
-        from hermes_constants import set_hermes_home_override, reset_hermes_home_override
-        import hermes_cli.plugins as plugins_mod
+        from eir_constants import set_eir_home_override, reset_eir_home_override
+        import eir_cli.plugins as plugins_mod
 
         def write_stateful_plugin(home: Path, marker: str) -> None:
             plugin_dir = (home / "plugins" / "stateful-plugin")
@@ -2511,7 +2511,7 @@ class TestPluginCommands:
             )
             # `state.py` is imported via a *relative* import from
             # `__init__.py`, so it lands in sys.modules as
-            # `hermes_plugins.stateful_plugin.state`.
+            # `eir_plugins.stateful_plugin.state`.
             (plugin_dir / "state.py").write_text(f"MARKER = {marker!r}\n", encoding="utf-8")
             (plugin_dir / "__init__.py").write_text(
                 "from . import state\n\n"
@@ -2528,26 +2528,26 @@ class TestPluginCommands:
         write_stateful_plugin(home_a, "marker-a")
         write_stateful_plugin(home_b, "marker-b")
 
-        token_a = set_hermes_home_override(str(home_a))
+        token_a = set_eir_home_override(str(home_a))
         try:
             manager_a = plugins_mod.get_plugin_manager()
             manager_a.discover_and_load()
             module_a = manager_a._plugins["stateful-plugin"].module
         finally:
-            reset_hermes_home_override(token_a)
+            reset_eir_home_override(token_a)
 
         assert module_a is not None
         module_a_state = f"{module_a.__name__}.state"
         assert module_a_state in sys.modules
         assert sys.modules[module_a_state].MARKER == "marker-a"
 
-        token_b = set_hermes_home_override(str(home_b))
+        token_b = set_eir_home_override(str(home_b))
         try:
             manager_b = plugins_mod.get_plugin_manager()
             manager_b.discover_and_load()
             module_b = manager_b._plugins["stateful-plugin"].module
         finally:
-            reset_hermes_home_override(token_b)
+            reset_eir_home_override(token_b)
 
         # Each profile keeps a stable namespace, so concurrent/runtime relative
         # imports cannot resolve another profile's package or submodules.
@@ -2572,7 +2572,7 @@ class TestPluginCommandResultResolution:
         async def _handler():
             return "threaded-ok"
 
-        monkeypatch.setattr("hermes_cli.plugins_dispatch.asyncio.get_running_loop", lambda: _Loop())
+        monkeypatch.setattr("eir_cli.plugins_dispatch.asyncio.get_running_loop", lambda: _Loop())
         assert resolve_plugin_command_result(_handler()) == "threaded-ok"
 
     def test_running_loop_timeout_does_not_hang_forever(self, monkeypatch):
@@ -2586,8 +2586,8 @@ class TestPluginCommandResultResolution:
             await _asyncio.sleep(10)
             return "should-not-reach"
 
-        monkeypatch.setattr("hermes_cli.plugins_dispatch.asyncio.get_running_loop", lambda: _Loop())
-        monkeypatch.setattr("hermes_cli.plugins_dispatch._PLUGIN_COMMAND_AWAIT_TIMEOUT_SECS", 0.1)
+        monkeypatch.setattr("eir_cli.plugins_dispatch.asyncio.get_running_loop", lambda: _Loop())
+        monkeypatch.setattr("eir_cli.plugins_dispatch._PLUGIN_COMMAND_AWAIT_TIMEOUT_SECS", 0.1)
 
         with pytest.raises(TimeoutError):
             resolve_plugin_command_result(_slow_handler())
@@ -2624,7 +2624,7 @@ class TestPluginDispatchTool:
 
 
 class TestPluginContextProfileName:
-    """ctx.profile_name resolves from HERMES_HOME in every context."""
+    """ctx.profile_name resolves from EIR_HOME in every context."""
 
     def _ctx(self):
         mgr = PluginManager()
@@ -2632,19 +2632,19 @@ class TestPluginContextProfileName:
         return PluginContext(manifest, mgr)
 
     def test_default_profile(self, tmp_path, monkeypatch):
-        """HERMES_HOME at the root resolves to 'default'."""
-        home = tmp_path / ".hermes"
+        """EIR_HOME at the root resolves to 'default'."""
+        home = tmp_path / ".eir"
         home.mkdir()
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("EIR_HOME", str(home))
         assert self._ctx().profile_name == "default"
 
     def test_named_profile(self, tmp_path, monkeypatch):
-        """HERMES_HOME under profiles/<name> resolves to that name."""
-        prof = tmp_path / ".hermes" / "profiles" / "coder"
+        """EIR_HOME under profiles/<name> resolves to that name."""
+        prof = tmp_path / ".eir" / "profiles" / "coder"
         prof.mkdir(parents=True)
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
-        monkeypatch.setenv("HERMES_HOME", str(prof))
+        monkeypatch.setenv("EIR_HOME", str(prof))
         assert self._ctx().profile_name == "coder"
 
 
@@ -2710,7 +2710,7 @@ class TestAsyncHookOnCallerLoop:
             return {"seen_async": event}
 
         mgr._hooks.setdefault("pre_gateway_dispatch", []).extend([narrow, boom, narrow_async])
-        with caplog.at_level(logging.WARNING, logger="hermes_cli.plugins"):
+        with caplog.at_level(logging.WARNING, logger="eir_cli.plugins"):
             results = asyncio.run(mgr.ainvoke_hook("pre_gateway_dispatch", event="e", gateway="g"))
         assert results == [{"seen": "e"}, {"seen_async": "e"}]
         assert "async plugin blew up" in caplog.text

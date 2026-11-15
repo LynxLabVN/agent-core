@@ -1,4 +1,4 @@
-import { Button, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, Input, randomUuid, Textarea } from '@hermes/plugin-sdk'
+import { Button, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, Input, randomUuid, Textarea } from '@eir/plugin-sdk'
 import { useState } from 'react'
 
 import { useCanonicalGroupLabels } from './canonical-group-labels'

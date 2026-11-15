@@ -4,9 +4,9 @@ write from the same thread cannot wait on its own lock; there ``consistent()`` t
 lands, this process's or another connection's."""
 import threading
 
-import hermes_yaml as yaml
+import eir_yaml as yaml
 
-from hermes_state import SessionDB
+from eir_state import SessionDB
 
 
 def _count(db):
@@ -32,10 +32,10 @@ def test_reads_inside_a_snapshot_see_one_generation(tmp_path):
 
 
 def test_a_delete_journal_store_is_not_pinned_and_any_write_makes_it_inconsistent(tmp_path, monkeypatch):
-    home = tmp_path / "hermes-home"
+    home = tmp_path / "eir-home"
     home.mkdir()
     (home / "config.yaml").write_text(yaml.safe_dump({"database": {"journal_mode": "delete"}}), encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     db = SessionDB(db_path=home / "state.db")
     try:
         assert db._wal_active is False

@@ -1,7 +1,7 @@
 """Full-text / trigram / CJK message search and FTS maintenance for SessionDB.
 
-Plain mixin for ``hermes_state.SessionDB`` (no ``__init__``/state of its own).
-Must never import hermes_state (cycle); shared constants live in hermes_state_common.
+Plain mixin for ``eir_state.SessionDB`` (no ``__init__``/state of its own).
+Must never import eir_state (cycle); shared constants live in eir_state_common.
 """
 
 import contextlib
@@ -16,17 +16,17 @@ from functools import partial
 from typing import Any, Callable, Collection, Dict, List, Optional, Tuple
 
 from agent.skill_commands import describe_skill_invocation
-from hermes_state_errors import is_malformed_db_error
-from hermes_state_common import (
+from eir_state_errors import is_malformed_db_error
+from eir_state_common import (
     FTS_SQL, FTS_STALE_KEY, FTS_STORAGE_VERSION, FTS_TOOL_CONTENT_PREFIX_CHARS,
     FTS_TRIGRAM_EXCLUDED_SOURCES, FTS_TRIGRAM_SQL,
     MAX_FTS5_QUERY_CHARS, SCHEMA_VERSION,
     escape_like as _escape_like, fts_rebuild_admission, fts_trigram_session_sql, routed_sessions_setting,
 )
-from hermes_state_fts import fts_layout_current, fts_layout_drift
+from eir_state_fts import fts_layout_current, fts_layout_drift
 
 # Pre-split logger identity so log filtering/capture is unchanged.
-logger = logging.getLogger("hermes_state")
+logger = logging.getLogger("eir_state")
 
 
 @dataclass
@@ -121,7 +121,7 @@ class _HolderWatch:
 
 def _search_slow_ms() -> float:
     """``sessions.search_slow_ms`` for the served profile (default 1000; 0 logs every call)."""
-    value = routed_sessions_setting("search_slow_ms", "HERMES_SEARCH_SLOW_MS")
+    value = routed_sessions_setting("search_slow_ms", "EIR_SEARCH_SLOW_MS")
     try:
         return 1000.0 if value is None or str(value).strip() == "" else float(value)
     except (TypeError, ValueError):
@@ -673,7 +673,7 @@ class SessionSearchMixin:
     def _optimize_drive(self, step: Callable[[], bool], info: Optional[Callable[[], dict[str, Any]]],
                         emit: Callable[[dict[str, Any]], None], watch: _HolderWatch) -> None:
         """Run *step* to completion, emitting ``info()`` (plus ``paced``) after every chunk. Back to
-        back while no other process holds state.db (see the chunk engine note in hermes_state_fts);
+        back while no other process holds state.db (see the chunk engine note in eir_state_fts);
         while *watch* sees a holder, the duty cycle (short chunks + a pause) keeps its writes moving.
         Chunk size adapts to its measured cost; a step may restart it (teardown on each new table)."""
         self._fts_chunk_rows = self._FTS_REBUILD_CHUNK_ROWS
@@ -1158,7 +1158,7 @@ class SessionSearchMixin:
         after_ts: Optional[int] = None, before_ts: Optional[int] = None,
     ) -> list[dict[str, Any]]:
         """:meth:`_search_messages_impl` plus one log line per slow search with the routing
-        path taken. Threshold HERMES_SEARCH_SLOW_MS (default 1000; 0 logs every call)."""
+        path taken. Threshold EIR_SEARCH_SLOW_MS (default 1000; 0 logs every call)."""
         started = time.time()
         rows = None
         try:
@@ -1405,7 +1405,7 @@ class SessionSearchMixin:
                         if is_malformed_db_error(exc):
                             logger.error(
                                 "FTS rebuild failed with a corruption-class error for %s: %s; "
-                                "run 'hermes sessions repair' (or 'hermes doctor --fix') to rebuild the index offline",
+                                "run 'eir sessions repair' (or 'eir doctor --fix') to rebuild the index offline",
                                 tbl, exc)
                         else:
                             logger.warning("FTS rebuild failed for %s: %s", tbl, exc)

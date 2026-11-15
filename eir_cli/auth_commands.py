@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 from pm import install_hint
-from hermes_cli.cli_output import line_input
+from eir_cli.cli_output import line_input
 
 import math
 import sys
@@ -19,27 +19,27 @@ from agent.credential_pool import (
     _exhausted_until, _normalize_custom_pool_name, get_pool_strategy, label_from_token, list_custom_pool_providers,
     load_pool)
 from agent.credential_pool_admin import CredentialNotSavedError
-import hermes_cli.auth as auth_mod
-from hermes_cli.auth import PROVIDER_REGISTRY
-from hermes_cli.auth_plugin_providers import (
+import eir_cli.auth as auth_mod
+from eir_cli.auth import PROVIDER_REGISTRY
+from eir_cli.auth_plugin_providers import (
     canonical_registry_rows, dispatch_plugin_auth, is_refreshable_oauth_provider, plugin_missing_auth_handler_error)
-from hermes_constants import OPENROUTER_BASE_URL
-from hermes_cli.secret_prompt import masked_secret_prompt
+from eir_constants import OPENROUTER_BASE_URL
+from eir_cli.secret_prompt import masked_secret_prompt
 
 
 # Providers that support OAuth login in addition to API keys.
 _OAUTH_CAPABLE_PROVIDERS = {"anthropic", "nous", "openai-codex", "xai-oauth", "qwen-oauth", "minimax-oauth", "openrouter"}
 # ...and default to it when ``--type`` is omitted. OpenRouter stays API-key-first: the documented
-# ``hermes auth add openrouter --api-key sk-or-...`` must keep working with no ``--type``.
+# ``eir auth add openrouter --api-key sk-or-...`` must keep working with no ``--type``.
 _OAUTH_DEFAULT_PROVIDERS = _OAUTH_CAPABLE_PROVIDERS - {"openrouter"}
-# Providers whose sibling CLI login Hermes may borrow (``auth.adopt_external_logins``).
+# Providers whose sibling CLI login Eir may borrow (``auth.adopt_external_logins``).
 EXTERNAL_LOGIN_PROVIDERS = {"anthropic", "openai-codex"}
 
 
 def _get_custom_provider_entries() -> list[dict]:
     """Return configured provider entries with legacy and canonical pool IDs."""
     try:
-        from hermes_cli.config import get_compatible_custom_providers, load_config
+        from eir_cli.config import get_compatible_custom_providers, load_config
         config = load_config()
     except Exception:
         return []
@@ -114,7 +114,7 @@ def _migrate_legacy_custom_pool_key(provider: str, legacy_key: str) -> None:
         del credential_pool[legacy_key]
         auth_mod._save_auth_store(auth_store)
     try:
-        from hermes_cli.models import clear_provider_models_cache
+        from eir_cli.models import clear_provider_models_cache
         clear_provider_models_cache(legacy_key)
     except Exception:
         pass
@@ -144,14 +144,14 @@ def _unknown_provider_exit(provider: str) -> SystemExit:
     import difflib
     known = sorted({pid for pid, _ in canonical_registry_rows()} | {"openrouter"}
                    | {entry["name"] for entry in _get_custom_provider_entries()})
-    from hermes_cli.left_core_migration import provider_install_hint
+    from eir_cli.left_core_migration import provider_install_hint
     if moved := provider_install_hint(provider):
         return SystemExit(f"Unknown provider '{provider}'. {moved}")
     close = difflib.get_close_matches(provider, known, n=3, cutoff=0.5)
     hint = f" Did you mean {', '.join(close)}?" if close else ""
     return SystemExit(
-        f"Unknown provider '{provider}'.{hint} Run `hermes auth` to see the provider list, or "
-        "`hermes model` to pick one interactively.")
+        f"Unknown provider '{provider}'.{hint} Run `eir auth` to see the provider list, or "
+        "`eir model` to pick one interactively.")
 
 
 def _display_source(source: str) -> str:
@@ -206,14 +206,14 @@ def _format_exhausted_status(entry) -> str:
 
 def _anthropic_oauth_login(args) -> dict:
     from agent import anthropic_credentials as anthropic_mod
-    creds = anthropic_mod.run_hermes_oauth_login_pure()
+    creds = anthropic_mod.run_eir_oauth_login_pure()
     if not creds:
         raise SystemExit("Anthropic OAuth login did not return credentials.")
     return creds
 
 
 def _qwen_oauth_login(args) -> dict:
-    from hermes_cli.auth_qwen import _mark_qwen_oauth_active
+    from eir_cli.auth_qwen import _mark_qwen_oauth_active
 
     creds = auth_mod.resolve_qwen_runtime_credentials(refresh_if_expiring=False)
     _mark_qwen_oauth_active(creds)
@@ -222,7 +222,7 @@ def _qwen_oauth_login(args) -> dict:
 
 @dataclass(frozen=True)
 class _OAuthAddSpec:
-    """Per-provider parameters for the generic ``hermes auth add <provider> --type oauth`` path."""
+    """Per-provider parameters for the generic ``eir auth add <provider> --type oauth`` path."""
 
     login: Callable[[Any], dict]
     token: Callable[[dict], str]
@@ -237,7 +237,7 @@ class _OAuthAddSpec:
 
 
 def _codex_login(args) -> dict:
-    from hermes_cli.auth_codex_browser import codex_oauth_login
+    from eir_cli.auth_codex_browser import codex_oauth_login
     return codex_oauth_login(args)
 
 
@@ -251,7 +251,7 @@ _OAUTH_ADD_SPECS: dict[str, _OAuthAddSpec] = {
     "anthropic": _OAuthAddSpec(
         login=_anthropic_oauth_login,
         token=lambda creds: creds["access_token"],
-        source=f"{SOURCE_MANUAL}:hermes_pkce",
+        source=f"{SOURCE_MANUAL}:eir_pkce",
         fields=lambda creds, provider: {
             "refresh_token": creds.get("refresh_token"),
             "expires_at_ms": creds.get("expires_at_ms"),
@@ -311,15 +311,15 @@ def _ask(prompt: str, reader: Callable[[str], str] | None = None) -> str | None:
 
 
 def _add_nous_oauth_credential(args, provider: str) -> PooledCredential:
-    """``hermes auth add nous --type oauth``: shared-credential import, else device-code login."""
+    """``eir auth add nous --type oauth``: shared-credential import, else device-code login."""
     custom_label = (getattr(args, "label", None) or "").strip() or None
     timeout = getattr(args, "timeout", None) or 15.0
 
     def _persist(creds: dict, what: str) -> PooledCredential:
         # `--label` is embedded into providers.nous so label_from_token doesn't overwrite it on every
         # subsequent load_pool("nous").
-        from hermes_cli.anon_auth import settle_after_upgrade
-        from hermes_cli.guest_handoff import drain, result_lines
+        from eir_cli.anon_auth import settle_after_upgrade
+        from eir_cli.guest_handoff import drain, result_lines
         entry = auth_mod.persist_nous_credentials(creds, label=custom_label)
         handoff = drain()  # a replaced free tier hands its apps over once the save lands
         settle_after_upgrade(creds)  # a config left on the free tier's route moves to the account
@@ -330,10 +330,10 @@ def _add_nous_oauth_credential(args, provider: str) -> PooledCredential:
             print(f"  {line}")
         return entry
 
-    # Codex-style auto-import: a shared Nous credential at <hermes-root>/shared/nous_auth.json
-    # (written by any previous login) makes `hermes --profile <name> auth add nous --type oauth`
+    # Codex-style auto-import: a shared Nous credential at <eir-root>/shared/nous_auth.json
+    # (written by any previous login) makes `eir --profile <name> auth add nous --type oauth`
     # a one-tap operation for multi-profile users.
-    from hermes_cli.anon_auth import is_guest_state
+    from eir_cli.anon_auth import is_guest_state
 
     if (shared := auth_mod._read_shared_nous_state()) and not is_guest_state(shared):
         try:
@@ -436,7 +436,7 @@ def _add_credential(args, provider: str, pool, requested_type: str) -> PooledCre
 
     spec = _OAUTH_ADD_SPECS.get(provider)
     if spec is None:
-        raise SystemExit(f"`hermes auth add {provider}` is not implemented for auth type {requested_type} yet.")
+        raise SystemExit(f"`eir auth add {provider}` is not implemented for auth type {requested_type} yet.")
 
     creds = spec.login(args)
     token = spec.token(creds)
@@ -476,14 +476,14 @@ def _warn_same_codex_account(token: str, existing: list[PooledCredential]) -> No
             print(f'warning: this login is the same OpenAI account as openai-codex credential #{position} '
                   f'("{sibling.label}"). Both logins share one token family, so OpenAI will revoke the older one '
                   "and you gain no extra quota. Log into a different account instead, or keep just one "
-                  f"(`hermes auth remove openai-codex {position}`).", file=sys.stderr)
+                  f"(`eir auth remove openai-codex {position}`).", file=sys.stderr)
             return
 
 
 def _report_priority(provider: str, pool, moved, requested: int, verb: str, prep: str) -> None:
     """Print the effective priority and say why it differs from the request, if it does."""
     print(f'{verb} {provider} credential "{moved.label}" {prep} priority {moved.priority} '
-          f"(#{moved.priority + 1} in `hermes auth list {provider}`)")
+          f"(#{moved.priority + 1} in `eir auth list {provider}`)")
     size = len(pool.entries())
     if moved.priority != requested:
         if requested < 0 or requested >= size:
@@ -499,7 +499,7 @@ def _report_priority(provider: str, pool, moved, requested: int, verb: str, prep
 
 
 def auth_priority_command(args) -> None:
-    """`hermes auth priority <provider> <target> <priority>`: reorder one pooled credential."""
+    """`eir auth priority <provider> <target> <priority>`: reorder one pooled credential."""
     provider = _normalize_provider(getattr(args, "provider", ""))
     pool = load_pool(provider)
     index, matched, error = pool.resolve_target(getattr(args, "target", None))
@@ -514,12 +514,12 @@ def auth_priority_command(args) -> None:
 
 def _free_tier_lines() -> tuple[str, str]:
     """The two-line free-tier rendering shared by every auth display surface (R-USR-1)."""
-    from hermes_cli.anon_auth import FREE_TIER_LABEL, GUEST_MODEL, UPGRADE_HINT
+    from eir_cli.anon_auth import FREE_TIER_LABEL, GUEST_MODEL, UPGRADE_HINT
     return f"{FREE_TIER_LABEL} · {GUEST_MODEL}", UPGRADE_HINT
 
 
 def _is_free_tier_entry(entry) -> bool:
-    from hermes_cli.anon_auth import is_guest_state
+    from eir_cli.anon_auth import is_guest_state
     return is_guest_state(getattr(entry, "extra", None))
 
 
@@ -590,7 +590,7 @@ def auth_remove_command(args) -> None:
         raise SystemExit(f'No credential matching "{target}" for provider {provider}.')
     print(f"Removed {provider} credential #{index} ({removed.label})")
 
-    # Every credential source Hermes reads from (env vars, external OAuth files, auth.json blocks,
+    # Every credential source Eir reads from (env vars, external OAuth files, auth.json blocks,
     # custom config) has a RemovalStep in agent.credential_sources; it does the source-specific
     # cleanup while suppression + user-facing output are centralised here.
     from agent.credential_sources import find_removal_step
@@ -624,7 +624,7 @@ def auth_reset_command(args) -> None:
 
 
 def auth_refresh_command(args) -> None:
-    """`hermes auth refresh <provider> [target]`: force one pooled OAuth entry to refresh.
+    """`eir auth refresh <provider> [target]`: force one pooled OAuth entry to refresh.
 
     A successful refresh rotates the stored tokens and clears the entry's local
     exhaustion block, returning it to rotation before its persisted
@@ -644,7 +644,7 @@ def auth_refresh_command(args) -> None:
         if len(entries) != 1:
             raise SystemExit(
                 f"{provider} has {len(entries)} credentials; pass an index, entry id, or exact "
-                f"label (see `hermes auth list {provider}`).")
+                f"label (see `eir auth list {provider}`).")
         index, matched = 1, entries[0]
     else:
         index, matched, error = pool.resolve_target(target)
@@ -660,7 +660,7 @@ def auth_refresh_command(args) -> None:
         raise SystemExit(
             f"nous credential #{index} ({matched.label}) is not a refreshable OAuth "
             "credential: only the device_code singleton supports refresh. "
-            "Reauthenticate with `hermes auth add nous --type oauth`.")
+            "Reauthenticate with `eir auth add nous --type oauth`.")
     refreshed = pool.try_refresh_matching(credential_id=matched.id)
     if refreshed is None:
         after = next((e for e in pool.entries() if e.id == matched.id), None)
@@ -669,7 +669,7 @@ def auth_refresh_command(args) -> None:
                  else "the saved session is no longer valid")
         raise SystemExit(
             f"Could not renew the {label} sign-in for credential #{index} ({matched.label}); {state}. "
-            f"Sign in again with `hermes auth add {provider} --type oauth`.")
+            f"Sign in again with `eir auth add {provider} --type oauth`.")
     status = refreshed.last_status or "ok"
     if status == "ok":
         print(f"Refreshed {provider} credential #{index} ({refreshed.label}); status: ok")
@@ -680,15 +680,15 @@ def auth_refresh_command(args) -> None:
 
 
 def _moved_auth_hint(action: str, provider: str) -> str:
-    """``hermes auth status|logout spotify`` after Spotify left core for its plugin's own command."""
-    from hermes_cli.left_core_migration import moved_command_hint
-    return moved_command_hint("hermes auth", provider, action)
+    """``eir auth status|logout spotify`` after Spotify left core for its plugin's own command."""
+    from eir_cli.left_core_migration import moved_command_hint
+    return moved_command_hint("eir auth", provider, action)
 
 
 def auth_status_command(args) -> None:
     provider = _normalize_provider(getattr(args, "provider", "") or "")
     if not provider:
-        raise SystemExit("Provider is required. Example: `hermes auth status nous`.")
+        raise SystemExit("Provider is required. Example: `eir auth status nous`.")
     if dispatch_plugin_auth("status", args, provider):
         return
     if moved := _moved_auth_hint("status", provider):
@@ -715,7 +715,7 @@ def auth_status_command(args) -> None:
         if value:
             print(f"  {key}: {value}")
     if provider == "nous":
-        from hermes_cli.guest_handoff import drain, handoff_status, status_lines
+        from eir_cli.guest_handoff import drain, handoff_status, status_lines
         drain()   # a move left retrying gets its next try now
         for line in status_lines(handoff_status()):
             print(f"  {line}")
@@ -756,7 +756,7 @@ def _print_bedrock_status() -> None:
 def _print_azure_entra_status() -> None:
     """Show Azure Foundry Entra ID status when model.provider is azure-foundry with entra_id auth."""
     try:
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
         cfg = load_config()
         model_cfg = cfg.get("model") if isinstance(cfg, dict) else None
         if not isinstance(model_cfg, dict) or (
@@ -774,9 +774,9 @@ def _print_azure_entra_status() -> None:
         print(f"  Scope: {scope}")
         if not has_azure_identity_installed():
             print("  Status: ⚠ azure-identity not installed")
-            print("  From the Hermes environment, run: "
+            print("  From the Eir environment, run: "
                   f"{install_hint('azure-identity')}")
-            print("  Then restart Hermes.")
+            print("  Then restart Eir.")
         else:
             info = describe_active_credential(config=EntraIdentityConfig(scope=scope), timeout_seconds=10.0)
             env_sources = info.get("env_sources") or []
@@ -792,7 +792,7 @@ def _print_azure_entra_status() -> None:
 
 
 def _interactive_auth() -> None:
-    """Interactive credential pool management when `hermes auth` is called bare."""
+    """Interactive credential pool management when `eir auth` is called bare."""
     print("Credential Pool Status")
     print("=" * 50)
     auth_list_command(SimpleNamespace(provider=None))
@@ -897,7 +897,7 @@ def _interactive_strategy() -> None:
     except (ValueError, IndexError):
         print("Invalid choice.")
         return
-    from hermes_cli.config import load_config, save_config
+    from eir_cli.config import load_config, save_config
     cfg = load_config()
     pool_strategies = cfg.get("credential_pool_strategies")
     if not isinstance(pool_strategies, dict):
@@ -909,8 +909,8 @@ def _interactive_strategy() -> None:
 
 
 def auth_upgrade_command(args) -> None:
-    """``hermes auth upgrade``: sign the free tier into a Nous account, keeping its connectors."""
-    from hermes_cli.anon_auth import upgrade_guest
+    """``eir auth upgrade``: sign the free tier into a Nous account, keeping its connectors."""
+    from eir_cli.anon_auth import upgrade_guest
     code = upgrade_guest(args)
     if code:
         raise SystemExit(code)

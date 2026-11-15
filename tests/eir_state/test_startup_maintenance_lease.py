@@ -9,12 +9,12 @@ from __future__ import annotations
 
 import time
 
-import hermes_startup_watchdog as sw
-from hermes_state import SessionDB
+import eir_startup_watchdog as sw
+from eir_state import SessionDB
 
 
 def test_maintenance_steps_renew_the_armed_watchdog_lease(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     sw._reset_for_tests()
     handle = sw.arm_startup_watchdog(timeout_s=300.0)
     db = SessionDB(db_path=tmp_path / "state.db")

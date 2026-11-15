@@ -1,16 +1,16 @@
-"""Tests for hermes_cli/setup_terminal.py backend wizards."""
+"""Tests for eir_cli/setup_terminal.py backend wizards."""
 
 import pytest
 
-from hermes_cli.config import save_env_value, get_env_value
-from hermes_cli import setup as setup_mod
-from hermes_cli import setup_terminal
+from eir_cli.config import save_env_value, get_env_value
+from eir_cli import setup as setup_mod
+from eir_cli import setup_terminal
 
 
 @pytest.fixture
 def ssh_wizard(tmp_path, monkeypatch):
     """Drive ``_setup_backend_ssh`` with scripted answers, SSH test declined."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     monkeypatch.delenv("TERMINAL_SSH_PORT", raising=False)
 
     def run(answers):

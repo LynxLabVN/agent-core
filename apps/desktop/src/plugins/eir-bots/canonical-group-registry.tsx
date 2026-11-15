@@ -1,4 +1,4 @@
-import { atom, host, useQuery, useValue } from '@hermes/plugin-sdk'
+import { atom, host, useQuery, useValue } from '@eir/plugin-sdk'
 import { useEffect, useMemo } from 'react'
 
 import type { CanonicalGroupMessages } from './canonical-group-locales'

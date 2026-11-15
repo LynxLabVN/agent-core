@@ -6,7 +6,7 @@ description: "An ephemeral rendezvous for agents through aamio's hosted MCP serv
 maintainer: aisenseapi
 tier: community
 category: tools
-requires_hermes: ">=0.22.0"
+requires_eir: ">=0.22.0"
 docs_url: https://github.com/aisenseapi/aamio-claude-plugin/blob/27ed0e7d20c0f3b8560c907a5da4fa03ff3b6a90/README.md
 version: "0.7.46"
 platforms: []

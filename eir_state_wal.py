@@ -1,6 +1,6 @@
-"""SQLite journal-mode and PRAGMA policy for state.db (split from hermes_state).
+"""SQLite journal-mode and PRAGMA policy for state.db (split from eir_state).
 
-Patchable helpers are looked up as module globals at call time, so tests patch ``hermes_state_wal.<name>``.
+Patchable helpers are looked up as module globals at call time, so tests patch ``eir_state_wal.<name>``.
 """
 
 from __future__ import annotations
@@ -15,11 +15,11 @@ import threading
 import time
 from typing import Any, Dict, Optional
 
-from hermes_cli.sqlite_runtime import is_sqlite_wal_reset_vulnerable as _is_sqlite_wal_reset_vulnerable
-from hermes_state_errors import is_sqlite_lock_error
+from eir_cli.sqlite_runtime import is_sqlite_wal_reset_vulnerable as _is_sqlite_wal_reset_vulnerable
+from eir_state_errors import is_sqlite_lock_error
 
-# Log-record parity with the origin module (caplog tests pin "hermes_state").
-logger = logging.getLogger("hermes_state")
+# Log-record parity with the origin module (caplog tests pin "eir_state").
+logger = logging.getLogger("eir_state")
 
 
 # WAL needs mmap shared memory + fcntl byte-range locks. Network filesystems (NFS, SMB/CIFS, some FUSE, WSL1) raise
@@ -31,7 +31,7 @@ _WAL_INCOMPAT_MARKERS = ("locking protocol", "not authorized", "disk i/o error")
 _WAL_SIZE_LIMIT_BYTES = 64 * 1024 * 1024  # 64 MiB
 
 # Once-per-process-per-db_label dedup sets (kanban_db.connect() runs on every kanban operation, so an undeduped
-# line would repeat per connection). Tests clear these via ``hermes_state_wal.<name>``.
+# line would repeat per connection). Tests clear these via ``eir_state_wal.<name>``.
 _wal_fallback_warned_paths: set[str] = set()
 _wal_fallback_warned_lock = threading.Lock()
 
@@ -158,7 +158,7 @@ def resolve_journal_mode() -> str:
     """The configured ``database.journal_mode`` (``wal`` default; ``delete`` for filesystems without WAL-safe
     durability: macOS virtiofs, NFS, SMB). Invalid values fail safe to ``wal``."""
     try:
-        from hermes_cli.config import load_config_readonly
+        from eir_cli.config import load_config_readonly
         database = (load_config_readonly() or {}).get("database", {})
         raw = database.get("journal_mode", "wal") if isinstance(database, dict) else "wal"
     except Exception:
@@ -210,8 +210,8 @@ def _journal_mode_explicitly_configured() -> bool:
     the ``wal`` default, so it cannot tell "chose WAL" from "never chose"). An unreadable config counts as
     configured, so the caller keeps the long-standing WAL default rather than guessing."""
     try:
-        from hermes_cli.config import read_raw_config_readonly
-        from hermes_cli.config_read_errors import FailedConfigRead
+        from eir_cli.config import read_raw_config_readonly
+        from eir_cli.config_read_errors import FailedConfigRead
         raw = read_raw_config_readonly()
     except Exception:  # health: allow BLE001 -- import/read failure keeps the WAL default (same as resolve_journal_mode)
         return True
@@ -319,7 +319,7 @@ def apply_wal_with_fallback(conn: sqlite3.Connection, *, db_label: str = "state.
 
     Returns the mode actually set — or, when the read-only mode probe is blocked by a concurrent opener, ``"wal"``
     as the assumed mode with nothing touched (``require_wal=True`` raises instead). Shared by :class:`SessionDB`
-    and ``hermes_cli.kanban_db_connect.connect``. WAL-incompatible filesystems either raise ``OperationalError`` ("locking protocol" / "disk I/O error") or —
+    and ``eir_cli.kanban_db_connect.connect``. WAL-incompatible filesystems either raise ``OperationalError`` ("locking protocol" / "disk I/O error") or —
     macOS NFS / SMB / AgentFS — silently refuse and stay in DELETE; either way log ERROR once per process per
     ``db_label`` and fall back. ``require_wal=True`` raises :class:`WalUnsupportedError` instead. WAL-reset-bug
     builds (https://sqlite.org/wal.html#walresetbug) never enable WAL on non-WAL files; an already-WAL DB keeps WAL
@@ -337,7 +337,7 @@ def apply_wal_with_fallback(conn: sqlite3.Connection, *, db_label: str = "state.
     still documents the WAL-reset bug as real through 3.51.2 with serious consequences. Until a fixed
     runtime is delivered, keep new databases out of WAL.
     """
-    config_module = sys.modules.get("hermes_cli.config")
+    config_module = sys.modules.get("eir_cli.config")
     if getattr(getattr(config_module, "__spec__", None), "_initializing", False):
         config_module = None
     config_lock = getattr(config_module, "_CONFIG_LOCK", None)
@@ -565,19 +565,19 @@ def _apply_delete_for_wal_reset_bug(conn: sqlite3.Connection, *, db_label: str, 
 
 
 def _wal_reset_repair_hint() -> str:
-    """Repair hint matching what ``hermes update`` can actually do for this install type.
+    """Repair hint matching what ``eir update`` can actually do for this install type.
 
     See #75153.
     """
     try:
-        from hermes_cli.config import detect_install_method, get_project_root, recommended_update_command_for_method
+        from eir_cli.config import detect_install_method, get_project_root, recommended_update_command_for_method
         method = detect_install_method(get_project_root())
         cmd = recommended_update_command_for_method(method)
         if method in {"git", "unknown"}:
-            return f"Hermes-managed installs can repair the embedded runtime with `{cmd}`"
+            return f"Eir-managed installs can repair the embedded runtime with `{cmd}`"
         return f"update the container image with `{cmd}`" if method == "docker" else cmd  # else nix/nixos
     except Exception:
-        return "install a Python build bundled with SQLite 3.51.3+ (or backports 3.50.7 / 3.44.6) and restart Hermes"
+        return "install a Python build bundled with SQLite 3.51.3+ (or backports 3.50.7 / 3.44.6) and restart Eir"
 
 
 # Once-per-(process, db_label) log table. Levels are deliberate: falling back to DELETE and an ignored
@@ -594,7 +594,7 @@ _ONCE_LOGS = {
         # Install-type-aware so the warning never promises a repair path that doesn't exist for git/pip installs.
         "%s: linked SQLite %s (interpreter %s) is vulnerable to the WAL-reset corruption bug "
         "(https://sqlite.org/wal.html#walresetbug) — %s. Upgrade to SQLite 3.51.3+ (or backports 3.50.7 / 3.44.6); "
-        "%s. See `hermes doctor`. This warning fires once per process per database."),
+        "%s. See `eir doctor`. This warning fires once per process per database."),
     "journal_upgrade": (_journal_upgrade_warned_lock, "_journal_upgrade_warned_paths", logging.WARNING,
         # journal_mode is a property of the FILE: switching an existing DB to WAL rewrites its header and outlives
         # the process. Operators set DELETE on the file (the WAL-reset-bug mitigation) and nothing told them the
@@ -620,8 +620,8 @@ _ONCE_LOGS = {
     "delete_overridden": (_delete_overridden_warned_lock, "_delete_overridden_warned_paths", logging.ERROR,
         # Never-live-downgrade keeps WAL; without this the operator never learns their delete had no effect.
         "%s: database.journal_mode=delete is configured but the on-disk database is already WAL; keeping WAL (a live "
-        "downgrade under open connections can corrupt the DB). To apply journal_mode=DELETE, stop every Hermes "
-        "process using this database and run `hermes sessions set-journal-mode delete` (add `--db PATH` for a "
+        "downgrade under open connections can corrupt the DB). To apply journal_mode=DELETE, stop every Eir "
+        "process using this database and run `eir sessions set-journal-mode delete` (add `--db PATH` for a "
         "store other than state.db). This message fires once per process per database."),
     "wal_probe_unknown": (_wal_probe_unknown_lock, "_wal_probe_unknown_paths", logging.WARNING,
         # WARNING, not ERROR: the connection inherits the header's mode, so an already-WAL file (the common case)
@@ -641,8 +641,8 @@ _ONCE_LOGS = {
         # operator can fix it (a live downgrade under other openers would destroy their uncheckpointed commits).
         "%s: existing WAL-mode database is on a cross-VM filesystem (virtiofs/9p — typical for Docker Desktop / "
         "OrbStack / Podman host bind mounts). SQLite WAL shared-memory is not coherent across the VM boundary and "
-        "concurrent writers can silently corrupt the database. Hermes does not live-downgrade an on-disk WAL database. "
-        "Fix one of two ways: stop every Hermes process using this database and run `hermes sessions "
+        "concurrent writers can silently corrupt the database. Eir does not live-downgrade an on-disk WAL database. "
+        "Fix one of two ways: stop every Eir process using this database and run `eir sessions "
         "set-journal-mode delete` (set `database.journal_mode: delete` in config.yaml to keep it), "
         "or move the database onto a native volume (e.g. a named Docker volume). This message fires once per process "
         "per database."),
@@ -651,8 +651,8 @@ _ONCE_LOGS = {
         # alarm. Never live-downgrade here either; the remedy is offline, by the operator.
         "%s: existing WAL-mode database is on a network filesystem (nfs/cifs/smb/sshfs). Every WAL shared-memory "
         "(-shm) lock is a network round trip there, so concurrent connections can stall for tens of seconds, and "
-        "concurrent writers risk silent corruption. Hermes does not live-downgrade an on-disk WAL database. To "
-        "switch it: stop every Hermes process using it, run `hermes sessions set-journal-mode delete` (add `--db "
+        "concurrent writers risk silent corruption. Eir does not live-downgrade an on-disk WAL database. To "
+        "switch it: stop every Eir process using it, run `eir sessions set-journal-mode delete` (add `--db "
         "PATH` for a store other than state.db), and set `database.journal_mode: delete` in config.yaml; or move "
         "the database onto local disk. This message fires once per process per database."),
     "network_fs_new_store": (_network_fs_new_store_warned_lock, "_network_fs_new_store_warned_paths", logging.WARNING,
@@ -745,7 +745,7 @@ def apply_database_pragmas(conn: sqlite3.Connection, *, db_label: str = "state.d
     between bundled/distro/Homebrew builds). Best-effort: failures are ignored so DB init never breaks on a
     malformed section. Applied to ALL connection types: writer, read_only, WAL readers."""
     try:
-        from hermes_cli.config import cfg_get, load_config_readonly  # local: avoids a circular import
+        from eir_cli.config import cfg_get, load_config_readonly  # local: avoids a circular import
         cfg = load_config_readonly()
     except Exception:
         return

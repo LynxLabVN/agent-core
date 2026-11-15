@@ -2,7 +2,7 @@ import { cleanup, render } from '@testing-library/react'
 import type { ComponentProps } from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
 
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@eir/plugin-sdk', async () => {
   const { pluginSdkMock, createGroupGateway } = await import('./group-test-utils')
 
   return { ...await pluginSdkMock(createGroupGateway().host), Button: (p: ComponentProps<'button'>) => <button {...p} /> }

@@ -10,15 +10,15 @@ import pytest
 
 
 @pytest.fixture
-def hermes_home(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+def eir_home(tmp_path, monkeypatch):
+    home = tmp_path / ".eir"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     return home
 
 
-def test_overrides_roundtrip_and_clear(hermes_home):
-    from hermes_cli.local_runtime.growth import (
+def test_overrides_roundtrip_and_clear(eir_home):
+    from eir_cli.local_runtime.growth import (
         clear_window_override,
         load_window_overrides,
         save_window_override,
@@ -34,8 +34,8 @@ def test_overrides_roundtrip_and_clear(hermes_home):
     clear_window_override("never-existed")
 
 
-def test_corrupt_overrides_read_as_empty(hermes_home):
-    from hermes_cli.local_runtime.growth import (
+def test_corrupt_overrides_read_as_empty(eir_home):
+    from eir_cli.local_runtime.growth import (
         load_window_overrides,
         window_overrides_path,
     )
@@ -46,10 +46,10 @@ def test_corrupt_overrides_read_as_empty(hermes_home):
     assert load_window_overrides() == {}
 
 
-def test_growth_declines_foreign_endpoints(hermes_home):
+def test_growth_declines_foreign_endpoints(eir_home):
     """Only the server THIS process supervises grows — a detected external
     server or another process's endpoint returns None untouched."""
-    from hermes_cli.local_runtime.growth import maybe_grow_window
+    from eir_cli.local_runtime.growth import maybe_grow_window
 
     grown = maybe_grow_window(
         "some-model", base_url="http://127.0.0.1:9999/v1",
@@ -61,8 +61,8 @@ def test_occupancy_confirmed_skips_gate_one():
     """The agent's compression gate IS the occupancy signal: when it fired,
     growth must not re-derive its own edge and hold. Decision-table check
     with a synthetic profile."""
-    from hermes_cli.local_runtime.context_policy import growth_decision
-    from hermes_cli.local_runtime.estimator import (
+    from eir_cli.local_runtime.context_policy import growth_decision
+    from eir_cli.local_runtime.estimator import (
         HardwareBudget,
         LayerKind,
         ModelProfile,
@@ -77,7 +77,7 @@ def test_occupancy_confirmed_skips_gate_one():
                             total_device_bytes=32 * gib,
                             ram_available_bytes=64 * gib)
 
-    # Hermes' threshold (e.g. 80% of window) can sit BELOW the ladder's 85%
+    # Eir' threshold (e.g. 80% of window) can sit BELOW the ladder's 85%
     # occupancy gate: 78K of a 96K window is 81%.
     kwargs = dict(current_window=98304, session_tokens=78_000,
                   measured_decode_tok_s=None, server_idle=True)
@@ -105,7 +105,7 @@ def _header_stub(sampling: dict | None = None):
 
 
 def _tiny_profile(model_id: str):
-    from hermes_cli.local_runtime.estimator import LayerKind, ModelProfile
+    from eir_cli.local_runtime.estimator import LayerKind, ModelProfile
 
     gib = 1 << 30
     return ModelProfile(
@@ -114,16 +114,16 @@ def _tiny_profile(model_id: str):
         layers=[(LayerKind.FULL, 512)] * 4)
 
 
-def test_preset_generation_for_catalog_model_with_mmproj(hermes_home, tmp_path, monkeypatch):
+def test_preset_generation_for_catalog_model_with_mmproj(eir_home, tmp_path, monkeypatch):
     """generate_presets must survive a model that IS in the catalog and
     carries a vision projector — this executes the find_entry_for_model +
     mmproj overhead branch that synthetic test models skip. Regression:
     the branch once treated the (entry, variant) tuple as the entry and
     crashed every real boot into the stock-fit fallback."""
-    import hermes_cli.local_runtime.presets as presets_mod
+    import eir_cli.local_runtime.presets as presets_mod
 
-    from hermes_cli.local_runtime.catalog import CATALOG
-    from hermes_cli.local_runtime.estimator import HardwareBudget
+    from eir_cli.local_runtime.catalog import CATALOG
+    from eir_cli.local_runtime.estimator import HardwareBudget
 
     # A real catalog id with an mmproj (the recommended row has one).
     entry = next(e for e in CATALOG if e.mmproj is not None)
@@ -145,14 +145,14 @@ def test_preset_generation_for_catalog_model_with_mmproj(hermes_home, tmp_path, 
     assert entries[0].window > 0
 
 
-def test_preset_restores_grown_window_capped_at_native(hermes_home, tmp_path, monkeypatch):
+def test_preset_restores_grown_window_capped_at_native(eir_home, tmp_path, monkeypatch):
     """A persisted override lifts the preset window; an absurd override is
     capped at native. GGUF parsing is stubbed — the contract under test is
     the override plumbing, not the reader."""
-    import hermes_cli.local_runtime.presets as presets_mod
+    import eir_cli.local_runtime.presets as presets_mod
 
-    from hermes_cli.local_runtime.estimator import HardwareBudget
-    from hermes_cli.local_runtime.growth import save_window_override
+    from eir_cli.local_runtime.estimator import HardwareBudget
+    from eir_cli.local_runtime.growth import save_window_override
 
     mdir = tmp_path / "models"
     _stage_fake_gguf(mdir, "tiny-dense")
@@ -175,13 +175,13 @@ def test_preset_restores_grown_window_capped_at_native(hermes_home, tmp_path, mo
     assert capped.window == 131072
 
 
-def test_preset_ignores_override_below_launch_window(hermes_home, tmp_path, monkeypatch):
+def test_preset_ignores_override_below_launch_window(eir_home, tmp_path, monkeypatch):
     """Overrides only ever RAISE the window (growth is monotone); a stale
     smaller override never shrinks a launch decision."""
-    import hermes_cli.local_runtime.presets as presets_mod
+    import eir_cli.local_runtime.presets as presets_mod
 
-    from hermes_cli.local_runtime.estimator import HardwareBudget
-    from hermes_cli.local_runtime.growth import save_window_override
+    from eir_cli.local_runtime.estimator import HardwareBudget
+    from eir_cli.local_runtime.growth import save_window_override
 
     mdir = tmp_path / "models"
     _stage_fake_gguf(mdir, "tiny-dense")
@@ -198,13 +198,13 @@ def test_preset_ignores_override_below_launch_window(hermes_home, tmp_path, monk
     assert entry.window == 131072
 
 
-def test_preset_restores_grown_window_midladder(hermes_home, tmp_path, monkeypatch):
+def test_preset_restores_grown_window_midladder(eir_home, tmp_path, monkeypatch):
     """The real growth shape: launch at a lower rung, override to a middle
     rung -> the preset window follows the override."""
-    import hermes_cli.local_runtime.presets as presets_mod
+    import eir_cli.local_runtime.presets as presets_mod
 
-    from hermes_cli.local_runtime.estimator import HardwareBudget, LayerKind, ModelProfile
-    from hermes_cli.local_runtime.growth import save_window_override
+    from eir_cli.local_runtime.estimator import HardwareBudget, LayerKind, ModelProfile
+    from eir_cli.local_runtime.growth import save_window_override
 
     gib = 1 << 30
     # Expensive dense KV so the launch decision lands BELOW native on this
@@ -230,14 +230,14 @@ def test_preset_restores_grown_window_midladder(hermes_home, tmp_path, monkeypat
     assert restored.window >= grown, "override must lift the launch window"
 
 
-def test_mtp_plan_matches_cost_at_initial_and_restored_windows(hermes_home, tmp_path, monkeypatch):
+def test_mtp_plan_matches_cost_at_initial_and_restored_windows(eir_home, tmp_path, monkeypatch):
     from dataclasses import replace
     from types import SimpleNamespace
 
-    from hermes_cli.local_runtime import presets
-    from hermes_cli.local_runtime.context_policy import FLOOR, RUNTIME_OVERHEAD_BYTES, ub_logits_bytes
-    from hermes_cli.local_runtime.estimator import HardwareBudget, LayerKind, ModelProfile, ctx_bytes
-    from hermes_cli.local_runtime.growth import save_window_override
+    from eir_cli.local_runtime import presets
+    from eir_cli.local_runtime.context_policy import FLOOR, RUNTIME_OVERHEAD_BYTES, ub_logits_bytes
+    from eir_cli.local_runtime.estimator import HardwareBudget, LayerKind, ModelProfile, ctx_bytes
+    from eir_cli.local_runtime.growth import save_window_override
 
     gib = 1 << 30
     profile = ModelProfile(name="mtp-fit", weights_bytes=16 * gib, embd_table_bytes=0,
@@ -290,13 +290,13 @@ def test_mtp_plan_matches_cost_at_initial_and_restored_windows(hermes_home, tmp_
     assert profile.weights_bytes + ctx_bytes(priced, control.window) + stacked <= device
 
 
-def test_growth_requires_an_admissible_materialized_preset(hermes_home, tmp_path, monkeypatch):
+def test_growth_requires_an_admissible_materialized_preset(eir_home, tmp_path, monkeypatch):
     from dataclasses import replace
     from types import SimpleNamespace
 
-    from hermes_cli.local_runtime import bootstrap, catalog, growth, hardware, presets
-    from hermes_cli.local_runtime.context_policy import FLOOR, RUNTIME_OVERHEAD_BYTES, ub_logits_bytes
-    from hermes_cli.local_runtime.estimator import HardwareBudget, ctx_bytes
+    from eir_cli.local_runtime import bootstrap, catalog, growth, hardware, presets
+    from eir_cli.local_runtime.context_policy import FLOOR, RUNTIME_OVERHEAD_BYTES, ub_logits_bytes
+    from eir_cli.local_runtime.estimator import HardwareBudget, ctx_bytes
 
     entry = next(e for e in catalog.CATALOG if e.mtp and e.mmproj)
     model_id = entry.variants[-1].model_id
@@ -306,7 +306,7 @@ def test_growth_requires_an_admissible_materialized_preset(hermes_home, tmp_path
     monkeypatch.setattr(bootstrap, "staged_models", lambda: list(mdir.glob("*.gguf")))
     monkeypatch.setattr(bootstrap, "get_supervisor", lambda: SimpleNamespace(is_idle=lambda m: True))
     monkeypatch.setattr(growth, "is_managed_endpoint", lambda url: True)
-    from hermes_cli.local_runtime import gguf, estimator
+    from eir_cli.local_runtime import gguf, estimator
     monkeypatch.setattr(gguf, "read_gguf_header", lambda p: _header_stub())
     monkeypatch.setattr(estimator, "profile_from_gguf", lambda h: profile)
     monkeypatch.setattr(presets, "read_gguf_header", lambda p: _header_stub())
@@ -321,7 +321,7 @@ def test_growth_requires_an_admissible_materialized_preset(hermes_home, tmp_path
     next_need = profile.weights_bytes + ctx_bytes(priced, next_window) + overhead
     budget = HardwareBudget(floor_need, floor_need, 0, True)
     monkeypatch.setattr(hardware, "probe_budget", lambda **kw: budget)
-    from hermes_cli.local_runtime.binaries import runtimes_root
+    from eir_cli.local_runtime.binaries import runtimes_root
     preset_path = runtimes_root() / "presets.ini"
     calls = []
 
@@ -345,16 +345,16 @@ def test_growth_requires_an_admissible_materialized_preset(hermes_home, tmp_path
     assert growth.maybe_grow_window(model_id, **{**args, "current_window": next_window}) is None
 
 
-def test_sampling_ladder_file_beats_catalog_beats_nothing(hermes_home, tmp_path, monkeypatch):
+def test_sampling_ladder_file_beats_catalog_beats_nothing(eir_home, tmp_path, monkeypatch):
     """The sampling deference ladder: the GGUF's own general.sampling.*
     wins per key, catalog fills only what the file left silent, and a
     model with neither gets no sampling keys at all (llama.cpp defaults).
     Policy keys (ctx-size, cache types) must never be displaced."""
     import configparser
 
-    import hermes_cli.local_runtime.presets as presets_mod
-    from hermes_cli.local_runtime.catalog import CATALOG
-    from hermes_cli.local_runtime.estimator import HardwareBudget
+    import eir_cli.local_runtime.presets as presets_mod
+    from eir_cli.local_runtime.catalog import CATALOG
+    from eir_cli.local_runtime.estimator import HardwareBudget
 
     # A real catalog entry WITH catalog sampling, staged on disk.
     entry = next(e for e in CATALOG if e.sampling)

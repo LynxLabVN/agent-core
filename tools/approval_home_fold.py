@@ -1,7 +1,7 @@
-"""Fold the resolved user home and HERMES_HOME in a command to ``~/`` / ``~/.hermes/``.
+"""Fold the resolved user home and EIR_HOME in a command to ``~/`` / ``~/.eir/``.
 
 Detection-time normalization for :mod:`tools.approval_detection`: the dangerous-command patterns
-name Hermes's own files through ``~/.hermes`` / ``$HERMES_HOME`` spellings, so every spelling a shell
+name Eir's own files through ``~/.eir`` / ``$EIR_HOME`` spellings, so every spelling a shell
 uses for the resolved homes (native, Git Bash ``/c/…``, ``~``, ``$HOME``, ``$LOCALAPPDATA``, …) is
 rewritten into those forms first.
 """
@@ -10,7 +10,7 @@ import functools
 import os
 import re
 
-from hermes_platform.host import facts
+from eir_platform.host import facts
 
 
 # Shell metacharacters, quotes, and whitespace that terminate a path token.
@@ -72,8 +72,8 @@ def _path_below(root: str, path: str) -> str | None:
 def _home_spellings(paths, command: str) -> list[str]:
     """Every spelling a shell uses for one of *paths*: as written (native and Git Bash drive form)
     and the same location written through a home variable — ``~``, ``$HOME``, ``$LOCALAPPDATA`` /
-    ``%LOCALAPPDATA%``, ``$USERPROFILE``. Windows's default HERMES_HOME nests under the profile,
-    which Git Bash reaches as ``/c/Users/<me>/AppData/Local/hermes``; folding only the absolute
+    ``%LOCALAPPDATA%``, ``$USERPROFILE``. Windows's default EIR_HOME nests under the profile,
+    which Git Bash reaches as ``/c/Users/<me>/AppData/Local/eir``; folding only the absolute
     native form left that spelling — and its ``~/…`` and ``$LOCALAPPDATA/…`` siblings — unmatched.
     The variable spellings are only derived when *command* writes one of ``~``, ``$``, ``%``, so a
     command with no variable syntax costs nothing beyond its own absolute prefixes."""
@@ -107,14 +107,14 @@ def _rewrite_resolved_user_home(command: str) -> str:
     return _fold_home_prefixes(command, paths, "~")
 
 
-def _rewrite_resolved_hermes_home(command: str) -> str:
-    """Resolved HERMES_HOME -> ``~/.hermes/`` so the _HERMES_CONFIG_PATH / _HERMES_ENV_PATH rules
+def _rewrite_resolved_eir_home(command: str) -> str:
+    """Resolved EIR_HOME -> ``~/.eir/`` so the _EIR_CONFIG_PATH / _EIR_ENV_PATH rules
     match Docker/gateway deployments and the platform default in every spelling a shell uses for it
-    (native, Git Bash ``/c/…``, ``~/AppData/Local/hermes``, ``$LOCALAPPDATA/hermes``)."""
+    (native, Git Bash ``/c/…``, ``~/AppData/Local/eir``, ``$LOCALAPPDATA/eir``)."""
     try:
-        from hermes_constants import get_hermes_home
-        home = get_hermes_home().expanduser()
+        from eir_constants import get_eir_home
+        home = get_eir_home().expanduser()
         paths = _home_spellings([str(home), str(home.resolve(strict=False))], command)
     except Exception:
         return command
-    return _fold_home_prefixes(command, paths, "~/.hermes")
+    return _fold_home_prefixes(command, paths, "~/.eir")

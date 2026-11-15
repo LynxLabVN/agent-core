@@ -8,11 +8,11 @@ from contextlib import asynccontextmanager
 
 import pytest
 
-from hermes_cli.gateway_client import DISCONNECTED, GatewayClientError, GatewayRPCError
-from hermes_cli.gateway_connection import GatewayConnection
-from hermes_cli.gateway_owner_restart import SuccessorWaitStopped, wait_for_successor
-from hermes_cli.gateway_session_store import GatewaySessionStore
-from tests.hermes_cli.test_cli_owner_restart_wait import _host, _snapshot
+from eir_cli.gateway_client import DISCONNECTED, GatewayClientError, GatewayRPCError
+from eir_cli.gateway_connection import GatewayConnection
+from eir_cli.gateway_owner_restart import SuccessorWaitStopped, wait_for_successor
+from eir_cli.gateway_session_store import GatewaySessionStore
+from tests.eir_cli.test_cli_owner_restart_wait import _host, _snapshot
 
 
 class Owner:
@@ -44,10 +44,10 @@ class Owner:
 
 @pytest.fixture
 def owner(monkeypatch):
-    import hermes_cli.gateway_owner_restart as restart
+    import eir_cli.gateway_owner_restart as restart
     monkeypatch.setattr(restart, "restart_wait_budget", lambda: 30.0)
     monkeypatch.setattr("agent.retry_utils.jittered_backoff", lambda *a, **k: 0.01)
-    monkeypatch.delenv("HERMES_SESSION_SOURCE", raising=False)
+    monkeypatch.delenv("EIR_SESSION_SOURCE", raising=False)
     client = Owner()
 
     @asynccontextmanager
@@ -66,7 +66,7 @@ def _sent(client, method):
 def test_new_session_retry_resends_the_same_request(owner):
     """A retry after a lost reply must carry the first attempt's ``request_id``: the owner then
     answers with the session that attempt committed instead of creating a second one."""
-    from hermes_cli.cli_init_mixin import CLIInitMixin
+    from eir_cli.cli_init_mixin import CLIInitMixin
     store, client = owner
     CLIInitMixin._new_session_id(_host(store), None)
     ids = {params["request_id"] for params in _sent(client, "session.create")}
@@ -74,7 +74,7 @@ def test_new_session_retry_resends_the_same_request(owner):
 
 
 def test_branch_retry_resends_the_same_fenced_mutation(owner):
-    from hermes_cli.cli_init_mixin import CLIInitMixin
+    from eir_cli.cli_init_mixin import CLIInitMixin
     store, client = owner
     host = _host(store)
     assert CLIInitMixin._new_session_id(host, None, branch_of="local-parent") == "local-child"
@@ -83,7 +83,7 @@ def test_branch_retry_resends_the_same_fenced_mutation(owner):
 
 
 def test_ctrl_c_during_an_in_flight_attempt_opens_nothing(owner):
-    from hermes_cli.cli_init_mixin import CLIInitMixin
+    from eir_cli.cli_init_mixin import CLIInitMixin
     store, client = owner
     host = _host(store)
     host._gateway_command_wait = None
@@ -113,10 +113,10 @@ def test_a_local_error_during_the_wait_is_raised_at_once():
 
 
 def test_quiet_query_cancel_exits_130(monkeypatch, capsys):
-    from hermes_cli.cli_agent_setup_mixin import CLIAgentSetupMixin
+    from eir_cli.cli_agent_setup_mixin import CLIAgentSetupMixin
 
     def stopped():
-        raise SuccessorWaitStopped("Stopped waiting for Hermes to restart; nothing was started.")
+        raise SuccessorWaitStopped("Stopped waiting for Eir to restart; nothing was started.")
     host = types.SimpleNamespace(agent=None, finalize_preloaded_skills=lambda: None,
                                  _install_tool_callbacks=lambda: None, _ensure_runtime_credentials=lambda: True,
                                  _session_db=object(), _ensure_gateway_session=stopped, _single_query_mode=True)

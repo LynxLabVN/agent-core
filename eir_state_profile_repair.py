@@ -1,5 +1,5 @@
 """Crossed-profile durable state in ONE ``state.db`` — finders and fixers for
-``hermes sessions repair-profiles`` (#88715 PR-6).
+``eir sessions repair-profiles`` (#88715 PR-6).
 
 Every ``state.db`` belongs to exactly one profile (``<root>/state.db`` → ``default``,
 ``<root>/profiles/<name>/state.db`` → ``name``) and every gateway session key encodes the profile
@@ -12,7 +12,7 @@ row and can settle it.
 
 Store-level only. Which profiles exist, which store owns which home, whether a live gateway holds the
 routing index in memory, and the JSON files outside ``state.db`` are the orchestrator's concern
-(``hermes_cli/sessions_repair_profiles.py``).
+(``eir_cli/sessions_repair_profiles.py``).
 
 Moving a session between two stores is two single-store transactions — copy into the target, then
 delete from the source — because a crash between them leaves a *duplicate*, which the next run
@@ -24,7 +24,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
-from hermes_state_common import (
+from eir_state_common import (
     _id_chunks,
     _placeholders as _session_ids_placeholders,
     emit_session_deleted,
@@ -41,7 +41,7 @@ def session_key_profile(session_key: Any) -> Optional[str]:
     parts = session_key.split(":")
     if len(parts) < 3 or parts[0] != "agent" or not parts[1]:
         return None
-    from hermes_state_keys import profile_from_session_key_namespace
+    from eir_state_keys import profile_from_session_key_namespace
     return profile_from_session_key_namespace(parts[1])
 
 

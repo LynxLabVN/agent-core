@@ -20,39 +20,39 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
-from hermes_cli.config import redact_key
-from hermes_cli.web_deps import late
-from hermes_cli.web_server_files import _path_is_under
-from hermes_cli.web_server_gateway import _restart_gateway_after
-from hermes_cli.web_server_memory import _normalize_memory_provider_name, _require_memory_provider_ready
-from hermes_cli.web_models import (
+from eir_cli.config import redact_key
+from eir_cli.web_deps import late
+from eir_cli.web_server_files import _path_is_under
+from eir_cli.web_server_gateway import _restart_gateway_after
+from eir_cli.web_server_memory import _normalize_memory_provider_name, _require_memory_provider_ready
+from eir_cli.web_models import (
     BackupRequest, CredentialPoolAdd, HookCreate, HookDelete, ImportRequest, MemoryProviderSelect,
     MemoryReset, PairingApprove, PairingRevoke, WebhookCreate, WebhookEnabledToggle,
 )
-from hermes_cli.web_routers._common import (
+from eir_cli.web_routers._common import (
     config_scoped_to_thread, config_write_scope, destructive_profile, http_failure,
     spawn_profile_action,
 )
-from hermes_cli.web_routers.files import stream_upload_to_path
+from eir_cli.web_routers.files import stream_upload_to_path
 
-_log = logging.getLogger("hermes_cli.web_server")
+_log = logging.getLogger("eir_cli.web_server")
 router = APIRouter()
 
 # Late-bound so a test's monkeypatch on the owning module wins at call time.
-_discover_memory_provider_statuses = late("_discover_memory_provider_statuses", "hermes_cli.web_server_memory")
-_gateway_subcommand = late("_gateway_subcommand", "hermes_cli.web_server_gateway")
-_config_profile_scope = late("_config_profile_scope", "hermes_cli.web_server_profiles")
-_resolve_profile_dir = late("_resolve_profile_dir", "hermes_cli.web_server_profiles")
-_spawn_hermes_action = late("_spawn_hermes_action", "hermes_cli.web_server_gateway")
-_write_platform_enabled = late("_write_platform_enabled", "hermes_cli.web_server_messaging")
-get_hermes_home = late("get_hermes_home", "hermes_cli.config")
-load_config = late("load_config", "hermes_cli.config")
-save_config = late("save_config", "hermes_cli.config")
+_discover_memory_provider_statuses = late("_discover_memory_provider_statuses", "eir_cli.web_server_memory")
+_gateway_subcommand = late("_gateway_subcommand", "eir_cli.web_server_gateway")
+_config_profile_scope = late("_config_profile_scope", "eir_cli.web_server_profiles")
+_resolve_profile_dir = late("_resolve_profile_dir", "eir_cli.web_server_profiles")
+_spawn_eir_action = late("_spawn_eir_action", "eir_cli.web_server_gateway")
+_write_platform_enabled = late("_write_platform_enabled", "eir_cli.web_server_messaging")
+get_eir_home = late("get_eir_home", "eir_cli.config")
+load_config = late("load_config", "eir_cli.config")
+save_config = late("save_config", "eir_cli.config")
 
 
 def _spawn_action(argv: list[str], name: str, *, log_msg: str, prefix: str,
                   profile: Optional[str] = None) -> dict:
-    """Spawn a ``hermes -p <profile> <argv>`` action; spawn failure -> 500.
+    """Spawn a ``eir -p <profile> <argv>`` action; spawn failure -> 500.
 
     The profile reaches the child as argv (``_profile_cli_args``) — the only mechanism
     that retargets a fresh process's import-time home bindings.
@@ -133,7 +133,7 @@ async def clear_pending_pairing(profile: Optional[str] = None):
     return {"ok": True, "cleared": await asyncio.to_thread(_pairing_store(profile).clear_pending)}
 
 
-# --- Webhooks: same JSON store as the CLI (hermes_cli.webhook); the adapter
+# --- Webhooks: same JSON store as the CLI (eir_cli.webhook); the adapter
 # hot-reloads it. Per-route HMAC secrets are redacted on read, surfaced once on create.
 
 
@@ -159,7 +159,7 @@ def _webhook_route_summary(name: str, route: dict[str, Any], base_url: str) -> d
 @router.get("/api/webhooks")
 async def list_webhooks(profile: Optional[str] = None):
     def _run():
-        import hermes_cli.webhook as wh
+        import eir_cli.webhook as wh
 
         base_url = wh._get_webhook_base_url()
         return {
@@ -206,7 +206,7 @@ def _dashboard_route_signature(requested: Optional[str], expected: object) -> di
 
 @router.post("/api/webhooks")
 async def create_webhook(body: WebhookCreate, profile: Optional[str] = None):
-    import hermes_cli.webhook as wh
+    import eir_cli.webhook as wh
 
     def _enabled():
         return wh._is_webhook_enabled()
@@ -274,7 +274,7 @@ async def delete_webhook(name: str, profile: Optional[str] = None):
     profile = destructive_profile(profile, "DELETE /api/webhooks/{name}")
 
     def _run():
-        import hermes_cli.webhook as wh
+        import eir_cli.webhook as wh
 
         def remove(subscriptions):
             del subscriptions[_webhook_key_in(subscriptions, name)]
@@ -290,7 +290,7 @@ async def set_webhook_enabled(name: str, body: WebhookEnabledToggle, profile: Op
     """Disabled routes stay on disk (re-enable later) but the gateway rejects
     their events with 403; it hot-reloads the file, so no restart is needed."""
     def _run():
-        import hermes_cli.webhook as wh
+        import eir_cli.webhook as wh
 
         def toggle(subscriptions):
             key = _webhook_key_in(subscriptions, name)
@@ -303,26 +303,26 @@ async def set_webhook_enabled(name: str, body: WebhookEnabledToggle, profile: Op
     return {"ok": True, "name": key, "enabled": bool(body.enabled)}
 
 
-# --- Gateway lifecycle: spawn the real `hermes gateway <verb>` so behaviour
+# --- Gateway lifecycle: spawn the real `eir gateway <verb>` so behaviour
 # matches the CLI exactly (status is surfaced by /api/status).
 
 
 @router.post("/api/gateway/start")
 async def start_gateway(profile: Optional[str] = None):
-    from hermes_cli.web_server_gateway import multiplexed_profile_refusal
-    # The spawned `hermes -p X gateway start` would refuse with exit 78 into an action log nobody reads;
+    from eir_cli.web_server_gateway import multiplexed_profile_refusal
+    # The spawned `eir -p X gateway start` would refuse with exit 78 into an action log nobody reads;
     # surface the same refusal here so the UI can point at the multiplexer instead of showing "started".
     refusal = await asyncio.to_thread(multiplexed_profile_refusal, profile, "start")
     if refusal:
         raise HTTPException(status_code=409, detail=refusal)
     with http_failure("Failed to spawn gateway start", 500, "Failed to start gateway"):
-        proc = _spawn_hermes_action(_gateway_subcommand(profile, "start"), "gateway-start")
+        proc = _spawn_eir_action(_gateway_subcommand(profile, "start"), "gateway-start")
     return {"ok": True, "pid": proc.pid, "name": "gateway-start"}
 
 
 @router.post("/api/gateway/stop")
 async def stop_gateway(profile: Optional[str] = None, interrupt: bool = False):
-    from hermes_cli.web_server_gateway import live_session_refusal, multiplexed_profile_refusal
+    from eir_cli.web_server_gateway import live_session_refusal, multiplexed_profile_refusal
     # A served profile has no gateway of its own to stop: the child prints "No gateway running for this
     # profile" (exit 0) while the multiplexer keeps serving it and the UI flips to "stopped".
     refusal = await asyncio.to_thread(multiplexed_profile_refusal, profile, "stop")
@@ -332,7 +332,7 @@ async def stop_gateway(profile: Optional[str] = None, interrupt: bool = False):
     if not interrupt and (refusal := await asyncio.to_thread(live_session_refusal, profile, "stop")):
         raise HTTPException(status_code=409, detail=refusal)
     with http_failure("Failed to spawn gateway stop", 500, "Failed to stop gateway"):
-        proc = _spawn_hermes_action(_gateway_subcommand(profile, "stop") + ["--interrupt"] * interrupt, "gateway-stop")
+        proc = _spawn_eir_action(_gateway_subcommand(profile, "stop") + ["--interrupt"] * interrupt, "gateway-stop")
     return {"ok": True, "pid": proc.pid, "name": "gateway-stop"}
 
 
@@ -365,7 +365,7 @@ def _pool_entry_summary(entry: Any, index: int) -> dict[str, Any]:
 @router.get("/api/credentials/pool")
 async def list_credential_pool(profile: Optional[str] = None):
     from agent.credential_pool import load_pool
-    from hermes_cli.auth import read_credential_pool
+    from eir_cli.auth import read_credential_pool
 
     def _run():
         providers = []
@@ -402,7 +402,7 @@ async def add_credential_pool_entry(body: CredentialPoolAdd, profile: Optional[s
         load_pool,
     )
 
-    from hermes_cli.auth_commands import _provider_base_url
+    from eir_cli.auth_commands import _provider_base_url
 
     provider = (body.provider or "").strip().lower()
     api_key = (body.api_key or "").strip()
@@ -418,7 +418,7 @@ async def add_credential_pool_entry(body: CredentialPoolAdd, profile: Optional[s
                 # Add a distinct, self-contained pool entry per account (matching the qwen-oauth /
                 # minimax-oauth multi-account patterns, and the xai-oauth path below) instead of routing
                 # through the singleton ``_save_codex_tokens`` save path. The singleton round-trip collapsed
-                # every added account into the latest login: a second ``hermes auth add openai-codex``
+                # every added account into the latest login: a second ``eir auth add openai-codex``
                 # overwrote the first account's singleton-mirrored ``device_code`` entry rather than
                 # creating an independent one (#39236). ``manual:device_code`` entries refresh from their
                 # own token pair, so they need no singleton shadow.
@@ -428,15 +428,15 @@ async def add_credential_pool_entry(body: CredentialPoolAdd, profile: Optional[s
                 priority=0,
                 source=SOURCE_MANUAL,
                 access_token=api_key,
-                # The key is bound to the address it was entered for (#130410), as `hermes auth add` does.
+                # The key is bound to the address it was entered for (#130410), as `eir auth add` does.
                 base_url=_provider_base_url(provider) or None,
             ))
             # Re-adding is an explicit re-engagement signal: lift every suppression
             # for this provider so a source deleted earlier can seed again
-            # (mirrors `hermes auth add`).
+            # (mirrors `eir auth add`).
             if not provider.startswith(CUSTOM_POOL_PREFIX):
                 try:
-                    from hermes_cli.auth import _load_auth_store, unsuppress_credential_source
+                    from eir_cli.auth import _load_auth_store, unsuppress_credential_source
 
                     suppressed = _load_auth_store().get("suppressed_sources", {})
                     for src in list(suppressed.get(provider, []) or []):
@@ -460,7 +460,7 @@ async def remove_credential_pool_entry(provider: str, index: int, profile: Optio
     Removal must be sticky: ``load_pool()`` re-seeds entries from their backing
     source (.env var, OAuth file, custom-provider config) on every call, so
     deleting only the row silently reverts on the next refresh. Dispatch through
-    the same RemovalStep registry as ``hermes auth remove``: each source cleans
+    the same RemovalStep registry as ``eir auth remove``: each source cleans
     its external state and suppresses ``(provider, source)`` so seeders skip it.
     Manual entries have no step — nothing external, and they aren't re-seeded.
 
@@ -468,7 +468,7 @@ async def remove_credential_pool_entry(provider: str, index: int, profile: Optio
     """
     from agent.credential_pool import load_pool
     from agent.credential_sources import find_removal_step
-    from hermes_cli.auth import suppress_credential_source
+    from eir_cli.auth import suppress_credential_source
 
     provider = (provider or "").strip().lower()
 
@@ -519,7 +519,7 @@ async def get_memory_status(profile: Optional[str] = None):
         cfg = load_config()
         mem = cfg.get("memory")
         active = _normalize_memory_provider_name(mem.get("provider")) if isinstance(mem, dict) else ""
-        mem_dir = get_hermes_home() / "memories"
+        mem_dir = get_eir_home() / "memories"
         files = {}  # sizes so the UI can show what a reset would erase
         for fname, key in _MEMORY_FILES:
             path = mem_dir / fname
@@ -558,7 +558,7 @@ async def reset_memory(body: MemoryReset, profile: Optional[str] = None):
     profile = destructive_profile(profile, "POST /api/memory/reset")
 
     def _run():
-        mem_dir = get_hermes_home() / "memories"
+        mem_dir = get_eir_home() / "memories"
         deleted = []
         for fname, key in _MEMORY_FILES:
             path = mem_dir / fname
@@ -595,7 +595,7 @@ async def run_security_audit(profile: Optional[str] = None):
 def _dashboard_backup_dir(profile: Optional[str] = None) -> Path:
     """``<profile home>/backups`` — the archive belongs to the profile it backs up."""
     with _config_profile_scope(profile):
-        return get_hermes_home() / "backups"
+        return get_eir_home() / "backups"
 
 
 @router.post("/api/ops/backup")
@@ -604,7 +604,7 @@ async def run_backup(body: BackupRequest, profile: Optional[str] = None):
     output = (body.output or "").strip()
     if not output:
         stamp = datetime.now().strftime("%Y-%m-%d-%H%M%S")
-        archive = _dashboard_backup_dir(profile) / f"hermes-backup-{stamp}-{secrets.token_hex(4)}.zip"
+        archive = _dashboard_backup_dir(profile) / f"eir-backup-{stamp}-{secrets.token_hex(4)}.zip"
         try:
             archive.parent.mkdir(parents=True, exist_ok=True)
         except OSError as exc:
@@ -693,12 +693,12 @@ async def list_hooks(profile: Optional[str] = None):
     """Configured shell hooks with consent (allowlist) status, whether the
     script is currently executable, and the valid hook events for the form."""
     def _run():
-        from hermes_cli.config import load_config as _load_config
+        from eir_cli.config import load_config as _load_config
         from agent import shell_hooks
 
         valid_events = []
         with contextlib.suppress(Exception):
-            from hermes_cli.plugins import VALID_HOOKS
+            from eir_cli.plugins import VALID_HOOKS
             valid_events = sorted(VALID_HOOKS)
 
         specs = []
@@ -755,7 +755,7 @@ async def create_hook(body: HookCreate, profile: Optional[str] = None):
     event, command = _hook_body_fields(body)
     valid_hooks = None
     with contextlib.suppress(Exception):
-        from hermes_cli.plugins import VALID_HOOKS as valid_hooks
+        from eir_cli.plugins import VALID_HOOKS as valid_hooks
     if valid_hooks is not None and event not in valid_hooks:
         raise HTTPException(status_code=400, detail=f"Unknown event '{event}'. Valid: {', '.join(sorted(valid_hooks))}")
 
@@ -829,7 +829,7 @@ async def list_checkpoints(profile: Optional[str] = None):
     so the UI can show what a prune reclaims; pruning itself is a spawned CLI
     action so the confirmation logic stays in one place."""
     def _run():
-        cp_dir = get_hermes_home() / "checkpoints"
+        cp_dir = get_eir_home() / "checkpoints"
         sessions = []
         total_bytes = 0
         if cp_dir.is_dir():

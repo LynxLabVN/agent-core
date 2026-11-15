@@ -15,16 +15,16 @@ from types import SimpleNamespace
 
 import pytest
 
-from hermes_cli import gateway, update_cmd, update_cmd_windows
-from hermes_cli import update_pause_record as pause_record
-from hermes_cli.update_cmd_windows import ServicePauseFailed, _pause_windows_gateways_for_update
+from eir_cli import gateway, update_cmd, update_cmd_windows
+from eir_cli import update_pause_record as pause_record
+from eir_cli.update_cmd_windows import ServicePauseFailed, _pause_windows_gateways_for_update
 
 
 @pytest.mark.parametrize("restore_fails", [False, True])
 def test_the_pause_record_survives_exactly_when_the_service_rollback_failed(monkeypatch, restore_fails):
-    from hermes_cli import main
+    from eir_cli import main
     pid = os.getpid()  # a live identity for the service's gateway; never signalled
-    service = SimpleNamespace(name="hermes-gw", profile="default", gateway_pid=pid, gateway_create_time=1.0,
+    service = SimpleNamespace(name="eir-gw", profile="default", gateway_pid=pid, gateway_create_time=1.0,
                               service_pid=pid, service_create_time=1.0, descendant_identities=())
     monkeypatch.setattr(main, "_is_windows", lambda: True)
     monkeypatch.setattr(gateway, "find_gateway_pids", lambda all_profiles=False: [])

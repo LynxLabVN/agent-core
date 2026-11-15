@@ -13,23 +13,23 @@ def served_root(tmp_path, monkeypatch):
     root = tmp_path / "home"
     home = root / "profiles" / "probe"
     home.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.setenv("HERMES_PROFILE", "probe")
+    monkeypatch.setenv("EIR_HOME", str(home))
+    monkeypatch.setenv("EIR_PROFILE", "probe")
     # Never read the real host rendezvous record of the developer's live gateway.
     (tmp_path / "locks").mkdir()
-    monkeypatch.setenv("HERMES_GATEWAY_LOCK_DIR", str(tmp_path / "locks"))
+    monkeypatch.setenv("EIR_GATEWAY_LOCK_DIR", str(tmp_path / "locks"))
     monkeypatch.delenv("GATEWAY_MULTIPLEX_PROFILES", raising=False)
-    monkeypatch.setattr("hermes_constants.get_default_hermes_root", lambda: root)
+    monkeypatch.setattr("eir_constants.get_default_eir_root", lambda: root)
     monkeypatch.setattr(jobs, "CRON_DIR", home / "cron")
     monkeypatch.setattr(jobs, "JOBS_FILE", home / "cron/jobs.json")
     monkeypatch.setattr(jobs, "OUTPUT_DIR", home / "cron/output")
-    monkeypatch.setattr("hermes_cli.gateway.find_gateway_pids", list)
+    monkeypatch.setattr("eir_cli.gateway.find_gateway_pids", list)
     # Model the default gateway's identity, not merely a live pytest PID. The satellite has no lock.
     monkeypatch.setattr(
         "gateway.status.is_gateway_runtime_lock_active",
         lambda lock_path=None: lock_path == root / "gateway.lock",
     )
-    monkeypatch.setattr("gateway.status._read_process_cmdline", lambda pid: "hermes gateway run")
+    monkeypatch.setattr("gateway.status._read_process_cmdline", lambda pid: "eir gateway run")
     root.joinpath("gateway.pid").write_text(json.dumps({"pid": os.getpid()}))
     root.joinpath("config.yaml").write_text("gateway:\n  multiplex_profiles: true\n")
     return root
@@ -38,7 +38,7 @@ def served_root(tmp_path, monkeypatch):
 @pytest.mark.parametrize("mode", ["missing", "fresh", "stale", "disabled", "excluded", "local", "external", "unrelated_pid"])
 def test_status_preserves_profile_health_contract(served_root, capsys, monkeypatch, mode):
     from cron import jobs
-    from hermes_cli import cron
+    from eir_cli import cron
 
     if mode in {"fresh", "stale", "local"}:
         jobs.record_ticker_heartbeat(success=True)
@@ -49,7 +49,7 @@ def test_status_preserves_profile_health_contract(served_root, capsys, monkeypat
     if mode == "excluded":
         served_root.joinpath("gateway_state.json").write_text(json.dumps({"served_profiles": ["other"]}))
     if mode == "local":
-        monkeypatch.setattr("hermes_cli.gateway.find_gateway_pids", lambda: [os.getpid()])
+        monkeypatch.setattr("eir_cli.gateway.find_gateway_pids", lambda: [os.getpid()])
     if mode == "external":
         monkeypatch.setattr(cron, "_active_cron_provider_name", lambda: "managed-test")
     if mode == "unrelated_pid":
@@ -63,22 +63,22 @@ def test_status_preserves_profile_health_contract(served_root, capsys, monkeypat
         mode in {"missing", "fresh", "stale"})
     assert ("will fire automatically" in output) == (mode in {"fresh", "local"})
     if mode in {"missing", "stale"}:
-        assert "hermes --profile default gateway restart" in output
+        assert "eir --profile default gateway restart" in output
     if mode == "missing":
         assert "has not reported a heartbeat" in output
     if mode == "stale":
         assert "STALLED" in output
     if mode in {"disabled", "excluded", "unrelated_pid"}:
         assert "No scheduler is serving profile" in output
-        assert "hermes --profile default gateway install" in output
-        assert "sudo hermes --profile default gateway install --system" in output
-        assert "hermes --profile default gateway run" in output
+        assert "eir --profile default gateway install" in output
+        assert "sudo eir --profile default gateway install --system" in output
+        assert "eir --profile default gateway run" in output
         # Multiplex-only: a per-profile service is not offered at all any more, not even as a
         # "legacy" fallback -- the one host gateway is the only topology, and an old per-profile
         # install is something to FOLD IN, not something to reinstall.
         assert "gateway migrate --multiplex" in output
         assert "LEGACY" not in output
-        assert "hermes gateway install   # starts a SECOND gateway" not in output
+        assert "eir gateway install   # starts a SECOND gateway" not in output
     if mode == "external":
         assert "managed scheduler" in output
         assert "STALLED" not in output
@@ -89,12 +89,12 @@ def test_host_record_rung_names_the_roster_and_a_runnable_restart(served_root, c
 
     Both rungs print a "Scheduler host: the host gateway…" line, so they are only distinguishable
     by their full text — and the remediation they print must actually run for THIS audience:
-    `hermes gateway restart` exits 78 for a served named profile.
+    `eir gateway restart` exits 78 for a served named profile.
     """
     import os
 
     from gateway import host_rendezvous as hr
-    from hermes_cli import cron
+    from eir_cli import cron
 
     # A live owner holds the host lock for its lifetime (run.py claims before it publishes).
     assert hr.claim_host_lock(hr.ROLE_GATEWAY)[0] is hr.HostLockOutcome.ACQUIRED
@@ -106,15 +106,15 @@ def test_host_record_rung_names_the_roster_and_a_runnable_restart(served_root, c
 
     assert f"Scheduler host: the host gateway (PID {os.getpid()}) serving profiles default, probe" in output
     assert "Scheduler host: the host gateway (multiplexing this profile)" not in output
-    assert "hermes --profile default gateway restart" in output
-    assert "\n  If heartbeat never appears, restart: hermes gateway restart" not in output
+    assert "eir --profile default gateway restart" in output
+    assert "\n  If heartbeat never appears, restart: eir gateway restart" not in output
 
 
 @pytest.mark.parametrize("heartbeat", ["missing", "fresh", "stale"])
 def test_satellite_list_and_create_require_own_heartbeat(served_root, capsys, monkeypatch, heartbeat):
     from argparse import Namespace
     from cron import jobs
-    from hermes_cli import cron
+    from eir_cli import cron
 
     # A fresh host heartbeat must not hide the satellite's missing or stale heartbeat.
     host_cron = served_root / "cron"
@@ -131,24 +131,24 @@ def test_satellite_list_and_create_require_own_heartbeat(served_root, capsys, mo
     cron.cron_list()
     listed = capsys.readouterr().out
     for output in (created, listed):
-        assert ("Check status:  hermes cron status" in output) == (heartbeat != "fresh")
+        assert ("Check status:  eir cron status" in output) == (heartbeat != "fresh")
     cron.cron_status()
     assert ("will fire automatically" in capsys.readouterr().out) == (heartbeat == "fresh")
 
 
 @pytest.mark.parametrize("home_kind", ["default", "custom", "named"])
 def test_standalone_guidance_matches_profile_membership(served_root, monkeypatch, capsys, home_kind):
-    from hermes_cli.cron import cron_status
+    from eir_cli.cron import cron_status
 
     homes = {"default": served_root, "custom": served_root.parent / "custom", "named": served_root / "profiles/probe"}
     home = homes[home_kind]
     home.mkdir(exist_ok=True)
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.delenv("HERMES_PROFILE")
+    monkeypatch.setenv("EIR_HOME", str(home))
+    monkeypatch.delenv("EIR_PROFILE")
     monkeypatch.setattr("gateway.status.is_gateway_runtime_lock_active", lambda lock_path=None: False)
     cron_status()
     output = capsys.readouterr().out
-    assert "hermes --profile default gateway install" in output
+    assert "eir --profile default gateway install" in output
     # A named profile is told the host gateway serves it and how to fold an older per-profile
     # install in; it is never offered a second host process, legacy or otherwise.
     assert ("gateway migrate --multiplex" in output) == (home_kind == "named")
@@ -158,22 +158,22 @@ def test_standalone_guidance_matches_profile_membership(served_root, monkeypatch
 def test_desktop_serve_ticker_is_not_reported_as_no_gateway(tmp_path, monkeypatch, capsys):
     """Desktop `serve` ticks cron in-process; a fresh ticker heartbeat is not a missing gateway."""
     from cron import jobs
-    from hermes_cli import cron
+    from eir_cli import cron
 
     home = tmp_path / "home"
     home.mkdir()
     (tmp_path / "locks").mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.setenv("HERMES_GATEWAY_LOCK_DIR", str(tmp_path / "locks"))
-    monkeypatch.delenv("HERMES_PROFILE", raising=False)
+    monkeypatch.setenv("EIR_HOME", str(home))
+    monkeypatch.setenv("EIR_GATEWAY_LOCK_DIR", str(tmp_path / "locks"))
+    monkeypatch.delenv("EIR_PROFILE", raising=False)
     monkeypatch.delenv("GATEWAY_MULTIPLEX_PROFILES", raising=False)
-    monkeypatch.setattr("hermes_constants.get_default_hermes_root", lambda: home)
+    monkeypatch.setattr("eir_constants.get_default_eir_root", lambda: home)
     monkeypatch.setattr(jobs, "CRON_DIR", home / "cron")
     monkeypatch.setattr(jobs, "JOBS_FILE", home / "cron/jobs.json")
     monkeypatch.setattr(jobs, "OUTPUT_DIR", home / "cron/output")
-    monkeypatch.setattr("hermes_cli.gateway.find_gateway_pids", list)
+    monkeypatch.setattr("eir_cli.gateway.find_gateway_pids", list)
     monkeypatch.setattr("gateway.status.is_gateway_runtime_lock_active", lambda lock_path=None: False)
-    monkeypatch.setattr("hermes_cli.gateway.named_profile_served_by_running_multiplexer", lambda: False)
+    monkeypatch.setattr("eir_cli.gateway.named_profile_served_by_running_multiplexer", lambda: False)
     monkeypatch.setattr("gateway.host_topology.host_gateway_serving", lambda profile_name=None: None)
     monkeypatch.setattr(cron, "_active_cron_provider_name", lambda: "builtin")
     jobs.record_ticker_heartbeat(success=True)
@@ -181,7 +181,7 @@ def test_desktop_serve_ticker_is_not_reported_as_no_gateway(tmp_path, monkeypatc
     assert cron._builtin_gateway_liveness() is True
     cron.cron_status()
     output = capsys.readouterr().out
-    assert "Scheduler host: an in-process ticker (hermes serve / Desktop backend) ticking profile 'default'" in output
+    assert "Scheduler host: an in-process ticker (eir serve / Desktop backend) ticking profile 'default'" in output
     assert "will fire automatically" in output
     assert "No scheduler is serving profile" not in output
     assert "gateway install" not in output
@@ -202,15 +202,15 @@ def test_in_process_ticker_heartbeat_counts_only_while_its_writer_lives(tmp_path
     import sys
 
     from cron import jobs
-    from hermes_cli import cron
+    from eir_cli import cron
 
     home = tmp_path / "home"
     (home / "cron").mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     monkeypatch.setattr(jobs, "CRON_DIR", home / "cron")
-    monkeypatch.setattr("hermes_cli.gateway.find_gateway_pids", list)
+    monkeypatch.setattr("eir_cli.gateway.find_gateway_pids", list)
     monkeypatch.setattr("gateway.status.is_gateway_runtime_lock_active", lambda lock_path=None: False)
-    monkeypatch.setattr("hermes_cli.gateway.named_profile_served_by_running_multiplexer", lambda: False)
+    monkeypatch.setattr("eir_cli.gateway.named_profile_served_by_running_multiplexer", lambda: False)
     monkeypatch.setattr(cron, "_active_cron_provider_name", lambda: "builtin")
     dead = subprocess.Popen([sys.executable, "-c", ""], stdin=subprocess.DEVNULL)
     dead.wait()
@@ -224,12 +224,12 @@ def test_in_process_ticker_heartbeat_counts_only_while_its_writer_lives(tmp_path
 
 
 def test_named_profile_output_names_the_profile_and_trusts_its_own_ticker(served_root, capsys, monkeypatch):
-    """`hermes -p probe cron list/status` names the inspected profile on every verdict (#99579) and
+    """`eir -p probe cron list/status` names the inspected profile on every verdict (#99579) and
     answers "is a scheduler ticking THIS home": a fresh heartbeat written into probe's store counts
     even when the default multiplexer's record does not list probe — the serve/Desktop backend ticks
     every local profile without any gateway record (#121881, #99631)."""
     from cron import jobs
-    from hermes_cli import cron
+    from eir_cli import cron
 
     served_root.joinpath("gateway_state.json").write_text(json.dumps({"served_profiles": ["other"]}))
     monkeypatch.setattr(cron, "_active_cron_provider_name", lambda: "builtin")
@@ -254,7 +254,7 @@ def test_named_profile_output_names_the_profile_and_trusts_its_own_ticker(served
 @pytest.mark.parametrize("detail", ["unreachable " * 30 + "\nsecret second line", ""])
 def test_doctor_bounds_persisted_fire_errors(served_root, capsys, detail):
     from cron import jobs
-    from hermes_cli.cron import cron_doctor
+    from eir_cli.cron import cron_doctor
 
     jobs.create_job(prompt="probe", schedule="every 1h")
     records = jobs.load_jobs()
@@ -266,7 +266,7 @@ def test_doctor_bounds_persisted_fire_errors(served_root, capsys, detail):
         assert "missed scheduled fire at test-time: unreachable" in output
         line = next(line for line in output.splitlines() if "missed scheduled fire at" in line)
         assert len(line.split(". The messaging gateway")[0]) < 200
-        assert f"hermes cron run {records[0]['id']}" in line
+        assert f"eir cron run {records[0]['id']}" in line
         assert detail not in output
         assert "secret second line" not in output
     else:
@@ -276,7 +276,7 @@ def test_doctor_bounds_persisted_fire_errors(served_root, capsys, detail):
 @pytest.mark.parametrize("dispatch", ["catch_up", "late", "forward_error"])
 def test_doctor_reports_persisted_dispatch_health(served_root, capsys, dispatch):
     from cron import jobs
-    from hermes_cli.cron import cron_doctor
+    from eir_cli.cron import cron_doctor
 
     job = jobs.create_job(prompt="probe", schedule="every 1h")
     if dispatch == "forward_error":
@@ -294,7 +294,7 @@ def test_doctor_reports_persisted_dispatch_health(served_root, capsys, dispatch)
     output = capsys.readouterr().out
     expected = {"catch_up": "catch-up", "late": "last fire was late", "forward_error": "loopback unavailable"}
     assert expected[dispatch] in output
-    assert "Review the findings above, then run `hermes cron doctor` again." in output
+    assert "Review the findings above, then run `eir cron doctor` again." in output
     jobs.mark_job_run(job["id"], success=True)
     if dispatch == "forward_error":
         assert cron_doctor() == 0

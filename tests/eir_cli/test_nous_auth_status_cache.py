@@ -1,7 +1,7 @@
 """Tests for the get_nous_auth_status() process-level cache.
 
 The cache avoids re-validating Nous credentials on every menu paint —
-`hermes tools` → "All Platforms" used to fire ~31 OAuth refresh POSTs
+`eir tools` → "All Platforms" used to fire ~31 OAuth refresh POSTs
 against portal.nousresearch.com during one render. The cache is keyed
 on auth.json path + mtime so profile switches stay isolated while
 login/logout flows invalidate naturally; tests and other writers can
@@ -14,7 +14,7 @@ import json
 from unittest.mock import patch
 
 def _seed_auth_file(tmp_path):
-    """Drop a placeholder auth.json into the test HERMES_HOME.
+    """Drop a placeholder auth.json into the test EIR_HOME.
 
     The exact content doesn't matter for cache-key purposes — only that
     the file exists and we can mutate it to bump mtime.
@@ -25,10 +25,10 @@ def _seed_auth_file(tmp_path):
 
 def test_get_nous_auth_status_caches_consecutive_calls(tmp_path, monkeypatch):
     """A second call within the TTL skips re-computing the snapshot."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     _seed_auth_file(tmp_path)
 
-    from hermes_cli import auth as auth_mod
+    from eir_cli import auth as auth_mod
 
     auth_mod.invalidate_nous_auth_status_cache()
 

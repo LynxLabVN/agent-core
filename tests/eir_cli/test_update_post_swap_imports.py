@@ -1,4 +1,4 @@
-"""After the checkout moves, the running ``hermes update`` process imports nothing from the tree.
+"""After the checkout moves, the running ``eir update`` process imports nothing from the tree.
 
 Once git (or the ZIP swap) writes the new code, every module this interpreter has not loaded yet is
 the REPLACEMENT tree's: importing one mixes generations in one process, and it is also why every
@@ -28,11 +28,11 @@ from pathlib import Path
 
 REPO, ROOT, CASE, LABEL, CLONE = sys.argv[1:6]
 sys.path.insert(0, REPO)
-import hermes_cli.main
-from hermes_cli import update_cmd, update_cmd_commit, update_cmd_posix_pause, update_receipt
-import hermes_cli.update_lock  # main.py imports it before the update runs
+import eir_cli.main
+from eir_cli import update_cmd, update_cmd_commit, update_cmd_posix_pause, update_receipt
+import eir_cli.update_lock  # main.py imports it before the update runs
 
-home = os.environ["HERMES_HOME"]
+home = os.environ["EIR_HOME"]
 GONE = 2 ** 22 + 7  # a PID no process holds
 
 
@@ -49,14 +49,14 @@ def posix_token(*entries, bare=()):
 
 if CASE == "systemd_resume":
     os.geteuid = lambda: 0  # root: a legacy system unit is rewritten, not just named
-    from hermes_cli import gateway  # loaded by the pause that stopped the unit
+    from eir_cli import gateway  # loaded by the pause that stopped the unit
     gateway._SYSTEM_UNIT_DIR = Path(ROOT) / "system-units"
     gateway._SYSTEM_UNIT_DIR.mkdir()
     unit_name = gateway.get_service_name()
     (gateway._SYSTEM_UNIT_DIR / f"{unit_name}.service").write_text(
         f"[Service]\nUser={os.environ.get('USER') or 'nobody'}\nExecStart=/bin/false\n")
 if CASE == "launchd_resume":
-    from hermes_cli import gateway  # loaded by the pause that stopped the job
+    from eir_cli import gateway  # loaded by the pause that stopped the job
     plist = Path(ROOT) / "job.plist"
     plist.write_text("<plist/>")
     gateway.get_launchd_plist_path = lambda: plist
@@ -93,10 +93,10 @@ if CASE == "shallow_count":
     def offline(*args, **kwargs):
         raise urllib.error.URLError("offline")
     urllib.request.urlopen = offline
-    hermes_cli.main.PROJECT_ROOT = Path(CLONE)
+    eir_cli.main.PROJECT_ROOT = Path(CLONE)
 
 # The run's own steps before its first tree move, then the commit point (``arm_commit_point``'s order).
-from hermes_cli.update_stage import publish_stage
+from eir_cli.update_stage import publish_stage
 publish_stage("Downloading updates")
 update_receipt.begin_update_receipt()
 update_receipt._current.get().data["pre_update"]["sha"] = "1" * 40  # the code this process started on
@@ -134,7 +134,7 @@ try:
         update_cmd._resume_paused_gateways_at_exit(token, request(token))
     elif CASE == "restart_child_env":
         # What the Windows restart (``gateway_windows``) builds for each relaunched gateway.
-        os.environ["HERMES_BRIDGED_TELEGRAM_REACTIONS"] = "sha256:0"
+        os.environ["EIR_BRIDGED_TELEGRAM_REACTIONS"] = "sha256:0"
         from tools.environments.local import served_profile_child_env
         served_profile_child_env(target_home=home, inherit_credentials=True)
     elif CASE == "shallow_count":
@@ -151,7 +151,7 @@ print("RESULT " + json.dumps({"found": found, "outcome": outcome}))
 # A restart path also has to reach its supervisor (the fakes append their argv to supervisor.log).
 _SUPERVISOR_CALLS = {
     "lost_completion": "bare-replay",
-    "systemd_resume": "start hermes-gateway",
+    "systemd_resume": "start eir-gateway",
     "launchd_resume": "bootstrap gui/0",
     "windows_resume": "restart watcher",
 }
@@ -201,7 +201,7 @@ def test_windows_restart_after_the_move_imports_nothing_from_the_checkout(tmp_pa
 def _run_case(case, tmp_path, monkeypatch):
     home = tmp_path / "home"
     home.mkdir()
-    (tmp_path / "hermes-home").mkdir()
+    (tmp_path / "eir-home").mkdir()
     root = tmp_path / "install"
     root.mkdir()
     fake_bin = tmp_path / "bin"
@@ -210,7 +210,7 @@ def _run_case(case, tmp_path, monkeypatch):
         (fake_bin / supervisor).write_text(f'#!/bin/sh\necho "{supervisor} $*" >> "{root}/supervisor.log"\nexit 1\n')
         (fake_bin / supervisor).chmod(0o755)
     # A home of its own (not the account default): the unit and job names carry its suffix.
-    env = {**os.environ, "HOME": str(home), "HERMES_HOME": str(tmp_path / "hermes-home"),
+    env = {**os.environ, "HOME": str(home), "EIR_HOME": str(tmp_path / "eir-home"),
            "USERPROFILE": str(home), "LOCALAPPDATA": str(home / "AppData" / "Local"),
            "APPDATA": str(home / "AppData" / "Roaming"), "XDG_STATE_HOME": str(tmp_path / "state"), "XDG_CONFIG_HOME": str(tmp_path / "config"),
            "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}", "GITHUB_TOKEN": "offline",
@@ -219,8 +219,8 @@ def _run_case(case, tmp_path, monkeypatch):
     env.pop("PYTEST_CURRENT_TEST", None)
     label = clone = ""
     if case == "launchd_resume":
-        monkeypatch.setenv("HERMES_HOME", env["HERMES_HOME"])
-        from hermes_cli.gateway_launchd import get_launchd_label
+        monkeypatch.setenv("EIR_HOME", env["EIR_HOME"])
+        from eir_cli.gateway_launchd import get_launchd_label
 
         label = get_launchd_label()
     if case == "shallow_count":

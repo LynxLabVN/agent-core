@@ -1,12 +1,12 @@
-"""``hermes fallback`` subcommand parser."""
+"""``eir fallback`` subcommand parser."""
 
 from __future__ import annotations
 
 
 def build_fallback_parser(subparsers) -> None:
     """Attach the ``fallback`` subcommand to ``subparsers``."""
-    from hermes_cli.fallback_cmd import cmd_fallback
-    from hermes_cli.subcommands._shared import add_json_flag
+    from eir_cli.fallback_cmd import cmd_fallback
+    from eir_cli.subcommands._shared import add_json_flag
 
     fallback_parser = subparsers.add_parser(
         "fallback", help="Manage fallback providers (tried when the primary model fails)",
@@ -19,7 +19,7 @@ def build_fallback_parser(subparsers) -> None:
         "list", aliases=["ls"], help="Show the current fallback chain (default when no subcommand)")
     fallback_subparsers.add_parser(
         "add",
-        help="Pick a provider + model (same picker as `hermes model`) and append to the chain")
+        help="Pick a provider + model (same picker as `eir model`) and append to the chain")
     fallback_subparsers.add_parser(
         "remove", aliases=["rm"], help="Pick an entry to delete from the chain")
     fallback_subparsers.add_parser("clear", help="Remove all fallback entries")

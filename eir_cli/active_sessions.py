@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterator, Optional
 
-from hermes_constants import get_default_hermes_root, get_hermes_home, named_profile_is_live
+from eir_constants import get_default_eir_root, get_eir_home, named_profile_is_live
 from utils import atomic_json_write, default_new_file_mode
 
 logger = logging.getLogger(__name__)
@@ -96,7 +96,7 @@ def active_session_limit_message(
     held = summarize_holders(entries or [])
     detail = f" Held by: {held}." if held else ""
     return (
-        f"Hermes is at the active session limit ({active_count}/{max_sessions})."
+        f"Eir is at the active session limit ({active_count}/{max_sessions})."
         f"{detail} Try again when another session finishes."
     )
 
@@ -139,7 +139,7 @@ class ActiveSessionRefusal(str):
 def format_refusal_stderr(message: str) -> str:
     """Keep the refusal contract across the one-shot CLI subprocess boundary."""
     reason = getattr(message, "reason", "")
-    return f"hermes-refusal-reason: {reason}\n{message}" if reason else str(message)
+    return f"eir-refusal-reason: {reason}\n{message}" if reason else str(message)
 
 
 def _is_same_writer(entry: dict[str, Any], metadata: Optional[dict[str, Any]]) -> bool:
@@ -171,13 +171,13 @@ def session_already_owned_message(session_id: str, entry: dict[str, Any]) -> str
     (no lease/pid/owner jargon); the second line is ``Details: ...`` for logs and bug reports.
     """
     return (
-        "This chat is open in another Hermes window/terminal. Use it there, or start a new chat here.\n"
+        "This chat is open in another Eir window/terminal. Use it there, or start a new chat here.\n"
         + session_owner_details(session_id, entry)
     )
 
 
 def _registry_home(registry_home: str | Path | None = None) -> Path:
-    return Path(registry_home) if registry_home is not None else Path(get_hermes_home())
+    return Path(registry_home) if registry_home is not None else Path(get_eir_home())
 
 
 def _state_path(registry_home: str | Path | None = None) -> Path:
@@ -359,7 +359,7 @@ def _valid_process_start(v: Any) -> bool:
 
 def _write_entries(path: Path, entries: list[dict[str, Any]]) -> None:
     # The registry carries the lease ids that key the session-attach MACs, so other users must
-    # never read it. Only the "other" bits are stripped: a shared-group HERMES_HOME (the NixOS
+    # never read it. Only the "other" bits are stripped: a shared-group EIR_HOME (the NixOS
     # module's setgid 2770 home, UMask 0007) needs group rw for cross-user session fencing. The
     # mode is applied to the temp file before the replace, so the payload never lands world-readable.
     try:
@@ -490,7 +490,7 @@ class ActiveSessionLease:
     surface: str
     enabled: bool = True
     released: bool = False
-    # Pinned at acquisition: a lease taken under the root HERMES_HOME must release
+    # Pinned at acquisition: a lease taken under the root EIR_HOME must release
     # against the same registry even inside a profile-home override, or phantom
     # leases fill the session cap.
     # See #85431.
@@ -613,7 +613,7 @@ def try_acquire_active_session(
         )
         if loaded is None:
             return None, ActiveSessionRefusal(
-                "Hermes could not read the active-session registry at "
+                "Eir could not read the active-session registry at "
                 f"{state_path}, so it cannot prove this session has no other "
                 "live owner. Fix or remove that file and try again.",
                 SESSION_COORDINATION_UNAVAILABLE,
@@ -665,7 +665,7 @@ def try_acquire_active_session(
 
 def release_active_session(lease: ActiveSessionLease) -> None:
     # Prefer the registry the lease was acquired against: the caller may be
-    # running under a profile HERMES_HOME override.
+    # running under a profile EIR_HOME override.
     # See #85431.
     state_path, lock_path = _lease_paths(lease)
     with _FileLock(lock_path):
@@ -782,7 +782,7 @@ def release_orphaned_leases(live_lease_ids: set[str]) -> int:
     only authority on its own leases — exact, no heartbeat on the turn path, no threshold.
     Sweeps the root home and every profile home (a multiplexed server leases across them).
     """
-    root = get_default_hermes_root()
+    root = get_default_eir_root()
     homes = [root]
     try:
         homes.extend(p for p in (root / "profiles").iterdir() if named_profile_is_live(p))

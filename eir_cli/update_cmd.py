@@ -1,8 +1,8 @@
-"""Hermes update pipeline: dispatchers (``_cmd_update_impl``/``_cmd_update_check``) + git plumbing.
+"""Eir update pipeline: dispatchers (``_cmd_update_impl``/``_cmd_update_check``) + git plumbing.
 
 Each concern lives in ``update_cmd_<concern>.py`` and is re-imported here so
-``hermes_cli.update_cmd.<name>`` keeps resolving (and stays monkeypatchable). Imports are one-way:
-main -> update_cmd -> update_cmd_*; ``_m()`` resolves ``hermes_cli.main`` at call time.
+``eir_cli.update_cmd.<name>`` keeps resolving (and stays monkeypatchable). Imports are one-way:
+main -> update_cmd -> update_cmd_*; ``_m()`` resolves ``eir_cli.main`` at call time.
 """
 
 import logging
@@ -18,31 +18,31 @@ from pathlib import Path
 from typing import NoReturn
 
 # Old updaters load _no_prompt_git_kwargs from here after the checkout swap (frozen surface).
-from hermes_cli._subprocess_compat import no_prompt_git_kwargs as _no_prompt_git_kwargs
-from hermes_cli.config import get_hermes_home
-from hermes_cli import update_handoff as _update_handoff
-from hermes_cli.update_cmd_common import _best_effort, _record_stop
+from eir_cli._subprocess_compat import no_prompt_git_kwargs as _no_prompt_git_kwargs
+from eir_cli.config import get_eir_home
+from eir_cli import update_handoff as _update_handoff
+from eir_cli.update_cmd_common import _best_effort, _record_stop
 # Captured BEFORE a checkout swap: parent transport/lifecycle never imports new code.
-from hermes_cli.update_completion import run_completion
-from hermes_cli.update_channel import adopt_retired_channel
+from eir_cli.update_completion import run_completion
+from eir_cli.update_channel import adopt_retired_channel
 from pm.receipt import accept_worker_receipt as _accept_completion_pm_receipt
-from hermes_cli import update_receipt as _completion_receipt, update_cmd_config as _completion_config
-from hermes_cli._old_updater import stop_for_relaunch, stop_historical_updater
-from hermes_cli._early_recovery import git_operation_in_progress, interrupted_pull_marker, is_object_id
-from hermes_cli import update_cmd_commit as _commit
-from hermes_cli import update_cmd_posix_pause as _posix_pause
-from hermes_cli.update_cmd_pause_gate import _checkout_move, _moves_for
-from hermes_cli import update_cmd_check as _check
+from eir_cli import update_receipt as _completion_receipt, update_cmd_config as _completion_config
+from eir_cli._old_updater import stop_for_relaunch, stop_historical_updater
+from eir_cli._early_recovery import git_operation_in_progress, interrupted_pull_marker, is_object_id
+from eir_cli import update_cmd_commit as _commit
+from eir_cli import update_cmd_posix_pause as _posix_pause
+from eir_cli.update_cmd_pause_gate import _checkout_move, _moves_for
+from eir_cli import update_cmd_check as _check
 
 # Re-exports: every split-module name stays reachable (and monkeypatchable) as update_cmd.<name>.
-from hermes_cli.update_abort_recovery import (
+from eir_cli.update_abort_recovery import (
     _abort_recovery_is_complete, _qualified_serve_skips, _recover_gateway_restart_after_abort,
     _serve_unit_recovery_available, _surviving_pre_update_serve_runtimes,
     _warn_stale_serve_runtimes)
-from hermes_cli.update_cmd_windows import (
+from eir_cli.update_cmd_windows import (
     _HOLDER_VALUE_FLAGS_FALLBACK,
     _cold_start_windows_gateway_after_update, _desktop_owns_gateway_lifecycle,
-    _detect_venv_python_processes, _hermes_holder_subcommand, _holder_value_flags,
+    _detect_venv_python_processes, _eir_holder_subcommand, _holder_value_flags,
     _holder_value_flags_cache, _looks_like_desktop_control_plane,
     _pause_windows_gateways_for_update,
     _refresh_bootstrap_cache_scripts, _refresh_windows_gateway_launchers,
@@ -52,7 +52,7 @@ from hermes_cli.update_cmd_windows import (
     _start_windows_gateway_service,
     _stop_windows_gateway_service, _venv_launcher_ancestors,
     _wait_for_windows_update_gateway_exit, _write_update_planned_stop_marker)
-from hermes_cli.update_cmd_fleet import (
+from eir_cli.update_cmd_fleet import (
     _FLEET_RESTART_PENDING_NAME, _FRESH_RESTART_SUPERVISORS, _GatewayRestartOutcome,
     _clear_fleet_restart_pending_marker,
     _current_checkout_sha, _drain_or_signal_gateway_for_update, _fleet_probe_expected_runtimes,
@@ -69,13 +69,13 @@ from hermes_cli.update_cmd_fleet import (
     _warn_incomplete_gateway_fleet_restart, _warn_pending_fleet_restart,
     _warn_pending_fleet_restart_on_startup, _write_fleet_restart_pending_marker,
     _write_gateway_update_exit_code)
-from hermes_cli.update_cmd_fleet_verify import _verify_fleet_after_update
-from hermes_cli.update_cmd_zip import (
+from eir_cli.update_cmd_fleet_verify import _verify_fleet_after_update
+from eir_cli.update_cmd_zip import (
     _ZIP_PRESERVED_TOP_LEVEL, _ZIP_STAGING_ARTIFACT_SUFFIXES, _abort_zip_update_if_dirty_tree,
     _atomic_replace_dir, _commit_staged_replacements, _discard_staged,
     _is_zip_preserved_entry_status_line, _is_zip_staging_artifact_status_line, _stage_replacement,
     _update_via_zip, _zip_overlay_block_reason)
-from hermes_cli.update_cmd_stash import (
+from eir_cli.update_cmd_stash import (
     _AUTOSTASH_NAME_PREFIX, _AUTOSTASH_WARN_AGE_DAYS, _clear_pending_autostash,
     _discard_stashed_changes,
     _git_untracked_paths, _park_stashed_changes, _print_stash_cleanup_guidance,
@@ -83,18 +83,18 @@ from hermes_cli.update_cmd_stash import (
     _restored_python_paths, _stash_apply_failed_only_on_existing_untracked,
     _stash_local_changes_if_needed, _target_would_move_head, _unrestored_autostash_notice,
     _warn_orphaned_update_autostashes)
-from hermes_cli.update_cmd_config import (
+from eir_cli.update_cmd_config import (
     _LAST_SIBLING_SNAPSHOTS, _check_and_apply_config_migration, _migrate_sibling_profile_configs,
     _print_items, _reload_config_modules, _run_config_check_fresh, _run_migrate_config_fresh)
-from hermes_cli.update_cmd_validation import (
+from eir_cli.update_cmd_validation import (
     _UPDATE_CRITICAL_MODULES, _critical_module_import_failures,
     _validate_critical_modules_import)
-from hermes_cli.old_updater_deps import (
+from eir_cli.old_updater_deps import (
     _capture_active_lazy_features, _npm_lockfile_changed, _path_uid,
     _rebuild_desktop_after_update, _refresh_active_lazy_features,
     _refresh_active_memory_provider_dependencies, _update_node_dependencies,
     _write_update_incomplete_marker)
-from hermes_cli.update_cmd_git import (
+from eir_cli.update_cmd_git import (
     OFFICIAL_REPO_URL, OFFICIAL_REPO_URLS, SKIP_UPSTREAM_PROMPT_FILE, _ORPHAN_RESCUE_REFS_TO_KEEP,
     _ORPHAN_RESCUE_REF_MAX_AGE_DAYS, _add_upstream_remote, _assess_parked_branch_switch,
     _branch_head_label, _branch_head_suffix, _classify_fetch_failure, _count_commits_between,
@@ -105,14 +105,14 @@ from hermes_cli.update_cmd_git import (
     _print_parked_branch_kept_notice, _print_parked_branch_skip_warning,
     _prune_orphan_rescue_refs, _push_synced_fork, _should_skip_upstream_prompt, _sync_fork_with_upstream,
     _sync_with_upstream_if_needed, UpstreamTargetBroken)
-from hermes_cli.update_cmd_maint import (
+from eir_cli.update_cmd_maint import (
     _PRE_UPDATE_SNAPSHOT_KEEP, _PRE_UPDATE_SNAPSHOT_MAX_FILE_SIZE,
     _checkout_version, _ensure_acp_launcher, _ensure_fhs_path_guard, _finish_dashboard_update_cleanup,
     _format_time_ago, _post_update_sqlite_runtime_status, _print_bundled_skills_sync_report,
     _print_curator_first_run_notice, _print_curator_recent_run_notice,
     _print_fts_optimize_available_notice, _print_update_completion, _print_update_summary,
     _prepare_updated_checkout,
-    _print_verified_update_completion, _purge_stale_hermes_modules, _read_project_version,
+    _print_verified_update_completion, _purge_stale_eir_modules, _read_project_version,
     _reload_process_scan_modules, _reload_updated_runtime_modules,
     _resolve_pre_update_backup_mode, _restore_state_db_from_snapshot,
     _run_post_update_maintenance, _run_pre_update_backup,
@@ -123,29 +123,29 @@ from datetime import UTC
 logger = logging.getLogger(__name__)
 
 
-def get_default_hermes_root() -> NoReturn:
+def get_default_eir_root() -> NoReturn:
     # Shim to suppress old updater work until relaunch. No path is safe to invent.
-    stop_historical_updater("hermes_cli.update_cmd.get_default_hermes_root")
+    stop_historical_updater("eir_cli.update_cmd.get_default_eir_root")
 
 
 def _ensure_uv_for_termux(pip_cmd: list[str]) -> NoReturn:
     # Shim to stop the old updater doing work until relaunch, not bootstrap uv.
-    stop_historical_updater("hermes_cli.update_cmd._ensure_uv_for_termux")
+    stop_historical_updater("eir_cli.update_cmd._ensure_uv_for_termux")
 
 
 def _ensure_venv_pip(pip_cmd: list, python_exe: str) -> NoReturn:
     # Shim to stop the old updater doing work until relaunch, not bootstrap pip.
-    stop_historical_updater("hermes_cli.update_cmd._ensure_venv_pip")
+    stop_historical_updater("eir_cli.update_cmd._ensure_venv_pip")
 
 
 def _pip_install_prefix(uv_bin) -> NoReturn:
     # Shim to stop the old updater doing work until relaunch, not form an install.
-    stop_historical_updater("hermes_cli.update_cmd._pip_install_prefix")
+    stop_historical_updater("eir_cli.update_cmd._pip_install_prefix")
 
 
 def _refuse_update_for_contended_shims(exc: BaseException) -> NoReturn:
     # Shim to stop the old updater doing work until relaunch. Write no markers.
-    stop_historical_updater("hermes_cli.update_cmd._refuse_update_for_contended_shims")
+    stop_historical_updater("eir_cli.update_cmd._refuse_update_for_contended_shims")
 
 
 def _shim_quarantine_error_type() -> type[Exception]:
@@ -158,21 +158,21 @@ def _shim_quarantine_error_type() -> type[Exception]:
 
 
 def _m():
-    """Lazy ``hermes_cli.main`` reference.
+    """Lazy ``eir_cli.main`` reference.
 
-    Lets callers keep patching ``hermes_cli.main.<helper>`` (the historical
+    Lets callers keep patching ``eir_cli.main.<helper>`` (the historical
     test surface) and have those patches reach this code path, and defers the
-    import so ``hermes_cli.main`` -> ``hermes_cli.update_cmd`` stays one-way
+    import so ``eir_cli.main`` -> ``eir_cli.update_cmd`` stays one-way
     at import time.
     """
-    from hermes_cli import main
+    from eir_cli import main
 
     return main
 
 
 def _updates_config() -> dict:
     """The ``updates:`` config section (``{}`` when absent/malformed); may raise on config errors."""
-    from hermes_cli.config import load_config
+    from eir_cli.config import load_config
     section = (load_config() or {}).get("updates", {})
     return section if isinstance(section, dict) else {}
 
@@ -202,28 +202,28 @@ def _map_ssl_cert_file_for_git(git_cmd) -> None:
     os.environ["GIT_SSL_CAINFO"] = bundle
 
 
-# Startup files of a tree that does not declare its own (pyproject ``[tool.hermes]
+# Startup files of a tree that does not declare its own (pyproject ``[tool.eir]
 # update-startup-files``, read by ``update_cmd_commit.startup_files``): every release before the
 # declaration has this layout, so the list stays as it is when files move. The first rows are what
-# the launcher and ``hermes_bootstrap`` import before any application code (review G3).
+# the launcher and ``eir_bootstrap`` import before any application code (review G3).
 _UPDATE_CRITICAL_FILES = (
-    "hermes_bootstrap.py", "hermes_cli/_parser.py", "hermes_cli/_launchers.py",
-    "hermes_cli/_early_recovery.py", "hermes_cli/update_lock.py", "hermes_cli/update_custody.py",
-    "hermes_cli/update_handoff.py", "hermes_cli/venv_sync.py", "pm/__init__.py", "pm/environments.py",
-    "hermes_cli/main.py", "hermes_cli/config.py", "hermes_cli/__init__.py",
-    "hermes_cli/web_server.py", "cli.py", "run_agent.py", "model_tools.py", "toolsets.py",
-    "hermes_constants.py")
+    "eir_bootstrap.py", "eir_cli/_parser.py", "eir_cli/_launchers.py",
+    "eir_cli/_early_recovery.py", "eir_cli/update_lock.py", "eir_cli/update_custody.py",
+    "eir_cli/update_handoff.py", "eir_cli/venv_sync.py", "pm/__init__.py", "pm/environments.py",
+    "eir_cli/main.py", "eir_cli/config.py", "eir_cli/__init__.py",
+    "eir_cli/web_server.py", "cli.py", "run_agent.py", "model_tools.py", "toolsets.py",
+    "eir_constants.py")
 
 
 def _record_update_step(step: str, ok: bool, detail: str = "") -> None:
     """Best-effort ``update_receipt.record_step``; the receipt must never break an update."""
     with suppress(Exception):
-        from hermes_cli.update_receipt import record_step
+        from eir_cli.update_receipt import record_step
         record_step(step, ok, detail)
 
 
 # A fetch whose transport dead-stalls (HTTP/2 to GitHub on some networks, a black-holed proxy)
-# otherwise leaves `hermes update` on "Fetching updates..." forever (#93759, #95777). Five
+# otherwise leaves `eir update` on "Fetching updates..." forever (#93759, #95777). Five
 # minutes is generous for a scoped single-branch fetch and still ends in a real error.
 NETWORK_GIT_TIMEOUT_SECONDS = 300
 
@@ -231,7 +231,7 @@ NETWORK_GIT_TIMEOUT_SECONDS = 300
 def _record_update_skip(step: str, reason: str) -> None:
     """Best-effort ``update_receipt.record_skip``; the receipt must never break an update."""
     with suppress(Exception):
-        from hermes_cli.update_receipt import record_skip
+        from eir_cli.update_receipt import record_skip
         record_skip(step, reason)
 
 
@@ -268,12 +268,12 @@ def _git_run(git_cmd, args, cwd=None, *, check=False, network=False):
 
     Every spawn carries ``windows_hide_flags()``: the updater's git children run under the
     console-less desktop backend, and a bare spawn flashes a console window each (#117781)."""
-    from hermes_cli._subprocess_compat import windows_hide_flags
+    from eir_cli._subprocess_compat import windows_hide_flags
     # ``_no_prompt_git_kwargs()`` already carries the hide flags for network
     # calls, so layer them instead of passing the keyword twice.
     spawn_kwargs = {"timeout": NETWORK_GIT_TIMEOUT_SECONDS, **_no_prompt_git_kwargs()} if network else {}
     spawn_kwargs.setdefault("creationflags", windows_hide_flags())
-    from hermes_cli.update_custody import run_git
+    from eir_cli.update_custody import run_git
 
     # The one custody policy (R2): local mutators keep the update's checkout lock fd, network
     # git runs without it and dies with us, no git forks a detached gc/maintenance child.
@@ -297,7 +297,7 @@ def _git_run(git_cmd, args, cwd=None, *, check=False, network=False):
 def _heal_stale_shallow_checkout(repo_root: Path, branch: str) -> None:
     """Unshallow a shallow checkout before the bounded fetch (#123254). Non-fatal: on failure the
     update proceeds with the fetch it always ran."""
-    from hermes_cli.gitlock import heal_shallow_history
+    from eir_cli.gitlock import heal_shallow_history
 
     try:
         if heal_shallow_history(repo_root, branch, **_no_prompt_git_kwargs()):
@@ -310,7 +310,7 @@ def _heal_stale_shallow_checkout(repo_root: Path, branch: str) -> None:
 def _capture_head_sha(git_cmd, cwd) -> str | None:
     """Return the current HEAD SHA, or None if it can't be resolved."""
     try:
-        from hermes_cli.update_custody import run_git
+        from eir_cli.update_custody import run_git
 
         result = run_git(
             git_cmd, ["rev-parse", "HEAD"],
@@ -336,7 +336,7 @@ def _validate_python_files_syntax(
     import tempfile
 
     root = Path(root)
-    with tempfile.TemporaryDirectory(prefix="hermes-syntax-check-") as tmpdir:
+    with tempfile.TemporaryDirectory(prefix="eir-syntax-check-") as tmpdir:
         for relpath in relpaths:
             path = root / relpath
             if not path.exists():
@@ -363,18 +363,18 @@ def _gateway_prompt(prompt_text: str, default: str = "", timeout: float = 300.0)
     Writes a prompt marker file so the gateway can forward the question to the
     user, then polls for a response file.  Falls back to *default* on timeout.
 
-    Used by ``hermes update --gateway`` so interactive prompts (stash restore,
+    Used by ``eir update --gateway`` so interactive prompts (stash restore,
     config migration) are forwarded to the messenger instead of being silently
     skipped.
     """
     import json as _json
     import uuid as _uuid
-    from hermes_constants import get_hermes_home
+    from eir_constants import get_eir_home
 
     if _posix_pause.gateways_paused():  # the gateway that would relay it is stopped for the update
         print(f"  → {prompt_text} → {default or '(empty)'} (gateways are paused for the update)")
         return default
-    home = get_hermes_home()
+    home = get_eir_home()
     prompt_path = home / ".update_prompt.json"
     response_path = home / ".update_response"
 
@@ -471,7 +471,7 @@ def _format_update_failure_stage(exc: subprocess.CalledProcessError) -> str:
 def _should_zip_fallback_on_update_error(exc: BaseException) -> bool:
     """ZIP fallback is for Windows git file-I/O breakage, not later stages.
 
-    A dependency-install failure (locked ``hermes.exe`` / ``uv pip install``
+    A dependency-install failure (locked ``eir.exe`` / ``uv pip install``
     exit 2) is not a git failure. The pull has already succeeded by then, so
     re-downloading the source ZIP cannot fix the install and would replace
     every top-level entry except ``venv`` / ``node_modules`` / ``.git`` /
@@ -516,7 +516,7 @@ def _print_called_process_error_tail(
 
 def _write_lazy_refresh_incomplete_marker() -> None:
     # Historical updater hook. There is no separate lazy-refresh transaction.
-    stop_historical_updater("hermes_cli.update_cmd._write_lazy_refresh_incomplete_marker")
+    stop_historical_updater("eir_cli.update_cmd._write_lazy_refresh_incomplete_marker")
 
 
 
@@ -524,13 +524,13 @@ def _filter_non_gateway_concurrent_instances(
     matches: list[tuple[int, str]],
 ) -> list[tuple[int, str]]:
     # Historical updater hook; PM never replaces a running venv's executables.
-    stop_historical_updater("hermes_cli.update_cmd._filter_non_gateway_concurrent_instances")
+    stop_historical_updater("eir_cli.update_cmd._filter_non_gateway_concurrent_instances")
 
 
 def _log_only_write(text: str) -> None:
-    """Write ``text`` to ``~/.hermes/logs/update.log`` only, never the terminal.
+    """Write ``text`` to ``~/.eir/logs/update.log`` only, never the terminal.
 
-    During ``hermes update`` ``sys.stdout`` is an ``_UpdateOutputStream`` that
+    During ``eir update`` ``sys.stdout`` is an ``_UpdateOutputStream`` that
     mirrors to both the terminal and ``update.log``. Loud, low-signal
     subprocess output (pnpm installs, the Electron/vite build, the cua-driver
     installer's "Next steps" wall) should be captured and tucked into the log
@@ -543,9 +543,9 @@ def _log_only_write(text: str) -> None:
     log_file = getattr(stream, "_log", None)
     with suppress(Exception):
         if log_file is None:
-            from hermes_constants import get_default_hermes_root
+            from eir_constants import get_default_eir_root
 
-            log_path = get_default_hermes_root() / "logs" / "update.log"  # the root home's tee
+            log_path = get_default_eir_root() / "logs" / "update.log"  # the root home's tee
             log_path.parent.mkdir(parents=True, exist_ok=True)
             with log_path.open("a", encoding="utf-8") as fallback:
                 fallback.write(text)
@@ -558,7 +558,7 @@ def _run_logged_subprocess(cmd, *, cwd=None, env=None):
     """Stream combined build output to update.log, retaining it for failure reporting."""
     import codecs
     import io
-    from hermes_cli._subprocess_compat import kill_process_tree, windows_hide_flags
+    from eir_cli._subprocess_compat import kill_process_tree, windows_hide_flags
 
     child_env = dict(os.environ if env is None else env)
     child_env.setdefault("PYTHONUNBUFFERED", "1")
@@ -596,18 +596,18 @@ def _source_update_channel(args=None, *, channel=None, branch_explicit=False) ->
         return "main"
     transient = channel if channel is not None else getattr(args, "channel", None)
     if transient is not None:
-        from hermes_cli.release_channels import validate_name
+        from eir_cli.release_channels import validate_name
         return validate_name(transient)
-    from hermes_cli.update_channel import resolve_update_channel
+    from eir_cli.update_channel import resolve_update_channel
 
-    from hermes_cli.config import get_config_path, require_readable_config_before_write
+    from eir_cli.config import get_config_path, require_readable_config_before_write
 
     config = require_readable_config_before_write(get_config_path())
     return resolve_update_channel(config, _m().PROJECT_ROOT)
 
 
 def _cmd_update_check(branch: str = "main", *, branch_explicit: bool = False, channel=None):
-    """Implement ``hermes update --check``: fetch and report without installing.
+    """Implement ``eir update --check``: fetch and report without installing.
 
     ``branch`` selects which branch the check compares against. Default is
     "main"; callers can pass another branch to ask "are there new commits
@@ -620,7 +620,7 @@ def _cmd_update_check(branch: str = "main", *, branch_explicit: bool = False, ch
     # Shared admission gate (#91277 Phase 3): same marker-first decision as
     # the apply path, so --check can never report git state for an install
     # whose real update mechanism is an image pull.
-    from hermes_cli.update_contract import (
+    from eir_cli.update_contract import (
         evaluate_update_admission,
         record_refusal_receipt,
     )
@@ -697,7 +697,7 @@ def _source_completion_request(opts, plan, snapshot_id, windows_resume, desktop,
         current = _completion_receipt._current.get()
     return {
         "schema": 1, "source": str(_m().PROJECT_ROOT.resolve()),
-        "home": str(get_hermes_home()), "branch": "main", "desktop": desktop,
+        "home": str(get_eir_home()), "branch": "main", "desktop": desktop,
         "assume_yes": opts.assume_yes, "gateway_mode": gateway_mode,
         "no_gateway_restart": getattr(opts, "no_gateway_restart", False),
         "pre_update_version": opts.pre_update_version, "snapshot_id": snapshot_id,
@@ -716,7 +716,7 @@ def _settle_windows_resume(request: dict) -> None:
     """
     import atexit
 
-    from hermes_cli import update_cmd_windows
+    from eir_cli import update_cmd_windows
 
     atexit.unregister(_m()._resume_windows_gateways_after_update)
     atexit.unregister(update_cmd_windows._resume_windows_gateways_after_update)
@@ -734,7 +734,7 @@ def _resume_paused_gateways_at_exit(token: dict | None, request: dict | None) ->
     try:
         _m()._resume_windows_gateways_after_update(token)
     except Exception as exc:  # health: allow BLE001 -- a restart failure is owed, not the update's status
-        from hermes_cli.update_receipt import owe_followup
+        from eir_cli.update_receipt import owe_followup
 
         owe_followup(request["receipt"]["update_id"] if request else None, "windows_resume",
                      f"Windows gateway recovery failed: {exc}")
@@ -752,7 +752,7 @@ def _complete_source_update(request: dict | None) -> None:
     from copy import deepcopy
     _completion_receipt.record_stage(
         "apply", "skipped" if request.get("completion_message") else "success", mode=request.get("apply_mode", "git"))
-    from hermes_cli.update_stage import publish_stage
+    from eir_cli.update_stage import publish_stage
     publish_stage("Updating dependencies")  # the completion below starts with the dependency sync
     current = _completion_receipt._current.get()
     if current is not None:
@@ -761,7 +761,7 @@ def _complete_source_update(request: dict | None) -> None:
     # fleet can be proven current on, so the warning could never clear (#125952).
     _write_fleet_restart_pending_marker(expected_sha=request.get("expected_sha") or _current_checkout_sha() or "")
     # Pre-swap module (imported with run_completion above): never the replacement tree's.
-    from hermes_cli.update_completion import settle_lost_completion
+    from eir_cli.update_completion import settle_lost_completion
     lost = False
     try:
         result = run_completion(request)
@@ -798,7 +798,7 @@ def _complete_source_update(request: dict | None) -> None:
         try:
             _m()._resume_windows_gateways_after_update(token)
         except Exception as exc:  # health: allow BLE001 -- the code is committed (C3)
-            from hermes_cli.update_receipt import owe_followup
+            from eir_cli.update_receipt import owe_followup
 
             owe_followup(request["receipt"]["update_id"], "windows_resume", f"Windows gateway recovery failed: {exc}")
         _settle_windows_resume(request)
@@ -810,10 +810,10 @@ def _complete_source_update(request: dict | None) -> None:
         if adopt_retired_channel(request):
             print(f"→ Source subscription moved to {request['channel_retirement']['destination']}")
     except Exception as exc:  # health: allow BLE001 -- the code is committed (C3); the next update re-adopts
-        from hermes_cli.update_receipt import owe_followup
+        from eir_cli.update_receipt import owe_followup
 
         owe_followup(request["receipt"]["update_id"], "channel_adoption", str(exc) or type(exc).__name__,
-                     retry="the next `hermes update` adopts it again")
+                     retry="the next `eir update` adopts it again")
 
 
 def _reconcile_diverged_checkout(git_cmd, branch: str, pre_pull_sha, *, target_ref=None) -> None:
@@ -853,7 +853,7 @@ def _reconcile_diverged_checkout(git_cmd, branch: str, pre_pull_sha, *, target_r
         # SHA suffix so two updates in the same second get distinct refs.
         kind = "diverged" if has_common_ancestor else "orphan"
         rescue_ref = (
-            f"refs/hermes-update-backups/{kind}-{branch}-"
+            f"refs/eir-update-backups/{kind}-{branch}-"
             f"{_dt.now(UTC).strftime('%Y%m%d-%H%M%S')}-{pre_pull_sha[:12]}")
         head = (
             f"  ⚠ Local history has diverged from origin/{branch} — "
@@ -955,7 +955,7 @@ def _roll_back_broken_update(git_cmd, pre_pull_sha, failing_path, syntax_error, 
             interrupted_pull_marker(root).unlink(missing_ok=True)
             _commit.disarm_commit_obligations()  # back on the code this run started from
             print("  ✓ Rollback complete — your install is unchanged.")
-            print("  Try ``hermes update`` again later once a fix lands.")
+            print("  Try ``eir update`` again later once a fix lands.")
         else:
             print("  ✗ Rollback failed. Recover manually with:")
             print(f"    cd {root} && git {shlex.join(rollback_args)}")
@@ -963,7 +963,7 @@ def _roll_back_broken_update(git_cmd, pre_pull_sha, failing_path, syntax_error, 
                 print(f"    ({rollback_result.stderr.strip().splitlines()[0]})")
             if interrupted_pull_marker(root).is_file():
                 _commit.owe_restore_of(root, pre_pull_sha)
-                print(f"  The next `hermes` launch also finishes the rollback to {pre_pull_sha[:10]} on its own.")
+                print(f"  The next `eir` launch also finishes the rollback to {pre_pull_sha[:10]} on its own.")
     else:
         print("  Could not capture pre-pull SHA — recover manually with:")
         print(f"    cd {_m().PROJECT_ROOT} && git reflog && git reset --hard <prev-sha>")
@@ -1043,8 +1043,8 @@ def _move_checkout_to(git_cmd, branch, merge_ref, target_sha, pre_pull_sha) -> N
         ancestry_detail = (ancestry.stderr or ancestry.stdout or "").strip()
         if ancestry_detail:
             print(f"  {ancestry_detail}")
-    print("  Resolve the Git error and re-run `hermes update`; no reset was attempted.")
-    from hermes_cli.update_receipt import git_output_stop_class
+    print("  Resolve the Git error and re-run `eir update`; no reset was attempted.")
+    from eir_cli.update_receipt import git_output_stop_class
 
     # The shared classifier: an index.lock that EXISTS is another git's; "Permission denied" on it is not.
     _record_stop(git_output_stop_class(detail, ["merge"], merge_result.returncode) or "checkout_move_failed")
@@ -1210,7 +1210,7 @@ def _switch_branch_at_commit_point(git_cmd, branch, target_ref, *, pre, stash):
             else:
                 _commit.owe_restore_of(root, pre)
             return subprocess.CompletedProcess(_REF_MOVED, 1, result.stdout, (
-                f"'{branch}' moved to {landed[:10]} during the switch; re-run `hermes update`"))
+                f"'{branch}' moved to {landed[:10]} during the switch; re-run `eir update`"))
         if result.returncode == 0:
             interrupted_pull_marker(root).unlink(missing_ok=True)  # git exited 0: whole at *target*
             return result
@@ -1226,7 +1226,7 @@ def _refuse_before_commit_point(git_cmd, target_ref, _windows_gateway_resume) ->
     """Preconditions that used to fail AFTER the swap: refuse with the install untouched."""
     reason = _commit.preflight_refusal(git_cmd, _m().PROJECT_ROOT, target_ref, _UPDATE_CRITICAL_FILES)
     if reason is None:
-        from hermes_cli.update_downgrade_guard import downgrade_refusal
+        from eir_cli.update_downgrade_guard import downgrade_refusal
         reason = downgrade_refusal(git_cmd, _m().PROJECT_ROOT, target_ref)
         if reason is not None:
             _record_stop("downgrade_refused")
@@ -1247,7 +1247,7 @@ def _exit_after_failed_branch_switch(
     """
     detail = (track_result.stderr or "").strip()
     if interrupted_pull_marker(_m().PROJECT_ROOT).is_file():
-        print(f"✗ Switching to '{branch}' stopped part-way; the next `hermes` launch puts the checkout back.")
+        print(f"✗ Switching to '{branch}' stopped part-way; the next `eir` launch puts the checkout back.")
         if detail:
             print(f"  {detail.splitlines()[0]}")
         if auto_stash_ref is not None:
@@ -1413,7 +1413,7 @@ def _prepare_checkout_for_update(
 
     apply_is_shallow = _is_shallow_checkout(git_cmd)
     if commit_count > 0 and apply_is_shallow:
-        from hermes_cli.source_check import _github_compare_behind
+        from eir_cli.source_check import _github_compare_behind
         counted = _github_compare_behind(*_tip_shas(git_cmd, target_ref, base))
         # counted == 0 means local-ahead: falls through to the up-to-date path.
         commit_count = counted if counted is not None else -1
@@ -1470,7 +1470,7 @@ def _prepare_checkout_for_update(
 
 @dataclass
 class _UpdateOptions:
-    """Resolved ``hermes update`` inputs (flags, config, pre-update snapshots)."""
+    """Resolved ``eir update`` inputs (flags, config, pre-update snapshots)."""
 
     pre_update_version: object
     gw_input_fn: object
@@ -1522,20 +1522,20 @@ def _begin_update_receipt_and_plan(args):
     # Structured receipt: record what this run discovers/does/skips so silent failures are diagnosable.
     with _best_effort('Update receipt unavailable: %s'):
         # See #74973, #81193, #85753, #88848, #91277.
-        from hermes_cli.update_receipt import begin_update_receipt
+        from eir_cli.update_receipt import begin_update_receipt
         begin_update_receipt()
         _record_update_initiator()
 
     # Plan phase: snapshot runtimes/supervisors/version (read-only; probe failure records
     # nothing). Re-read AFTER the restart phase to reconcile — the plan is the worklist.
-    # Plan phase (#91277 Phase 2): snapshot the pre-update fleet — every running Hermes runtime, its
+    # Plan phase (#91277 Phase 2): snapshot the pre-update fleet — every running Eir runtime, its
     # supervisor, and its running code version — into the receipt, so a post-mortem can compare what the
     # update SAW against what it did. ``_pre_update_plan`` is read again AFTER the restart phase to
     # reconcile every planned runtime against the phase's bookkeeping (restart via declared mechanism — the
     # plan is the worklist, not just a printout).
     _pre_update_plan = None
     with _best_effort('Update plan phase failed: %s'):
-        from hermes_cli.update_inventory import collect_runtime_inventory, record_plan_in_receipt
+        from eir_cli.update_inventory import collect_runtime_inventory, record_plan_in_receipt
         _pre_update_plan = collect_runtime_inventory()
         record_plan_in_receipt(_pre_update_plan)
         if _pre_update_plan.runtimes:
@@ -1551,7 +1551,7 @@ def _record_update_initiator() -> None:
     hand-off (posix shim, windows script, Tauri updater) — the metric's ``kind``. Read the marker
     raw: a liveness probe or stale-marker cleanup is lock policy, not a metrics side effect."""
     with _best_effort('Update initiator unavailable: %s'):
-        from hermes_cli.update_lock import update_marker_path
+        from eir_cli.update_lock import update_marker_path
         first = update_marker_path().read_text(encoding="utf-8-sig").partition("\n")[0].strip()
         if first.isdigit() and int(first) != os.getpid():
             _completion_receipt.record_fact("initiator", "desktop")
@@ -1569,7 +1569,7 @@ def _prepare_git_command(*, checkout_move=None) -> tuple[bool, list, bool]:
         _record_stop("not_git_checkout")
         sys.exit(1)
 
-    from hermes_cli._subprocess_compat import expose_pm_git
+    from eir_cli._subprocess_compat import expose_pm_git
 
     expose_pm_git(_m().PROJECT_ROOT)
     git_cmd = _base_git_cmd()
@@ -1614,8 +1614,8 @@ def _verify_head_after_pull(
     # Verify HEAD actually moved (issue #79678). ``merge --ff-only`` succeeding only means the merge
     # completed, not that the update applied: a checkout that is pinned to a raw SHA (detached HEAD) can
     # report "N new commit(s)" against origin yet still sit on the old commit afterward (the branch-switch
-    # step re-detaches to the SHA). Before this guard, ``hermes update`` printed "✓ Code updated!" and
-    # reinstalled deps + rebuilt the desktop app against the stale tree — no error, no warning, ``hermes
+    # step re-detaches to the SHA). Before this guard, ``eir update`` printed "✓ Code updated!" and
+    # reinstalled deps + rebuilt the desktop app against the stale tree — no error, no warning, ``eir
     # doctor`` healthy. Compare pre-pull and post-pull HEAD; if they match, surface the no-op instead of
     # claiming success.
     post_pull_sha = _capture_head_sha(git_cmd, _m().PROJECT_ROOT)
@@ -1627,7 +1627,7 @@ def _verify_head_after_pull(
             f"origin/{branch} advanced but the working tree stayed put.")
         print(
             "  Reattach to the branch and retry: "
-            f"git -C {_m().PROJECT_ROOT} checkout {branch} && hermes update")
+            f"git -C {_m().PROJECT_ROOT} checkout {branch} && eir update")
         _commit.disarm_commit_obligations()  # nothing moved: no tail is owed (refused if HEAD did)
         _m()._resume_windows_gateways_after_update(_windows_gateway_resume)
         _record_stop("detached_head")
@@ -1643,7 +1643,7 @@ def _verify_head_after_pull(
             f"'{post_pull_branch}' — not claiming success.")
         print(
             "  Switch to the target branch and retry: "
-            f"git -C {_m().PROJECT_ROOT} checkout {branch} && hermes update")
+            f"git -C {_m().PROJECT_ROOT} checkout {branch} && eir update")
         _m()._resume_windows_gateways_after_update(_windows_gateway_resume)
         _record_stop("unexpected_branch")
         sys.exit(1)
@@ -1676,13 +1676,13 @@ def _handle_update_called_process_error(
             print(f"✗ {stage} (the code update itself succeeded).")
             _print_called_process_error_tail(e)
             print()
-            print("  Hermes may not start until the dependencies are installed. Fix the error above")
-            print("  (usually network or disk space), then run `hermes update` again.")
+            print("  Eir may not start until the dependencies are installed. Fix the error above")
+            print("  (usually network or disk space), then run `eir update` again.")
             if _m()._is_windows():
-                print("  If `hermes update` itself will not start, retry through the venv interpreter:")
+                print("  If `eir update` itself will not start, retry through the venv interpreter:")
                 print(
                     '    venv\\Scripts\\python.exe -c '
-                    '"from hermes_cli.main import main; main()" update --yes')
+                    '"from eir_cli.main import main; main()" update --yes')
         else:
             print(f"✗ {stage}.")
             print(f"  Details: {e}")
@@ -1696,7 +1696,7 @@ def _handle_update_called_process_error(
 def _finalize_receipt(status: str, debug_message: str) -> None:
     """Best-effort ``finalize_update_receipt(status)``; the receipt must never break an update."""
     with _best_effort(debug_message):
-        from hermes_cli.update_receipt import finalize_update_receipt
+        from eir_cli.update_receipt import finalize_update_receipt
         finalize_update_receipt(status)
 
 
@@ -1777,15 +1777,15 @@ def _cmd_update_impl(args, gateway_mode: bool):
     # Marks this frame as the CURRENT updater for
     # _old_updater.in_historical_update(); historical on-disk updaters do not
     # declare this local, so only they hand off through retired shims.
-    _hermes_current_updater_frame = True
+    _eir_current_updater_frame = True
     _commit.begin_update_attempt()  # nothing an earlier update in this process armed is ours (O5)
-    from hermes_cli.update_proxy_env import prefer_dotenv_proxy_env
+    from eir_cli.update_proxy_env import prefer_dotenv_proxy_env
     prefer_dotenv_proxy_env()  # the .env loaded at import beats a system proxy the Desktop injected
     git_operation = git_operation_in_progress(_m().PROJECT_ROOT)
     if git_operation:
         root = _m().PROJECT_ROOT
         print(f"✗ Cannot update while a Git {git_operation} is in progress in {root}.")
-        print(f"  Finish it or run `git {git_operation} --abort`, then re-run `hermes update`.")
+        print(f"  Finish it or run `git {git_operation} --abort`, then re-run `eir update`.")
         _record_stop("git_in_progress", without_receipt="failed")  # before the receipt opens: a metrics row only
         sys.exit(1)
 
@@ -1797,7 +1797,7 @@ def _cmd_update_impl(args, gateway_mode: bool):
     # index.lock is younger than the sweep's age floor, so it goes here once its git is proven
     # dead (we hold the update lock: no other update's git can own it). Its killed fetch's ref
     # and shallow locks likewise, or every later fetch fails ("reference already exists").
-    from hermes_cli.gitlock import release_dead_fetch_locks, release_dead_index_lock
+    from eir_cli.gitlock import release_dead_fetch_locks, release_dead_index_lock
     if release_dead_index_lock(_m().PROJECT_ROOT):
         print("  (removed .git/index.lock left by a git that was killed)")
     for lock in release_dead_fetch_locks(_m().PROJECT_ROOT):
@@ -1807,7 +1807,7 @@ def _cmd_update_impl(args, gateway_mode: bool):
     opts = _resolve_update_options(args, gateway_mode)
     gw_input_fn, assume_yes = opts.gw_input_fn, opts.assume_yes
 
-    print("☤ Updating Hermes Agent...")
+    print("☤ Updating Eir Agent...")
     print()
 
     _pre_update_plan = _begin_update_receipt_and_plan(args)
@@ -1818,7 +1818,7 @@ def _cmd_update_impl(args, gateway_mode: bool):
     pre_update_snapshot_id = _m()._run_pre_update_backup(args)
     _record_pre_update_backup_outcome(args, pre_update_snapshot_id)
     _record_snapshot_stage(args, pre_update_snapshot_id)
-    from hermes_cli.update_stage import publish_stage
+    from eir_cli.update_stage import publish_stage
     publish_stage("Downloading updates")  # a failed backup never stops the update
 
     _windows_gateway_resume = _pause_gateways_for_update(opts)
@@ -1826,7 +1826,7 @@ def _cmd_update_impl(args, gateway_mode: bool):
         import atexit as _atexit
         _atexit.register(_m()._resume_windows_gateways_after_update, _windows_gateway_resume)
     desktop_dir = _m().PROJECT_ROOT / "apps" / "desktop"
-    # An installed Hermes.app only this update refreshes counts even with no release/ build
+    # An installed Eir.app only this update refreshes counts even with no release/ build
     # beside it: without one it was never rebuilt, so it never got newer (#52339).
     had_desktop_app_before_update = (
         _m()._desktop_packaged_executable(desktop_dir) is not None
@@ -1860,7 +1860,7 @@ def _cmd_update_impl(args, gateway_mode: bool):
         _check.report_pack_tidy(_m().PROJECT_ROOT)
         # Shallow installer checkouts collect one `.git/shallow` graft per past depth-1 fetch
         # (#105951); stale grafts break merge-base and push this run into the divergence path.
-        from hermes_cli.gitlock import repair_broken_shallow_boundaries, prune_stale_shallow_grafts
+        from eir_cli.gitlock import repair_broken_shallow_boundaries, prune_stale_shallow_grafts
         repaired = repair_broken_shallow_boundaries(_m().PROJECT_ROOT)
         if repaired:
             print(f"  (restored {repaired} broken shallow boundary(ies))")
@@ -1885,7 +1885,7 @@ def _cmd_update_impl(args, gateway_mode: bool):
             fetch_args = ["fetch", "--no-tags", "origin", target_ref]
         else:
             fetch_args = ["fetch", "origin", _check.tracking_refspec("origin", branch)]
-        from hermes_cli.gitlock import fetch_with_partial_clone_recovery, is_partial_clone_pack_objects_crash
+        from eir_cli.gitlock import fetch_with_partial_clone_recovery, is_partial_clone_pack_objects_crash
         # Marking the unmarked packs clears the git 2.53+ partial-clone pack-objects crash (#124272).
         if fetch_args is None:
             fetch_result = subprocess.CompletedProcess([], 0)

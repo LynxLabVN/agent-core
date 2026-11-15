@@ -1,10 +1,10 @@
-"""Unit tests for hermes_cli.xai_retirement (May 15, 2026 model retirement)."""
+"""Unit tests for eir_cli.xai_retirement (May 15, 2026 model retirement)."""
 from __future__ import annotations
 
 
-import hermes_yaml as yaml
+import eir_yaml as yaml
 
-from hermes_cli.xai_retirement import (
+from eir_cli.xai_retirement import (
     RetirementIssue,
     _RETIRED_MODELS,
     _looks_like_xai,
@@ -17,7 +17,7 @@ from hermes_cli.xai_retirement import (
 def test_apply_migration_preserves_long_double_quoted_scalar(tmp_path, monkeypatch):
     """Same fold-after-backslash class as #119844: the migration's own emitter must not mutate
     unrelated long quoted values while it rewrites the model key."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     value = "A" * 74 + r"D:\CentBrowserPortable " + "B" * 40
     cfg = tmp_path / "config.yaml"
     cfg.write_text(

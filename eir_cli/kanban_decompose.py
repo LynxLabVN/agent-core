@@ -1,6 +1,6 @@
 """Kanban decomposer — fan a triage task out into a graph of child tasks.
 
-Invoked by ``hermes kanban decompose [task_id | --all]`` and the gateway
+Invoked by ``eir kanban decompose [task_id | --all]`` and the gateway
 dispatcher's auto-decompose path. Reads the profile roster (with
 descriptions), asks the auxiliary LLM for a task graph in JSON, then
 atomically creates the children, links them under the root, and flips the
@@ -22,19 +22,19 @@ import re
 from dataclasses import dataclass
 from typing import Optional
 
-from hermes_cli import kanban_db as kb
-from hermes_cli.kanban_db_graph import decompose_triage_task
-from hermes_cli import kanban_db_connect as kbc
-from hermes_cli import profiles as profiles_mod
-from hermes_cli.kanban_specify import (
+from eir_cli import kanban_db as kb
+from eir_cli.kanban_db_graph import decompose_triage_task
+from eir_cli import kanban_db_connect as kbc
+from eir_cli import profiles as profiles_mod
+from eir_cli.kanban_specify import (
     _call_aux, _extract_json_blob, _load_triage_task, _task_prompt_fields, _title_body,
 )
-from hermes_cli.kanban_specify import _profile_author as _specify_author
+from eir_cli.kanban_specify import _profile_author as _specify_author
 
 logger = logging.getLogger(__name__)
 
 
-_SYSTEM_PROMPT = """You are the Kanban decomposer for the Hermes Agent board.
+_SYSTEM_PROMPT = """You are the Kanban decomposer for the Eir Agent board.
 
 A user dropped a rough idea into the Triage column. Your job is to break it
 into a small graph of concrete child tasks and route each one to the best-
@@ -122,7 +122,7 @@ class DecomposeOutcome:
 
 
 def _profile_author() -> str:
-    """Mirror of ``hermes_cli.kanban._profile_author``."""
+    """Mirror of ``eir_cli.kanban._profile_author``."""
     return _specify_author("decomposer")
 
 
@@ -202,7 +202,7 @@ class _Routing:
 
 
 def _load_routing(*, root_assignee: Optional[str] = None) -> _Routing:
-    from hermes_cli.config import load_config_readonly
+    from eir_cli.config import load_config_readonly
     try:
         cfg = load_config_readonly()
     except Exception:  # decompose_task promises ok=False, never a raise, on config trouble

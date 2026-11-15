@@ -1,4 +1,4 @@
-"""Regression for #74973 — `hermes update` must not leave the gateway down.
+"""Regression for #74973 — `eir update` must not leave the gateway down.
 
 On macOS the update's launchd branch guarded the restart behind
 ``launchctl list <label>`` exiting 0. A job that has been *booted out* of
@@ -6,7 +6,7 @@ launchd exits non-zero there, so the whole restart branch was skipped — with
 no ``else`` and no message. The update printed ``✓ Update complete!`` and
 exited 0 while the gateway was stopped *and* deregistered, which ``KeepAlive``
 cannot recover because the job definition is gone. Messaging adapters and
-cron stayed dark until someone manually ran ``hermes gateway restart``.
+cron stayed dark until someone manually ran ``eir gateway restart``.
 
 ``launchctl list`` is also not a reliable loaded/unloaded classifier: it is
 session-scoped and can exit non-zero while the job is alive in its gui/user
@@ -22,7 +22,7 @@ import subprocess
 
 import pytest
 
-from hermes_cli import update_cmd
+from eir_cli import update_cmd
 
 
 class _FakePlist:
@@ -35,14 +35,14 @@ class _FakePlist:
 
 @pytest.fixture
 def launchd(monkeypatch):
-    """Stub hermes_cli.gateway so no real launchctl call is made."""
+    """Stub eir_cli.gateway so no real launchctl call is made."""
     calls: list[str] = []
     state = {"plist": _FakePlist(True), "restart_exc": None}
     subprocess_calls: list[list] = []
 
-    import hermes_cli.gateway as gateway_mod
+    import eir_cli.gateway as gateway_mod
 
-    monkeypatch.setattr(gateway_mod, "get_launchd_label", lambda: "ai.hermes.gateway", raising=False)
+    monkeypatch.setattr(gateway_mod, "get_launchd_label", lambda: "ai.eir.gateway", raising=False)
     monkeypatch.setattr(gateway_mod, "get_launchd_plist_path", lambda: state["plist"], raising=False)
 
     def fake_restart():
@@ -74,7 +74,7 @@ class TestLaunchdRestartAfterUpdate:
         """
         calls, _state, subprocess_calls = launchd
 
-        assert update_cmd._restart_launchd_gateway_after_update(supervision_verify=False) == (["ai.hermes.gateway"], [])
+        assert update_cmd._restart_launchd_gateway_after_update(supervision_verify=False) == (["ai.eir.gateway"], [])
         assert calls == ["restart"]
         # No `launchctl list` classification happens in this helper.
         assert subprocess_calls == []
@@ -86,10 +86,10 @@ class TestLaunchdRestartAfterUpdate:
             returncode=1, cmd=["launchctl", "kickstart"], stderr="kickstart refused"
         )
 
-        assert update_cmd._restart_launchd_gateway_after_update(supervision_verify=False) == ([], ["ai.hermes.gateway"])
+        assert update_cmd._restart_launchd_gateway_after_update(supervision_verify=False) == ([], ["ai.eir.gateway"])
         out = capsys.readouterr().out
         assert "kickstart refused" in out
-        assert "hermes gateway restart" in out
+        assert "eir gateway restart" in out
 
     @pytest.mark.parametrize(
         "exc",
@@ -103,24 +103,24 @@ class TestLaunchdRestartAfterUpdate:
         calls, state, _ = launchd
         state["restart_exc"] = exc
 
-        assert update_cmd._restart_launchd_gateway_after_update(supervision_verify=False) == ([], ["ai.hermes.gateway"])
+        assert update_cmd._restart_launchd_gateway_after_update(supervision_verify=False) == ([], ["ai.eir.gateway"])
         assert calls == []
         out = capsys.readouterr().out
-        assert "hermes gateway restart" in out
+        assert "eir gateway restart" in out
 
     def test_invoking_label_of_another_home_is_left_alone(self, launchd, capsys, tmp_path, monkeypatch):
-        """2026-10-01: a scratch HERMES_HOME shaped like the native default derives the bare label,
+        """2026-10-01: a scratch EIR_HOME shaped like the native default derives the bare label,
         and the plist path follows the real account home, so the update refreshed and restarted the
         account's LIVE gateway onto the scratch home. A plist pinning another home is not ours (#93349)."""
         import plistlib
 
         calls, state, subprocess_calls = launchd
-        plist = tmp_path / "ai.hermes.gateway.plist"
-        plist.write_bytes(plistlib.dumps({"Label": "ai.hermes.gateway",
-                                          "EnvironmentVariables": {"HERMES_HOME": str(tmp_path / "live-home")}}))
+        plist = tmp_path / "ai.eir.gateway.plist"
+        plist.write_bytes(plistlib.dumps({"Label": "ai.eir.gateway",
+                                          "EnvironmentVariables": {"EIR_HOME": str(tmp_path / "live-home")}}))
         before = plist.read_bytes()
         state["plist"] = plist
-        monkeypatch.setattr("hermes_cli.update_fleet_scope.update_scope_homes", lambda: {(tmp_path / "scratch").resolve()})
+        monkeypatch.setattr("eir_cli.update_fleet_scope.update_scope_homes", lambda: {(tmp_path / "scratch").resolve()})
 
         assert update_cmd._restart_launchd_gateway_after_update(supervision_verify=False) == ([], [])
         assert calls == []
@@ -141,12 +141,12 @@ class TestLaunchdRestartAfterUpdate:
 # `launchctl print gui/<uid>/<label>` excerpt for a running service, matching
 # the real output shape (tab-indented, lowercase `pid = <N>`).
 _PRINT_OUTPUT_RUNNING = """\
-ai.hermes.gateway = {
+ai.eir.gateway = {
 \tactive count = 1
-\tpath = /Users/u/Library/LaunchAgents/ai.hermes.gateway.plist
+\tpath = /Users/u/Library/LaunchAgents/ai.eir.gateway.plist
 \tstate = running
 \tpid = 59038
-\tprogram = /Users/u/.hermes/bin/hermes
+\tprogram = /Users/u/.eir/bin/eir
 }
 """
 
@@ -164,12 +164,12 @@ class TestServicePidSweepExclusion:
 
     @pytest.fixture
     def macos_launchd(self, monkeypatch):
-        import hermes_cli.gateway as gateway_mod
+        import eir_cli.gateway as gateway_mod
 
         state = {"list_rc": 1, "print_rc": 0, "print_out": _PRINT_OUTPUT_RUNNING}
 
         monkeypatch.setattr(gateway_mod, "supports_systemd_services", lambda: False)
-        monkeypatch.setattr(gateway_mod, "get_launchd_label", lambda: "ai.hermes.gateway")
+        monkeypatch.setattr(gateway_mod, "get_launchd_label", lambda: "ai.eir.gateway")
         monkeypatch.setattr(gateway_mod, "_launchd_domain", lambda: "gui/501")
 
         def fake_run(argv, **kwargs):
@@ -186,37 +186,37 @@ class TestServicePidSweepExclusion:
 
     def test_list_failure_falls_back_to_domain_print(self, macos_launchd):
         """`list` rc=1, `print` reports pid 59038 → the PID is still excluded."""
-        from hermes_cli.gateway import _get_service_pids
+        from eir_cli.gateway import _get_service_pids
 
         assert 59038 in _get_service_pids()
 
     def test_both_interfaces_negative_means_no_pid(self, macos_launchd):
         macos_launchd["print_rc"] = 113  # job genuinely not found in the domain
 
-        from hermes_cli.gateway import _get_service_pids
+        from eir_cli.gateway import _get_service_pids
 
         assert _get_service_pids() == set()
 
     def test_registered_but_not_running_has_no_pid_line(self, macos_launchd):
         macos_launchd["print_out"] = _PRINT_OUTPUT_RUNNING.replace("\tpid = 59038\n", "")
 
-        from hermes_cli.gateway import _get_service_pids
+        from eir_cli.gateway import _get_service_pids
 
         assert _get_service_pids() == set()
 
 
 class TestParseLaunchdPidFromPrintOutput:
     def test_running_service(self):
-        from hermes_cli.gateway import _parse_launchd_pid_from_print_output
+        from eir_cli.gateway import _parse_launchd_pid_from_print_output
 
         assert _parse_launchd_pid_from_print_output(_PRINT_OUTPUT_RUNNING) == 59038
 
     def test_no_pid_line(self):
-        from hermes_cli.gateway import _parse_launchd_pid_from_print_output
+        from eir_cli.gateway import _parse_launchd_pid_from_print_output
 
         assert _parse_launchd_pid_from_print_output("state = not running\n") is None
 
     def test_nonpositive_pid_is_ignored(self):
-        from hermes_cli.gateway import _parse_launchd_pid_from_print_output
+        from eir_cli.gateway import _parse_launchd_pid_from_print_output
 
         assert _parse_launchd_pid_from_print_output("\tpid = -1\n") is None

@@ -1,10 +1,10 @@
-"""The plugin host process: imports third-party plugins and serves their callbacks to Hermes.
+"""The plugin host process: imports third-party plugins and serves their callbacks to Eir.
 
-Started by :class:`hermes_cli.plugin_host.PluginHost` as ``python -m hermes_cli.plugin_host_child``
+Started by :class:`eir_cli.plugin_host.PluginHost` as ``python -m eir_cli.plugin_host_child``
 (optionally under ``plugins.host.launcher``, e.g. a sandbox runner) with the profile's environment.
 Plugins get a :class:`RemotePluginContext` that looks like ``PluginContext``: registrations and
-queries are forwarded to Hermes, callables and provider objects stay here and are invoked by
-reference. Nothing in this module is imported by the Hermes process itself.
+queries are forwarded to Eir, callables and provider objects stay here and are invoked by
+reference. Nothing in this module is imported by the Eir process itself.
 
 stdin/stdout carry the protocol, so the real file descriptors are duplicated for the channel and
 fd 0/1 are pointed at /dev/null and stderr before any plugin code runs: a stray ``print()`` in a
@@ -29,14 +29,14 @@ import types
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-from hermes_cli.plugin_host_wire import (
+from eir_cli.plugin_host_wire import (
     Channel, Opaque, PROTOCOL_VERSION, PluginHostUnsupported, bind_serving_request, declared_member, decode,
     describe_signature, encode, is_async_callable, restore_arguments, serving_request,
 )
 
-logger = logging.getLogger("hermes_cli.plugin_host_child")
+logger = logging.getLogger("eir_cli.plugin_host_child")
 
-_ENTRY_POINTS_GROUP = "hermes_agent.plugins"
+_ENTRY_POINTS_GROUP = "eir_agent.plugins"
 
 # The plugin whose code this request runs (its ``plugin_key``) and the load it runs in: bound per incoming
 # request, so it follows that code onto the host loop's tasks; a thread the plugin starts itself has none.
@@ -45,7 +45,7 @@ _EXECUTING_PLUGIN: contextvars.ContextVar[tuple[str, Optional[int]]] = contextva
 
 
 class RemoteRegistration:
-    """Child-side twin of ``PluginRegistration``: ``dispose()`` releases the Hermes-side entry."""
+    """Child-side twin of ``PluginRegistration``: ``dispose()`` releases the Eir-side entry."""
 
     def __init__(self, runtime: HostRuntime, handle_id: int, kind: str, key: str):
         self._runtime, self._id, self.kind, self.key = runtime, handle_id, kind, key
@@ -63,11 +63,11 @@ class RemoteRegistration:
 
 
 class RemoteFacade:
-    """``ctx.state`` / ``ctx.llm`` / ...: every method call runs on the Hermes-side facade."""
+    """``ctx.state`` / ``ctx.llm`` / ...: every method call runs on the Eir-side facade."""
 
     def __init__(self, runtime: HostRuntime, plugin_key: str, name: str):
         self._runtime, self._plugin_key, self._name = runtime, plugin_key, name
-        self._methods: dict[str, bool] = {}  # method name -> is a coroutine function in Hermes
+        self._methods: dict[str, bool] = {}  # method name -> is a coroutine function in Eir
 
     def __getattr__(self, attr: str) -> Any:
         if attr.startswith("_"):
@@ -90,7 +90,7 @@ class RemoteFacade:
 
 class RemotePluginContext:
     """What ``register(ctx)`` receives inside the host. Mirrors ``PluginContext``'s public surface as
-    announced by Hermes at load, so ``hasattr(ctx, "register_x")`` answers the same as in-process."""
+    announced by Eir at load, so ``hasattr(ctx, "register_x")`` answers the same as in-process."""
 
     def __init__(self, runtime: HostRuntime, plugin_key: str, info: dict[str, Any]):
         self._runtime, self._plugin_key = runtime, plugin_key
@@ -103,7 +103,7 @@ class RemotePluginContext:
     def __getattr__(self, name: str) -> Any:
         if name.startswith("_"):
             raise AttributeError(name)
-        from hermes_cli.plugin_isolation import (
+        from eir_cli.plugin_isolation import (
             HOST_REMOTE_FACADES, HOST_SKIPPED_CTX_METHODS, HOST_UNSUPPORTED_CTX_METHODS,
         )
         if name in HOST_UNSUPPORTED_CTX_METHODS:
@@ -141,7 +141,7 @@ class HostRuntime:
         self._lock = threading.Lock()
         self.unload_callbacks: dict[str, list[Callable[[], Any]]] = {}
         self.modules: dict[str, str] = {}
-        self.loads: dict[str, Optional[int]] = {}  # plugin_key -> its current load, as Hermes numbered it
+        self.loads: dict[str, Optional[int]] = {}  # plugin_key -> its current load, as Eir numbered it
         self.asgi_apps: dict[str, Any] = {}
         self.profiles: dict[str, dict[str, Any]] = {}
         self.instance_modules: dict[str, Any] = {}
@@ -188,7 +188,7 @@ class HostRuntime:
                 methods[name] = {"async": is_async_callable(value), "sig": describe_signature(value)}
             else:
                 # Class-level defaults too: an engine that sets ``context_length`` only later in
-                # ``update_model()`` must not read as the base-class default forever in Hermes.
+                # ``update_model()`` must not read as the base-class default forever in Eir.
                 live.append(name)
         return {"__object__": self._remember(plugin_key, obj), "methods": methods, "live": live,
                 "type": type(obj).__name__}
@@ -208,7 +208,7 @@ class HostRuntime:
         return decode(self.channel.call(method, payload), self.resolve_from_parent)
 
     def ctx_call(self, plugin_key: str, method: str, *args: Any, **kwargs: Any) -> Any:
-        from hermes_cli.plugin_isolation import HOST_OBJECT_BASES
+        from eir_cli.plugin_isolation import HOST_OBJECT_BASES
         return self._send_call("ctx", plugin_key, {"method": method, "args": args, "kwargs": kwargs},
                                allow_objects=method in HOST_OBJECT_BASES)
 
@@ -280,9 +280,9 @@ class HostRuntime:
     def op_load_instance(self, params: dict[str, Any]) -> Any:
         """Category plugins (memory provider, context engine, cron scheduler): import the directory,
         run ``register(ctx)`` capturing the one ``capture`` registration, else instantiate the first
-        subclass of ``base``. Other registrations reach Hermes only when it bound a ctx for them."""
+        subclass of ``base``. Other registrations reach Eir only when it bound a ctx for them."""
         plugin_key = str(params["plugin_key"])
-        # Hermes asks for a fresh instance many times (agent cache, doctor, dashboard); like the
+        # Eir asks for a fresh instance many times (agent cache, doctor, dashboard); like the
         # in-process loader, the module body runs once per host and only the instance is new.
         module = self.instance_modules.get(str(params["path"]))
         if module is None:
@@ -331,7 +331,7 @@ class HostRuntime:
         app = self.asgi_apps.get(str(api_path))
         if app is None:
             from fastapi import FastAPI
-            module_name = f"hermes_dashboard_plugin_{params['plugin']}"
+            module_name = f"eir_dashboard_plugin_{params['plugin']}"
             spec = importlib.util.spec_from_file_location(module_name, api_path)
             if spec is None or spec.loader is None:
                 raise ImportError(f"cannot load dashboard api {api_path}")
@@ -347,7 +347,7 @@ class HostRuntime:
 
         async def request() -> dict[str, Any]:
             import httpx
-            from hermes_cli.plugin_host_http_auth import with_hosted_admission
+            from eir_cli.plugin_host_http_auth import with_hosted_admission
             transport = httpx.ASGITransport(app=with_hosted_admission(app, params.get("authenticated")))
             async with httpx.AsyncClient(transport=transport, base_url="http://plugin-host") as client:
                 response = await client.request(
@@ -377,7 +377,7 @@ class HostRuntime:
             raise AttributeError(method)
         args, kwargs = self._decode_args(params)
         base = _provider_base(obj)
-        if base is not None:  # the ABC's annotations say what Hermes passed (``home_path: Path``)
+        if base is not None:  # the ABC's annotations say what Eir passed (``home_path: Path``)
             args, kwargs = restore_arguments(declared_member(base, method), args, kwargs)
         return self._encode_result(self.owners.get(ref, ""), self._run(getattr(obj, method)(*args, **kwargs)))
 
@@ -391,7 +391,7 @@ class HostRuntime:
         return self._encode_result(self.owners.get(int(params["ref"]), ""), getattr(obj, name))
 
     def op_release(self, params: dict[str, Any]) -> None:
-        """Drop objects whose Hermes-side proxies were garbage-collected."""
+        """Drop objects whose Eir-side proxies were garbage-collected."""
         with self._lock:
             for ref in params.get("refs") or ():
                 self.refs.pop(int(ref), None)
@@ -400,7 +400,7 @@ class HostRuntime:
     def op_config_schema(self, params: dict[str, Any]) -> Any:
         """A memory provider's ``config_schema.py`` ``CONFIG_SCHEMA`` (user code: it runs here)."""
         path = Path(str(params["path"]))
-        spec = importlib.util.spec_from_file_location(f"_hermes_memory_config_schema.{path.parent.name}", path)
+        spec = importlib.util.spec_from_file_location(f"_eir_memory_config_schema.{path.parent.name}", path)
         if spec is None or spec.loader is None:
             raise ImportError(f"cannot load {path}")
         module = importlib.util.module_from_spec(spec)
@@ -452,7 +452,7 @@ _HANDLERS: dict[str, Callable[[HostRuntime, dict[str, Any]], Any]] = {
 
 class _CapturingContext(RemotePluginContext):
     """``register(ctx)`` for a category plugin: the category's own registration is kept here; the rest
-    forward to Hermes when it bound a context (memory providers), else are no-ops."""
+    forward to Eir when it bound a context (memory providers), else are no-ops."""
 
     def __init__(self, runtime: HostRuntime, plugin_key: str, info: dict[str, Any], capture: str,
                  base: type, captured: list[Any], *, forward: bool):
@@ -478,9 +478,9 @@ def _import_base(ref: str) -> type:
 def _provider_base(value: Any) -> Optional[type]:
     """The provider ABC (``HOST_OBJECT_BASES``) ``value`` implements. Only an already-imported base
     can match: a plugin object subclassing it imported it."""
-    from hermes_agent.compat.finder import current_name
-    from hermes_agent.compat.moves import MOVES
-    from hermes_cli.plugin_isolation import HOST_OBJECT_BASES
+    from eir_agent.compat.finder import current_name
+    from eir_agent.compat.moves import MOVES
+    from eir_cli.plugin_isolation import HOST_OBJECT_BASES
     for ref in HOST_OBJECT_BASES.values():
         module, attr = ref.split(":")
         for name in (module, current_name(module, MOVES)):
@@ -502,7 +502,7 @@ async def _on_behalf_of(awaitable: Any, origin: Optional[int]) -> Any:
 
 
 def _import_plugin(params: dict[str, Any]) -> Any:
-    """Import a directory plugin under the module name Hermes assigned, or resolve an entry point."""
+    """Import a directory plugin under the module name Eir assigned, or resolve an entry point."""
     if params.get("entrypoint"):
         for ep in importlib.metadata.entry_points().select(group=_ENTRY_POINTS_GROUP):
             if ep.name == params.get("name"):
@@ -514,7 +514,7 @@ def _import_plugin(params: dict[str, Any]) -> Any:
         raise FileNotFoundError(f"No __init__.py in {plugin_dir}")
     module_name = str(params["module_name"])
     parts = module_name.split(".")[:-1]
-    for i in range(1, len(parts) + 1):  # synthetic parent packages (hermes_plugins, _hermes_user_memory)
+    for i in range(1, len(parts) + 1):  # synthetic parent packages (eir_plugins, _eir_user_memory)
         parent = ".".join(parts[:i])
         if parent not in sys.modules:
             ns_pkg = types.ModuleType(parent)
@@ -611,7 +611,7 @@ def extract_profiles_main(path: str, module_name: str) -> int:
     import json
     reader, writer = _take_protocol_streams()
     del reader
-    import hermes_bootstrap
+    import eir_bootstrap
     try:
         payload = {"profiles": [_extraction_entry(p) for p in capture_profiles(path, module_name)]}
     except Exception as exc:
@@ -623,13 +623,13 @@ def extract_profiles_main(path: str, module_name: str) -> int:
 
 def main() -> int:
     reader, writer = _take_protocol_streams()
-    import hermes_bootstrap
-    from hermes_logging import DisplayNameFormatter
+    import eir_bootstrap
+    from eir_logging import DisplayNameFormatter
     stderr_handler = logging.StreamHandler(sys.stderr)
     stderr_handler.setFormatter(DisplayNameFormatter("%(levelname)s %(name)s: %(message)s"))
-    logging.basicConfig(handlers=[stderr_handler], level=os.environ.get("HERMES_PLUGIN_HOST_LOG_LEVEL", "WARNING"))
+    logging.basicConfig(handlers=[stderr_handler], level=os.environ.get("EIR_PLUGIN_HOST_LOG_LEVEL", "WARNING"))
     runtime = HostRuntime(reader, writer)
-    from hermes_cli import plugin_events
+    from eir_cli import plugin_events
     plugin_events._session_event_forwarder = runtime.session_event
     runtime.channel.start()
     runtime.stopped.wait()
@@ -641,5 +641,5 @@ if __name__ == "__main__":
     code = (extract_profiles_main(sys.argv[2], sys.argv[3]) if sys.argv[1:2] == ["--extract-profiles"]
             else main())
     sys.stderr.flush()
-    # A plugin thread stuck in a handler must not keep the host alive once Hermes has gone.
+    # A plugin thread stuck in a handler must not keep the host alive once Eir has gone.
     os._exit(code)

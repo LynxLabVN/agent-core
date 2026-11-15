@@ -17,7 +17,7 @@ const { hostMock } = vi.hoisted(() => ({
   }
 }))
 
-vi.mock('@hermes/plugin-sdk', () => ({ host: hostMock }))
+vi.mock('@eir/plugin-sdk', () => ({ host: hostMock }))
 
 const unscoped = { name: 'mybot' } as RosterRow
 

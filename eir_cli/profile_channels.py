@@ -1,12 +1,12 @@
 """Messaging-channel settings a profile clone must NOT inherit.
 
 A ``--clone``d profile that keeps the source's bot tokens, allowlists and platform state makes two
-gateways fight over one bot (standalone) or blocks ``hermes gateway migrate --multiplex`` with a
+gateways fight over one bot (standalone) or blocks ``eir gateway migrate --multiplex`` with a
 duplicate-credential finding per platform.
 
 The inventory is OWNERSHIP-based and evaluated in the SOURCE profile's plugin scope: every adapter
 (built-in ``Platform`` member, a platform that left core — its ``LEFT_CORE`` row, plugin installed or
-not — or a plugin registered under the source's ``HERMES_HOME``) owns the env
+not — or a plugin registered under the source's ``EIR_HOME``) owns the env
 keys it declares outright (``required_env``, allowlist / allow-all / home-channel names, its
 ``env_overrides`` / ``env_enable_credentials``, core's ``config_env._ENV_ENABLE_CREDENTIALS``) plus every key
 under its canonical ``<PLATFORM>_`` prefix and its historical alias prefixes. Gateway-wide channel
@@ -65,12 +65,12 @@ def _plugin_scope(source_dir: Optional[Path]):
     if source_dir is None:
         yield
         return
-    from hermes_constants import reset_hermes_home_override, set_hermes_home_override
-    token = set_hermes_home_override(str(source_dir))
+    from eir_constants import reset_eir_home_override, set_eir_home_override
+    token = set_eir_home_override(str(source_dir))
     try:
         yield
     finally:
-        reset_hermes_home_override(token)
+        reset_eir_home_override(token)
 
 
 def platform_env_prefixes(platform_id: str) -> tuple[str, ...]:
@@ -81,7 +81,7 @@ def platform_env_prefixes(platform_id: str) -> tuple[str, ...]:
 
 def _registry_entries() -> list:
     with contextlib.suppress(Exception):
-        from hermes_cli.plugins import discover_plugins
+        from eir_cli.plugins import discover_plugins
         discover_plugins()  # idempotent per profile scope
         from gateway.platform_registry import platform_registry
         return list(platform_registry.all_entries())
@@ -89,9 +89,9 @@ def _registry_entries() -> list:
 
 
 def _left_core_platforms() -> list:
-    """Rows of platforms that left core for a catalog plugin (``hermes_cli.left_core_migration``).
+    """Rows of platforms that left core for a catalog plugin (``eir_cli.left_core_migration``).
     Their channel ownership comes from the row, so it holds while the plugin is absent."""
-    from hermes_cli.left_core_migration import LEFT_CORE
+    from eir_cli.left_core_migration import LEFT_CORE
     return [feature for feature in LEFT_CORE if feature.platform]
 
 
@@ -269,12 +269,12 @@ def _shared_adapters_active(source_dir: Optional[Path], shared: dict[str, tuple[
     """Shared-prefix platforms the SOURCE runs as a channel: explicitly enabled in its config.yaml, or
     auto-enabled by a complete credential set in its ``.env`` and not explicitly disabled — the same
     gate ``gateway.platform_env.EnvCred`` applies at gateway start."""
-    from hermes_cli.config_backend import config_exists
+    from eir_cli.config_backend import config_exists
     if source_dir is None:
         return set(shared)  # no source to consult: the historical (strip) behaviour
     raw: dict = {}
     if config_exists(source_dir / "config.yaml"):
-        from hermes_cli.config import read_user_config_raw
+        from eir_cli.config import read_user_config_raw
         with contextlib.suppress(Exception):
             raw = read_user_config_raw(source_dir / "config.yaml") or {}
     env = _env_values(source_dir / ".env")
@@ -387,10 +387,10 @@ def _channel_config_paths(raw: dict, platforms: Iterable[str]) -> list[tuple[str
 
 def strip_channel_config(config_path: Path, index: Optional[ChannelKeyIndex] = None) -> list[str]:
     """Remove platform sections from a raw ``config.yaml`` in place. Returns the dotted paths removed."""
-    from hermes_cli.config_backend import config_exists
+    from eir_cli.config_backend import config_exists
     if not config_exists(config_path):
         return []
-    from hermes_cli.config import atomic_config_replace, read_user_config_raw
+    from eir_cli.config import atomic_config_replace, read_user_config_raw
     index = index or ChannelKeyIndex()
     raw = read_user_config_raw(config_path)
     paths = _channel_config_paths(raw, index.platforms)
@@ -452,7 +452,7 @@ def strip_channel_settings(profile_dir: Path, *, include_state: bool, source_dir
 def channel_platforms_configured(profile_dir: Path) -> list[str]:
     """Platform ids with any channel setting in ``profile_dir`` (.env keys or config.yaml sections) —
     what a channel-less clone of it leaves behind. Pure read, in ``profile_dir``'s plugin scope."""
-    from hermes_cli.config_backend import config_exists
+    from eir_cli.config_backend import config_exists
     index = ChannelKeyIndex(profile_dir)
     found: set[str] = set()
     env_path = profile_dir / ".env"
@@ -464,7 +464,7 @@ def channel_platforms_configured(profile_dir: Path) -> list[str]:
                 found.add(platform)
     config_path = profile_dir / "config.yaml"
     if config_exists(config_path):
-        from hermes_cli.config import read_user_config_raw
+        from eir_cli.config import read_user_config_raw
         raw = read_user_config_raw(config_path)
         for path in _channel_config_paths(raw, index.platforms):
             node = raw
@@ -481,9 +481,9 @@ def clone_channels_refusal(source_dir: Path, source_label: str) -> Optional[str]
     """Why ``--clone-channels`` must be refused for ``source_dir``: a live multiplexer already serves
     the source, so the copied bot would be parked as a duplicate credential at once (the same finding
     the migrate preflight reports). ``None`` when the copy is allowed. Shared by CLI, REST and TUI
-    through :func:`hermes_cli.profiles.create_profile`."""
-    from hermes_cli.gateway_multiplex_served import recorded_served_profiles
-    from hermes_cli.profiles import normalize_profile_name
+    through :func:`eir_cli.profiles.create_profile`."""
+    from eir_cli.gateway_multiplex_served import recorded_served_profiles
+    from eir_cli.profiles import normalize_profile_name
     served = recorded_served_profiles()
     if not served or len(served) < 2 or normalize_profile_name(source_label) not in {
         normalize_profile_name(p) for p in served
@@ -496,17 +496,17 @@ def clone_channels_refusal(source_dir: Path, source_label: str) -> Optional[str]
         f"--clone-channels would copy {', '.join(platforms)} from '{source_label}', which the running "
         "multiplexed gateway already serves: the bot can only belong to one profile, so the copy would be "
         "parked as a duplicate credential. Clone without --clone-channels and give the new profile its own bot "
-        "(hermes -p <name> setup), or route its chats with gateway.profile_routes instead."
+        "(eir -p <name> setup), or route its chats with gateway.profile_routes instead."
     )
 
 
 def _config_platform_tokens(config_path: Path) -> dict[str, str]:
     """``{platform: token}`` from ``platforms.<p>.token|api_key`` (both nesting spellings)."""
-    from hermes_cli.config_backend import config_exists
+    from eir_cli.config_backend import config_exists
     tokens: dict[str, str] = {}
     if not config_exists(config_path):
         return tokens
-    from hermes_cli.config import read_user_config_raw
+    from eir_cli.config import read_user_config_raw
     raw = read_user_config_raw(config_path)
     gateway: dict = raw["gateway"] if isinstance(raw.get("gateway"), dict) else {}
     for section in (raw.get("platforms"), gateway.get("platforms")):
@@ -523,7 +523,7 @@ def _config_platform_tokens(config_path: Path) -> dict[str, str]:
 def shared_channel_credentials(profile_dir: Path, source_dir: Path) -> list[str]:
     """Platforms whose CONNECTING credential (bot token / app id / account) in ``profile_dir`` is
     byte-identical to ``source_dir``'s — the bots that will collide. Pure file reads: no secret
-    manager, no gateway config load, so ``hermes profile list`` can afford it per profile."""
+    manager, no gateway config load, so ``eir profile list`` can afford it per profile."""
     wanted = credential_env_keys()
     mine = _env_values(profile_dir / ".env", wanted)
     theirs = _env_values(source_dir / ".env", wanted)
@@ -537,9 +537,9 @@ def shared_channel_credentials(profile_dir: Path, source_dir: Path) -> list[str]
 def shared_credential_warning(profile: str, platforms: list[str], source: str = "default") -> str:
     return (
         f"⚠ Profile '{profile}' shares its {', '.join(platforms)} credential with {source}: the bot can "
-        f"only belong to one profile. Give '{profile}' its own bot (hermes -p {profile} setup, or the "
+        f"only belong to one profile. Give '{profile}' its own bot (eir -p {profile} setup, or the "
         f"dashboard Messaging page) or remove the token from '{profile}'; a multiplexed gateway parks "
-        f"the duplicate and `hermes gateway migrate --multiplex` refuses until it is gone."
+        f"the duplicate and `eir gateway migrate --multiplex` refuses until it is gone."
     )
 
 
@@ -551,6 +551,6 @@ def format_stripped_notice(profile: str, platforms: list[str], clone_flag: str =
     return [
         f"Messaging channels were NOT cloned ({', '.join(platforms)}): a copied bot token or allowlist "
         "would make two gateways fight over one bot.",
-        f"  Configure this profile's own bots:  hermes -p {profile} setup   (or the dashboard Messaging page)",
-        f"  To copy the source's channels anyway:  hermes profile create {profile} {clone_flag} --clone-channels",
+        f"  Configure this profile's own bots:  eir -p {profile} setup   (or the dashboard Messaging page)",
+        f"  To copy the source's channels anyway:  eir profile create {profile} {clone_flag} --clone-channels",
     ]

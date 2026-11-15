@@ -8,7 +8,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Callable, ClassVar, ContextManager, Iterator, Optional
 
-from hermes_cli.auth_constants import httpx
+from eir_cli.auth_constants import httpx
 
 
 UPGRADE_START = "Sign in with a Nous account to unlock more models and tools."
@@ -23,16 +23,16 @@ UPGRADE_SERVICE_BUSY = ("Signing in couldn't finish because the Nous service is 
 UPGRADE_SERVICE_UNREACHABLE = ("The Nous service couldn't be reached to finish signing you in. "
                                "Check your internet connection and try again. Your session is still here.")
 
-UPGRADE_NO_DEFAULT_TERMINAL = "No default model is set yet; run `hermes model` to pick one."
+UPGRADE_NO_DEFAULT_TERMINAL = "No default model is set yet; run `eir model` to pick one."
 UPGRADE_NO_DEFAULT_CHAT = "No default model is set yet; run /model to pick one."
 UPGRADE_WAITING = "Waiting for sign-in..."
 UPGRADE_WAITING_UP_TO = "Waiting for sign-in, up to {minutes}."
 UPGRADE_CANCELLED = "\nSign-in cancelled."
 LOGIN_COMMAND = "/login"
 LOGIN_STARTING = "Starting sign-in..."
-LOGIN_DM_ONLY = "Sign in from a direct message with Hermes."
-LOGIN_BUSY_ELSEWHERE = "Another sign-in is already running on this Hermes. Try again in a few minutes."
-LOGIN_NOT_ALLOWED = "Only an operator of this Hermes can sign it in."
+LOGIN_DM_ONLY = "Sign in from a direct message with Eir."
+LOGIN_BUSY_ELSEWHERE = "Another sign-in is already running on this Eir. Try again in a few minutes."
+LOGIN_NOT_ALLOWED = "Only an operator of this Eir can sign it in."
 # The card form (a surface with its own sign-in button) and the chat form (names /login).
 FREE_TIER_RATE_LIMIT_CARD = (
     "You've used up the allowance for chatting without signing in. It refreshes in {reset}. "
@@ -50,7 +50,7 @@ def format_wait_line(expires_in: int) -> str:
 #
 # One sign-in composition (:func:`run_sign_in`) yields these; every surface is a renderer over them.
 # Each state carries its own user copy, so no renderer ever maps a reason to a string: ``.copy`` is
-# the in-chat form (never a raw exception, a URL or a ``hermes`` verb) and ``.copy_terminal`` the
+# the in-chat form (never a raw exception, a URL or a ``eir`` verb) and ``.copy_terminal`` the
 # form a top-level terminal command prints.
 
 
@@ -170,12 +170,12 @@ class Failed(SignInState):
 
     @property
     def retryable(self) -> bool:
-        from hermes_cli import anon_auth as _core
+        from eir_cli import anon_auth as _core
         return bool(self.reason.startswith("anon_") and self.reason not in _core.ANON_TERMINAL_CODES)
 
     @property
     def copy(self) -> str:
-        from hermes_cli import anon_auth as _core
+        from eir_cli import anon_auth as _core
         if self.reason in _core.ANON_UNREACHABLE_CODES:
             return UPGRADE_SERVICE_UNREACHABLE
         if self.reason in (_core.ANON_RATE_LIMITED, _core.ANON_GATE_PAUSED):
@@ -206,7 +206,7 @@ def _failed_from_exception(exc: BaseException) -> Failed:
     """A ``Failed`` that keeps the service's own verdict: the ``anon_*`` code and wait hint an
     ``AuthError`` carries, or the wire's shape for a transport error. The raw detail never reaches a
     chat; ``copy_terminal`` may show it when nothing better is known."""
-    from hermes_cli import anon_auth as _core
+    from eir_cli import anon_auth as _core
     err = _core.classify_mint_exception(exc)
     reason = str(err.code or "")
     if reason == _core.ANON_SERVER_ERROR and not isinstance(exc, _core.AuthError):
@@ -226,13 +226,13 @@ def _default_persist_guard(is_cancelled: Callable[[], bool]) -> Callable[[], Con
 
 def _account_email(account_state: dict[str, Any], fallback: Optional[str]) -> str:
     """The signed-in account's email, read from its own access token."""
-    from hermes_cli.auth_constants import _decode_jwt_claims
+    from eir_cli.auth_constants import _decode_jwt_claims
     email = _decode_jwt_claims(account_state.get("access_token")).get("email")
     return str(email or fallback or "").strip()
 
 
 def _handoff_lines(results: list[dict[str, Any]]) -> tuple[str, ...]:
-    from hermes_cli.guest_handoff import result_lines
+    from eir_cli.guest_handoff import result_lines
     return tuple(line for view in results for line in result_lines(view))
 
 
@@ -240,8 +240,8 @@ def _handoff_status(results: list[dict[str, Any]], replaced: Optional[dict[str, 
     """The handoff a completed sign-in reports (``guest_handoff.wire_status`` form): the latest record its
     own run attempted, else the replaced free tier's saved record (another process held it), else
     None when it replaced no free tier. Read under the scope."""
-    from hermes_cli import anon_auth as _core
-    from hermes_cli.guest_handoff import record_status, wire_status
+    from eir_cli import anon_auth as _core
+    from eir_cli.guest_handoff import record_status, wire_status
     if results:
         return wire_status(results[-1])
     anon_token = replaced.get("anon_token") if _core.is_guest_state(replaced) else None
@@ -278,12 +278,12 @@ def run_sign_in(
     scope has to be entered inside the generator, on whichever thread is advancing it.
     *client_factory* is the HTTP client seam, ``client_factory(timeout_seconds, verify)``.
     """
-    from hermes_cli import anon_auth as _core
-    from hermes_cli.auth import PROVIDER_REGISTRY, _resolve_verify
-    from hermes_cli.auth_device_flow import DeviceFlowCancelled, _request_device_code
-    from hermes_cli.auth_error_copy import is_device_code_expired
-    from hermes_cli.auth_nous import _nous_http_client, _nous_portal_base_url
-    from hermes_cli.guest_handoff import drain
+    from eir_cli import anon_auth as _core
+    from eir_cli.auth import PROVIDER_REGISTRY, _resolve_verify
+    from eir_cli.auth_device_flow import DeviceFlowCancelled, _request_device_code
+    from eir_cli.auth_error_copy import is_device_code_expired
+    from eir_cli.auth_nous import _nous_http_client, _nous_portal_base_url
+    from eir_cli.guest_handoff import drain
 
     is_cancelled = cancelled or (lambda: False)
     open_scope = scope or contextlib.nullcontext

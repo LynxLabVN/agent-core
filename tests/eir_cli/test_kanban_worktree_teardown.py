@@ -16,9 +16,9 @@ from pathlib import Path
 
 import pytest
 
-from hermes_cli import kanban_db as kb
-from hermes_cli import kanban_db_workspace as kbw
-from hermes_cli import kanban_db_connect as kbc
+from eir_cli import kanban_db as kb
+from eir_cli import kanban_db_workspace as kbw
+from eir_cli import kanban_db_connect as kbc
 
 
 def _git(*args: str, cwd: str | None = None) -> str:
@@ -43,9 +43,9 @@ def _git(*args: str, cwd: str | None = None) -> str:
 
 @pytest.fixture
 def kanban_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     kb.init_db()
     return home
@@ -212,7 +212,7 @@ def test_tree_dirtied_between_check_and_removal_preserved(
     (wt / "late-wip.txt").write_text("dirtied after the check\n", encoding="utf-8")
     # Pre-check lies (as if the file appeared just after it ran) — real git
     # must still refuse the removal.
-    from hermes_cli import worktree_ops
+    from eir_cli import worktree_ops
 
     monkeypatch.setattr(worktree_ops, "_worktree_is_dirty", lambda _p, *_a, **_k: False)
     kbw._cleanup_worktree_workspace("t_gggg7777", str(wt))

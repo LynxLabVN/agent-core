@@ -16,12 +16,12 @@ import urllib.request
 from dataclasses import dataclass, field
 from pathlib import PurePosixPath
 
-from hermes_cli.local_runtime.context_policy import (
+from eir_cli.local_runtime.context_policy import (
     FLOOR, RUNTIME_OVERHEAD_BYTES, TARGET_WINDOW, LaunchPlan, plan_launch)
-from hermes_cli.local_runtime.estimator import (
+from eir_cli.local_runtime.estimator import (
     HardwareBudget, LayerKind, ModelProfile, PhysicsRefusal, as_loaded)
-from hermes_cli.local_runtime.gguf import model_id_from_stem
-from hermes_platform.host.products import is_nvidia_n1x_pci_id
+from eir_cli.local_runtime.gguf import model_id_from_stem
+from eir_platform.host.products import is_nvidia_n1x_pci_id
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +130,7 @@ class CatalogEntry:
     recommend: bool = True
     # Reasoning-effort levels this model's chat template accepts; empty when it accepts every
     # level. Qwen3.8's template raises on any other level and llama-server answers HTTP 500, so
-    # Hermes sends the nearest listed level in its place.
+    # Eir sends the nearest listed level in its place.
     reasoning_efforts: tuple = ()
 
     @property
@@ -309,7 +309,7 @@ def recommended_entry(budget: HardwareBudget,
 # next fetch, and day-0 entries reach users without an app release.
 
 _CATALOG_URL = ("https://raw.githubusercontent.com/NousResearch/hermes-agent"
-                "/main/hermes_cli/local_runtime/catalog.json")
+                "/main/eir_cli/local_runtime/catalog.json")
 _SCHEMA_VERSION = 3  # bump when an older app would read a newer catalog but launch its entries wrongly
 _REFRESH_TTL_S = 6 * 3600
 _refresh_lock = threading.Lock()
@@ -364,7 +364,7 @@ def _load_catalog(doc: dict) -> tuple[CatalogEntry, ...]:
 def _packaged_catalog() -> tuple[CatalogEntry, ...]:
     from importlib.resources import files
 
-    raw = files("hermes_cli.local_runtime").joinpath("catalog.json").read_text(encoding="utf-8-sig")
+    raw = files("eir_cli.local_runtime").joinpath("catalog.json").read_text(encoding="utf-8-sig")
     return _load_catalog(json.loads(raw))
 
 
@@ -383,7 +383,7 @@ def refresh_catalog(force: bool = False) -> bool:
             return False
         _last_refresh_attempt = now
     try:
-        req = urllib.request.Request(_CATALOG_URL, headers={"User-Agent": "hermes-local-runtime"})
+        req = urllib.request.Request(_CATALOG_URL, headers={"User-Agent": "eir-local-runtime"})
         with urllib.request.urlopen(req, timeout=10) as r:
             fetched = _load_catalog(json.load(r))
     except Exception as exc:

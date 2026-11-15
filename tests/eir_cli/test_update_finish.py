@@ -30,21 +30,21 @@ def _put(root, name, content):
 
 @pytest.fixture
 def completion(tmp_path, monkeypatch):
-    from hermes_cli.config_defaults import DEFAULT_CONFIG
+    from eir_cli.config_defaults import DEFAULT_CONFIG
     from pm.environments import install_state_dir, runtime_facts_path, site_packages
 
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
-    monkeypatch.setenv("HERMES_HOME", str(home / ".hermes"))
-    monkeypatch.setenv("HERMES_RUNTIME_DIR", str(tmp_path / "store"))
+    monkeypatch.setenv("EIR_HOME", str(home / ".eir"))
+    monkeypatch.setenv("EIR_RUNTIME_DIR", str(tmp_path / "store"))
     source = tmp_path / "selected source"
     source.mkdir()
     # Copies give bootstrap/main a genuine selected checkout identity. No file
     # in the working checkout is modified, even by import-time self-heals.
     for path in ROOT.glob("*.py"):
         shutil.copy2(path, source / path.name)
-    for name in ("hermes_cli", "hermes_platform", "hermes_agent", "pm", "agent", "gateway", "tools", "cron"):
+    for name in ("eir_cli", "eir_platform", "eir_agent", "pm", "agent", "gateway", "tools", "cron"):
         shutil.copytree(ROOT / name, source / name,
                         ignore=shutil.ignore_patterns("__pycache__", "web_dist", "tui_dist"))
     shutil.copytree(ROOT / "scripts/build", source / "scripts/build",
@@ -77,12 +77,12 @@ def completion(tmp_path, monkeypatch):
     _put(site, "selected_dependency.py", "VALUE = 'selected generation'\n")
     _put(runtime_facts_path(source).parent, "facts.json", json.dumps({
         "packages": {"venv": {"environment": str(generation)}}}))
-    _put(home / ".hermes", "config.yaml",
+    _put(home / ".eir", "config.yaml",
          f"_config_version: {DEFAULT_CONFIG['_config_version'] - 1}\nmodel:\n  default: retained-model\n")
     env = {key: value for key, value in os.environ.items()
-           if not key.startswith(("HERMES_", "PYTHON", "PYTEST_", "VIRTUAL_ENV", "npm_", "NPM_", "pnpm_", "PNPM_"))}
-    env.update(HOME=str(home), HERMES_HOME=str(home / ".hermes"),
-               HERMES_RUNTIME_DIR=str(tmp_path / "store"),
+           if not key.startswith(("EIR_", "PYTHON", "PYTEST_", "VIRTUAL_ENV", "npm_", "NPM_", "pnpm_", "PNPM_"))}
+    env.update(HOME=str(home), EIR_HOME=str(home / ".eir"),
+               EIR_RUNTIME_DIR=str(tmp_path / "store"),
                PYTHONPATH="/obsolete/pre-pm/site-packages", PYTHONHOME="/obsolete/python",
                pnpm_config_offline="true")
     probe = subprocess.run([str(python), "-I", "-c",
@@ -139,7 +139,7 @@ def completion(tmp_path, monkeypatch):
                     spec.loader.exec_module = execute
                     return spec
 
-                if fullname != 'hermes_cli.main':
+                if fullname != 'eir_cli.main':
                     return None
                 import selected_dependency
                 assert selected_dependency.VALUE == 'selected generation'
@@ -151,14 +151,14 @@ def completion(tmp_path, monkeypatch):
                     original(module)
                     # Install only service/machine boundaries after REAL CLI
                     # startup; all dependencies must be available by now.
-                    from hermes_cli import update_cmd as update
-                    from hermes_cli import update_cmd_maint as maint
-                    from hermes_cli import update_cmd_fleet as fleet
-                    from hermes_cli import update_cmd_fleet_verify as fleet_verify
-                    from hermes_cli import gateway_migrate
-                    from hermes_cli import macos_tcc_anchor
-                    from hermes_cli import source_build
-                    from hermes_cli.update_inventory import UpdatePlan, RuntimeRecord
+                    from eir_cli import update_cmd as update
+                    from eir_cli import update_cmd_maint as maint
+                    from eir_cli import update_cmd_fleet as fleet
+                    from eir_cli import update_cmd_fleet_verify as fleet_verify
+                    from eir_cli import gateway_migrate
+                    from eir_cli import macos_tcc_anchor
+                    from eir_cli import source_build
+                    from eir_cli.update_inventory import UpdatePlan, RuntimeRecord
                     from pm.package import Runner
                     import pm
                     import os
@@ -170,10 +170,10 @@ def completion(tmp_path, monkeypatch):
                         assert name == 'pnpm' and explicit and not verify
                         assert shutil.which('node', path=base_env['PATH'])
                         assert shutil.which('pnpm', path=base_env['PATH'])
-                        assert base_env['HERMES_PYTHON'] == str(project_python(root))
-                        assert base_env['PYTHON'] == base_env['HERMES_PYTHON']
+                        assert base_env['EIR_PYTHON'] == str(project_python(root))
+                        assert base_env['PYTHON'] == base_env['EIR_PYTHON']
                         (root / 'build-environment.json').write_text(json.dumps({
-                            'python': base_env['HERMES_PYTHON'], 'selected': selected_dependency.__file__,
+                            'python': base_env['EIR_PYTHON'], 'selected': selected_dependency.__file__,
                             'argv': sys.argv, 'old_module': 'pre_pm_only' in sys.modules,
                             'pid': os.getpid(), 'parent': os.getppid(),
                         }))
@@ -197,7 +197,7 @@ def completion(tmp_path, monkeypatch):
                     maint._print_post_update_notices_and_self_heals = lambda: None
                     maint._sync_profiles_after_update = lambda: None
                     # A detached git writer would outlive the test in its deleted tmp checkout.
-                    from hermes_cli import git_commit_graph
+                    from eir_cli import git_commit_graph
                     git_commit_graph.spawn_commit_graph_refresh = lambda root: False
                     maint._print_bundled_skills_sync_report = lambda: None
                     fleet_verify._print_legacy_units_warning = lambda: None
@@ -211,7 +211,7 @@ def completion(tmp_path, monkeypatch):
                         assert isinstance(plan, UpdatePlan)
                         assert isinstance(plan.runtimes[0], RuntimeRecord)
                         assert plan.to_dict() == request['plan'] | {
-                            'updatable_in_place': True, 'update_mechanism': 'hermes update'}
+                            'updatable_in_place': True, 'update_mechanism': 'eir update'}
                         (root / 'restarted-plan.json').write_text(json.dumps(plan.to_dict()))
                         return fleet._GatewayRestartOutcome(
                             incomplete=False, phase_errors=[], pre_restart_gateway_pids=[],
@@ -232,22 +232,22 @@ def completion(tmp_path, monkeypatch):
                     update._resume_windows_gateways_and_merge_outcome = resume
                     if fault == 'scm':
                         # The Windows service manager refuses the paused gateway's restart.
-                        from hermes_cli import update_cmd_windows
+                        from eir_cli import update_cmd_windows
                         def scm(token):
                             if token and token.get('resume_needed'):
-                                raise RuntimeError('Could not restart Windows gateway service(s): HermesGatewayProbe')
+                                raise RuntimeError('Could not restart Windows gateway service(s): EirGatewayProbe')
                         module._resume_windows_gateways_after_update = scm
                         update_cmd_windows._resume_windows_gateways_after_update = scm
                 spec.loader.exec_module = execute
                 return spec
         sys.meta_path.insert(0, CompletionImports())
-        sys.argv = [str(root / 'hermes_cli/update_finish.py'), context, result]
+        sys.argv = [str(root / 'eir_cli/update_finish.py'), context, result]
         runpy.run_path(sys.argv[0], run_name='__main__')
     '''))
     def run(fault=""):
         return subprocess.run([str(python), "-I", "-B", str(runner), str(context), str(result), fault],
                               cwd=tmp_path, env=env, capture_output=True, text=True, timeout=90, check=False)
-    return source, home / ".hermes", request, context, result, run
+    return source, home / ".eir", request, context, result, run
 
 
 @pytest.mark.platforms("posix")
@@ -299,8 +299,8 @@ def test_refused_gateway_resume_after_commit_is_a_followup_not_exit_1(completion
     # file (the fixture's placeholder falls back to the clock and can split them across a second).
     request["receipt"]["started_at"] = "2026-10-04T12:00:00+00:00"
     request["windows_resume"] = {"resume_needed": True, "profiles": {}, "unmapped": [],
-                                 "services": ["HermesGatewayProbe"],
-                                 "service_profiles": {"HermesGatewayProbe": "default"}}
+                                 "services": ["EirGatewayProbe"],
+                                 "service_profiles": {"EirGatewayProbe": "default"}}
     context.write_text(json.dumps(request), encoding="utf-8")
     child = run("scm")
     assert child.returncode == 0, child.stdout + child.stderr
@@ -362,8 +362,8 @@ def test_missing_desktop_observation_uses_installed_products(completion, capture
     if installed == "renderer":
         _put(source, "apps/desktop/dist/index.html", "old renderer")
     elif installed == "packaged":
-        executable = ("mac-arm64/Hermes.app/Contents/MacOS/Hermes" if sys.platform == "darwin"
-                      else "linux-unpacked/hermes")
+        executable = ("mac-arm64/Eir.app/Contents/MacOS/Eir" if sys.platform == "darwin"
+                      else "linux-unpacked/eir")
         _put(source, f"apps/desktop/release/{executable}", "old packaged app")
     before = context.read_bytes()
     child = run()
@@ -414,7 +414,7 @@ def _pnpm_graph(source):
           symlinkSync(target, workspace + '/node_modules/' + name, 'dir');
         }}
         // A real pnpm lifecycle child, not an assertion about a constructed env.
-        writeFileSync('lifecycle-python.json', execFileSync(process.env.HERMES_PYTHON,
+        writeFileSync('lifecycle-python.json', execFileSync(process.env.EIR_PYTHON,
           ['-I', '-c', 'import json, os, sys, selected_dependency; print(json.dumps(dict(python=sys.executable, configured=os.environ["PYTHON"])))']));
     '''))
     _put(source, "packages/value/index.js", "export const value = 'compiled local graph';\n")
@@ -435,9 +435,9 @@ def _pnpm_graph(source):
 
 @pytest.mark.platforms("posix")
 def test_selected_child_builds_and_finalizes_under_parent_lock(completion):
-    from hermes_cli.config_defaults import DEFAULT_CONFIG
-    from hermes_cli.update_lock import UpdateLock
-    import hermes_yaml
+    from eir_cli.config_defaults import DEFAULT_CONFIG
+    from eir_cli.update_lock import UpdateLock
+    import eir_yaml
 
     source, home, request, context, result, run = completion
     node = _pnpm_graph(source)
@@ -451,20 +451,20 @@ def test_selected_child_builds_and_finalizes_under_parent_lock(completion):
     built = subprocess.run([node, str(source / "ui-tui/dist/entry.js")],
                            capture_output=True, text=True, check=True)
     assert built.stdout.strip() == "compiled local graph"
-    assert (source / "hermes_cli/web_dist/index.html").is_file()
-    assert any("compiled local graph" in p.read_text() for p in (source / "hermes_cli/web_dist/assets").glob("*.js"))
-    assert (source / "node_modules/.hermes-node-deps").is_file()
+    assert (source / "eir_cli/web_dist/index.html").is_file()
+    assert any("compiled local graph" in p.read_text() for p in (source / "eir_cli/web_dist/assets").glob("*.js"))
+    assert (source / "node_modules/.eir-node-deps").is_file()
     environment = json.loads((source / "build-environment.json").read_text())
     assert "repairing the recorded dependency environment" not in child.stderr
     lifecycle_python = json.loads((source / "lifecycle-python.json").read_text())
     assert lifecycle_python["python"] == lifecycle_python["configured"] == environment["python"]
     assert environment["parent"] == os.getpid()
     assert environment["old_module"] is False
-    assert environment["argv"] == [str(source / "hermes"), "update"]
+    assert environment["argv"] == [str(source / "eir"), "update"]
     assert context.read_bytes() == before
     assert json.loads((source / "restarted-plan.json").read_text())["expected_sha"] == "old-sha"
     assert json.loads((source / "resumed-token.json").read_text()) == request["windows_resume"]
-    config = hermes_yaml.safe_load((home / "config.yaml").read_text())
+    config = eir_yaml.safe_load((home / "config.yaml").read_text())
     assert config["_config_version"] == DEFAULT_CONFIG["_config_version"], child.stdout + child.stderr
     assert config["model"]["default"] == "retained-model"
     receipt = json.loads((home / "logs/update_receipts/latest.json").read_text())
@@ -483,9 +483,9 @@ def test_real_compiler_failure_is_owed_build_and_completion_continues(completion
     """Contract C3 for the historical takeover child: the code is committed, so a failed product
     build is an owed ``build`` follow-up, never a failed update. Maintenance (config migration)
     and the fleet restart still run, the exit is 0, and the tail stays pending until it builds."""
-    from hermes_cli.config_defaults import DEFAULT_CONFIG
-    from hermes_cli.venv_sync import completion_pending_path
-    import hermes_yaml
+    from eir_cli.config_defaults import DEFAULT_CONFIG
+    from eir_cli.venv_sync import completion_pending_path
+    import eir_yaml
 
     source, home, request, context, result, run = completion
     _pnpm_graph(source)
@@ -497,9 +497,9 @@ def test_real_compiler_failure_is_owed_build_and_completion_continues(completion
     assert "TypeScript build failed" in child.stdout + child.stderr
     assert (source / "lifecycle-python.json").is_file()
     assert (source / "ui-tui/dist/entry.js").is_file()
-    assert not (source / "hermes_cli/web_dist/index.html").exists()
+    assert not (source / "eir_cli/web_dist/index.html").exists()
     # Maintenance and the fleet restart were not skipped by the build failure.
-    config = hermes_yaml.safe_load((home / "config.yaml").read_text())
+    config = eir_yaml.safe_load((home / "config.yaml").read_text())
     assert config["_config_version"] == DEFAULT_CONFIG["_config_version"]
     assert config["model"]["default"] == "retained-model"
     assert (source / "restarted-plan.json").is_file()
@@ -524,7 +524,7 @@ def test_pre_pull_restart_enters_current_cli_with_original_arguments(completion,
     source, _home, request, context, result, run = completion
     # Exercise the REAL parser without contacting a repository or supervisor.
     # The full update command's apply path is covered by its own tests.
-    request.update(restart_update=True, argv=[str(source / "hermes"), "update", argument])
+    request.update(restart_update=True, argv=[str(source / "eir"), "update", argument])
     context.write_text(json.dumps(request), encoding="utf-8")
     child = run()
     assert child.returncode == code, child.stdout + child.stderr

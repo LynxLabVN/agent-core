@@ -10,9 +10,9 @@ from pathlib import Path
 
 import pytest
 
-import hermes_cli.left_core_migration as lcm
-from hermes_cli import default_plugins
-from hermes_cli.plugin_catalog import entry_from_mapping
+import eir_cli.left_core_migration as lcm
+from eir_cli import default_plugins
+from eir_cli.plugin_catalog import entry_from_mapping
 
 
 def _entry(name: str, tier: str = "official"):
@@ -23,7 +23,7 @@ def _entry(name: str, tier: str = "official"):
 
 @pytest.fixture
 def installs(monkeypatch):
-    monkeypatch.delenv("HERMES_DISABLE_LAZY_INSTALLS", raising=False)  # the suite turns fetching off
+    monkeypatch.delenv("EIR_DISABLE_LAZY_INSTALLS", raising=False)  # the suite turns fetching off
     calls: list[tuple[Path, str]] = []
 
     def install_into(home, consent=None):
@@ -57,7 +57,7 @@ def test_default_is_installed_once_and_a_removal_sticks(tmp_path, installs):
 def test_a_refused_enable_is_retried_until_the_user_decides(tmp_path, monkeypatch):
     """Co-authored with @BearHuddleston's review patch on #154858."""
     import json
-    monkeypatch.delenv("HERMES_DISABLE_LAZY_INSTALLS", raising=False)
+    monkeypatch.delenv("EIR_DISABLE_LAZY_INSTALLS", raising=False)
     home = tmp_path / "home"
     for name in ("kept-off", "by-hand"):  # disabled by the user; installed by hand with the enable declined
         (home / "plugins" / name).mkdir(parents=True)
@@ -68,7 +68,7 @@ def test_a_refused_enable_is_retried_until_the_user_decides(tmp_path, monkeypatc
     def install_into(h, consent=None):
         def install(name, discard=None):
             calls.append(name)
-            installed = name.removeprefix("hermes-")  # hermes-user-off installs as user-off, like hermes-memory-wiki
+            installed = name.removeprefix("eir-")  # eir-user-off installs as user-off, like eir-memory-wiki
             (h / "plugins" / installed).mkdir(parents=True, exist_ok=True)  # the clone lands before the enable
             sidecar = h / "plugins" / ".install-metadata.json"
             rows = json.loads(sidecar.read_text()) if sidecar.exists() else {}
@@ -78,20 +78,20 @@ def test_a_refused_enable_is_retried_until_the_user_decides(tmp_path, monkeypatc
             return {"ok": True}
         return install
     monkeypatch.setattr(lcm, "_install_into", install_into)
-    entries = [_entry(name) for name in ("kept-off", "by-hand", "accent-picker", "user-on", "hermes-user-off")]
+    entries = [_entry(name) for name in ("kept-off", "by-hand", "accent-picker", "user-on", "eir-user-off")]
 
     # An older install record (top-level catalog_name) under another dir name, disabled by the user.
     (home / "plugins" / "legacy-dir").mkdir()
-    (home / "plugins" / ".install-metadata.json").write_text(json.dumps({"legacy-dir": {"catalog_name": "hermes-legacy"}}))
+    (home / "plugins" / ".install-metadata.json").write_text(json.dumps({"legacy-dir": {"catalog_name": "eir-legacy"}}))
     config.write_text("plugins:\n  disabled: [kept-off, legacy-dir]\n", encoding="utf-8")
-    entries.append(_entry("hermes-legacy"))
+    entries.append(_entry("eir-legacy"))
 
     first = default_plugins.install_defaults(home, entries=entries)
-    assert first["owed"] == ["accent-picker", "user-on", "hermes-user-off"]
+    assert first["owed"] == ["accent-picker", "user-on", "eir-user-off"]
     # The user settles two of the leftover trees by hand before the next attempt (by their installed names).
     config.write_text("plugins:\n  enabled: [user-on]\n  disabled: [kept-off, user-off]\n", encoding="utf-8")
     assert default_plugins.install_defaults(home, entries=entries) == {"installed": ["accent-picker"], "owed": []}
-    assert calls == ["accent-picker", "user-on", "hermes-user-off", "accent-picker"], "retried the wrong trees"
+    assert calls == ["accent-picker", "user-on", "eir-user-off", "accent-picker"], "retried the wrong trees"
     assert default_plugins.install_defaults(home, entries=entries) == {"installed": [], "owed": []}
 
     # A tree a refused enable left, which the user then removes, is their removal: never reinstalled.
@@ -112,7 +112,7 @@ def test_a_home_that_turned_lazy_installs_off_fetches_nothing(tmp_path, installs
 
 def test_an_owed_boot_step_stays_owed_until_it_succeeds(tmp_path, monkeypatch):
     """An owed step that raises on a retry is still owed; only a success clears it."""
-    from hermes_cli import boot_bootstrap, post_update
+    from eir_cli import boot_bootstrap, post_update
     monkeypatch.setattr(boot_bootstrap, "current_install_identity", lambda root: "a" * 40)
     script = iter([{"ok": True, "owed": True}, OSError("profiles dir unreadable"), {"ok": True}])
 
@@ -152,12 +152,12 @@ def test_a_new_home_or_a_failed_pass_unsettles_the_revision(tmp_path, monkeypatc
     """@BearHuddleston's review patch on #154858."""
     import subprocess
 
-    import hermes_cli.plugin_catalog
+    import eir_cli.plugin_catalog
     import pm.plugins_state
-    monkeypatch.delenv("HERMES_DISABLE_LAZY_INSTALLS", raising=False)
+    monkeypatch.delenv("EIR_DISABLE_LAZY_INSTALLS", raising=False)
     monkeypatch.setattr(default_plugins, "_identity", lambda: "rev-1")
     live: list = [None]  # the live catalog is unreadable until the first pass
-    monkeypatch.setattr(hermes_cli.plugin_catalog, "fetch_live_catalog", lambda **kwargs: live[0])
+    monkeypatch.setattr(eir_cli.plugin_catalog, "fetch_live_catalog", lambda **kwargs: live[0])
     entries = [_entry("accent-picker")]
     monkeypatch.setattr(default_plugins, "default_entries", lambda: list(entries))
     homes = [tmp_path / "home"]
@@ -197,8 +197,8 @@ def test_a_new_home_or_a_failed_pass_unsettles_the_revision(tmp_path, monkeypatc
 def test_default_entries_keep_the_tier_and_platform_rules(monkeypatch):
     import dataclasses
 
-    import hermes_cli.plugin_catalog as catalog
-    from hermes_platform.host.facts import os_family
+    import eir_cli.plugin_catalog as catalog
+    from eir_platform.host.facts import os_family
     elsewhere = "linux" if os_family() == "win32" else "windows"
     entries = [_entry("here"), dataclasses.replace(_entry("merged"), tier="community"),
                dataclasses.replace(_entry("elsewhere"), platforms=[elsewhere])]
@@ -208,7 +208,7 @@ def test_default_entries_keep_the_tier_and_platform_rules(monkeypatch):
 
 def test_an_unreadable_config_keeps_the_home_owed_and_a_repinned_leftover_is_replaced(tmp_path, monkeypatch):
     """The leftover is replaced by removing that dir, never by forcing over the destination (Greptile)."""
-    monkeypatch.delenv("HERMES_DISABLE_LAZY_INSTALLS", raising=False)
+    monkeypatch.delenv("EIR_DISABLE_LAZY_INSTALLS", raising=False)
     home = tmp_path / "home"
     home.mkdir()
     config = home / "config.yaml"
@@ -244,7 +244,7 @@ def test_an_unreadable_config_keeps_the_home_owed_and_a_repinned_leftover_is_rep
 def test_a_retry_that_removed_our_leftover_and_then_failed_stays_owed(tmp_path, monkeypatch):
     """Greptile: the retry removes the leftover with the real remove path, then the install fails before
     publishing (offline). The missing tree is ours, not the user's removal: the next pass tries again."""
-    monkeypatch.delenv("HERMES_DISABLE_LAZY_INSTALLS", raising=False)
+    monkeypatch.delenv("EIR_DISABLE_LAZY_INSTALLS", raising=False)
     home = tmp_path / "home"
     home.mkdir()
     attempts: list[str] = []
@@ -253,13 +253,13 @@ def test_a_retry_that_removed_our_leftover_and_then_failed_stays_owed(tmp_path, 
         def install(name, discard=None):
             attempts.append(name)
             if discard is not None:  # the real remove path, as the installer runs it
-                from hermes_cli.plugins_cmd_remove import _remove_plugin_core
-                from hermes_constants import reset_hermes_home_override, set_hermes_home_override
-                token = set_hermes_home_override(h)
+                from eir_cli.plugins_cmd_remove import _remove_plugin_core
+                from eir_constants import reset_eir_home_override, set_eir_home_override
+                token = set_eir_home_override(h)
                 try:
                     _remove_plugin_core(discard)
                 finally:
-                    reset_hermes_home_override(token)
+                    reset_eir_home_override(token)
             if len(attempts) == 1:  # the clone lands, then the enable is refused
                 (h / "plugins" / name).mkdir(parents=True)
                 (h / "plugins" / name / "plugin.yaml").write_text(f"name: {name}\n", encoding="utf-8")

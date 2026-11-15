@@ -3,7 +3,7 @@
  * room's parts, kept out of `group-chat-view.tsx` so that file does not grow.
  */
 
-import { cn, Codicon, Tip } from '@hermes/plugin-sdk'
+import { cn, Codicon, Tip } from '@eir/plugin-sdk'
 import type { ReactNode } from 'react'
 
 import { useCanonicalGroupLabels } from './canonical-group-labels'

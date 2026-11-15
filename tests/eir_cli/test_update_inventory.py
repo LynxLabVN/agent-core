@@ -1,11 +1,11 @@
-"""Tests for hermes_cli.update_inventory — the plan phase (#91277 Phase 2)."""
+"""Tests for eir_cli.update_inventory — the plan phase (#91277 Phase 2)."""
 
 import json
 from pathlib import Path
 
 import pytest
 
-import hermes_cli.update_inventory as ui
+import eir_cli.update_inventory as ui
 
 def _write_state(home: Path, pid: int, sha: str | None = None, version: str | None = None,
                  gateway_state: str = "running"):
@@ -26,22 +26,22 @@ def fleet(monkeypatch, tmp_path):
     _write_state(work_home, 200)  # pre-stamp gateway: no code identity
 
     import re
-    monkeypatch.setattr("hermes_cli.profiles._get_default_hermes_home", lambda: default_home)
-    monkeypatch.setattr("hermes_cli.profiles._get_profiles_root", lambda: default_home / "profiles")
-    monkeypatch.setattr("hermes_cli.profiles._PROFILE_ID_RE", re.compile(r"^[a-z0-9][a-z0-9_-]*$"), raising=False)
+    monkeypatch.setattr("eir_cli.profiles._get_default_eir_home", lambda: default_home)
+    monkeypatch.setattr("eir_cli.profiles._get_profiles_root", lambda: default_home / "profiles")
+    monkeypatch.setattr("eir_cli.profiles._PROFILE_ID_RE", re.compile(r"^[a-z0-9][a-z0-9_-]*$"), raising=False)
     monkeypatch.setattr("gateway.status._pid_exists", lambda pid: pid in (100, 200))
     # A runtime is a VERIFIED gateway identity: live PID whose command line is a gateway's for that home.
     monkeypatch.setattr("gateway.status._read_process_cmdline", lambda pid: {
-        100: "hermes gateway run", 200: "hermes --profile work gateway run"}.get(pid))
-    monkeypatch.setattr("hermes_cli.gateway._get_service_pids", lambda all_profiles=False: {100})
-    monkeypatch.setattr("hermes_cli.gateway.supports_systemd_services", lambda: True)
-    monkeypatch.setattr("hermes_cli.gateway.find_profile_gateway_processes", lambda exclude_pids=None: [])
+        100: "eir gateway run", 200: "eir --profile work gateway run"}.get(pid))
+    monkeypatch.setattr("eir_cli.gateway._get_service_pids", lambda all_profiles=False: {100})
+    monkeypatch.setattr("eir_cli.gateway.supports_systemd_services", lambda: True)
+    monkeypatch.setattr("eir_cli.gateway.find_profile_gateway_processes", lambda exclude_pids=None: [])
     monkeypatch.setattr(
-        "hermes_cli.version_info.get_code_identity",
+        "eir_cli.version_info.get_code_identity",
         lambda refresh=False: {"sha": "a" * 40, "short_sha": "a" * 8, "version": "1.0", "source": "git"},
     )
-    monkeypatch.setattr("hermes_cli.config.detect_install_method", lambda *a, **k: "git")
-    monkeypatch.setattr("hermes_cli.config.get_managed_system", lambda: None)
+    monkeypatch.setattr("eir_cli.config.detect_install_method", lambda *a, **k: "git")
+    monkeypatch.setattr("eir_cli.config.get_managed_system", lambda: None)
     return tmp_path
 
 class TestCollectInventory:
@@ -60,17 +60,17 @@ class TestCollectInventory:
         assert by_profile["work"].supervisor == "manual"
         assert by_profile["work"].code_sha is None  # pre-stamp gateway
         assert by_profile["work"].restart_via == "manual"
-        from hermes_cli.update_inventory import describe_restart_mechanism
+        from eir_cli.update_inventory import describe_restart_mechanism
 
-        assert "hermes -p work gateway restart" in describe_restart_mechanism(
+        assert "eir -p work gateway restart" in describe_restart_mechanism(
             by_profile["work"].restart_via, "work"
         )
 
     def test_docker_install_not_updatable_in_place(self, fleet, monkeypatch):
-        monkeypatch.setattr("hermes_cli.config.detect_install_method", lambda *a, **k: "docker")
+        monkeypatch.setattr("eir_cli.config.detect_install_method", lambda *a, **k: "docker")
         monkeypatch.setattr(
-            "hermes_cli.config.recommended_update_command_for_method",
-            lambda m: "docker pull nousresearch/hermes-agent:latest",
+            "eir_cli.config.recommended_update_command_for_method",
+            lambda m: "docker pull nousresearch/eir-agent:latest",
         )
         plan = ui.collect_runtime_inventory()
         assert plan.install_method == "docker"
@@ -84,20 +84,20 @@ class TestCollectInventory:
 
     def test_stopped_record_with_recycled_pid_is_not_a_runtime(self, fleet, monkeypatch):
         """#109680: a ``stopped`` record whose PID an unrelated process now holds must not fabricate a
-        gateway the restart phase can never touch (that phantom made `hermes update` exit partial)."""
+        gateway the restart phase can never touch (that phantom made `eir update` exit partial)."""
         work_home = fleet / "home" / "profiles" / "work"
         _write_state(work_home, 200, gateway_state="stopped")
         monkeypatch.setattr("gateway.status._read_process_cmdline", lambda pid: {
-            100: "hermes gateway run", 200: "C:/Windows/system32/dllhost.exe /Processid:{X}"}.get(pid))
+            100: "eir gateway run", 200: "C:/Windows/system32/dllhost.exe /Processid:{X}"}.get(pid))
         plan = ui.collect_runtime_inventory()
         assert [r.profile for r in plan.runtimes] == ["default"]
 
     def test_pid_file_fallback_covers_unstamped_profiles(self, fleet, monkeypatch):
         """Gateways with a PID file but no runtime-status record still appear."""
-        from hermes_cli.gateway import ProfileGatewayProcess
+        from eir_cli.gateway import ProfileGatewayProcess
 
         monkeypatch.setattr(
-            "hermes_cli.gateway.find_profile_gateway_processes",
+            "eir_cli.gateway.find_profile_gateway_processes",
             lambda exclude_pids=None: [
                 ProfileGatewayProcess(profile="legacy", path=Path("/x"), pid=300),
                 # duplicate of an already-seen pid — must be deduped
@@ -115,11 +115,11 @@ class TestCollectInventory:
             raise RuntimeError("probe down")
 
         for target in (
-            "hermes_cli.config.detect_install_method",
-            "hermes_cli.version_info.get_code_identity",
-            "hermes_cli.profiles._get_default_hermes_home",
-            "hermes_cli.gateway._get_service_pids",
-            "hermes_cli.gateway.find_profile_gateway_processes",
+            "eir_cli.config.detect_install_method",
+            "eir_cli.version_info.get_code_identity",
+            "eir_cli.profiles._get_default_eir_home",
+            "eir_cli.gateway._get_service_pids",
+            "eir_cli.gateway.find_profile_gateway_processes",
         ):
             monkeypatch.setattr(target, _boom)
         plan = ui.collect_runtime_inventory()
@@ -138,11 +138,11 @@ class TestCollectInventory:
 
 class TestReceiptIntegration:
     def test_plan_recorded_into_active_receipt(self, fleet, monkeypatch, tmp_path):
-        import hermes_cli.update_receipt as ur
+        import eir_cli.update_receipt as ur
 
         home = tmp_path / "receipt_home"
         home.mkdir()
-        monkeypatch.setattr("hermes_cli.config.get_hermes_home", lambda: home, raising=False)
+        monkeypatch.setattr("eir_cli.config.get_eir_home", lambda: home, raising=False)
         ur.begin_update_receipt()
         plan = ui.collect_runtime_inventory()
         ui.record_plan_in_receipt(plan)

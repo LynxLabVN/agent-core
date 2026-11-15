@@ -19,12 +19,12 @@ describe('MarkdownTextContent remote images', () => {
     throw new Error(`unexpected path ${path}`)
   })
 
-  let originalDesktop: typeof window.hermesDesktop
+  let originalDesktop: typeof window.eirDesktop
 
   beforeEach(() => {
     api.mockClear()
-    originalDesktop = window.hermesDesktop
-    Object.defineProperty(window, 'hermesDesktop', {
+    originalDesktop = window.eirDesktop
+    Object.defineProperty(window, 'eirDesktop', {
       configurable: true,
       value: { api }
     })
@@ -34,7 +34,7 @@ describe('MarkdownTextContent remote images', () => {
   afterEach(() => {
     cleanup()
     $connection.set(null)
-    Object.defineProperty(window, 'hermesDesktop', {
+    Object.defineProperty(window, 'eirDesktop', {
       configurable: true,
       value: originalDesktop
     })
@@ -164,7 +164,7 @@ describe('MarkdownImage media routing', () => {
 // or play after a long pause) instead of degrading to "Open file" for good.
 describe('MarkdownImage stream-ticket renewal', () => {
   const mint = vi.fn()
-  let originalDesktop: typeof window.hermesDesktop
+  let originalDesktop: typeof window.eirDesktop
 
   const audioSrc = (container: HTMLElement) => container.querySelector('audio')?.getAttribute('src')
 
@@ -172,13 +172,13 @@ describe('MarkdownImage stream-ticket renewal', () => {
     let minted = 0
 
     mint.mockReset().mockImplementation(async () => `https://hermes.test/api/files/stream?ticket=t${++minted}`)
-    originalDesktop = window.hermesDesktop
-    Object.defineProperty(window, 'hermesDesktop', { configurable: true, value: { getGatewayFileStreamUrl: mint } })
+    originalDesktop = window.eirDesktop
+    Object.defineProperty(window, 'eirDesktop', { configurable: true, value: { getGatewayFileStreamUrl: mint } })
   })
 
   afterEach(() => {
     cleanup()
-    Object.defineProperty(window, 'hermesDesktop', { configurable: true, value: originalDesktop })
+    Object.defineProperty(window, 'eirDesktop', { configurable: true, value: originalDesktop })
   })
 
   it('re-mints the source after a loaded element errors and resumes where it stopped', async () => {

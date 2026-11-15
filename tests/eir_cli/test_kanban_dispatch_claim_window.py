@@ -13,17 +13,17 @@ from pathlib import Path
 
 import pytest
 
-from hermes_cli import kanban_db as kb
-from hermes_cli import kanban_db_connect as kbc
-from hermes_cli import kanban_db_default_assignee as kbda
-from hermes_cli import kanban_db_dispatch as kbd
+from eir_cli import kanban_db as kb
+from eir_cli import kanban_db_connect as kbc
+from eir_cli import kanban_db_default_assignee as kbda
+from eir_cli import kanban_db_dispatch as kbd
 
 
 @pytest.fixture
 def kanban_home(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     (home / "config.yaml").write_text(
         "kanban:\n  dispatch_profiles: [worker-a]\n", encoding="utf-8",

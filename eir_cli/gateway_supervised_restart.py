@@ -1,4 +1,4 @@
-"""``hermes gateway restart`` for a gateway whose supervisor Hermes did not install.
+"""``eir gateway restart`` for a gateway whose supervisor Eir did not install.
 
 A custom launchd agent / systemd unit / any KeepAlive-style manager running ``gateway run
 --external-supervisor`` owns the respawn. The manual fallback in ``_cmd_restart`` (SIGTERM, then a
@@ -34,10 +34,10 @@ def gateway_declares_external_supervisor(pid: int, home: Path | None = None) -> 
     if not pid or pid <= 1:
         return False
     from gateway.control_socket import identify_gateway, launch_supervisor
-    from gateway.status import _get_process_hermes_home, read_runtime_status
-    from hermes_cli.gateway import _capture_gateway_argv
+    from gateway.status import _get_process_eir_home, read_runtime_status
+    from eir_cli.gateway import _capture_gateway_argv
 
-    home = home or _get_process_hermes_home()
+    home = home or _get_process_eir_home()
     identity = identify_gateway(home) or {}
     # Not ``identity["supervisor"]``: the runtime protocol reports a manual gateway as "none".
     if identity.get("pid") == pid and launch_supervisor(identity) not in (None, "manual"):
@@ -79,7 +79,7 @@ def restart_externally_supervised_gateway(supervised_pid: int) -> None:
     wedge (#110637). A broken/unloaded supervisor surfaces as exit 1, not a success printed over
     a dead gateway (the contract ``launchd_restart`` enforces via ``_wait_for_launchd_service_pid``).
     """
-    from hermes_cli.gateway import _get_restart_exit_wait_budget, _graceful_restart_via_sigusr1, _print_lines
+    from eir_cli.gateway import _get_restart_exit_wait_budget, _graceful_restart_via_sigusr1, _print_lines
 
     from gateway.status import get_process_start_time
     wait_budget = _get_restart_exit_wait_budget()
@@ -94,7 +94,7 @@ def restart_externally_supervised_gateway(supervised_pid: int) -> None:
             return
         print("⚠ Supervisor did not relaunch the gateway after its graceful exit")
     else:
-        from hermes_cli.update_cmd_drain_report import leave_restart_pending
+        from eir_cli.update_cmd_drain_report import leave_restart_pending
         if leave_restart_pending(supervised_pid, f"Gateway PID {supervised_pid}", start_time=born):
             return  # still working: its supervisor relaunches it once it is idle
         print(f"⚠ Gateway did not exit within {wait_budget:.0f}s of SIGUSR1 (or the signal could not be sent)")
@@ -102,7 +102,7 @@ def restart_externally_supervised_gateway(supervised_pid: int) -> None:
         "",
         "✗ Not stopping or foreground-running a supervisor-owned gateway.",
         "  Check the supervisor (it may be unloaded, wedged, or stopped retrying),",
-        "  then rerun once it is healthy: hermes gateway restart",
+        "  then rerun once it is healthy: eir gateway restart",
     )
     sys.exit(1)
 
@@ -110,7 +110,7 @@ def restart_externally_supervised_gateway(supervised_pid: int) -> None:
 def refuse_restart_of_service_managed_gateway(pid: int | None) -> None:
     """Refuse the manual restart fallback when systemd owns the gateway under ANY unit name.
 
-    Canonical-unit checks miss pre-convention installs (``hermes.service``), so the fallback's
+    Canonical-unit checks miss pre-convention installs (``eir.service``), so the fallback's
     stop + in-process ``run_gateway`` SIGKILLed a live service-managed gateway and spawned an
     unsupervised orphan in the caller's cgroup while the unit flapped against the stolen lock
     (#126474). Reuses the dashboard's MainPID-verified lookup: a bare ``.service`` cgroup alone
@@ -118,23 +118,23 @@ def refuse_restart_of_service_managed_gateway(pid: int | None) -> None:
     """
     if not pid or pid <= 1:
         return
-    from hermes_cli import main_dashboard as _dash
+    from eir_cli import main_dashboard as _dash
 
     owner = _dash._systemd_owner_for_pid(pid)
     if owner is None:
         return
     unit, scope = owner
     cmds = _dash._systemd_restart_commands(unit, scope)
-    from hermes_cli.gateway import _print_lines
+    from eir_cli.gateway import _print_lines
     _print_lines(
         "",
         f"✗ Gateway (PID {pid}) is managed by systemd unit {unit}.",
-        "  `hermes gateway restart` cannot restart it from here: the fallback would",
+        "  `eir gateway restart` cannot restart it from here: the fallback would",
         "  kill a live gateway and spawn an unsupervised replacement in this shell's",
         "  cgroup while the unit keeps failing against the stolen lock.",
         "  Restart it through its unit instead:",
         *(f"    {c}" for c in cmds),
-        "  (Pre-convention `hermes.service` installs: `hermes gateway migrate-legacy`",
+        "  (Pre-convention `eir.service` installs: `eir gateway migrate-legacy`",
         "  removes the legacy unit so the canonical one can own the gateway.)",
     )
     sys.exit(1)
@@ -147,8 +147,8 @@ def start_restart_replacement(args, *, force: bool) -> None:
     ``gateway ensure`` starts an absent owner. In the foreground that caller became the long-lived
     gateway it only meant to restart: a child its own timeout killed, holding the app's quit open.
     """
-    from hermes_cli import gateway as gw
+    from eir_cli import gateway as gw
     if getattr(args, "detach", False):
-        from hermes_cli.gateway_runtime_start import start_detached_replacement
-        sys.exit(start_detached_replacement(gw.get_hermes_home(), force=force))
+        from eir_cli.gateway_runtime_start import start_detached_replacement
+        sys.exit(start_detached_replacement(gw.get_eir_home(), force=force))
     gw.run_gateway(verbose=0, force=force)

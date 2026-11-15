@@ -1,4 +1,4 @@
-"""Dump command for hermes CLI."""
+"""Dump command for eir CLI."""
 
 import json
 import os
@@ -7,18 +7,18 @@ import subprocess
 import sys
 from pathlib import Path
 
-from hermes_cli.config import get_hermes_home, get_env_path, get_project_root, load_config
-from hermes_cli.env_loader import load_hermes_dotenv
-from hermes_constants import display_hermes_home
+from eir_cli.config import get_eir_home, get_env_path, get_project_root, load_config
+from eir_cli.env_loader import load_eir_dotenv
+from eir_constants import display_eir_home
 from agent.skill_utils import is_excluded_skill_path
 from datetime import UTC
 
 
 def _dotenv_key_names() -> set[str]:
-    """Env-var names assigned a non-empty value in ~/.hermes/.env — what the managed backends (launchd /
+    """Env-var names assigned a non-empty value in ~/.eir/.env — what the managed backends (launchd /
     systemd / desktop ``serve``) load, as opposed to the shell exports ``os.getenv`` reflects here.
 
-    ``hermes debug share`` runs in a terminal, so ``os.getenv`` reflects the shell's environment, which can
+    ``eir debug share`` runs in a terminal, so ``os.getenv`` reflects the shell's environment, which can
     include exported keys the managed backend never sees. Comparing against this set lets the dump flag that
     mismatch (the exact trap behind #48504-style "no web_search" reports: key exported in the shell, absent
     from .env, invisible to the launchd backend).
@@ -56,8 +56,8 @@ def _get_git_commit(project_root: Path) -> str:
 
     The requested *project_root* is authoritative: when it has no git,
     the install-stamp fallback is only valid for the RUNNING install
-    (``hermes_cli.version_info`` has no per-root API — it reads
-    HERMES_INSTALL_ROOT / the running code root, never an arbitrary
+    (``eir_cli.version_info`` has no per-root API — it reads
+    EIR_INSTALL_ROOT / the running code root, never an arbitrary
     directory). For any other root the provenance is unknown.
     """
     value = _git_output(project_root, "rev-parse", "--short=8", "HEAD")
@@ -66,7 +66,7 @@ def _get_git_commit(project_root: Path) -> str:
     if project_root.resolve() != get_project_root():
         return "(unknown)"
     try:
-        from hermes_cli.version_info import get_code_identity  # deferred: keeps dump cheap on non-dump paths
+        from eir_cli.version_info import get_code_identity  # deferred: keeps dump cheap on non-dump paths
         return get_code_identity().get("short_sha") or "(unknown)"
     except Exception:
         return "(unknown)"
@@ -86,7 +86,7 @@ def _get_git_commit_date(project_root: Path) -> str:
     try:
         from datetime import datetime, timezone
 
-        from hermes_cli.version_info import get_version_info  # deferred: keeps dump cheap on non-dump paths
+        from eir_cli.version_info import get_version_info  # deferred: keeps dump cheap on non-dump paths
         commit_date = get_version_info().commit_date
         return datetime.fromtimestamp(commit_date, tz=UTC).strftime("%Y-%m-%d") if commit_date else ""
     except Exception:
@@ -102,7 +102,7 @@ def _redact(value: str) -> str:
 def _gateway_status() -> str:
     """Return a short gateway status string."""
     try:
-        from hermes_cli.gateway import get_gateway_runtime_snapshot
+        from eir_cli.gateway import get_gateway_runtime_snapshot
         snapshot = get_gateway_runtime_snapshot()
         if snapshot.running:
             mode = "manual" if snapshot.has_process_service_mismatch else snapshot.manager
@@ -114,15 +114,15 @@ def _gateway_status() -> str:
         return "unknown" if sys.platform.startswith(("linux", "darwin")) else "N/A"
 
 
-def _count_skills(hermes_home: Path) -> int:
+def _count_skills(eir_home: Path) -> int:
     """Count installed skills."""
-    skills_dir = hermes_home / "skills"
+    skills_dir = eir_home / "skills"
     return sum(1 for item in skills_dir.rglob("SKILL.md") if not is_excluded_skill_path(item)) if skills_dir.is_dir() else 0
 
 
-def _cron_summary(hermes_home: Path) -> str:
+def _cron_summary(eir_home: Path) -> str:
     """Return cron jobs summary."""
-    jobs_file = hermes_home / "cron" / "jobs.json"
+    jobs_file = eir_home / "cron" / "jobs.json"
     if not jobs_file.exists():
         return "0"
     try:
@@ -166,7 +166,7 @@ _INTERESTING_PATHS = (
 
 def _config_overrides(config: dict) -> dict[str, str]:
     """Find non-default config values worth reporting."""
-    from hermes_cli.config import DEFAULT_CONFIG
+    from eir_cli.config import DEFAULT_CONFIG
     overrides = {}
     for section, key in _INTERESTING_PATHS:
         default_section = DEFAULT_CONFIG.get(section, {})
@@ -181,7 +181,7 @@ def _config_overrides(config: dict) -> dict[str, str]:
         overrides["toolsets"] = str(user_toolsets)
     fallbacks = config.get("fallback_providers", [])
     if fallbacks:
-        from hermes_cli.debug_redaction import redact_debug_support_text
+        from eir_cli.debug_redaction import redact_debug_support_text
 
         overrides["fallback_providers"] = redact_debug_support_text(
             str(_fallback_debug_projection(fallbacks))
@@ -246,7 +246,7 @@ _API_KEYS = [
 def _version_line(project_root: Path) -> str:
     """``<version> [<commit>] (<commit date>)`` using the running code identity."""
     try:
-        from hermes_cli.version_info import get_version_info
+        from eir_cli.version_info import get_version_info
 
         version = get_version_info().derived_version
     except Exception:
@@ -272,13 +272,13 @@ def _api_key_lines(show_keys: bool) -> list[str]:
     for env_var, label in _API_KEYS:
         val = os.getenv(env_var, "")
         display = _redact(val) if show_keys and val else ("set" if val else "not set")
-        # Set in this shell but absent from ~/.hermes/.env: a managed backend loads .env, not the login
+        # Set in this shell but absent from ~/.eir/.env: a managed backend loads .env, not the login
         # shell, so it likely can't see this key — flag it so support doesn't chase a phantom "configured".
         if val and env_var not in dotenv_keys:
             display += " (shell only — not in .env; managed/desktop backend may not see it)"
-        # `hermes auth add openrouter` credentials live in the pool, not env — don't read "not set".
-        # A credential added via `hermes auth add openrouter` lives in the credential pool, not as an env
-        # var — surface it so the dump doesn't misleadingly read "not set" while `hermes auth list` shows it
+        # `eir auth add openrouter` credentials live in the pool, not env — don't read "not set".
+        # A credential added via `eir auth add openrouter` lives in the credential pool, not as an env
+        # var — surface it so the dump doesn't misleadingly read "not set" while `eir auth list` shows it
         # (#42130).
         if not val and label == "openrouter":
             try:
@@ -303,28 +303,28 @@ def run_dump(args):
     """Output a compact, copy-pasteable setup summary."""
     show_keys = getattr(args, "show_keys", False)
     # Load env from .env file so key checks work
-    load_hermes_dotenv(hermes_home=get_env_path().parent, project_env=get_project_root() / ".env")
-    project_root, hermes_home = get_project_root(), get_hermes_home()
+    load_eir_dotenv(eir_home=get_env_path().parent, project_env=get_project_root() / ".env")
+    project_root, eir_home = get_project_root(), get_eir_home()
     try:
         config = load_config()
     except Exception:
         config = {}
     model, provider = _get_model_and_provider(config)
     try:
-        from hermes_cli.profiles import get_active_profile_name
+        from eir_cli.profiles import get_active_profile_name
         profile = get_active_profile_name() or "(default)"
     except Exception:
         profile = "(default)"
-    toolsets = config.get("toolsets", ["hermes-cli"])
+    toolsets = config.get("toolsets", ["eir-cli"])
     platforms = [name for name, env in _PLATFORM_ENV_VARS.items() if os.getenv(env)]
     lines = [
-        "--- hermes dump ---",
+        "--- eir dump ---",
         f"version:          {_version_line(project_root)}",
         f"os:               {platform.system()} {platform.release()} {platform.machine()}",
         f"python:           {sys.version.split()[0]}",
         f"openai_sdk:       {_openai_version()}",
         f"profile:          {profile}",
-        f"hermes_home:      {display_hermes_home()}",
+        f"eir_home:      {display_eir_home()}",
         f"model:            {model}",
         f"provider:         {provider}",
         f"terminal:         {_effective_terminal_backend(config)}",
@@ -335,8 +335,8 @@ def run_dump(args):
         f"  memory_provider:    {config.get('memory', {}).get('provider', '') or 'built-in'}",
         f"  gateway:            {_gateway_status()}",
         f"  platforms:          {', '.join(platforms) if platforms else 'none'}",
-        f"  cron_jobs:          {_cron_summary(hermes_home)}",
-        f"  skills:             {_count_skills(hermes_home)}",
+        f"  cron_jobs:          {_cron_summary(eir_home)}",
+        f"  skills:             {_count_skills(eir_home)}",
     ]
     overrides = _config_overrides(config)
     if overrides:

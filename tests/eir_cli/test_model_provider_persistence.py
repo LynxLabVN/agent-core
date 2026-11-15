@@ -1,4 +1,4 @@
-"""Tests that provider selection via `hermes model` always persists correctly.
+"""Tests that provider selection via `eir model` always persists correctly.
 
 Regression tests for the bug where _save_model_choice could save config.model
 as a plain string, causing subsequent provider writes (which check
@@ -13,19 +13,19 @@ import pytest
 
 @pytest.fixture
 def config_home(tmp_path, monkeypatch):
-    """Isolated HERMES_HOME with a minimal string-format config."""
-    home = tmp_path / "hermes"
+    """Isolated EIR_HOME with a minimal string-format config."""
+    home = tmp_path / "eir"
     home.mkdir()
     config_yaml = home / "config.yaml"
     # Start with model as a plain string — the format that triggered the bug
     config_yaml.write_text("model: some-old-model\n")
     env_file = home / ".env"
     env_file.write_text("")
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     # Clear env vars that could interfere
-    monkeypatch.delenv("HERMES_MODEL", raising=False)
+    monkeypatch.delenv("EIR_MODEL", raising=False)
     monkeypatch.delenv("LLM_MODEL", raising=False)
-    monkeypatch.delenv("HERMES_INFERENCE_PROVIDER", raising=False)
+    monkeypatch.delenv("EIR_INFERENCE_PROVIDER", raising=False)
     monkeypatch.delenv("GITHUB_TOKEN", raising=False)
     monkeypatch.delenv("GH_TOKEN", raising=False)
     monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
@@ -40,11 +40,11 @@ class TestSaveModelChoiceAlwaysDict:
     def test_string_model_becomes_dict(self, config_home):
         """When config.model is a plain string, _save_model_choice must
         convert it to a dict so provider can be set afterwards."""
-        from hermes_cli.auth import _save_model_choice
+        from eir_cli.auth import _save_model_choice
 
         _save_model_choice("kimi-k2.5")
 
-        import hermes_yaml as yaml
+        import eir_yaml as yaml
         config = yaml.safe_load((config_home / "config.yaml").read_text()) or {}
         model = config.get("model")
         assert isinstance(model, dict), (
@@ -56,7 +56,7 @@ class TestSaveModelChoiceAlwaysDict:
 class TestProviderPersistsAfterModelSave:
     def test_update_config_for_provider_uses_atomic_config_replace(self, config_home):
         """Provider switches delegate config writes to the comment-preserving config writer."""
-        from hermes_cli.auth import _update_config_for_provider
+        from eir_cli.auth import _update_config_for_provider
 
         config_path = config_home / "config.yaml"
         original_text = config_path.read_text(encoding="utf-8")
@@ -68,7 +68,7 @@ class TestProviderPersistsAfterModelSave:
             assert data["model"]["default"] == "some-old-model"
             raise OSError("simulated atomic write failure")
 
-        with patch("hermes_cli.auth.atomic_config_replace", side_effect=_boom) as mock_write:
+        with patch("eir_cli.auth.atomic_config_replace", side_effect=_boom) as mock_write:
             with pytest.raises(OSError, match="simulated atomic write failure"):
                 _update_config_for_provider(
                     "nous",
@@ -82,7 +82,7 @@ class TestProviderPersistsAfterModelSave:
     def test_api_key_provider_saved_when_model_was_string(self, config_home, monkeypatch):
         """_model_flow_api_key_provider must persist the provider even when
         config.model started as a plain string."""
-        from hermes_cli.auth import PROVIDER_REGISTRY
+        from eir_cli.auth import PROVIDER_REGISTRY
 
         pconfig = PROVIDER_REGISTRY.get("kimi-coding")
         if not pconfig:
@@ -91,17 +91,17 @@ class TestProviderPersistsAfterModelSave:
         # Simulate: user has a Kimi API key, model was a string
         monkeypatch.setenv("KIMI_API_KEY", "sk-kimi-test-key")
 
-        from hermes_cli.model_setup_flows import _model_flow_api_key_provider
-        from hermes_cli.config import load_config
+        from eir_cli.model_setup_flows import _model_flow_api_key_provider
+        from eir_cli.config import load_config
 
         # Mock the model selection prompt to return "kimi-k2.5"
         # Also mock input() for the base URL prompt and builtins.input
-        with patch("hermes_cli.auth._prompt_model_selection", return_value="kimi-k2.5"), \
-             patch("hermes_cli.auth.deactivate_provider"), \
+        with patch("eir_cli.auth._prompt_model_selection", return_value="kimi-k2.5"), \
+             patch("eir_cli.auth.deactivate_provider"), \
              patch("builtins.input", return_value=""):
             _model_flow_api_key_provider(load_config(), "kimi-coding", "old-model")
 
-        import hermes_yaml as yaml
+        import eir_yaml as yaml
         config = yaml.safe_load((config_home / "config.yaml").read_text()) or {}
         model = config.get("model")
         assert isinstance(model, dict), f"model should be dict, got {type(model)}"
@@ -122,7 +122,7 @@ class TestBaseUrlValidation:
 
     def test_empty_base_url_keeps_default(self, config_home, monkeypatch):
         """Pressing Enter (empty) should not change the base URL."""
-        from hermes_cli.auth import PROVIDER_REGISTRY
+        from eir_cli.auth import PROVIDER_REGISTRY
 
         pconfig = PROVIDER_REGISTRY.get("minimax")
         if not pconfig:
@@ -131,11 +131,11 @@ class TestBaseUrlValidation:
         monkeypatch.setenv("MINIMAX_API_KEY", "test-key")
         monkeypatch.delenv("MINIMAX_BASE_URL", raising=False)
 
-        from hermes_cli.model_setup_flows import _model_flow_api_key_provider
-        from hermes_cli.config import load_config, get_env_value
+        from eir_cli.model_setup_flows import _model_flow_api_key_provider
+        from eir_cli.config import load_config, get_env_value
 
-        with patch("hermes_cli.auth._prompt_model_selection", return_value="MiniMax-M2"), \
-             patch("hermes_cli.auth.deactivate_provider"), \
+        with patch("eir_cli.auth._prompt_model_selection", return_value="MiniMax-M2"), \
+             patch("eir_cli.auth.deactivate_provider"), \
              patch("builtins.input", return_value=""):
             _model_flow_api_key_provider(load_config(), "minimax", "old-model")
 
@@ -148,17 +148,17 @@ class TestZaiEndpointPicker:
 
     def test_custom_proxy_rejects_invalid_url(self, config_home, monkeypatch):
         """Custom proxy must start with http:// or https://."""
-        from hermes_cli.model_setup_flows import _model_flow_api_key_provider
-        from hermes_cli.config import load_config
+        from eir_cli.model_setup_flows import _model_flow_api_key_provider
+        from eir_cli.config import load_config
 
         monkeypatch.setenv("GLM_API_KEY", "test-key")
         monkeypatch.delenv("GLM_BASE_URL", raising=False)
-        from hermes_cli.auth import ZAI_ENDPOINTS
+        from eir_cli.auth import ZAI_ENDPOINTS
         custom_idx = len(ZAI_ENDPOINTS)
 
-        with patch("hermes_cli.main_provider_setup._prompt_provider_choice", return_value=custom_idx), \
-             patch("hermes_cli.auth._prompt_model_selection", return_value="glm-5"), \
-             patch("hermes_cli.auth.deactivate_provider"), \
+        with patch("eir_cli.main_provider_setup._prompt_provider_choice", return_value=custom_idx), \
+             patch("eir_cli.auth._prompt_model_selection", return_value="glm-5"), \
+             patch("eir_cli.auth.deactivate_provider"), \
              patch("builtins.input", return_value="not-a-url"):
             _model_flow_api_key_provider(load_config(), "zai", "old-model")
 
@@ -168,8 +168,8 @@ class TestZaiEndpointPicker:
 
     def test_current_endpoint_is_default_choice(self, config_home, monkeypatch):
         """When a known endpoint is already active, it should be the default."""
-        from hermes_cli.auth import ZAI_ENDPOINTS
-        from hermes_cli.model_setup_flows import _select_zai_endpoint
+        from eir_cli.auth import ZAI_ENDPOINTS
+        from eir_cli.model_setup_flows import _select_zai_endpoint
 
         coding_url = ZAI_ENDPOINTS[2][1]  # coding-global
 
@@ -180,7 +180,7 @@ class TestZaiEndpointPicker:
             captured["choices"] = choices
             return default
 
-        with patch("hermes_cli.main_provider_setup._prompt_provider_choice", side_effect=fake_choice):
+        with patch("eir_cli.main_provider_setup._prompt_provider_choice", side_effect=fake_choice):
             result = _select_zai_endpoint(coding_url)
 
         # Default should point at index 2 (coding-global)

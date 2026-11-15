@@ -13,23 +13,23 @@ import json
 import sys
 from unittest.mock import MagicMock
 
-import hermes_yaml as yaml
+import eir_yaml as yaml
 import pytest
 
 from agent import auxiliary_client as aux
-from hermes_cli import models as models_mod
-from hermes_cli import models_pricing
-from hermes_cli.auth import AuthError, resolve_api_key_provider_credentials
+from eir_cli import models as models_mod
+from eir_cli import models_pricing
+from eir_cli.auth import AuthError, resolve_api_key_provider_credentials
 
 BASE_URL = "https://proxy.example.test/v1"
 PROVIDER = "my-proxy"
 
 
 @pytest.fixture
-def hermes_home(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+def eir_home(tmp_path, monkeypatch):
+    home = tmp_path / ".eir"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     return home
 
@@ -50,10 +50,10 @@ def _write_provider(home, entry: dict) -> None:
     }), encoding="utf-8")
 
 
-def test_inline_api_key_env_ref_is_expanded(hermes_home, monkeypatch):
+def test_inline_api_key_env_ref_is_expanded(eir_home, monkeypatch):
     """``api_key: ${env:VAR}`` must never reach a probe as the literal ref."""
     monkeypatch.setenv("PROBE_KEY", "sk-declared-inline")
-    _write_provider(hermes_home, {"api_key": "${env:PROBE_KEY}"})
+    _write_provider(eir_home, {"api_key": "${env:PROBE_KEY}"})
 
     creds = resolve_api_key_provider_credentials(PROVIDER)
 
@@ -62,10 +62,10 @@ def test_inline_api_key_env_ref_is_expanded(hermes_home, monkeypatch):
 
 
 @pytest.mark.parametrize("field", ["key_env", "api_key_env"])
-def test_key_env_pointer_is_resolved(hermes_home, monkeypatch, field):
+def test_key_env_pointer_is_resolved(eir_home, monkeypatch, field):
     """``key_env`` and its documented ``api_key_env`` alias both name the credential."""
     monkeypatch.setenv("PROBE_KEY", "sk-declared-env")
-    _write_provider(hermes_home, {field: "PROBE_KEY"})
+    _write_provider(eir_home, {field: "PROBE_KEY"})
 
     creds = resolve_api_key_provider_credentials(PROVIDER)
 
@@ -73,42 +73,42 @@ def test_key_env_pointer_is_resolved(hermes_home, monkeypatch, field):
     assert creds["source"] == "PROBE_KEY"
 
 
-def test_key_cmd_token_is_materialized(hermes_home, monkeypatch, tmp_path):
+def test_key_cmd_token_is_materialized(eir_home, monkeypatch, tmp_path):
     """A ``key_cmd`` helper resolves to a probe-ready token through the same resolver."""
     from agent.command_token_source import materialize_probe_api_key
 
     helper = tmp_path / "mint_key.py"
     helper.write_text("print('sk-declared-cmd')\n", encoding="utf-8")
-    _write_provider(hermes_home, {"key_cmd": f'"{sys.executable}" "{helper}"'})
+    _write_provider(eir_home, {"key_cmd": f'"{sys.executable}" "{helper}"'})
 
     creds = resolve_api_key_provider_credentials(PROVIDER)
 
     assert materialize_probe_api_key(creds["api_key"]) == "sk-declared-cmd"
 
 
-def test_key_cmd_runs_once_per_token_not_per_probe(hermes_home, monkeypatch, tmp_path):
+def test_key_cmd_runs_once_per_token_not_per_probe(eir_home, monkeypatch, tmp_path):
     """Repeated catalog lookups reuse the minted token instead of re-running the helper; another
     profile with the same key_cmd mints its own."""
     runs = tmp_path / "runs.txt"
     helper = tmp_path / "mint_key.py"
     helper.write_text(f"open({str(runs)!r}, 'a').write('x')\nprint('tok')\n", encoding="utf-8")
     entry = {"key_cmd": f'"{sys.executable}" "{helper}"'}
-    _write_provider(hermes_home, entry)
+    _write_provider(eir_home, entry)
 
     for _ in range(3):
         assert resolve_api_key_provider_credentials(PROVIDER)["api_key"] == "tok"
     other = tmp_path / "other-profile"
     other.mkdir()
     _write_provider(other, entry)
-    monkeypatch.setenv("HERMES_HOME", str(other))
+    monkeypatch.setenv("EIR_HOME", str(other))
     assert resolve_api_key_provider_credentials(PROVIDER)["api_key"] == "tok"
 
     assert runs.read_text() == "xx"
 
 
-def test_api_field_is_the_base_url(hermes_home):
+def test_api_field_is_the_base_url(eir_home):
     """The ``api`` spelling (legacy named-endpoint field) is honoured like ``base_url``."""
-    (hermes_home / "config.yaml").write_text(yaml.safe_dump({
+    (eir_home / "config.yaml").write_text(yaml.safe_dump({
         "providers": {PROVIDER: {"name": "my proxy", "api": "https://api.example.test/v1"}},
     }), encoding="utf-8")
 
@@ -117,19 +117,19 @@ def test_api_field_is_the_base_url(hermes_home):
     assert creds["base_url"] == "https://api.example.test/v1"
 
 
-def test_unknown_provider_still_raises(hermes_home):
+def test_unknown_provider_still_raises(eir_home):
     """Only a real config entry widens the resolver; an unknown name stays an error."""
-    _write_provider(hermes_home, {"key_env": "PROBE_KEY"})
+    _write_provider(eir_home, {"key_env": "PROBE_KEY"})
 
     with pytest.raises(AuthError):
         resolve_api_key_provider_credentials("not-configured-anywhere")
 
 
-def test_fast_model_catalog_sends_the_declared_credential(hermes_home, monkeypatch):
+def test_fast_model_catalog_sends_the_declared_credential(eir_home, monkeypatch):
     """``_fast_model_from_catalog`` probes the config-declared endpoint with its own key —
     never an unexpanded ref — and reads the catalog from its declared base URL."""
     monkeypatch.setenv("PROBE_KEY", "sk-declared-catalog")
-    _write_provider(hermes_home, {"api_key": "${env:PROBE_KEY}"})
+    _write_provider(eir_home, {"api_key": "${env:PROBE_KEY}"})
     seen: list[str | None] = []
 
     def _fake_urlopen(req, timeout=8.0):
@@ -186,14 +186,14 @@ def two_catalog_servers():
 
 @pytest.mark.parametrize("same_origin", [True, False])
 def test_relay_probe_sends_declared_key_only_to_its_own_origin(
-        hermes_home, monkeypatch, two_catalog_servers, same_origin):
+        eir_home, monkeypatch, two_catalog_servers, same_origin):
     """The picker's relay probe hits ``model.base_url``. The declared key belongs to
     ``providers.<id>.base_url``, and inference resolves there, so a stale or edited
     ``model.base_url`` on another origin is probed keyless, never with that key."""
     (url_a, seen_a), (url_b, seen_b) = two_catalog_servers
     monkeypatch.setenv("ROUTE_KEY", "route-key-secret")
     probed_url, seen = (url_a, seen_a) if same_origin else (url_b, seen_b)
-    (hermes_home / "config.yaml").write_text(yaml.safe_dump({
+    (eir_home / "config.yaml").write_text(yaml.safe_dump({
         "model": {"default": "my-combo", "provider": PROVIDER, "base_url": probed_url},
         "providers": {PROVIDER: {"name": "my proxy", "base_url": url_a, "key_env": "ROUTE_KEY"}},
     }), encoding="utf-8")

@@ -1,8 +1,8 @@
 """Nous free tier: every way the account service or the wire can refuse the free tier, and what
-Hermes does with each (the failure-mode contract behind the desktop's onboarding copy).
+Eir does with each (the failure-mode contract behind the desktop's onboarding copy).
 
 Driven through a fake NAS whose responses are the ones the real service sends (see the code table
-in ``hermes_cli.anon_auth``), never through mocked-away client code.
+in ``eir_cli.anon_auth``), never through mocked-away client code.
 """
 
 from __future__ import annotations
@@ -12,10 +12,10 @@ import json
 import httpx
 import pytest
 
-from hermes_cli import anon_auth, anon_sign_in, free_tier_bootstrap
-from hermes_cli.auth import _load_auth_store
+from eir_cli import anon_auth, anon_sign_in, free_tier_bootstrap
+from eir_cli.auth import _load_auth_store
 
-from tests.hermes_cli.anon_portal import PORTAL, WELCOME, as_local_desktop_backend, claimed_trial, install_portal
+from tests.eir_cli.anon_portal import PORTAL, WELCOME, as_local_desktop_backend, claimed_trial, install_portal
 
 
 @pytest.fixture
@@ -31,7 +31,7 @@ def _mint_error(nas) -> anon_auth.AuthError:
 
 def _exchange_error(nas, monkeypatch) -> anon_auth.AuthError:
     """Claim the trial (the credential is persisted before any exchange), then exchange it at first use."""
-    from hermes_cli.auth_nous import resolve_nous_runtime_credentials
+    from eir_cli.auth_nous import resolve_nous_runtime_credentials
     assert anon_auth.is_guest_state(claimed_trial(monkeypatch))
     with pytest.raises(anon_auth.AuthError) as exc:
         resolve_nous_runtime_credentials()
@@ -90,8 +90,8 @@ class TestNasRefusalCodes:
         assert nas.creates() == 1
 
     def test_a_locked_account_is_never_replaced_through_connectors_either(self, nas):
-        from hermes_cli.auth import _auth_store_lock, _save_auth_store
-        from tests.hermes_cli.anon_portal import make_jwt
+        from eir_cli.auth import _auth_store_lock, _save_auth_store
+        from tests.eir_cli.anon_portal import make_jwt
         from tools import managed_tool_gateway as mtg
         anon_auth.ensure_portal_identity(explicit=True)
         with _auth_store_lock():
@@ -175,7 +175,7 @@ class TestMintCooldown:
 
 def _failed_claim(nas, monkeypatch) -> anon_auth.AuthError:
     """The desktop's welcome-trial claim, refused by the service (boot itself never mints)."""
-    from hermes_cli import welcome_trial
+    from eir_cli import welcome_trial
     as_local_desktop_backend(monkeypatch)
     with pytest.raises(anon_auth.AuthError) as exc:
         welcome_trial.claim_desktop_free_tier()
@@ -212,7 +212,7 @@ class TestBootstrapRecord:
         assert _load_auth_store().get("active_provider") != "nous"
 
     def test_the_desktop_retry_refreshes_the_boot_record(self, nas, monkeypatch):
-        from hermes_cli import welcome_trial
+        from eir_cli import welcome_trial
         nas.raise_transport = httpx.ConnectTimeout("no route")
         _failed_claim(nas, monkeypatch)
         free_tier_bootstrap.run_bootstrap(announce=False)
@@ -241,7 +241,7 @@ class TestSignInFailures:
         assert state.retryable is retryable
         assert state.retry_after == retry_after
         assert needle in state.copy
-        assert "Hermes " not in state.copy and "http" not in state.copy
+        assert "Eir " not in state.copy and "http" not in state.copy
 
     def test_the_wire_failing_reads_as_unreachable(self):
         state = anon_sign_in._failed_from_exception(httpx.ReadTimeout("slow"))
@@ -257,11 +257,11 @@ class TestSignInFailures:
 
 
 def test_extra_welcome_hosts_make_a_local_stand_in_the_welcome_host(monkeypatch):
-    """``HERMES_EXTRA_WELCOME_HOSTS`` (env-only) extends the ROUTE predicate so a rehearsal against a
+    """``EIR_EXTRA_WELCOME_HOSTS`` (env-only) extends the ROUTE predicate so a rehearsal against a
     local stand-in gets the free tier's rules — including the route-keyed dark-tier 403."""
-    monkeypatch.delenv("HERMES_EXTRA_WELCOME_HOSTS", raising=False)
+    monkeypatch.delenv("EIR_EXTRA_WELCOME_HOSTS", raising=False)
     assert anon_auth.route_is_welcome_host("http://127.0.0.1:8765/v1") is False
-    monkeypatch.setenv("HERMES_EXTRA_WELCOME_HOSTS", "127.0.0.1, localhost")
+    monkeypatch.setenv("EIR_EXTRA_WELCOME_HOSTS", "127.0.0.1, localhost")
     assert anon_auth.route_is_welcome_host("http://127.0.0.1:8765/v1") is True
     assert anon_auth.route_is_welcome_host("http://localhost:9/v1") is True
     assert anon_auth.welcome_route_refusal(403, "You tried to access something", "http://127.0.0.1:8765/v1") == "tier_disabled"

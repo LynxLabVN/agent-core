@@ -1,13 +1,13 @@
 """Deferred platform plugins must still register their *client* tools.
 
 Issue #78050: a bundled ``kind: platform`` plugin is registered as a deferred
-loader so ``hermes chat`` doesn't import ~20 gateway SDKs. The a2a plugin ships
+loader so ``eir chat`` doesn't import ~20 gateway SDKs. The a2a plugin ships
 two independent things behind that one deferral — an inbound adapter (heavy)
 and five outbound client tools (``a2a_call``, ``a2a_discover``, ``a2a_list``,
 ``a2a_history``, ``a2a_orchestrate``). Deferring the plugin deferred both, so
 in a CLI/TUI process the client tools never registered at all:
 ``resolve_toolset("a2a")`` returned ``[]`` and the toolset was absent from the
-``hermes tools`` checklist. The same tools worked in gateway/web processes only
+``eir tools`` checklist. The same tools worked in gateway/web processes only
 because those materialize every platform at startup.
 
 Client tools that live in a dedicated ``tools`` submodule are now registered at
@@ -22,7 +22,7 @@ import threading
 from pathlib import Path
 
 import pytest
-import hermes_yaml as yaml
+import eir_yaml as yaml
 
 
 A2A_CLIENT_TOOLS = {
@@ -55,7 +55,7 @@ def _write_platform_plugin(
     triggers pre-registration. Defaults to following ``with_tools_module``,
     which is the shape a real plugin ships.
     """
-    from hermes_cli.plugins import PluginManifest
+    from eir_cli.plugins import PluginManifest
 
     if declares_provides_tools is None:
         declares_provides_tools = with_tools_module
@@ -142,7 +142,7 @@ def clean_registry():
     """Undo everything a synthetic plugin leaves behind.
 
     Each test writes a fresh plugin to its own tmp_path but reuses the
-    ``probeplat`` name, so the imported ``hermes_plugins.*`` modules have to go
+    ``probeplat`` name, so the imported ``eir_plugins.*`` modules have to go
     too — otherwise the next test's ``import_module`` returns the previous
     test's cached submodule instead of reading the new file.
     """
@@ -157,7 +157,7 @@ def clean_registry():
     for platform in ("probeplat", "barefoot", "quietplat", "promiseplat"):
         platform_registry.unregister(platform)
     for name in set(sys.modules) - before_modules:
-        if name.startswith("hermes_plugins."):
+        if name.startswith("eir_plugins."):
             sys.modules.pop(name, None)
 
 
@@ -169,7 +169,7 @@ class TestA2AClientToolsInCliProcess:
 
 
     def test_a2a_toolset_resolves_without_materializing_the_platform(self):
-        from hermes_cli.plugins import PluginManager
+        from eir_cli.plugins import PluginManager
         from toolsets import resolve_toolset
 
         mgr = PluginManager()
@@ -186,35 +186,35 @@ class TestA2AClientToolsInCliProcess:
         # this was [] until a gateway/web process called all_entries().
         assert set(resolve_toolset("a2a")) == A2A_CLIENT_TOOLS
 
-    def test_a2a_appears_in_the_hermes_tools_checklist(self):
+    def test_a2a_appears_in_the_eir_tools_checklist(self):
         """`a2a` is in _DEFAULT_OFF_TOOLSETS, so it must be tickable.
 
         Every other member of that set (video_gen,
         x_search, ...) renders a checkbox; a2a rendered nothing, so the
         documented opt-in path had nothing to tick.
         """
-        from hermes_cli.plugins import discover_plugins, get_plugin_toolsets
+        from eir_cli.plugins import discover_plugins, get_plugin_toolsets
 
         # get_plugin_toolsets() reads the process-wide manager, which is what
-        # the `hermes tools` checklist does.
+        # the `eir tools` checklist does.
         discover_plugins()
 
         assert "a2a" in {key for key, _, _ in get_plugin_toolsets()}
 
     def test_platform_bundle_includes_the_client_tools(self):
-        """``hermes-a2a`` sessions get the client tools too.
+        """``eir-a2a`` sessions get the client tools too.
 
         The bundle path read the tool registry behind a deliberately cheap
         ``is_registered()`` check, so a deferred platform's own tools were
         dropped from its bundle as well.
         """
-        from hermes_cli.plugins import PluginManager
+        from eir_cli.plugins import PluginManager
         from toolsets import resolve_toolset
 
         mgr = PluginManager()
         mgr.discover_and_load()
 
-        assert A2A_CLIENT_TOOLS.issubset(set(resolve_toolset("hermes-a2a")))
+        assert A2A_CLIENT_TOOLS.issubset(set(resolve_toolset("eir-a2a")))
 
 
 # ── the general mechanism ──────────────────────────────────────────────────
@@ -224,7 +224,7 @@ class TestDeferredPlatformToolPreregistration:
     def test_tools_module_registers_without_importing_the_adapter(
         self, tmp_path, probe, clean_registry
     ):
-        from hermes_cli.plugins import PluginManager
+        from eir_cli.plugins import PluginManager
         from toolsets import resolve_toolset
 
         manifest = _write_platform_plugin(tmp_path, "probeplat", with_tools_module=True)
@@ -242,7 +242,7 @@ class TestDeferredPlatformToolPreregistration:
         self, tmp_path, probe, clean_registry
     ):
         """No ``tools.py`` means no behaviour change at all — nothing imported."""
-        from hermes_cli.plugins import PluginManager
+        from eir_cli.plugins import PluginManager
 
         manifest = _write_platform_plugin(tmp_path, "barefoot", with_tools_module=False)
 
@@ -264,7 +264,7 @@ class TestDeferredPlatformToolPreregistration:
         naming a file, and the contract is invisible to anyone reading the
         manifest.
         """
-        from hermes_cli.plugins import PluginManager
+        from eir_cli.plugins import PluginManager
 
         manifest = _write_platform_plugin(
             tmp_path,
@@ -292,7 +292,7 @@ class TestDeferredPlatformToolPreregistration:
         that module instead of re-running its body.
         """
         from gateway.platform_registry import platform_registry
-        from hermes_cli.plugins import PluginManager
+        from eir_cli.plugins import PluginManager
 
         manifest = _write_platform_plugin(tmp_path, "probeplat", with_tools_module=True)
 
@@ -309,14 +309,14 @@ class TestDeferredPlatformToolPreregistration:
     def test_tools_stay_attributed_after_materialization(
         self, tmp_path, probe, clean_registry
     ):
-        """`hermes plugins list` must still credit the pre-registered tools.
+        """`eir plugins list` must still credit the pre-registered tools.
 
         ``_load_plugin`` attributes tools by diffing the registry around
         ``register()``. Tools registered at discovery are already in the
         "before" snapshot, so the diff alone would report zero.
         """
         from gateway.platform_registry import platform_registry
-        from hermes_cli.plugins import PluginManager
+        from eir_cli.plugins import PluginManager
 
         manifest = _write_platform_plugin(tmp_path, "probeplat", with_tools_module=True)
 
@@ -339,7 +339,7 @@ class TestDeferredPlatformToolPreregistration:
         symptom (declared tools absent from the session), so it has to be
         visible without enabling debug logging to find it.
         """
-        from hermes_cli.plugins import PluginManager
+        from eir_cli.plugins import PluginManager
 
         manifest = _write_platform_plugin(tmp_path, "probeplat", with_tools_module=True)
         (Path(manifest.path) / "tools.py").write_text(
@@ -347,7 +347,7 @@ class TestDeferredPlatformToolPreregistration:
         )
 
         mgr = PluginManager()
-        with caplog.at_level(logging.WARNING, logger="hermes_cli.plugins"):
+        with caplog.at_level(logging.WARNING, logger="eir_cli.plugins"):
             mgr._register_deferred_platform(manifest)  # must not raise
 
         assert mgr._plugins["probeplat-platform"].deferred is True
@@ -364,11 +364,11 @@ class TestDeferredPlatformToolPreregistration:
 
         `register_tools` is not transactional: whatever it registered before
         raising stays in the registry. Leaving those unattributed makes
-        `hermes plugins list` under-report what the process is carrying, and
+        `eir plugins list` under-report what the process is carrying, and
         `_load_plugin`'s own diff cannot recover them later because they are
         already inside its "before" snapshot.
         """
-        from hermes_cli.plugins import PluginManager
+        from eir_cli.plugins import PluginManager
 
         manifest = _write_platform_plugin(tmp_path, "probeplat", with_tools_module=True)
         tools_py = (Path(manifest.path) / "tools.py").read_text(encoding="utf-8")
@@ -378,7 +378,7 @@ class TestDeferredPlatformToolPreregistration:
         )
 
         mgr = PluginManager()
-        with caplog.at_level(logging.WARNING, logger="hermes_cli.plugins"):
+        with caplog.at_level(logging.WARNING, logger="eir_cli.plugins"):
             mgr._register_deferred_platform(manifest)  # must not raise
 
         # Attribution without a live tool would be a lie, so check the registry
@@ -402,14 +402,14 @@ class TestDeferredPlatformToolPreregistration:
         ``_load_plugin_scoped``'s failure path sweeps the *whole* ownership
         ledger for this plugin key — not the ``registration_start:`` slice —
         and disposes it, so the discovery-time client tools go with the failed
-        adapter. Attribution and the registry therefore agree at zero: `hermes
+        adapter. Attribution and the registry therefore agree at zero: `eir
         plugins list` reports no tools because the process really is serving
         none.
 
         ``enabled`` stays False on purpose: the adapter genuinely did not load.
         """
         from gateway.platform_registry import platform_registry
-        from hermes_cli.plugins import PluginManager
+        from eir_cli.plugins import PluginManager
         from toolsets import resolve_toolset
 
         manifest = _write_platform_plugin(tmp_path, "probeplat", with_tools_module=True)
@@ -420,7 +420,7 @@ class TestDeferredPlatformToolPreregistration:
         )
 
         mgr = PluginManager()
-        with caplog.at_level(logging.WARNING, logger="hermes_cli.plugins"):
+        with caplog.at_level(logging.WARNING, logger="eir_cli.plugins"):
             mgr._register_deferred_platform(manifest)
             platform_registry.get("probeplat")  # gateway startup; register() raises
 
@@ -437,7 +437,7 @@ class TestDeferredPlatformToolPreregistration:
         re-armed by the reconnect watcher's hook, so the next lookup imports it again and the platform
         registers, without a forced re-discovery (#126356)."""
         from gateway.platform_registry import platform_registry
-        from hermes_cli.plugins import PluginManager
+        from eir_cli.plugins import PluginManager
 
         manifest = _write_platform_plugin(tmp_path, "probeplat", with_tools_module=False)
         (Path(manifest.path) / "__init__.py").write_text(
@@ -454,14 +454,14 @@ class TestDeferredPlatformToolPreregistration:
         assert platform_registry.get("probeplat") is None
         assert platform_registry.get("probeplat") is None  # a failed load is never retried by a lookup
         with monkeypatch.context() as m:  # a placeholder the user disabled is never imported by a re-arm
-            m.setattr("hermes_cli.plugins_discovery._get_disabled_plugins", lambda: {"probeplat-platform"})
+            m.setattr("eir_cli.plugins_discovery._get_disabled_plugins", lambda: {"probeplat-platform"})
             mgr._gate_manifest(manifest, {"probeplat-platform"}, None)
             assert mgr.rearm_failed_platform("probeplat") is False
-        with monkeypatch.context() as m:  # nor one built for another Hermes version
-            m.setattr("hermes_cli.plugins_manifest.requires_hermes_error", lambda _manifest: "needs newer hermes")
+        with monkeypatch.context() as m:  # nor one built for another Eir version
+            m.setattr("eir_cli.plugins_manifest.requires_eir_error", lambda _manifest: "needs newer eir")
             assert mgr.rearm_failed_platform("probeplat") is False
 
-        from hermes_cli import plugins_loader
+        from eir_cli import plugins_loader
         release = threading.Event()
         hung = threading.Thread(target=release.wait, name=f"{plugins_loader._LOADER_THREAD_PREFIX}probeplat-platform",
                                 daemon=True)
@@ -470,7 +470,7 @@ class TestDeferredPlatformToolPreregistration:
         assert mgr.rearm_failed_platform("probeplat") is False  # its hung load is still running
         release.set()
         hung.join()
-        monkeypatch.setattr("hermes_cli.plugins_loader._ABANDONED_LOADERS", [])
+        monkeypatch.setattr("eir_cli.plugins_loader._ABANDONED_LOADERS", [])
         assert mgr.rearm_failed_platform("probeplat") is True
         assert platform_registry.get("probeplat") is not None
         assert probe.adapter_imports == 2
@@ -484,7 +484,7 @@ class TestDeferredPlatformToolPreregistration:
         Returning silently here leaves the operator with exactly the bug this
         path fixes and no thread to pull on.
         """
-        from hermes_cli.plugins import PluginManager
+        from eir_cli.plugins import PluginManager
 
         manifest = _write_platform_plugin(
             tmp_path,
@@ -494,7 +494,7 @@ class TestDeferredPlatformToolPreregistration:
         )
 
         mgr = PluginManager()
-        with caplog.at_level(logging.WARNING, logger="hermes_cli.plugins"):
+        with caplog.at_level(logging.WARNING, logger="eir_cli.plugins"):
             mgr._register_deferred_platform(manifest)
 
         assert probe.package_execs == 0

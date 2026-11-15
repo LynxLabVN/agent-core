@@ -6,15 +6,15 @@ close interrupted the session's turn and every background subagent
 (gateway/session_viewer_close.py::close_viewer_session). A signal now leaves the session as a
 dropped socket does: no ``end_session``, no ``session.interrupt``; the owner's orphan close
 (``ws_orphan_reap``) ends the idle row later without stopping delegations. User exits are unchanged
-(tests/hermes_cli/test_gateway_session_end_ownership.py).
+(tests/eir_cli/test_gateway_session_end_ownership.py).
 """
 import signal
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from hermes_cli.gateway_agent import GatewayAgent
-from hermes_cli.gateway_session_store import GatewaySessionStore
+from eir_cli.gateway_agent import GatewayAgent
+from eir_cli.gateway_session_store import GatewaySessionStore
 
 pytestmark = pytest.mark.platforms("posix")  # SIGHUP exists only on POSIX hosts
 
@@ -41,9 +41,9 @@ def _hang_up(cli_mod, cli, signame):
 
 
 @pytest.mark.parametrize("signame", ["SIGHUP", "SIGTERM"])
-@patch("hermes_cli.lifecycle.invoke_hook")
+@patch("eir_cli.lifecycle.invoke_hook")
 def test_hangup_mid_turn_leaves_the_gateway_session_running(_hook, cli_mod, signame):
-    cli = cli_mod.HermesCLI()
+    cli = cli_mod.EirCLI()
     cli._session_db = MagicMock(spec=GatewaySessionStore)
     cli.agent = GatewayAgent(connection=MagicMock(), session_id="gw-session")
     cli._agent_running = True
@@ -53,9 +53,9 @@ def test_hangup_mid_turn_leaves_the_gateway_session_running(_hook, cli_mod, sign
     cli._session_db.end_session.assert_not_called()
 
 
-@patch("hermes_cli.lifecycle.invoke_hook")
+@patch("eir_cli.lifecycle.invoke_hook")
 def test_hangup_at_an_idle_prompt_does_not_close_the_gateway_session(_hook, cli_mod):
-    cli = cli_mod.HermesCLI()
+    cli = cli_mod.EirCLI()
     cli._session_db = MagicMock(spec=GatewaySessionStore)
     cli.agent = GatewayAgent(connection=MagicMock(), session_id="gw-session")
     cli._agent_running = False
@@ -65,10 +65,10 @@ def test_hangup_at_an_idle_prompt_does_not_close_the_gateway_session(_hook, cli_
 
 
 @pytest.mark.parametrize("delete", [False, True])
-@patch("hermes_cli.lifecycle.invoke_hook")
+@patch("eir_cli.lifecycle.invoke_hook")
 def test_a_signal_after_an_explicit_exit_keeps_the_close_and_delete(_hook, cli_mod, delete):
     """/exit (or Ctrl+D) already asked to close; a SIGTERM landing while the app unwinds stays a close."""
-    cli = cli_mod.HermesCLI()
+    cli = cli_mod.EirCLI()
     cli._session_db = MagicMock(spec=GatewaySessionStore)
     cli.agent = GatewayAgent(connection=MagicMock(), session_id="gw-session")
     cli._agent_running = False
@@ -78,14 +78,14 @@ def test_a_signal_after_an_explicit_exit_keeps_the_close_and_delete(_hook, cli_m
     assert cli._session_db.delete_session.called is delete
 
 
-@patch("hermes_cli.lifecycle.invoke_hook")
+@patch("eir_cli.lifecycle.invoke_hook")
 def test_hangup_in_cli_local_mode_still_interrupts_and_ends_the_session(_hook, cli_mod):
     """No gateway owns a CLI-local session: a lost terminal still stops and closes it."""
-    cli = cli_mod.HermesCLI()
+    cli = cli_mod.EirCLI()
     cli._session_db = MagicMock()
     cli.agent = MagicMock(session_id="local-session")
     cli._agent_running = True
-    with patch("hermes_cli.cli_tui_runtime_mixin.request_hard_interrupt"):
+    with patch("eir_cli.cli_tui_runtime_mixin.request_hard_interrupt"):
         interrupt = _hang_up(cli_mod, cli, "SIGHUP")
     interrupt.assert_called_once_with(cli.agent, signal.SIGHUP)
     cli._session_db.end_session.assert_called_once_with("local-session", "cli_close")

@@ -1,6 +1,6 @@
 """Dispatcher: crash/stale/orphan detection, failure accounting and the respawn circuit breaker, memory-aware concurrency caps, the one-shot ``dispatch_once`` pass, worker spawning (``_default_spawn``), worker-log rotation and the long-lived ``run_daemon`` loop.
 
-Split out of ``hermes_cli.kanban_db``; origin-resident helpers are reached
+Split out of ``eir_cli.kanban_db``; origin-resident helpers are reached
 late-bound via ``_kb`` (import-cycle breaking) so monkeypatching
 ``kanban_db.<name>`` keeps working.
 """
@@ -26,11 +26,11 @@ from typing import Mapping
 from typing import Optional
 from typing import TYPE_CHECKING
 
-from hermes_cli.quiet_single_query import KANBAN_WORKER_EXIT_TRAILER
-from hermes_cli._startup_fast import project_root_str
+from eir_cli.quiet_single_query import KANBAN_WORKER_EXIT_TRAILER
+from eir_cli._startup_fast import project_root_str
 
 if TYPE_CHECKING:
-    from hermes_cli.kanban_db import Task
+    from eir_cli.kanban_db import Task
 
 
 # After this many consecutive non-success attempts on a task/profile the
@@ -74,7 +74,7 @@ _RESPAWN_GUARD_SUCCESS_WINDOW = 3600  # 1 hour
 # Cooldown after a rate-limited (quota-wall) requeue before re-spawning. Without
 # it the task would re-spawn on the very next tick and bounce off the same quota
 # wall, burning a worker slot every tick for hours. Overridable via
-# ``HERMES_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS``.
+# ``EIR_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS``.
 DEFAULT_RATE_LIMIT_COOLDOWN_SECONDS = 300  # 5 minutes
 
 # Within this window a GitHub PR URL in a comment blocks re-spawn.
@@ -120,7 +120,7 @@ class DispatchResult:
     acting on the fallback rule rather than explicit assignments."""
     skipped_nonspawnable: list[str] = field(default_factory=list)
     """Ready task ids whose assignee names a control-plane lane (e.g. a Claude
-    Code terminal like ``orion-cc``), not a Hermes profile. Expected steady-state
+    Code terminal like ``orion-cc``), not a Eir profile. Expected steady-state
     on multi-lane setups, NOT operator-actionable; tracked apart so health
     telemetry can tell "stuck" from "correctly idle"."""
     skipped_per_profile_capped: list[tuple[str, str, int]] = field(default_factory=list)
@@ -159,7 +159,7 @@ def describe_suppression(results: Iterable[Optional[DispatchResult]]) -> str:
     memory_pressure=critical`` — the respawn-guard reasons counted per task
     plus the tick-level holds. Feeds the "dispatcher stuck" warnings of the
     CLI daemon and the embedded gateway dispatcher, which otherwise report a
-    bare zero-spawn count while ``hermes kanban tail`` is the only place the
+    bare zero-spawn count while ``eir kanban tail`` is the only place the
     guard reason is written (#111910).
     """
     counts: dict[str, int] = {}
@@ -186,7 +186,7 @@ def describe_suppression(results: Iterable[Optional[DispatchResult]]) -> str:
 # task. Entry: ``pid -> (raw_wait_status, reaped_at_epoch)``; raw status kept so
 # both WIFEXITED/WEXITSTATUS and WIFSIGNALED can be consulted. Trimmed by age
 # plus a total size cap. Process-local by nature (``waitpid`` only reaps our own
-# children): a per-tick ``hermes kanban dispatch`` process finds it empty, so
+# children): a per-tick ``eir kanban dispatch`` process finds it empty, so
 # ``_classify_dead_worker_exit`` falls back to the exit trailer the worker
 # leaves in its own log (``KANBAN_WORKER_EXIT_TRAILER``).
 _RECENT_WORKER_EXIT_TTL_SECONDS = 600
@@ -264,7 +264,7 @@ def _worker_log_exit_code(task_id: str, board: Optional[str] = None) -> Optional
     """Exit code from the trailer the worker CLI wrote to its own log; None when absent.
 
     The durable twin of ``_recent_worker_exits``: written by the worker itself
-    (``hermes_cli.quiet_single_query.exit_single_query``), so it is there whether
+    (``eir_cli.quiet_single_query.exit_single_query``), so it is there whether
     or not the process running this sweep ever reaped the worker. Last trailer
     wins — the log is append-mode across re-runs.
     """
@@ -663,7 +663,7 @@ def enforce_max_runtime(conn: sqlite3.Connection, *, signal_fn=None) -> list[str
         "  AND COALESCE(r.started_at, t.started_at) IS NOT NULL "
         "  AND t.worker_pid IS NOT NULL"
     ).fetchall()
-    from hermes_cli.kanban_owner_recovery import owner_reclaim_blocked, owner_reclaim_blocked_after_kill
+    from eir_cli.kanban_owner_recovery import owner_reclaim_blocked, owner_reclaim_blocked_after_kill
     for row in rows:
         if owner_reclaim_blocked(conn, row["id"]):
             continue
@@ -778,7 +778,7 @@ def detect_stale_running(
         "WHERE t.status = 'running'"
     ).fetchall()
 
-    from hermes_cli.kanban_owner_recovery import owner_reclaim_blocked, owner_reclaim_blocked_after_kill
+    from eir_cli.kanban_owner_recovery import owner_reclaim_blocked, owner_reclaim_blocked_after_kill
     for row in rows:
         if owner_reclaim_blocked(conn, row["id"]):
             continue
@@ -868,7 +868,7 @@ def reconcile_orphaned_running(conn: sqlite3.Connection) -> list[str]:
         "WHERE status = 'running' "
         "  AND (claim_lock IS NULL OR claim_expires IS NULL)"
     ).fetchall()
-    from hermes_cli.kanban_owner_recovery import owner_reclaim_blocked
+    from eir_cli.kanban_owner_recovery import owner_reclaim_blocked
     for row in rows:
         if owner_reclaim_blocked(conn, row["id"]):
             continue
@@ -989,7 +989,7 @@ _PROTOCOL_VIOLATION_ERROR = (
 
 
 # Rich panel/rule chrome around the rendered response, and the CLI's own preamble lines.
-_LOG_CHROME = re.compile(r"[─━═╭╮╰╯│┃┌┐└┘]+|☤\s*Hermes")
+_LOG_CHROME = re.compile(r"[─━═╭╮╰╯│┃┌┐└┘]+|☤\s*Eir")
 
 
 def _exit_summary_marker() -> str:
@@ -1172,7 +1172,7 @@ def _reclaim_dead_workers(conn: sqlite3.Connection, board: Optional[str] = None)
             "WHERE status = 'running' AND worker_pid IS NOT NULL"
         ).fetchall()
         host_prefix = _kb._host_prefix()
-        from hermes_cli.kanban_owner_recovery import apply_attempt_note, managed_run_exit_code, owner_reclaim_blocked
+        from eir_cli.kanban_owner_recovery import apply_attempt_note, managed_run_exit_code, owner_reclaim_blocked
         for row in rows:
             lock = row["claim_lock"] or ""
             if not lock.startswith(host_prefix):
@@ -1352,7 +1352,7 @@ def detect_crashed_workers(conn: sqlite3.Connection, board: Optional[str] = None
                 # task mutation. Cost rule: every call site short-circuits on has_hook(), so when nothing
                 # subscribes no payload is built and the hot paths (each dispatcher tick, each task write)
                 # pay one dict probe. WHICH PROCESS: worker spawn/exit/stale-claim and the dispatch tick
-                # fire in the DISPATCHER process (gateway-embedded dispatcher or ``hermes kanban
+                # fire in the DISPATCHER process (gateway-embedded dispatcher or ``eir kanban
                 # dispatch``); on_kanban_task_updated fires in whichever process committed the mutation
                 # (CLI, worker, or the gateway-embedded dashboard API). Common kwargs (task-scoped hooks):
                 # task_id: str, profile_name: str, board: str | None, assignee: str | None, run_id: int |
@@ -1693,18 +1693,18 @@ def _is_handoff_event(kind: str, payload: Optional[str]) -> bool:
 
 
 def _profile_exists_fn() -> Optional[Callable[[str], bool]]:
-    """``profile_exists`` from ``hermes_cli.profiles``; ``None`` when it cannot be
+    """``profile_exists`` from ``eir_cli.profiles``; ``None`` when it cannot be
     imported and no allowlist is set (callers then trust the assignee).
 
     With ``kanban.dispatch_profiles`` set (#110995) the predicate also requires the
     assignee to be listed, fail-closed: a ``default`` card is only claimable by homes that
     opted in, and a set allowlist whose gate cannot be built claims nothing (#147531)."""
     try:
-        from hermes_cli.profiles import normalize_profile_name, profile_exists
+        from eir_cli.profiles import normalize_profile_name, profile_exists
     except Exception:
         if _dispatch_profile_allowlist(str) is None:
             return None
-        _kb._log.warning("kanban: hermes_cli.profiles unimportable — claiming no cards", exc_info=True)
+        _kb._log.warning("kanban: eir_cli.profiles unimportable — claiming no cards", exc_info=True)
         return lambda _name: False
     allowlist = _dispatch_profile_allowlist(normalize_profile_name)
     if allowlist is None:
@@ -1723,7 +1723,7 @@ def _profile_exists_fn() -> Optional[Callable[[str], bool]]:
 def _dispatch_profile_allowlist(normalize_profile_name) -> Optional[frozenset]:
     """Per-home claim allowlist ``kanban.dispatch_profiles`` (#110995).
 
-    On a shared board (one ``kanban.db`` mounted across several Hermes homes),
+    On a shared board (one ``kanban.db`` mounted across several Eir homes),
     every home's ``profile_exists`` returns True for ``default`` — the root
     profile every home has — so a card assigned to ``default`` is claimable by
     every home's dispatcher. A home opts out of foreign claims by declaring
@@ -1740,7 +1740,7 @@ def _dispatch_profile_allowlist(normalize_profile_name) -> Optional[frozenset]:
     ``DEFAULT_CONFIG`` merge, whose ``None`` placeholder fakes the key's presence.
     """
     try:
-        from hermes_cli.config_effective import load_user_config_effective
+        from eir_cli.config_effective import load_user_config_effective
         kanban = (load_user_config_effective(fail_closed=True) or {}).get("kanban")
         if kanban is not None and not isinstance(kanban, Mapping):
             raise TypeError(f"the `kanban` section is {type(kanban).__name__}, not a mapping")
@@ -1770,11 +1770,11 @@ def _dispatch_profile_allowlist(normalize_profile_name) -> Optional[frozenset]:
 
 
 def dispatch_profile_allowlist_summary() -> str:
-    """What this home may claim, for ``hermes kanban diagnostics`` (#113620): ``any``
+    """What this home may claim, for ``eir kanban diagnostics`` (#113620): ``any``
     (key absent; also when profiles cannot import, as the gate then stays open too),
     the sorted allowed names, or ``none (fail-closed: ...)``, as `_profile_exists_fn`."""
     try:
-        from hermes_cli.profiles import normalize_profile_name
+        from eir_cli.profiles import normalize_profile_name
     except Exception as exc:
         if _dispatch_profile_allowlist(str) is None:
             return "any"
@@ -1804,7 +1804,7 @@ def _has_spawnable(conn: sqlite3.Connection, status: str) -> bool:
 
 
 def has_spawnable_ready(conn: sqlite3.Connection) -> bool:
-    """True iff a ready+assigned+unclaimed task maps to a real Hermes profile.
+    """True iff a ready+assigned+unclaimed task maps to a real Eir profile.
 
     Lets health telemetry tell "stuck" (``0 spawned`` with spawnable work) from
     "correctly idle" (only control-plane lanes waiting on ``claim_task``). Falls
@@ -1819,11 +1819,11 @@ def has_spawnable_review(conn: sqlite3.Connection) -> bool:
 
 
 def review_dispatch_enabled() -> bool:
-    """Whether review tasks dispatch automatically. Default true (Hermes ships
+    """Whether review tasks dispatch automatically. Default true (Eir ships
     ``sdlc-review``); operators disable it for human-only review boards.
     """
     try:
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
         return bool((load_config() or {}).get("kanban", {}).get("review_dispatch", True))
     except Exception:
         return True
@@ -1891,7 +1891,7 @@ def configured_max_in_progress() -> Optional[int]:
     positive integer wins, anything else falls through to the derived default.
     """
     try:
-        from hermes_cli.config import load_config_readonly
+        from eir_cli.config import load_config_readonly
         raw = (load_config_readonly() or {}).get("kanban", {}).get("max_in_progress")
     except Exception:
         return None
@@ -1926,7 +1926,7 @@ def count_running_tasks_other_boards(board: Optional[str] = None) -> int:
 
     Caps bound the HOST, but each board's tick only sees its own DB; without
     this a derived cap of N gets multiplied by the number of active boards.
-    Boards are matched by resolved DB path, so ``HERMES_KANBAN_DB`` (pins every
+    Boards are matched by resolved DB path, so ``EIR_KANBAN_DB`` (pins every
     board to one file) yields 0. Fails open per board.
     """
     try:
@@ -2070,7 +2070,7 @@ def _dispatch_lane_task(
     """
     task_id = row["id"]
     # Non-profile assignees (control-plane lanes that pull via ``claim_task``)
-    # would fail ``hermes -p <assignee>`` at startup and loop ready→crash→ready
+    # would fail ``eir -p <assignee>`` at startup and loop ready→crash→ready
     # forever. Bucketed apart from skipped_unassigned: the operator cannot fix
     # it by assigning a profile, and health telemetry suppresses "stuck" for it.
     profile_exists = _profile_exists_fn()
@@ -2100,7 +2100,7 @@ def _dispatch_lane_task(
     guard_reason = check_respawn_guard(conn, task_id, lane=lane)
     if guard_reason is not None:
         result.respawn_guarded.append((task_id, guard_reason))
-        # Event so ``hermes kanban tail`` shows why the task looks stuck.
+        # Event so ``eir kanban tail`` shows why the task looks stuck.
         # Honour kanban.default_assignee: when the dispatcher hits an unassigned ready task and an
         # operator-configured fallback exists, persist the assignment and proceed. This removes the
         # dashboard footgun where a task created without an assignee parks in 'ready' forever even though
@@ -2427,14 +2427,14 @@ def _positive_int(value: Any, default: int, *, minimum: int = 1) -> int:
     return parsed if parsed >= minimum else default
 
 
-def _module_hermes_argv() -> list[str]:
-    """Interpreter-bound Hermes CLI invocation (``hermes_cli.main`` is the
-    console-script target — there is no top-level ``hermes`` package)."""
-    return [sys.executable, "-m", "hermes_cli.main"]
+def _module_eir_argv() -> list[str]:
+    """Interpreter-bound Eir CLI invocation (``eir_cli.main`` is the
+    console-script target — there is no top-level ``eir`` package)."""
+    return [sys.executable, "-m", "eir_cli.main"]
 
 
-def _absolute_hermes_path(path: str) -> str:
-    """Return an absolute filesystem path for a resolved Hermes shim."""
+def _absolute_eir_path(path: str) -> str:
+    """Return an absolute filesystem path for a resolved Eir shim."""
     expanded = os.path.expanduser(path)
     return expanded if os.path.isabs(expanded) else os.path.abspath(expanded)
 
@@ -2482,49 +2482,49 @@ def _safe_which_no_cwd(command: str) -> Optional[str]:
     return None
 
 
-def _hermes_path_argv(path: str) -> list[str]:
-    """argv for a resolved Hermes executable path. Windows batch shims
+def _eir_path_argv(path: str) -> list[str]:
+    """argv for a resolved Eir executable path. Windows batch shims
     (``.cmd``/``.bat``) are unsafe as argv[0] because the argument vector
     includes task-derived values; prefer the module form."""
     if _kb._IS_WINDOWS and _is_windows_batch_shim(path):
-        return _module_hermes_argv()
-    return [_absolute_hermes_path(path)]
+        return _module_eir_argv()
+    return [_absolute_eir_path(path)]
 
 
-def _resolve_hermes_argv() -> list[str]:
-    """Resolve the ``hermes`` invocation as argv for ``Popen``: ``$HERMES_BIN``
+def _resolve_eir_argv() -> list[str]:
+    """Resolve the ``eir`` invocation as argv for ``Popen``: ``$EIR_BIN``
     (path-like -> absolute; bare names keep PATH semantics, never a
     same-directory file), then the running interpreter's ``sys.executable -m
-    hermes_cli.main`` (exactly this install; also covers shim-less cron,
-    systemd ``User=``, launchd), then ``which("hermes")`` (Windows: safe PATH
-    search, batch shims fall back to the module form) only when ``hermes_cli``
+    eir_cli.main`` (exactly this install; also covers shim-less cron,
+    systemd ``User=``, launchd), then ``which("eir")`` (Windows: safe PATH
+    search, batch shims fall back to the module form) only when ``eir_cli``
     is not importable. The module argv must win over PATH: a PATH-first lookup
-    lets an attacker-planted ``hermes`` shadow the running install (#111569).
-    Mirrors ``gateway.run._resolve_hermes_bin``; local because ``hermes_cli``
+    lets an attacker-planted ``eir`` shadow the running install (#111569).
+    Mirrors ``gateway.run._resolve_eir_bin``; local because ``eir_cli``
     sits below ``gateway`` in the dependency order.
     """
     import importlib.util
     import shutil
 
-    env_bin = os.environ.get("HERMES_BIN", "").strip()
+    env_bin = os.environ.get("EIR_BIN", "").strip()
     if env_bin:
         if _looks_like_path(env_bin):
-            return _hermes_path_argv(env_bin)
+            return _eir_path_argv(env_bin)
         resolved_env_bin = _safe_which_no_cwd(env_bin)
         if resolved_env_bin:
-            return _hermes_path_argv(resolved_env_bin)
-        return _module_hermes_argv()
+            return _eir_path_argv(resolved_env_bin)
+        return _module_eir_argv()
 
     try:
-        if importlib.util.find_spec("hermes_cli") is not None:
-            return _module_hermes_argv()
+        if importlib.util.find_spec("eir_cli") is not None:
+            return _module_eir_argv()
     except Exception:
         pass
 
-    hermes_bin = _safe_which_no_cwd("hermes") if _kb._IS_WINDOWS else shutil.which("hermes")
-    if hermes_bin:
-        return _hermes_path_argv(hermes_bin)
-    return _module_hermes_argv()
+    eir_bin = _safe_which_no_cwd("eir") if _kb._IS_WINDOWS else shutil.which("eir")
+    if eir_bin:
+        return _eir_path_argv(eir_bin)
+    return _module_eir_argv()
 
 
 def _worker_terminal_timeout_env(
@@ -2557,7 +2557,7 @@ def _worker_terminal_timeout_env(
 
 
 @contextlib.contextmanager
-def _worker_profile_scope(hermes_home: str):
+def _worker_profile_scope(eir_home: str):
     """Bind an assigned profile's whole runtime scope (home, secrets, terminal policy) for one
     dispatch-side read or spawn-env build.
 
@@ -2577,33 +2577,33 @@ def _worker_profile_scope(hermes_home: str):
     resolves for a standalone dispatcher.
     """
     from agent.runtime_scope import bind_profile_scope
-    with bind_profile_scope(hermes_home, hydrate_secrets=False):
+    with bind_profile_scope(eir_home, hydrate_secrets=False):
         yield
 
 
-def _resolve_worker_cli_toolsets(hermes_home: Optional[str]) -> Optional[list[str]]:
+def _resolve_worker_cli_toolsets(eir_home: Optional[str]) -> Optional[list[str]]:
     """Return the assigned profile's effective CLI toolsets for a worker.
 
     Resolved at dispatch time and passed as an explicit ``--toolsets`` pin so
     worker startup cannot fall back to a stale root/active-profile config or a
     profile whose top-level ``toolsets`` is only the kanban orchestrator
     surface. ``model_tools`` still appends the task-scoped kanban lifecycle
-    tools when ``HERMES_KANBAN_TASK`` is set.
+    tools when ``EIR_KANBAN_TASK`` is set.
     """
-    if not hermes_home:
+    if not eir_home:
         return None
     try:
-        from hermes_cli.config import load_config
-        from hermes_cli.tools_config import _get_platform_tools
+        from eir_cli.config import load_config
+        from eir_cli.tools_config import _get_platform_tools
 
-        with _worker_profile_scope(hermes_home):
+        with _worker_profile_scope(eir_home):
             cfg = load_config()
             toolsets = sorted(_get_platform_tools(cfg, "cli"))
         return toolsets or None
     except Exception as exc:
         _kb._log.debug(
-            "kanban worker: could not resolve CLI toolsets for HERMES_HOME=%r (%s)",
-            hermes_home,
+            "kanban worker: could not resolve CLI toolsets for EIR_HOME=%r (%s)",
+            eir_home,
             exc,
         )
         return None
@@ -2622,7 +2622,7 @@ def _retag_legacy_worker_sessions(workspaces_root_path: str) -> None:
     if workspaces_root_path in _retagged_workspace_roots:
         return
     try:
-        from hermes_state_registry import acquire, release_or_close
+        from eir_state_registry import acquire, release_or_close
 
         # Inside the gateway the dispatcher shares the process's registry handle; a bare
         # SessionDB() here was one more writer connection on the same state.db (#100896).
@@ -2636,21 +2636,21 @@ def _retag_legacy_worker_sessions(workspaces_root_path: str) -> None:
         _kb._log.debug("kanban worker: legacy session retag skipped (%s)", exc)
 
 
-def _worker_argv(task: Task, profile_arg: str, hermes_home: Optional[str]) -> list[str]:
+def _worker_argv(task: Task, profile_arg: str, eir_home: Optional[str]) -> list[str]:
     """The profile owner executes; this subprocess only waits for its receipt."""
     import sys
-    return [sys.executable, "-m", "hermes_cli.kanban_worker_client"]
+    return [sys.executable, "-m", "eir_cli.kanban_worker_client"]
 
 
 def _open_worker_log(task: Task, board: Optional[str]):
     """Append-mode per-task log (a re-run on unblock appends, never overwrites),
     rotated first. Anchored at the board root (not the shared kanban root) so
-    `hermes kanban log` reads its own file and boards sharing task ids don't
+    `eir kanban log` reads its own file and boards sharing task ids don't
     collide."""
     log_dir = _kb.worker_logs_dir(board=board)
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / f"{task.id}.log"
-    from hermes_cli.kanban_worker_log import open_worker_log
+    from eir_cli.kanban_worker_log import open_worker_log
     return open_worker_log(log_path)
 
 
@@ -2693,30 +2693,30 @@ def _restart_safe_worker_argv(task: Task, command: list[str]) -> list[str]:
 
 
 def _default_spawn(task: Task, workspace: str, *, board: Optional[str] = None) -> Optional[int]:
-    """Fire-and-forget worker client (``-m hermes_cli.kanban_worker_client``) for the claim.
+    """Fire-and-forget worker client (``-m eir_cli.kanban_worker_client``) for the claim.
 
     Returns the child's PID so the dispatcher can detect crashes before the
     claim TTL expires; completion is still observed via the worker's own
     ``complete`` / ``block`` transitions. ``board`` pins the child's
-    ``HERMES_KANBAN_DB`` / ``HERMES_KANBAN_BOARD`` / workspaces_root to the
+    ``EIR_KANBAN_DB`` / ``EIR_KANBAN_BOARD`` / workspaces_root to the
     board the task was claimed from, so workers cannot see other boards.
     """
     if not task.assignee:
         raise ValueError(f"task {task.id} has no assignee")
 
-    from hermes_cli.profiles import normalize_profile_name, resolve_profile_env
+    from eir_cli.profiles import normalize_profile_name, resolve_profile_env
 
     profile_arg = normalize_profile_name(task.assignee)
 
     from agent.secret_scope import is_multiplex_active
-    from hermes_cli.kanban_worker_env import worker_client_env
+    from eir_cli.kanban_worker_env import worker_client_env
     from tools.environments.local import _is_routed_home, build_subprocess_env
 
     try:
         profile_home = resolve_profile_env(profile_arg)
     except FileNotFoundError:
         # No profile dir (isolated test fixtures) — the CLI resolves it from
-        # HERMES_PROFILE (set below) instead.
+        # EIR_PROFILE (set below) instead.
         profile_home = None
 
     # Scrub for a ROUTED home, not only under multiplex: the authority test is "does this worker act
@@ -2743,19 +2743,19 @@ def _default_spawn(task: Task, workspace: str, *, board: Optional[str] = None) -
     for key in _VAR_MAP:
         env.pop(key, None)
 
-    # Inject HERMES_HOME so the worker reads the profile-scoped config.yaml:
-    # without it the child's get_hermes_home() falls back to the DEFAULT
-    # profile root because `hermes -p` applies its override before
-    # hermes_constants is imported.
+    # Inject EIR_HOME so the worker reads the profile-scoped config.yaml:
+    # without it the child's get_eir_home() falls back to the DEFAULT
+    # profile root because `eir -p` applies its override before
+    # eir_constants is imported.
     if profile_home:
-        env["HERMES_HOME"] = profile_home
+        env["EIR_HOME"] = profile_home
     if task.tenant:
-        env["HERMES_TENANT"] = task.tenant
-    env["HERMES_KANBAN_TASK"] = task.id
-    env["HERMES_KANBAN_WORKSPACE"] = workspace
+        env["EIR_TENANT"] = task.tenant
+    env["EIR_KANBAN_TASK"] = task.id
+    env["EIR_KANBAN_WORKSPACE"] = workspace
     # Tag the session `kanban` so session-browsing surfaces filter it out by
     # source instead of rendering one sidebar row per attempt.
-    env["HERMES_SESSION_SOURCE"] = "kanban"
+    env["EIR_SESSION_SOURCE"] = "kanban"
     # TERMINAL_CWD takes precedence over process cwd in file_tools and
     # build_context_files_prompt; without it relative writes land in the gateway
     # user's home and workers load the gateway's AGENTS.md. file_tools rejects
@@ -2770,43 +2770,43 @@ def _default_spawn(task: Task, workspace: str, *, board: Optional[str] = None) -
     if workspace and os.path.isabs(workspace) and os.path.isdir(workspace):
         env["TERMINAL_CWD"] = workspace
     if task.branch_name:
-        env["HERMES_KANBAN_BRANCH"] = task.branch_name
+        env["EIR_KANBAN_BRANCH"] = task.branch_name
     if task.current_run_id is not None:
-        env["HERMES_KANBAN_RUN_ID"] = str(task.current_run_id)
+        env["EIR_KANBAN_RUN_ID"] = str(task.current_run_id)
     if task.claim_lock:
-        env["HERMES_KANBAN_CLAIM_LOCK"] = task.claim_lock
+        env["EIR_KANBAN_CLAIM_LOCK"] = task.claim_lock
     # Goal-loop mode (Ralph-style /goal judge loop in cli.py quiet-mode path).
     # Only set when enabled so non-goal tasks keep a clean env.
     if task.goal_mode:
-        env["HERMES_KANBAN_GOAL_MODE"] = "1"
+        env["EIR_KANBAN_GOAL_MODE"] = "1"
         if task.goal_max_turns is not None:
-            env["HERMES_KANBAN_GOAL_MAX_TURNS"] = str(int(task.goal_max_turns))
+            env["EIR_KANBAN_GOAL_MAX_TURNS"] = str(int(task.goal_max_turns))
     for var in ("TERMINAL_TIMEOUT", "TERMINAL_MAX_FOREGROUND_TIMEOUT"):
         override = _worker_terminal_timeout_env(task.max_runtime_seconds, env.get(var))
         if override is not None:
             env[var] = override
     # Pin the board DB + workspaces root so the worker's kanban paths still
-    # match after `hermes -p` rewrites HERMES_HOME (symlink / Docker layouts).
-    env["HERMES_KANBAN_DB"] = str(_kb.kanban_db_path(board=board))
-    env["HERMES_KANBAN_WORKSPACES_ROOT"] = str(_kb.workspaces_root(board=board))
+    # match after `eir -p` rewrites EIR_HOME (symlink / Docker layouts).
+    env["EIR_KANBAN_DB"] = str(_kb.kanban_db_path(board=board))
+    env["EIR_KANBAN_WORKSPACES_ROOT"] = str(_kb.workspaces_root(board=board))
     # Board slug — defense-in-depth pin if a path is resolved without the
     # DB / workspaces env vars.
-    env["HERMES_KANBAN_BOARD"] = _kb._normalize_board_slug(board) or _kb.get_current_board()
-    # kanban_comment reads HERMES_PROFILE for its default author; `-p` alone
+    env["EIR_KANBAN_BOARD"] = _kb._normalize_board_slug(board) or _kb.get_current_board()
+    # kanban_comment reads EIR_PROFILE for its default author; `-p` alone
     # doesn't set the env var.
-    env["HERMES_PROFILE"] = profile_arg
-    # This is the grant boundary: the dispatcher assigned this new worker's task. HERMES_TUI: older
-    # hermes builds on PATH predate `--cli`'s precedence.
+    env["EIR_PROFILE"] = profile_arg
+    # This is the grant boundary: the dispatcher assigned this new worker's task. EIR_TUI: older
+    # eir builds on PATH predate `--cli`'s precedence.
     from agent.delegation_context import DELEGATED_CHILD_ENV_MARKER
     env.pop(DELEGATED_CHILD_ENV_MARKER, None)
-    env.pop("HERMES_TUI", None)
+    env.pop("EIR_TUI", None)
 
-    cmd = _worker_argv(task, profile_arg, env.get("HERMES_HOME"))
-    # The worker is `-m hermes_cli.kanban_worker_client` with no console-script bootstrap, and the scrub
+    cmd = _worker_argv(task, profile_arg, env.get("EIR_HOME"))
+    # The worker is `-m eir_cli.kanban_worker_client` with no console-script bootstrap, and the scrub
     # above strips our PYTHONPATH entries, so a PYTHONPATH-launched dispatcher's child died on
-    # `No module named 'hermes_cli'` (#112729). Pinned last, after every other env decision.
-    from cron.scheduler_worker_env import pin_hermes_tree_on_pythonpath
-    env = pin_hermes_tree_on_pythonpath(env, Path(project_root_str()))
+    # `No module named 'eir_cli'` (#112729). Pinned last, after every other env decision.
+    from cron.scheduler_worker_env import pin_eir_tree_on_pythonpath
+    env = pin_eir_tree_on_pythonpath(env, Path(project_root_str()))
     # A worker spawned by a managed systemd gateway must leave the gateway's
     # cgroup before startup; otherwise restarting the service kills the worker
     # that is performing the handoff.
@@ -2828,8 +2828,8 @@ def _default_spawn(task: Task, workspace: str, *, board: Optional[str] = None) -
     except FileNotFoundError:
         log_f.close()
         raise RuntimeError(
-            "`hermes` executable not found on PATH. "
-            "Install Hermes Agent or activate its venv before running the kanban dispatcher."
+            "`eir` executable not found on PATH. "
+            "Install Eir Agent or activate its venv before running the kanban dispatcher."
         )
     # Intentionally NOT closing log_f: the child keeps writing after return;
     # the OS-level FD stays open in the child until it exits.
@@ -2855,7 +2855,7 @@ def run_daemon(
     Calls :func:`dispatch_once` every ``interval`` seconds; exits cleanly on
     SIGINT / SIGTERM so it is systemd-friendly. ``stop_event`` and ``on_tick``
     are test hooks. Each tick resolves ``kanban.max_in_progress`` exactly like
-    the gateway dispatcher and ``hermes kanban dispatch`` — the standalone
+    the gateway dispatcher and ``eir kanban dispatch`` — the standalone
     daemon must not be the one uncapped entry point.
     """
     import threading
@@ -2899,7 +2899,7 @@ def run_daemon(
 
 # Late-bound origin namespace (see module docstring); imported LAST so this
 # module is fully populated before ``kanban_db`` imports from it.
-from hermes_cli import kanban_db as _kb
-from hermes_cli import kanban_db_connect as _kbc
-from hermes_cli import kanban_db_default_assignee as _kbda
-from hermes_cli import kanban_db_workspace as _kbw
+from eir_cli import kanban_db as _kb
+from eir_cli import kanban_db_connect as _kbc
+from eir_cli import kanban_db_default_assignee as _kbda
+from eir_cli import kanban_db_workspace as _kbw

@@ -1,4 +1,4 @@
-"""``hermes fallback check`` (#63852): per-entry readiness through the fallback switch's own resolvers."""
+"""``eir fallback check`` (#63852): per-entry readiness through the fallback switch's own resolvers."""
 from __future__ import annotations
 
 import json
@@ -8,18 +8,18 @@ import httpx
 import pytest
 from openai import OpenAI
 
-import hermes_yaml as yaml
-from hermes_cli import fallback_check as fc
+import eir_yaml as yaml
+from eir_cli import fallback_check as fc
 
 _KEY = "sk-fbcheck" + "K" * 30
 
 
-# tests/conftest.py already points HERMES_HOME at a per-test dir and blanks credential env vars.
+# tests/conftest.py already points EIR_HOME at a per-test dir and blanks credential env vars.
 def _config(chain):
-    from hermes_constants import get_hermes_home
+    from eir_constants import get_eir_home
     data = {"custom_providers": [{"name": "local-oai", "base_url": "http://127.0.0.1:9/v1", "api_key": _KEY}],
             "fallback_providers": chain}
-    (get_hermes_home() / "config.yaml").write_text(yaml.safe_dump(data), encoding="utf-8")
+    (get_eir_home() / "config.yaml").write_text(yaml.safe_dump(data), encoding="utf-8")
 
 
 def _route_to(monkeypatch, client, sent_model=None, seen=None):
@@ -140,7 +140,7 @@ def test_reported_model_is_evidence_only_where_it_proves_a_swap(provider, model,
 def test_live_passes_the_swap_shape_and_provider_timeout(monkeypatch):
     calls, seen = [], []
     _route_to(monkeypatch, _openai_client(lambda request: _completion("m"), calls), seen=seen)
-    monkeypatch.setattr("hermes_cli.timeouts.get_provider_request_timeout", lambda provider, model: 7.0)
+    monkeypatch.setattr("eir_cli.timeouts.get_provider_request_timeout", lambda provider, model: 7.0)
     sent = {}
     import agent.auxiliary_client as aux
     real = aux._build_call_kwargs
@@ -186,7 +186,7 @@ def test_cli_all_ready_exits_zero_without_inference_in_static_mode(monkeypatch, 
 
 def test_parser_wires_check_subcommand():
     import argparse
-    from hermes_cli.subcommands.fallback import build_fallback_parser
+    from eir_cli.subcommands.fallback import build_fallback_parser
     parser = argparse.ArgumentParser()
     build_fallback_parser(parser.add_subparsers(dest="command"))
     args = parser.parse_args(["fallback", "check", "--live", "--json"])
@@ -271,7 +271,7 @@ def test_codex_wrapper_inner_client_loses_sdk_retries():
 
 def test_live_keeps_aws_instance_metadata_and_skips_auto_and_moa(monkeypatch):
     seen = {}
-    monkeypatch.setattr("hermes_cli.doctor_connectivity.run_probes",
+    monkeypatch.setattr("eir_cli.doctor_connectivity.run_probes",
                         lambda probes, **kw: seen.update(kw, names=[n for n, _ in probes]) or [])
     ready = lambda entry: fc.EntryCheck(provider=entry["provider"], model="m", configured=True, auth_ready=True)
     monkeypatch.setattr(fc, "check_entry_static", ready)

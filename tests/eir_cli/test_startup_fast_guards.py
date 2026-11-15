@@ -1,10 +1,10 @@
-"""Guards for hermes_cli._startup_fast — the pre-import version fast path.
+"""Guards for eir_cli._startup_fast — the pre-import version fast path.
 
 Two invariants, each of which has been broken before:
 
 1. IMPORT WEIGHT: _startup_fast must stay stdlib-only. The whole point of
    the module is to run before main.py's heavy import wall; one careless
-   ``from hermes_cli.config import ...`` silently makes `hermes --version`
+   ``from eir_cli.config import ...`` silently makes `eir --version`
    slow again for everyone (the regression would be invisible — everything
    still works, just 40x slower).
 
@@ -31,8 +31,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 # Modules that must NEVER be imported by the fast path. Each one either
 # pulls yaml/argparse/logging config or is itself a god-module.
 _FORBIDDEN_MODULES = (
-    "hermes_cli.config",
-    "hermes_cli.main",
+    "eir_cli.config",
+    "eir_cli.main",
     "yaml",
     "argparse",
     "cli",
@@ -48,27 +48,27 @@ def test_cli_starts_from_a_deleted_cwd(tmp_path):
     """A child spawned into a directory that was removed since (a cron delivery from a reaped
     kanban workspace) must still reach argv parsing: a relative ``sys.path`` entry made
     ``ensure_project_root_on_path`` die in ``realpath`` → ``getcwd`` (#102941)."""
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     home.mkdir()
     gone = tmp_path / "scratch"
     gone.mkdir()
     # The child needs the checkout on sys.path by absolute name; the cwd is exactly what is gone.
-    env = {**os.environ, "HERMES_HOME": str(home), "TERMUX_VERSION": "",
+    env = {**os.environ, "EIR_HOME": str(home), "TERMUX_VERSION": "",
            "PYTHONPATH": os.pathsep.join(p for p in (str(REPO_ROOT), os.environ.get("PYTHONPATH")) if p)}
-    env.pop("HERMES_DEV", None)
+    env.pop("EIR_DEV", None)
     fd = os.open(gone, os.O_RDONLY)
     try:
         gone.rmdir()
         # ``cwd=`` of a removed path is refused by Popen, so start in the dead dir via a
         # preexec fchdir onto its still-open handle — the shape a reaped workspace leaves behind.
         result = subprocess.run(
-            [sys.executable, "-m", "hermes_cli.main", "--version"],
+            [sys.executable, "-m", "eir_cli.main", "--version"],
             capture_output=True, text=True, timeout=60, env=env,
             cwd=REPO_ROOT, preexec_fn=lambda: os.fchdir(fd), check=False)
     finally:
         os.close(fd)
     assert result.returncode == 0, result.stderr
-    assert "Hermes Agent v" in result.stdout
+    assert "Eir Agent v" in result.stdout
     assert "FileNotFoundError" not in result.stderr
 
 
@@ -76,7 +76,7 @@ def test_startup_fast_import_weight():
     """Importing _startup_fast must not drag in any heavy module."""
     probe = (
         "import sys, json\n"
-        "import hermes_cli._startup_fast\n"
+        "import eir_cli._startup_fast\n"
         "print(json.dumps(sorted(sys.modules.keys())))\n"
     )
     result = subprocess.run(
@@ -91,7 +91,7 @@ def test_startup_fast_import_weight():
     loaded = set(json.loads(result.stdout))
     offenders = [m for m in _FORBIDDEN_MODULES if m in loaded]
     assert not offenders, (
-        f"hermes_cli._startup_fast imported heavy modules: {offenders} — "
+        f"eir_cli._startup_fast imported heavy modules: {offenders} — "
         "the fast path must stay stdlib-only (see module docstring)."
     )
 
@@ -102,12 +102,12 @@ _OFFLINE = {"HTTPS_PROXY": "http://127.0.0.1:9", "HTTP_PROXY": "http://127.0.0.1
             "NO_PROXY": "", "no_proxy": ""}
 
 
-@pytest.mark.parametrize("package", ["hermes_cli", "hermes_agent/hermes_cli"])
-def test_project_root_is_the_folder_that_holds_hermes_agent(tmp_path, package):
-    """The install-root owner gives the same answer before and after hermes_cli moves into the package."""
-    (tmp_path / "hermes_agent" / "compat").mkdir(parents=True)
+@pytest.mark.parametrize("package", ["eir_cli", "eir_agent/eir_cli"])
+def test_project_root_is_the_folder_that_holds_eir_agent(tmp_path, package):
+    """The install-root owner gives the same answer before and after eir_cli moves into the package."""
+    (tmp_path / "eir_agent" / "compat").mkdir(parents=True)
     (tmp_path / package).mkdir(parents=True, exist_ok=True)
-    shutil.copy2(REPO_ROOT / "hermes_cli" / "_startup_fast.py", tmp_path / package / "_startup_fast.py")
+    shutil.copy2(REPO_ROOT / "eir_cli" / "_startup_fast.py", tmp_path / package / "_startup_fast.py")
     owner = runpy.run_path(str(tmp_path / package / "_startup_fast.py"))["project_root_str"]
     assert owner() == os.path.realpath(tmp_path)
 
@@ -116,9 +116,9 @@ def _run_version(env_overrides: dict) -> subprocess.CompletedProcess:
     # --version's update check is not under test; offline it answers at once instead of
     # waiting out GitHub's 30 s API and 60 s ls-remote timeouts (the test's own budget).
     env = {**os.environ, **_OFFLINE, **env_overrides}
-    env.pop("HERMES_DEV", None)
+    env.pop("EIR_DEV", None)
     return subprocess.run(
-        [sys.executable, "-m", "hermes_cli.main", "--version"],
+        [sys.executable, "-m", "eir_cli.main", "--version"],
         capture_output=True,
         text=True,
         timeout=60,
@@ -132,27 +132,27 @@ def _run_version(env_overrides: dict) -> subprocess.CompletedProcess:
 
 def test_fast_version_parity_on_termux(tmp_path):
     """The historical Termux path — the one eb4040242 broke."""
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     home.mkdir()
     result = _run_version(
-        {"HERMES_HOME": str(home), "TERMUX_VERSION": "0.118"}
+        {"EIR_HOME": str(home), "TERMUX_VERSION": "0.118"}
     )
     assert result.returncode == 0, result.stderr
-    assert "Hermes Agent v" in result.stdout
+    assert "Eir Agent v" in result.stdout
     assert "Traceback" not in result.stderr
 
 
 def test_fast_version_reports_install_method_stamp(tmp_path):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     home.mkdir()
     (home / ".install_method").write_text("git\n", encoding="utf-8")
-    result = _run_version({"HERMES_HOME": str(home)})
+    result = _run_version({"EIR_HOME": str(home)})
     assert result.returncode == 0, result.stderr
     assert "Install method: git" in result.stdout
 
 
-def test_literal_tilde_hermes_home_expands_before_any_reader(tmp_path):
-    """A literal ``~`` in HERMES_HOME (fish, or any quoted value) is expanded at process entry.
+def test_literal_tilde_eir_home_expands_before_any_reader(tmp_path):
+    """A literal ``~`` in EIR_HOME (fish, or any quoted value) is expanded at process entry.
 
     Before the fix ``Path("~/.x")`` was relative, so the real CLI resolved it against cwd and
     scaffolded a full home under ``<cwd>/~/.x``. The negative assertion on cwd is the
@@ -162,11 +162,11 @@ def test_literal_tilde_hermes_home_expands_before_any_reader(tmp_path):
     cwd = tmp_path / "project"
     fake_home.mkdir()
     cwd.mkdir()
-    env = {**os.environ, "HOME": str(fake_home), "USERPROFILE": str(fake_home), "HERMES_HOME": "~/.x"}
-    env.pop("HERMES_DEV", None)
+    env = {**os.environ, "HOME": str(fake_home), "USERPROFILE": str(fake_home), "EIR_HOME": "~/.x"}
+    env.pop("EIR_DEV", None)
     env["PYTHONPATH"] = str(REPO_ROOT)
     result = subprocess.run(
-        [sys.executable, "-m", "hermes_cli.main", "config", "path"],
+        [sys.executable, "-m", "eir_cli.main", "config", "path"],
         capture_output=True, text=True, timeout=120, cwd=cwd, env=env,
         check=False,
     )
@@ -174,11 +174,11 @@ def test_literal_tilde_hermes_home_expands_before_any_reader(tmp_path):
     assert result.stdout.strip() == str(fake_home / ".x" / "config.yaml")
     assert not (cwd / "~").exists(), sorted(p.name for p in cwd.iterdir())
 
-    # Raw-reader observable: the ~30 ``os.environ["HERMES_HOME"]`` readers in hermes_cli/ never
-    # call the resolver, so the entry-point hunk in main.py (not hermes_constants) must have
+    # Raw-reader observable: the ~30 ``os.environ["EIR_HOME"]`` readers in eir_cli/ never
+    # call the resolver, so the entry-point hunk in main.py (not eir_constants) must have
     # rewritten the env var by the time the module import finishes.
     probe = subprocess.run(
-        [sys.executable, "-c", "import hermes_cli.main, os; print(os.environ['HERMES_HOME'])"],
+        [sys.executable, "-c", "import eir_cli.main, os; print(os.environ['EIR_HOME'])"],
         capture_output=True, text=True, timeout=120, cwd=cwd, env=env,
         check=False,
     )
@@ -186,22 +186,22 @@ def test_literal_tilde_hermes_home_expands_before_any_reader(tmp_path):
     assert probe.stdout.strip() == str(fake_home / ".x")
 
 
-def test_normalize_hermes_home_env_rewrites_tilde_and_leaves_absolute_alone(tmp_path, monkeypatch):
-    from hermes_cli import _startup_fast
+def test_normalize_eir_home_env_rewrites_tilde_and_leaves_absolute_alone(tmp_path, monkeypatch):
+    from eir_cli import _startup_fast
 
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
-    monkeypatch.setenv("HERMES_HOME", "~/.x")
-    _startup_fast.normalize_hermes_home_env()
-    assert os.environ["HERMES_HOME"] == str(tmp_path / ".x")
+    monkeypatch.setenv("EIR_HOME", "~/.x")
+    _startup_fast.normalize_eir_home_env()
+    assert os.environ["EIR_HOME"] == str(tmp_path / ".x")
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "abs"))
-    _startup_fast.normalize_hermes_home_env()
-    assert os.environ["HERMES_HOME"] == str(tmp_path / "abs")
+    monkeypatch.setenv("EIR_HOME", str(tmp_path / "abs"))
+    _startup_fast.normalize_eir_home_env()
+    assert os.environ["EIR_HOME"] == str(tmp_path / "abs")
 
-    monkeypatch.delenv("HERMES_HOME")
-    _startup_fast.normalize_hermes_home_env()
-    assert "HERMES_HOME" not in os.environ
+    monkeypatch.delenv("EIR_HOME")
+    _startup_fast.normalize_eir_home_env()
+    assert "EIR_HOME" not in os.environ
 
 
 @pytest.mark.platforms("linux")
@@ -214,12 +214,12 @@ def test_bootstrap_preserves_live_cwd_and_recovers_deleted_cwd(tmp_path, remove_
         "os.chdir(sys.argv[1])\n"
         "if sys.argv[2] == 'deleted':\n"
         "    os.rmdir(sys.argv[1])\n"
-        "import hermes_bootstrap\n"
+        "import eir_bootstrap\n"
         "print(os.getcwd())\n"
     )
-    env = {**os.environ, "HERMES_HOME": str(tmp_path / ".hermes"),
+    env = {**os.environ, "EIR_HOME": str(tmp_path / ".eir"),
            "PYTHONPATH": str(REPO_ROOT)}
-    env.pop("HERMES_DEV", None)
+    env.pop("EIR_DEV", None)
     result = subprocess.run(
         [sys.executable, "-c", probe, str(cwd), "deleted" if remove_cwd else "live"],
         stdin=subprocess.DEVNULL, capture_output=True, text=True,
@@ -232,21 +232,21 @@ def test_bootstrap_preserves_live_cwd_and_recovers_deleted_cwd(tmp_path, remove_
 
 
 def test_fast_version_parity(tmp_path):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     home.mkdir()
-    result = _run_version({"HERMES_HOME": str(home)})
+    result = _run_version({"EIR_HOME": str(home)})
     assert result.returncode == 0, result.stderr
     out = result.stdout
-    for field in ("Hermes Agent v", "Install directory:", "Python:", "OpenAI SDK:"):
+    for field in ("Eir Agent v", "Install directory:", "Python:", "OpenAI SDK:"):
         assert field in out, f"fast --version output missing {field!r}:\n{out}"
     assert "Traceback" not in result.stderr
 
 
 @pytest.mark.parametrize("argv", [["update"], ["pm", "doctor"], ["gateway", "status"]])
 def test_termux_chat_shortcut_leaves_subcommands_to_dispatch(monkeypatch, argv):
-    from hermes_cli import main
+    from eir_cli import main
 
     monkeypatch.setenv("PREFIX", "/data/data/com.termux/files/usr")
-    monkeypatch.delenv("HERMES_TERMUX_DISABLE_FAST_CLI", raising=False)
-    monkeypatch.setattr(sys, "argv", ["hermes", *argv])
+    monkeypatch.delenv("EIR_TERMUX_DISABLE_FAST_CLI", raising=False)
+    monkeypatch.setattr(sys, "argv", ["eir", *argv])
     assert main._try_termux_fast_cli_launch() is False

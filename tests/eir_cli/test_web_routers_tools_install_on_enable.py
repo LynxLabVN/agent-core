@@ -3,36 +3,36 @@
 When a toolset is toggled ON via ``PUT /api/tools/toolsets/{name}`` and its
 provider carries a post_setup hook with a registered, UNSATISFIED
 install-state predicate (``_POST_SETUP_INSTALLED`` — today: cua-driver),
-the endpoint spawns the same background ``hermes tools post-setup <key>``
+the endpoint spawns the same background ``eir tools post-setup <key>``
 action the interactive CLI flow runs. Without this, a GUI toggle "saves"
 but the tool never appears in the schema because its check_fn can't find
 the binary.
 """
 
 import pytest
-import hermes_cli.web_server_gateway as _web_server_gateway
+import eir_cli.web_server_gateway as _web_server_gateway
 
 
 class TestToggleToolsetInstallOnEnable:
     @pytest.fixture(autouse=True)
-    def _setup(self, monkeypatch, _isolate_hermes_home):
+    def _setup(self, monkeypatch, _isolate_eir_home):
         try:
             from starlette.testclient import TestClient
         except ImportError:
             pytest.skip("fastapi/starlette not installed")
 
-        import hermes_state
-        from hermes_constants import get_hermes_home
-        from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
+        import eir_state
+        from eir_constants import get_eir_home
+        from eir_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
 
         monkeypatch.setattr(
-            hermes_state, "DEFAULT_DB_PATH", get_hermes_home() / "state.db"
+            eir_state, "DEFAULT_DB_PATH", get_eir_home() / "state.db"
         )
         self.client = TestClient(app)
         self.client.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
 
     def _spawn_recorder(self, monkeypatch):
-        from hermes_cli import web_server
+        from eir_cli import web_server
 
         calls = []
 
@@ -43,15 +43,15 @@ class TestToggleToolsetInstallOnEnable:
             calls.append((tuple(subcommand), name))
             return _FakeProc()
 
-        monkeypatch.setattr(_web_server_gateway, "_spawn_hermes_action", _fake_spawn)
+        monkeypatch.setattr(_web_server_gateway, "_spawn_eir_action", _fake_spawn)
         return calls
 
     def test_enable_computer_use_spawns_cua_install_when_binary_missing(
         self, monkeypatch
     ):
-        from hermes_cli import tools_config
-        from hermes_cli import tools_config_cua
-        from hermes_cli import tools_config_post_setup
+        from eir_cli import tools_config
+        from eir_cli import tools_config_cua
+        from eir_cli import tools_config_post_setup
 
         calls = self._spawn_recorder(monkeypatch)
         # Binary missing → the cua_driver predicate reports unsatisfied.
@@ -77,9 +77,9 @@ class TestToggleToolsetInstallOnEnable:
     def test_enable_computer_use_skips_install_when_binary_present(
         self, monkeypatch
     ):
-        from hermes_cli import tools_config
-        from hermes_cli import tools_config_cua
-        from hermes_cli import tools_config_post_setup
+        from eir_cli import tools_config
+        from eir_cli import tools_config_cua
+        from eir_cli import tools_config_post_setup
 
         calls = self._spawn_recorder(monkeypatch)
         monkeypatch.setattr(
@@ -97,9 +97,9 @@ class TestToggleToolsetInstallOnEnable:
         assert calls == []
 
     def test_disable_never_spawns_install(self, monkeypatch):
-        from hermes_cli import tools_config
-        from hermes_cli import tools_config_cua
-        from hermes_cli import tools_config_post_setup
+        from eir_cli import tools_config
+        from eir_cli import tools_config_cua
+        from eir_cli import tools_config_post_setup
 
         calls = self._spawn_recorder(monkeypatch)
         monkeypatch.setattr(
@@ -117,10 +117,10 @@ class TestToggleToolsetInstallOnEnable:
         assert calls == []
 
     def test_spawn_failure_does_not_fail_the_toggle(self, monkeypatch):
-        from hermes_cli import tools_config
-        from hermes_cli import tools_config_cua
-        from hermes_cli import tools_config_post_setup
-        from hermes_cli import web_server
+        from eir_cli import tools_config
+        from eir_cli import tools_config_cua
+        from eir_cli import tools_config_post_setup
+        from eir_cli import web_server
 
         monkeypatch.setattr(
             tools_config_cua, "_resolved_cua_driver_cmd", lambda: None
@@ -132,7 +132,7 @@ class TestToggleToolsetInstallOnEnable:
         def _boom(subcommand, name, **kwargs):
             raise RuntimeError("spawn exploded")
 
-        monkeypatch.setattr(_web_server_gateway, "_spawn_hermes_action", _boom)
+        monkeypatch.setattr(_web_server_gateway, "_spawn_eir_action", _boom)
 
         resp = self.client.put(
             "/api/tools/toolsets/computer_use", json={"enabled": True}

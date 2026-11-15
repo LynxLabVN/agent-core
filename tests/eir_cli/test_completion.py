@@ -1,11 +1,11 @@
-"""Tests for hermes_cli/completion.py — shell completion script generation."""
+"""Tests for eir_cli/completion.py — shell completion script generation."""
 
 import argparse
 import os
 import subprocess
 import tempfile
 
-from hermes_cli.completion import _walk, generate_bash, generate_fish
+from eir_cli.completion import _walk, generate_bash, generate_fish
 
 
 # ---------------------------------------------------------------------------
@@ -13,8 +13,8 @@ from hermes_cli.completion import _walk, generate_bash, generate_fish
 # ---------------------------------------------------------------------------
 
 def _make_parser() -> argparse.ArgumentParser:
-    """Build a minimal parser that mirrors the real hermes structure."""
-    p = argparse.ArgumentParser(prog="hermes")
+    """Build a minimal parser that mirrors the real eir structure."""
+    p = argparse.ArgumentParser(prog="eir")
     p.add_argument("--version", "-V", action="store_true")
     p.add_argument("-p", "--profile", help="Profile name")
     sub = p.add_subparsers(dest="command")
@@ -76,8 +76,8 @@ class TestWalk:
 class TestGenerateBash:
     def test_contains_completion_function_and_register(self):
         out = generate_bash(_make_parser())
-        assert "_hermes_completion()" in out
-        assert "complete -F _hermes_completion hermes" in out
+        assert "_eir_completion()" in out
+        assert "complete -F _eir_completion eir" in out
 
 
     def test_valid_bash_syntax(self):
@@ -102,25 +102,25 @@ class TestProfileCompletion:
 
 
     def test_bash_profile_actions_complete_profile_names(self):
-        """After 'hermes profile use', complete with profile names."""
+        """After 'eir profile use', complete with profile names."""
         out = generate_bash(_make_parser())
-        # The profile case should have _hermes_profiles for name-taking actions
+        # The profile case should have _eir_profiles for name-taking actions
         lines = out.split("\n")
         in_profile_case = False
         has_profiles_in_action = False
         for line in lines:
             if "profile)" in line:
                 in_profile_case = True
-            if in_profile_case and "_hermes_profiles" in line:
+            if in_profile_case and "_eir_profiles" in line:
                 has_profiles_in_action = True
                 break
-        assert has_profiles_in_action, "profile actions should complete with _hermes_profiles"
+        assert has_profiles_in_action, "profile actions should complete with _eir_profiles"
 
 
     def test_fish_profile_actions_complete_names(self):
         out = generate_fish(_make_parser())
         # Should have profile name completion for actions like use, delete, etc.
-        assert "__hermes_profiles" in out
-        count = out.count("(__hermes_profiles)")
+        assert "__eir_profiles" in out
+        count = out.count("(__eir_profiles)")
         # At least the -p flag + the profile action completions
         assert count >= 2, f"Expected >=2 profile completion entries, got {count}"

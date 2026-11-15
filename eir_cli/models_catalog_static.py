@@ -1,7 +1,7 @@
 """Static provider/model catalog tables (data only — no network).
 
 Curated per-provider model lists, the canonical provider registry, display groups and alias
-maps. Split out of ``hermes_cli.models``.
+maps. Split out of ``eir_cli.models``.
 """
 
 from __future__ import annotations
@@ -87,13 +87,13 @@ VERCEL_AI_GATEWAY_MODELS: list[tuple[str, str]] = [("moonshotai/kimi-k2.6", "rec
 
 def _codex_curated_models() -> list[str]:
     """openai-codex curated list from codex_models.py (DEFAULT_CODEX_MODELS + forward-compat
-    synthesis) so the gateway /model picker and the CLI ``hermes model`` flow share one source."""
-    from hermes_cli.codex_models import DEFAULT_CODEX_MODELS, _finalize_codex_models
+    synthesis) so the gateway /model picker and the CLI ``eir model`` flow share one source."""
+    from eir_cli.codex_models import DEFAULT_CODEX_MODELS, _finalize_codex_models
     return _finalize_codex_models(list(DEFAULT_CODEX_MODELS))
 
 
 # Static xAI fallback when the models.dev disk cache is empty (fresh install, offline first run).
-# Mirrors the xAI-direct IDs from $HERMES_HOME/models_dev_cache.json; the cache overrides it on the
+# Mirrors the xAI-direct IDs from $EIR_HOME/models_dev_cache.json; the cache overrides it on the
 # next refresh. Models xAI retired on 2026-05-15 (grok-4*, grok-4-fast*, grok-4-1-fast*,
 # grok-code-fast-1) are excluded — see docs.x.ai/developers/migration/may-15-retirement.
 _XAI_STATIC_FALLBACK: list[str] = [
@@ -116,7 +116,7 @@ def _xai_promote_top(ids: list[str]) -> list[str]:
 
 
 def _xai_merge_curated_extras(ids: list[str]) -> list[str]:
-    """Append Hermes-curated xAI models missing from models.dev, right after the pinned headline."""
+    """Append Eir-curated xAI models missing from models.dev, right after the pinned headline."""
     out = list(ids)
     for extra in _XAI_CURATED_EXTRAS:
         if extra not in out:
@@ -129,7 +129,7 @@ def _xai_finalize_catalog(ids: list[str]) -> list[str]:
 
 
 def _xai_curated_models() -> list[str]:
-    """Offline curated floor for xAI / xAI OAuth pickers: $HERMES_HOME/models_dev_cache.json
+    """Offline curated floor for xAI / xAI OAuth pickers: $EIR_HOME/models_dev_cache.json
     (no network), else ``_XAI_STATIC_FALLBACK``. Any failure falls through to the static list.
     Reads through the process-wide models.dev copy, so the parse is the one every later reader shares."""
     try:
@@ -342,7 +342,7 @@ _PROVIDER_MODELS: dict[str, list[str]] = _CuratedCatalog({
     "azure-foundry": [],
     # Vertex's OpenAI-compatible endpoint has no /models route, so without this the /model picker
     # only shows the configured model. IDs carry the "google/" publisher prefix Vertex expects
-    # (see hermes_cli/model_setup_flows.py); validated live against a GCP project (global region).
+    # (see eir_cli/model_setup_flows.py); validated live against a GCP project (global region).
     "vertex": [
         "google/gemini-3.8-flash", "google/gemini-4-argon", "google/gemini-3.7-flash",  # [0] = silent default
         "google/gemini-3.1-pro-preview", "google/gemini-3-pro-preview", "google/gemini-3.6-flash",
@@ -360,9 +360,9 @@ _PROVIDER_MODELS: dict[str, list[str]] = _CuratedCatalog({
 
 # ---------------------------------------------------------------------------
 # Canonical provider list — single source of truth for provider identity. Every code path that
-# lists, displays, or iterates providers (hermes model, /model, list_authenticated_providers)
+# lists, displays, or iterates providers (eir model, /model, list_authenticated_providers)
 # derives from it. slug = internal ID (config.yaml, --provider); label = short display name;
-# tui_desc = longer description for the `hermes model` picker.
+# tui_desc = longer description for the `eir model` picker.
 # ---------------------------------------------------------------------------
 
 class ProviderEntry(NamedTuple):
@@ -437,8 +437,8 @@ def sync_plugin_provider_catalog() -> int:
 
     Runs at import and again from ``providers._sync_auth_registry`` whenever a profile is registered
     after this module was imported. The import-time pass alone observes a *partial* registry: a
-    plugin whose own imports pull ``hermes_cli.models`` in mid-``_discover_providers()``, or a
-    profile registered later at runtime, would otherwise never reach the picker, ``hermes model``,
+    plugin whose own imports pull ``eir_cli.models`` in mid-``_discover_providers()``, or a
+    profile registered later at runtime, would otherwise never reach the picker, ``eir model``,
     ``/model`` or the Desktop ``model.options`` list until restart — the catalog twin of the auth
     registry window (#102123). Idempotent by slug; built-in rows are never rewritten. A row lands
     after its ``picker_after`` slug when that row exists, else at the end.
@@ -488,7 +488,7 @@ _PROVIDER_LABELS["custom"] = "Custom endpoint"  # special case: not a named prov
 def listed_canonical_providers() -> list[ProviderEntry]:
     """``CANONICAL_PROVIDERS`` minus pre-release profiles the user has not opted into: what a provider
     LIST offers. Typed paths (``provider:model``, labels, ``--provider``) keep the full table."""
-    from hermes_cli import models  # the binding every list consumer read before this filter existed
+    from eir_cli import models  # the binding every list consumer read before this filter existed
     from providers import unlisted_provider_names
     hidden = unlisted_provider_names()
     return [p for p in models.CANONICAL_PROVIDERS if p.slug not in hidden]
@@ -496,7 +496,7 @@ def listed_canonical_providers() -> list[ProviderEntry]:
 
 # ---------------------------------------------------------------------------
 # Provider groups — DISPLAY ONLY. Vendors with several slugs (global API, China API, OAuth plan,
-# ...) fold under one top-level row in the INTERACTIVE PICKERS (``hermes model``, setup wizard,
+# ...) fold under one top-level row in the INTERACTIVE PICKERS (``eir model``, setup wizard,
 # Telegram ``/model``). They do NOT change CANONICAL_PROVIDERS, slug identity, ``--provider``,
 # ``/model <provider:model>`` or any typed path — every member slug stays individually addressable.
 # ``group_providers()`` is the single fold used by all three surfaces.
@@ -641,14 +641,14 @@ _PROVIDER_ALIASES = _CatalogAliases((
     ("ollama", "custom"),  # bare "ollama" = local; use "ollama-cloud" for cloud
     ("ollama_cloud", "ollama-cloud"),
     # Local OpenAI-compatible servers route through the generic "custom" provider
-    # (parity with hermes_cli.auth and hermes_cli.providers). Issue #62213. The llamacpp
+    # (parity with eir_cli.auth and eir_cli.providers). Issue #62213. The llamacpp
     # aliases stay unmapped: they are the managed local runtime's picker id, and the model
     # validator must reach its staged-library branch before the custom one.
     ("local", "custom"), ("vllm", "custom"),
 ))
 
 
-# Offline/fresh-install fallback for the model Hermes silently lands on when the user never picked
+# Offline/fresh-install fallback for the model Eir silently lands on when the user never picked
 # one (GUI onboarding confirm card, empty ``model.default``, provider-set-but-model-missing). The
 # AUTHORITATIVE source is the remote catalog manifest, which labels exactly one entry per provider
 # ``"default": true`` (get_default_model_from_cache) so the default rotates without a release; this
@@ -663,8 +663,8 @@ PREFERRED_SILENT_DEFAULT_MODEL = "z-ai/glm-5.3"
 # best-first, so [0] is the priciest flagship; a profile that sets a provider with no model would
 # otherwise silently bill the most expensive model (863 Opus requests before one user noticed).
 # Network-free (cache-only) on purpose — this is the hot resolution path. The *interactive* default
-# (GUI onboarding / ``hermes model``) uses the tier-aware ``get_recommended_default_model`` in
-# hermes_cli/web_server.py + ``partition_nous_models_by_tier``, which may hit the Portal.
+# (GUI onboarding / ``eir model``) uses the tier-aware ``get_recommended_default_model`` in
+# eir_cli/web_server.py + ``partition_nous_models_by_tier``, which may hit the Portal.
 _SILENT_DEFAULT_PROVIDERS: frozenset[str] = frozenset({"nous", "openrouter"})
 
 
@@ -701,7 +701,7 @@ _LIVE_FIRST_PICKER_PROVIDERS: frozenset[str] = frozenset({"opencode-zen", "openc
 _OPENAI_FAST_MODE_PREFIXES: tuple[str, ...] = ("gpt-", "o1", "o3", "o4")
 # OpenAI Ultrafast (service_tier="ultrafast", 6x Standard): GPT-6 Astra and GPT-6.1 Sol
 # (developers.openai.com/api/docs/guides/ultrafast-mode, 2026-10-08).
-# Exact wire slugs, matched after stripping the vendor prefix and the Hermes-side ``-900k`` alias.
+# Exact wire slugs, matched after stripping the vendor prefix and the Eir-side ``-900k`` alias.
 _OPENAI_ULTRAFAST_MODELS: frozenset[str] = frozenset({"gpt-6-astra", "gpt-6.1-sol"})
 
 

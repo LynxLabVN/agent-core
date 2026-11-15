@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 from rich.console import Console
 
-from hermes_cli import secrets_cli
+from eir_cli import secrets_cli
 
 HOSTILE = "token revoked [green]Token accepted[/green] \x1b]8;;http://evil.example\x07CLICKME\x1b]8;;\x07 end"
 
@@ -170,11 +170,11 @@ class TestSetupAndSyncSurfaces:
 
 
 class TestEgressSetupFromBitwarden:
-    """Same defect in ``hermes egress setup --from-bitwarden`` (proxy_cli)."""
+    """Same defect in ``eir egress setup --from-bitwarden`` (proxy_cli)."""
 
     def test_fetch_error_text_escaped(self, monkeypatch):
         from agent.secret_sources import bitwarden as bw
-        from hermes_cli import proxy_cli
+        from eir_cli import proxy_cli
 
         monkeypatch.setattr(
             proxy_cli, "load_config",
@@ -192,11 +192,11 @@ class TestEgressSetupFromBitwarden:
         assert "\x1b" not in out and "\x07" not in out
 
     def test_start_bitwarden_refresh_error_text_escaped(self, monkeypatch, capsys):
-        """hermes egress start/restart with credential_source: bitwarden: the BWS refresh
+        """eir egress start/restart with credential_source: bitwarden: the BWS refresh
         error propagates out of start_proxy into cmd_start's failure line."""
         from agent.proxy_sources import iron_proxy as ip
         from agent.secret_sources import bitwarden as bw
-        from hermes_cli import proxy_cli
+        from eir_cli import proxy_cli
 
         monkeypatch.setattr(
             proxy_cli, "load_config",
@@ -254,7 +254,7 @@ class TestTokenCommandE2E:
     def test_token_verify_hostile_stderr_literal(self, monkeypatch, capsys):
         import argparse as _ap
 
-        from hermes_cli.subcommands.secrets import build_secrets_parser
+        from eir_cli.subcommands.secrets import build_secrets_parser
         monkeypatch.setattr(
             secrets_cli, "load_config",
             lambda: {"secrets": {"bitwarden": {"enabled": True, "project_id": "p1",
@@ -280,7 +280,7 @@ class TestOnepasswordSiblingSurfaces:
     """Same defect class in the 1Password secrets CLI (op stderr/server text)."""
 
     def test_sync_fetch_error_text_escaped(self, monkeypatch, capsys):
-        import hermes_cli.onepassword_secrets_cli as op_cli
+        import eir_cli.onepassword_secrets_cli as op_cli
 
         monkeypatch.setattr(
             op_cli, "load_config",
@@ -298,12 +298,12 @@ class TestOnepasswordSiblingSurfaces:
 
 
 class TestStatusCommandE2E:
-    """Real parser + dispatcher: hermes secrets bitwarden status."""
+    """Real parser + dispatcher: eir secrets bitwarden status."""
 
     def test_status_e2e_hostile_stderr_literal(self, monkeypatch, capsys):
         import argparse as _ap
 
-        from hermes_cli.subcommands.secrets import build_secrets_parser
+        from eir_cli.subcommands.secrets import build_secrets_parser
         monkeypatch.setattr(
             secrets_cli, "load_config",
             lambda: {"secrets": {"bitwarden": {"enabled": True, "project_id": "p1",

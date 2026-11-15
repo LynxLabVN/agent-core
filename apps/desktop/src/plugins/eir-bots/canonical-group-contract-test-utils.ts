@@ -9,9 +9,9 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import type * as HermesSdk from '@hermes/plugin-sdk'
+import type * as EirSdk from '@eir/plugin-sdk'
 // eslint-disable-next-line no-restricted-imports -- Wire fixtures use the real client decoder, not a plugin capability.
-import { jsonRpcErrorFromFrame } from '@hermes/shared'
+import { jsonRpcErrorFromFrame } from '@eir/shared'
 import { afterEach } from 'vitest'
 
 import type { CanonicalRoom } from './canonical-groups'
@@ -160,7 +160,7 @@ export function answerGroupRequests(request: { mockImplementation: (fn: ProfileR
   })
 }
 
-/** The standalone server's answer (`hermes serve`, `hermes dashboard`; tui_gateway/methods_groups.py
+/** The standalone server's answer (`eir serve`, `eir dashboard`; tui_gateway/methods_groups.py
  *  `_METHODS`): it starts its own room driver at boot, so `driver` is true too. */
 export const STANDALONE_GROUP_CAPABILITIES = declaredCapabilities({
   protocol_version: 2,
@@ -258,10 +258,10 @@ export function captureGroupRequests(request: ProfileRequest) {
   }
 }
 
-/** `@hermes/plugin-sdk` for a dialog or gate on the `local` connection's default profile, with its
+/** `@eir/plugin-sdk` for a dialog or gate on the `local` connection's default profile, with its
  *  group requests going to `request` (contract-checked), Bot Mode words from `translate()` (read at
  *  render, since the plugin's bundle imports this module) and `host` overrides. */
-export async function localGatewaySdkMock(sdk: typeof HermesSdk, request: ProfileRequest, translate: () => unknown,
+export async function localGatewaySdkMock(sdk: typeof EirSdk, request: ProfileRequest, translate: () => unknown,
   host: Record<string, unknown> = {}) {
   const { en } = await import('@/i18n/en')
 

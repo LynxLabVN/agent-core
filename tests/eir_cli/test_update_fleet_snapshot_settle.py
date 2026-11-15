@@ -12,10 +12,10 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from hermes_cli import update_cmd
-from hermes_cli import update_cmd_fleet
-import hermes_cli.update_cmd_fleet_verify as fleet_verify
-from hermes_constants import get_hermes_home
+from eir_cli import update_cmd
+from eir_cli import update_cmd_fleet
+import eir_cli.update_cmd_fleet_verify as fleet_verify
+from eir_constants import get_eir_home
 
 
 class _FakeClock:
@@ -40,7 +40,7 @@ def test_snapshot_waits_for_late_current_gateway_state(monkeypatch) -> None:
     monkeypatch.setattr(update_cmd_fleet._time, "monotonic", clock.monotonic)
     monkeypatch.setattr(update_cmd_fleet._time, "sleep", clock.sleep)
     monkeypatch.setattr(
-        "hermes_cli.update_receipt.collect_fleet_versions",
+        "eir_cli.update_receipt.collect_fleet_versions",
         lambda **_kwargs: next(snapshots),
     )
 
@@ -58,13 +58,13 @@ def test_snapshot_stops_waiting_once_the_restarted_unit_is_dead(monkeypatch) -> 
     clock = _FakeClock()
     monkeypatch.setattr(update_cmd_fleet._time, "monotonic", clock.monotonic)
     monkeypatch.setattr(update_cmd_fleet._time, "sleep", clock.sleep)
-    monkeypatch.setattr("hermes_cli.update_receipt.collect_fleet_versions", lambda **_kwargs: [])
+    monkeypatch.setattr("eir_cli.update_receipt.collect_fleet_versions", lambda **_kwargs: [])
     monkeypatch.setattr(
         update_cmd_fleet, "_systemctl",
         lambda cmd, *, timeout: SimpleNamespace(
             stdout="LoadState=loaded\nActiveState=failed\n", stderr="", returncode=0))
 
-    restart = SimpleNamespace(pre_restart_gateway_pids=[101], restarted_scoped_units={"user/hermes-gateway.service"})
+    restart = SimpleNamespace(pre_restart_gateway_pids=[101], restarted_scoped_units={"user/eir-gateway.service"})
     assert fleet_verify._collect_fleet_snapshot(restart, rows_expected=True) == []
     assert clock.now < 30.0
 
@@ -75,7 +75,7 @@ def test_snapshot_keeps_waiting_when_the_unit_is_unknown_to_the_asked_scope(monk
     clock = _FakeClock()
     monkeypatch.setattr(update_cmd_fleet._time, "monotonic", clock.monotonic)
     monkeypatch.setattr(update_cmd_fleet._time, "sleep", clock.sleep)
-    monkeypatch.setattr("hermes_cli.update_receipt.collect_fleet_versions", lambda **_kwargs: [])
+    monkeypatch.setattr("eir_cli.update_receipt.collect_fleet_versions", lambda **_kwargs: [])
 
     def systemctl(cmd, *, timeout):
         # Real systemctl shape: the owning (user) scope has the unit loaded and active; the system
@@ -86,9 +86,9 @@ def test_snapshot_keeps_waiting_when_the_unit_is_unknown_to_the_asked_scope(monk
             stderr="", returncode=0)
 
     monkeypatch.setattr(update_cmd_fleet, "_systemctl", systemctl)
-    assert fleet_verify._restarted_units_gone(("system/hermes-gateway.service",)) is False
+    assert fleet_verify._restarted_units_gone(("system/eir-gateway.service",)) is False
 
-    restart = SimpleNamespace(pre_restart_gateway_pids=[101], restarted_scoped_units={"system/hermes-gateway.service"})
+    restart = SimpleNamespace(pre_restart_gateway_pids=[101], restarted_scoped_units={"system/eir-gateway.service"})
     assert fleet_verify._collect_fleet_snapshot(restart, rows_expected=True) == []
     assert clock.now >= fleet_verify._FLEET_PROBE_SETTLE_TIMEOUT_SECONDS
 
@@ -102,7 +102,7 @@ def test_snapshot_waits_for_the_relaunched_pid_to_publish_its_identity(monkeypat
     unknown = {"profile": "default", "pid": 34516, "code_sha": None, "code_version": None, "state": "unknown"}
     current = {**unknown, "code_sha": "new", "code_version": "0.21.3", "state": "current"}
     snapshots = iter([[dict(unknown)]] * 5 + [[current]])
-    monkeypatch.setattr("hermes_cli.update_receipt.collect_fleet_versions", lambda **_kwargs: next(snapshots))
+    monkeypatch.setattr("eir_cli.update_receipt.collect_fleet_versions", lambda **_kwargs: next(snapshots))
     restart = SimpleNamespace(pre_restart_gateway_pids=[32512], restarted_scoped_units=set())
 
     assert fleet_verify._collect_fleet_snapshot(restart, rows_expected=True) == [current]
@@ -110,7 +110,7 @@ def test_snapshot_waits_for_the_relaunched_pid_to_publish_its_identity(monkeypat
 
     # Control: the same unknown row for a pid that was already running pre-update is settled as-is.
     clock.now = 0.0
-    monkeypatch.setattr("hermes_cli.update_receipt.collect_fleet_versions", lambda **_kwargs: [dict(unknown)])
+    monkeypatch.setattr("eir_cli.update_receipt.collect_fleet_versions", lambda **_kwargs: [dict(unknown)])
     survivor = SimpleNamespace(pre_restart_gateway_pids=[34516], restarted_scoped_units=set())
     result = fleet_verify._collect_fleet_snapshot(survivor, rows_expected=True)
     assert clock.now == 2.0 and "identity_pending" not in result[0]
@@ -127,17 +127,17 @@ def test_verifier_clears_marker_after_late_current_gateway_state(monkeypatch) ->
     clock = _FakeClock()
     expected = {"profile": "default", "pid": 202, "code_sha": "new", "state": "current"}
     snapshots = iter([[], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [expected]])
-    marker = get_hermes_home() / "fleet_restart_pending"
+    marker = get_eir_home() / "fleet_restart_pending"
     marker.write_text("started=1\npid=101\nexpected_sha=new\n", encoding="utf-8")
 
     monkeypatch.setattr(update_cmd_fleet._time, "monotonic", clock.monotonic)
     monkeypatch.setattr(update_cmd_fleet._time, "sleep", clock.sleep)
     monkeypatch.setattr(
-        "hermes_cli.update_receipt.collect_fleet_versions",
+        "eir_cli.update_receipt.collect_fleet_versions",
         lambda **_kwargs: next(snapshots),
     )
     monkeypatch.setattr(
-        "hermes_cli.update_receipt.print_fleet_version_matrix",
+        "eir_cli.update_receipt.print_fleet_version_matrix",
         lambda _fleet: False,
     )
     monkeypatch.setattr(fleet_verify, "_print_legacy_units_warning", lambda: None)
@@ -150,7 +150,7 @@ def test_verifier_clears_marker_after_late_current_gateway_state(monkeypatch) ->
     restart = SimpleNamespace(
         incomplete=False,
         pre_restart_gateway_pids=[101],
-        restarted_services=["hermes-gateway.service"],
+        restarted_services=["eir-gateway.service"],
         relaunched_profiles=[],
         externally_supervised_profiles=[],
         killed_pids=set(),

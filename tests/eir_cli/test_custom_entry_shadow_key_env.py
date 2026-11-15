@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 
-import hermes_yaml as yaml
+import eir_yaml as yaml
 import pytest
 
 ENDPOINT = "http://127.0.0.1:18080/v1"
@@ -26,22 +26,22 @@ SHADOWED_BUILTINS = [
 
 
 def _home(tmp_path, monkeypatch, name, builtin_env, *, entry_extra=None, pool=None):
-    hermes_home = tmp_path / ".hermes"
-    hermes_home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    eir_home = tmp_path / ".eir"
+    eir_home.mkdir()
+    monkeypatch.setenv("EIR_HOME", str(eir_home))
     entry = {"name": name, "api": ENDPOINT, "transport": "chat_completions", "default_model": "m"}
     entry.update({"key_env": "ENTRY_KEY_VAR"} if entry_extra is None else entry_extra)
     config = {"model": {"default": "m", "provider": f"custom:{name}"}, "providers": {name: entry}}
-    (hermes_home / "config.yaml").write_text(yaml.safe_dump(config), encoding="utf-8")
-    (hermes_home / "auth.json").write_text(
+    (eir_home / "config.yaml").write_text(yaml.safe_dump(config), encoding="utf-8")
+    (eir_home / "auth.json").write_text(
         json.dumps({"version": 1, "providers": {}, "credential_pool": pool or {}}), encoding="utf-8")
     monkeypatch.setenv(builtin_env, BUILTIN_KEY)
     monkeypatch.setenv("ENTRY_KEY_VAR", ENTRY_KEY)
-    return hermes_home
+    return eir_home
 
 
 def _entry_manual_row():
-    """What ``hermes auth add deepseek`` records while ``providers.deepseek`` is configured: the
+    """What ``eir auth add deepseek`` records while ``providers.deepseek`` is configured: the
     entry's address. A row with no address in the built-in's pool is the built-in's (#130410)."""
     return {"id": "m1", "label": "manual", "auth_type": "api_key", "priority": 0, "source": "manual",
             "access_token": MANUAL_KEY, "base_url": ENDPOINT}
@@ -51,7 +51,7 @@ def _entry_manual_row():
 def test_shadowing_entry_main_runtime_sends_its_key_env(tmp_path, monkeypatch, name, builtin_env):
     """``model.provider: custom:<name>`` (which pick a bare ``<name>`` routes to is #140107's scope)."""
     _home(tmp_path, monkeypatch, name, builtin_env)
-    from hermes_cli import runtime_provider as rp
+    from eir_cli import runtime_provider as rp
 
     resolved = rp.resolve_runtime_provider(requested=f"custom:{name}")
     assert resolved["base_url"] == ENDPOINT
@@ -62,8 +62,8 @@ def test_shadowing_entry_main_runtime_sends_its_key_env(tmp_path, monkeypatch, n
 def test_shadowing_entry_frozen_policy_sends_its_key_env(tmp_path, monkeypatch, name, builtin_env):
     """The session's frozen route ``{provider: custom:<name>, base_url, key_env}``."""
     _home(tmp_path, monkeypatch, name, builtin_env)
-    from hermes_cli import runtime_provider as rp
-    from hermes_cli.runtime_provider_custom import _resolve_named_custom_runtime
+    from eir_cli import runtime_provider as rp
+    from eir_cli.runtime_provider_custom import _resolve_named_custom_runtime
 
     frozen = rp.load_config()
     resolved = _resolve_named_custom_runtime(requested_provider=f"custom:{name}", config=frozen)
@@ -83,7 +83,7 @@ def test_shadowing_entry_auxiliary_client_never_borrows_builtin_key(tmp_path, mo
     if not entry_key_set:
         monkeypatch.delenv("ENTRY_KEY_VAR")
     from agent.auxiliary_client import _named_custom_api_key
-    from hermes_cli.runtime_provider import _get_named_custom_provider
+    from eir_cli.runtime_provider import _get_named_custom_provider
 
     entry = _get_named_custom_provider(f"custom:{name}")
     expected = ENTRY_KEY if entry_key_set else "no-key-required"
@@ -93,7 +93,7 @@ def test_shadowing_entry_auxiliary_client_never_borrows_builtin_key(tmp_path, mo
 def test_shadowing_entry_unset_key_env_never_borrows_builtin_key(tmp_path, monkeypatch):
     _home(tmp_path, monkeypatch, "deepseek", "DEEPSEEK_API_KEY")
     monkeypatch.delenv("ENTRY_KEY_VAR")
-    from hermes_cli import runtime_provider as rp
+    from eir_cli import runtime_provider as rp
 
     resolved = rp.resolve_runtime_provider(requested="custom:deepseek")
     assert resolved["base_url"] == ENDPOINT
@@ -102,17 +102,17 @@ def test_shadowing_entry_unset_key_env_never_borrows_builtin_key(tmp_path, monke
 
 def test_shadowing_entry_inline_api_key_beats_builtin_env(tmp_path, monkeypatch):
     _home(tmp_path, monkeypatch, "deepseek", "DEEPSEEK_API_KEY", entry_extra={"api_key": ENTRY_KEY})
-    from hermes_cli import runtime_provider as rp
+    from eir_cli import runtime_provider as rp
 
     assert rp.resolve_runtime_provider(requested="custom:deepseek")["api_key"] == ENTRY_KEY
 
 
 def test_shadowing_entry_manual_pool_row_still_wins(tmp_path, monkeypatch):
-    """``hermes auth add deepseek`` rows are the operator's credential for the slug and keep
+    """``eir auth add deepseek`` rows are the operator's credential for the slug and keep
     their precedence over key_env, exactly like a non-shadowing keyed entry."""
     manual = _entry_manual_row()
     _home(tmp_path, monkeypatch, "deepseek", "DEEPSEEK_API_KEY", pool={"deepseek": [manual]})
-    from hermes_cli import runtime_provider as rp
+    from eir_cli import runtime_provider as rp
 
     for _ in range(3):
         resolved = rp.resolve_runtime_provider(requested="custom:deepseek")
@@ -130,7 +130,7 @@ def test_entry_without_key_env_uses_builtin_rows_only_on_their_own_origin(tmp_pa
     """No key_env / api_key / key_cmd: the built-in's env-seeded row (recorded for api.deepseek.com)
     serves the entry on that origin only; at any other host the entry goes keyless (#130410)."""
     home = _home(tmp_path, monkeypatch, "deepseek", "DEEPSEEK_API_KEY", entry_extra={})
-    from hermes_cli import runtime_provider as rp
+    from eir_cli import runtime_provider as rp
 
     assert rp.resolve_runtime_provider(requested="custom:deepseek")["api_key"] == "no-key-required"
     _edit_config(home, entry={"api": BUILTIN_HOST})
@@ -145,7 +145,7 @@ def test_withheld_builtin_key_is_reported_once_with_the_remedy_never_the_key(tmp
     from agent import custom_entry_pool
     monkeypatch.setattr(custom_entry_pool, "_WARNED_WITHHELD", set())
     _home(tmp_path, monkeypatch, "deepseek", "DEEPSEEK_API_KEY", entry_extra={})
-    from hermes_cli import runtime_provider as rp
+    from eir_cli import runtime_provider as rp
 
     with caplog.at_level(logging.WARNING):
         for _ in range(2):
@@ -158,7 +158,7 @@ def test_withheld_builtin_key_is_reported_once_with_the_remedy_never_the_key(tmp
     # The documented opt-in restores the key on the entry's own host, and says nothing more.
     caplog.clear()
     monkeypatch.setattr(custom_entry_pool, "_WARNED_WITHHELD", set())
-    _edit_config(tmp_path / ".hermes", entry={"key_env": "DEEPSEEK_API_KEY"})
+    _edit_config(tmp_path / ".eir", entry={"key_env": "DEEPSEEK_API_KEY"})
     with caplog.at_level(logging.WARNING):
         resolved = rp.resolve_runtime_provider(requested="custom:deepseek")
     assert (resolved["base_url"], resolved["api_key"]) == (ENDPOINT, BUILTIN_KEY)
@@ -171,7 +171,7 @@ def test_withheld_builtin_key_warning_reaches_every_profile_home(tmp_path, monke
 
     from agent import custom_entry_pool
     monkeypatch.setattr(custom_entry_pool, "_WARNED_WITHHELD", set())
-    from hermes_cli import runtime_provider as rp
+    from eir_cli import runtime_provider as rp
 
     counts = []
     for profile in ("a", "b"):
@@ -197,7 +197,7 @@ def test_withheld_builtin_key_warning_on_the_builtins_own_host_names_the_recordi
                  pool={"deepseek": [row]})
     monkeypatch.delenv("DEEPSEEK_API_KEY")
     _edit_config(home, entry={"api": BUILTIN_HOST})
-    from hermes_cli import runtime_provider as rp
+    from eir_cli import runtime_provider as rp
 
     with caplog.at_level(logging.WARNING):
         rp.resolve_runtime_provider(requested="custom:deepseek")
@@ -208,7 +208,7 @@ def test_withheld_builtin_key_warning_on_the_builtins_own_host_names_the_recordi
 
 def test_non_shadowing_entry_sends_its_key_env(tmp_path, monkeypatch):
     _home(tmp_path, monkeypatch, "mydeep", "DEEPSEEK_API_KEY")
-    from hermes_cli import runtime_provider as rp
+    from eir_cli import runtime_provider as rp
 
     resolved = rp.resolve_runtime_provider(requested="custom:mydeep")
     assert (resolved["base_url"], resolved["api_key"]) == (ENDPOINT, ENTRY_KEY)
@@ -231,7 +231,7 @@ def test_url_matched_bare_custom_sends_the_entry_key(tmp_path, monkeypatch, expl
     """Bare ``provider: custom`` whose URL matches ``providers.deepseek`` gets the entry's key_env."""
     home = _home(tmp_path, monkeypatch, "deepseek", "DEEPSEEK_API_KEY")
     _edit_config(home, model={"provider": "custom", "base_url": ENDPOINT})
-    from hermes_cli import runtime_provider as rp
+    from eir_cli import runtime_provider as rp
 
     resolved = rp.resolve_runtime_provider(requested="custom", **({"explicit_base_url": ENDPOINT} if explicit else {}))
     assert (resolved["base_url"], resolved["api_key"]) == (ENDPOINT, ENTRY_KEY)
@@ -241,7 +241,7 @@ def test_url_matched_bare_custom_sends_the_entry_key(tmp_path, monkeypatch, expl
 def test_url_matched_bare_custom_frozen_route_sends_the_entry_key(tmp_path, monkeypatch, explicit):
     home = _home(tmp_path, monkeypatch, "deepseek", "DEEPSEEK_API_KEY")
     _edit_config(home, model={"provider": "custom", "base_url": ENDPOINT})
-    from hermes_cli import runtime_provider as rp
+    from eir_cli import runtime_provider as rp
 
     frozen = rp.load_config()
     # A live edit after the session froze its route must not change who owns the endpoint.
@@ -253,7 +253,7 @@ def test_url_matched_bare_custom_frozen_route_sends_the_entry_key(tmp_path, monk
 
 def test_url_matched_entry_without_declared_credential_never_sends_the_builtin_key_elsewhere(tmp_path, monkeypatch):
     _home(tmp_path, monkeypatch, "deepseek", "DEEPSEEK_API_KEY", entry_extra={})
-    from hermes_cli import runtime_provider as rp
+    from eir_cli import runtime_provider as rp
 
     resolved = rp.resolve_runtime_provider(requested="custom", explicit_base_url=ENDPOINT)
     assert resolved["api_key"] != BUILTIN_KEY
@@ -265,7 +265,7 @@ def test_declared_key_env_unset_never_falls_back_to_the_builtin_host_key(tmp_pat
     home = _home(tmp_path, monkeypatch, "deepseek", "DEEPSEEK_API_KEY")
     _edit_config(home, entry={"api": BUILTIN_HOST})
     monkeypatch.delenv("ENTRY_KEY_VAR")
-    from hermes_cli import runtime_provider as rp
+    from eir_cli import runtime_provider as rp
 
     with caplog.at_level("WARNING"):
         resolved = rp.resolve_runtime_provider(requested=requested, explicit_base_url=BUILTIN_HOST if requested == "custom" else None)
@@ -280,7 +280,7 @@ def test_entry_owns_pool_rows_seeded_from_its_own_key_env(tmp_path, monkeypatch)
     row = {"id": "e1", "label": "ENTRY_KEY_VAR", "auth_type": "api_key", "priority": 0,
            "source": "env:ENTRY_KEY_VAR", "access_token": ENTRY_KEY, "base_url": ENDPOINT}
     _home(tmp_path, monkeypatch, "deepseek", "DEEPSEEK_API_KEY", pool={"deepseek": [row]})
-    from hermes_cli import runtime_provider as rp
+    from eir_cli import runtime_provider as rp
 
     resolved = rp.resolve_runtime_provider(requested="custom:deepseek")
     assert resolved["api_key"] == ENTRY_KEY
@@ -319,7 +319,7 @@ def _restorable_agent(primary: dict):
 
 def test_restoring_the_primary_after_fallback_keeps_the_entry_endpoint_and_key(tmp_path, monkeypatch):
     _home(tmp_path, monkeypatch, "deepseek", "DEEPSEEK_API_KEY")
-    from hermes_cli import runtime_provider as rp
+    from eir_cli import runtime_provider as rp
 
     initial = rp.resolve_runtime_provider(requested="custom:deepseek")
     assert initial["api_key"] == ENTRY_KEY
@@ -345,7 +345,7 @@ def test_delegated_child_never_leases_the_builtin_account(tmp_path, monkeypatch)
 
     home = _home(tmp_path, monkeypatch, "deepseek", "DEEPSEEK_API_KEY")
     _edit_config(home, entry={"api": BUILTIN_HOST})
-    from hermes_cli import runtime_provider as rp
+    from eir_cli import runtime_provider as rp
     from tools.delegate_tool_child_run import _lease_child_credential
     from tools.delegate_tool_config import _resolve_child_credential_pool
 
@@ -367,7 +367,7 @@ def test_explicit_builtin_pick_keeps_its_env_key(tmp_path, monkeypatch, name, bu
     with its env key. With an endpoint the entry is what the name means (#151775 ruling, option A),
     and it sends its own key there."""
     home = _home(tmp_path, monkeypatch, name, builtin_env)
-    from hermes_cli import runtime_provider as rp
+    from eir_cli import runtime_provider as rp
 
     resolved = rp.resolve_runtime_provider(requested=name)
     assert (resolved["base_url"], resolved["api_key"]) == (ENDPOINT, ENTRY_KEY)
@@ -384,7 +384,7 @@ def test_persisting_the_entry_view_keeps_the_builtin_rows_and_writes_no_secret(t
     manual = _entry_manual_row()
     home = _home(tmp_path, monkeypatch, "deepseek", "DEEPSEEK_API_KEY", pool={"deepseek": [manual]})
     from agent.credential_pool import load_pool
-    from hermes_cli import runtime_provider as rp
+    from eir_cli import runtime_provider as rp
 
     load_pool("deepseek")
     before = {r["id"] for r in json.loads((home / "auth.json").read_text())["credential_pool"]["deepseek"]}
@@ -402,7 +402,7 @@ SIBLING_KEY = "sibling-key-C-0123456789"
 
 
 def _two_entries_on_one_url(tmp_path, monkeypatch):
-    """``alpha`` (with a ``hermes auth add alpha`` row) and ``beta`` share ENDPOINT; beta is the primary."""
+    """``alpha`` (with a ``eir auth add alpha`` row) and ``beta`` share ENDPOINT; beta is the primary."""
     home = _home(tmp_path, monkeypatch, "alpha", "ALPHA_KEY_VAR", entry_extra={"key_env": "ALPHA_KEY_VAR"},
                  pool={"alpha": [{"id": "m1", "label": "manual", "auth_type": "api_key", "priority": 0,
                                   "source": "manual", "access_token": MANUAL_KEY}]})
@@ -417,7 +417,7 @@ def _two_entries_on_one_url(tmp_path, monkeypatch):
 def test_restoring_a_named_entry_never_resumes_on_a_sibling_sharing_its_url(tmp_path, monkeypatch):
     _two_entries_on_one_url(tmp_path, monkeypatch)
     from agent.custom_entry_pool import load_runtime_pool
-    from hermes_cli import runtime_provider as rp
+    from eir_cli import runtime_provider as rp
 
     pool = load_runtime_pool("custom", ENDPOINT, "custom:beta")
     assert pool is None or not {e.access_token for e in pool.entries()} & {MANUAL_KEY, SIBLING_KEY}
@@ -504,8 +504,8 @@ def test_aux_auth_failure_on_the_entry_never_rotates_the_builtin_pool(tmp_path, 
 def test_bare_route_skips_an_unusable_inline_key_for_the_declared_key_env(tmp_path, monkeypatch):
     _home(tmp_path, monkeypatch, "deepseek", "DEEPSEEK_API_KEY",
           entry_extra={"key_env": "ENTRY_KEY_VAR", "api_key": "placeholder"})
-    from hermes_cli import runtime_provider as rp
-    from hermes_cli.runtime_provider_custom import _owning_entry_credential
+    from eir_cli import runtime_provider as rp
+    from eir_cli.runtime_provider_custom import _owning_entry_credential
 
     assert _owning_entry_credential(rp, ENDPOINT) == (True, ENTRY_KEY)
 
@@ -514,7 +514,7 @@ def test_aux_named_entry_skips_an_unusable_inline_key_for_the_declared_key_env(t
     _home(tmp_path, monkeypatch, "mydeep", "DEEPSEEK_API_KEY",
           entry_extra={"key_env": "ENTRY_KEY_VAR", "api_key": "placeholder"})
     from agent.auxiliary_client import _named_custom_api_key
-    from hermes_cli.runtime_provider import _get_named_custom_provider
+    from eir_cli.runtime_provider import _get_named_custom_provider
 
     assert _named_custom_api_key(_get_named_custom_provider("custom:mydeep"), "mydeep", ENDPOINT) == ENTRY_KEY
 
@@ -569,9 +569,9 @@ def _drop_declaration(home, key):
 @pytest.mark.parametrize("builder", SNAPSHOT_BUILDERS)
 def test_restore_keeps_the_frozen_owner_after_its_endpoint_moves(tmp_path, monkeypatch, builder):
     """beta's live endpoint moves off the shared URL: the named lookup misses, and the URL-only
-    fallback used to hand the session alpha's ``hermes auth add`` key."""
+    fallback used to hand the session alpha's ``eir auth add`` key."""
     home = _two_entries_on_one_url(tmp_path, monkeypatch)
-    from hermes_cli import runtime_provider as rp
+    from eir_cli import runtime_provider as rp
 
     initial = rp.resolve_runtime_provider(requested="custom:beta")
     assert initial["api_key"] == ENTRY_KEY
@@ -587,7 +587,7 @@ def test_restore_keeps_the_frozen_declaration_after_it_is_removed(tmp_path, monk
     """The live entry stops declaring a credential: the built-in's env row used to win, moving the
     session onto DEEPSEEK_API_KEY and api.deepseek.com."""
     home = _home(tmp_path, monkeypatch, "deepseek", "DEEPSEEK_API_KEY", entry_extra=declared)
-    from hermes_cli import runtime_provider as rp
+    from eir_cli import runtime_provider as rp
 
     initial = rp.resolve_runtime_provider(requested="custom:deepseek")
     assert initial["api_key"] == ENTRY_KEY
@@ -608,7 +608,7 @@ def test_a_snapshot_without_recorded_ownership_keeps_its_own_credential(tmp_path
         home, name = _two_entries_on_one_url(tmp_path, monkeypatch), "beta"
     else:
         home, name = _home(tmp_path, monkeypatch, "deepseek", "DEEPSEEK_API_KEY"), "deepseek"
-    from hermes_cli import runtime_provider as rp
+    from eir_cli import runtime_provider as rp
 
     initial = rp.resolve_runtime_provider(requested=f"custom:{name}")
     agent = _restorable_agent({"provider": initial["provider"], "requested_provider": f"custom:{name}",
@@ -623,11 +623,11 @@ def test_a_snapshot_without_recorded_ownership_keeps_its_own_credential(tmp_path
 
 @pytest.mark.parametrize("builder", SNAPSHOT_BUILDERS)
 def test_restore_still_reselects_the_owners_own_pool_row(tmp_path, monkeypatch, builder):
-    """Recorded ownership scopes the pool, it doesn't drop it: the entry's ``hermes auth add`` row
+    """Recorded ownership scopes the pool, it doesn't drop it: the entry's ``eir auth add`` row
     replaces a stale snapshot key on restore, and the built-in's row stays out."""
     manual = _entry_manual_row()
     _home(tmp_path, monkeypatch, "deepseek", "DEEPSEEK_API_KEY", pool={"deepseek": [manual]})
-    from hermes_cli import runtime_provider as rp
+    from eir_cli import runtime_provider as rp
 
     initial = rp.resolve_runtime_provider(requested="custom:deepseek")
     agent = _snapshotted_agent(builder, initial, "custom:deepseek", api_key="stale-snapshot-key-0123")

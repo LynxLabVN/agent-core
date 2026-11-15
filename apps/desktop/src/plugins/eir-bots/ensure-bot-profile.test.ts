@@ -12,7 +12,7 @@ import type { RosterRow } from './types'
 
 const { requestForBotMock } = vi.hoisted(() => ({ requestForBotMock: vi.fn() }))
 
-vi.mock('@hermes/plugin-sdk', () => ({ host: {} }))
+vi.mock('@eir/plugin-sdk', () => ({ host: {} }))
 
 vi.mock('./routing', () => ({
   backendTargetProfile: (route: { targetProfile?: string } | null, name: string) => route?.targetProfile ?? name,

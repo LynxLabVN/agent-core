@@ -1,4 +1,4 @@
-import { Button, ConfirmDialog, host, useValue } from '@hermes/plugin-sdk'
+import { Button, ConfirmDialog, host, useValue } from '@eir/plugin-sdk'
 import { useEffect, useRef, useState } from 'react'
 
 import { canonicalMemberName } from './canonical-group-activity'

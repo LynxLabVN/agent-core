@@ -35,7 +35,7 @@ def _findings(plugin: Path, rel: str = "core/store.py"):
 
 
 # A defensive module: every entry point validates the id, and the docstrings say so with a
-# realistic traversal example -- the shape that blocked hermes-genui (catalog pin 43de4cdb).
+# realistic traversal example -- the shape that blocked eir-genui (catalog pin 43de4cdb).
 DEFENSIVE_MODULE = '''"""Vault store: every id is validated before it reaches the filesystem."""
 
 import re

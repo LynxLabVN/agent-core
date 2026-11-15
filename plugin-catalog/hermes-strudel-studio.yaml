@@ -1,10 +1,10 @@
 name: hermes-strudel-studio
-title: Hermes Strudel Studio
+title: Eir Strudel Studio
 repo: https://github.com/mojomast/poptart
 sha: 42356ddb9eff2eea2419bbd223ee159f353e4632
-subdir: integration/hermes
+subdir: integration/eir
 description: >-
-  Local Strudel live-coding studio for Hermes: write patterns, hit Play, and
+  Local Strudel live-coding studio for Eir: write patterns, hit Play, and
   let the agent compose alongside you with one poptart_studio tool and a
   Desktop SandboxedFrame pane. Disclosure — lazily starts a Node sidecar on
   127.0.0.1 with a random per-install token in private profile plugin-data
@@ -18,7 +18,7 @@ description: >-
 maintainer: mojomast
 tier: community
 category: desktop
-requires_hermes: ">=0.22.7"
+requires_eir: ">=0.22.7"
 version: "0.2.5"
 docs_url: https://github.com/mojomast/poptart/blob/42356ddb9eff2eea2419bbd223ee159f353e4632/INTEGRATION.md
 readme: true

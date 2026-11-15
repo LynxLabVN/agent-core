@@ -1,6 +1,6 @@
-import type * as HermesSdk from '@hermes/plugin-sdk'
+import type * as EirSdk from '@eir/plugin-sdk'
 // eslint-disable-next-line no-restricted-imports -- Exercise the same serialized errors as the shared client.
-import { jsonRpcErrorFromFrame } from '@hermes/shared'
+import { jsonRpcErrorFromFrame } from '@eir/shared'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
@@ -14,8 +14,8 @@ import { $groupChats, updateGroupChat } from './group-chat'
 import { translateBotsIn } from './i18n-test-helper'
 
 const { request, locale } = vi.hoisted(() => ({ request: vi.fn(), locale: { value: 'en' } }))
-vi.mock('@hermes/plugin-sdk', async importOriginal =>
-  localGatewaySdkMock(await importOriginal<typeof HermesSdk>(), request, () => translateBotsIn(locale.value)))
+vi.mock('@eir/plugin-sdk', async importOriginal =>
+  localGatewaySdkMock(await importOriginal<typeof EirSdk>(), request, () => translateBotsIn(locale.value)))
 
 // Captured through AuthorityConnection.dispatch at gateway 62f2b28d15. The fixture generator
 // verifies the durable receipt is absent/present; neither state exposes that receipt to Desktop.
@@ -24,7 +24,7 @@ vi.mock('@hermes/plugin-sdk', async importOriginal =>
 const frame = (name: keyof typeof wire) => JSON.parse(wire[name])
 const binding = { connectionId: 'local', profile: 'default', roomId: 'linked' }
 const locales = Object.keys(CANONICAL_GROUP_LOCALES) as (keyof typeof CANONICAL_GROUP_LOCALES)[]
-const originalDesktop = window.hermesDesktop
+const originalDesktop = window.eirDesktop
 
 const recoveryAdvice = {
   en: ['when its computer is answering', 'haven’t all confirmed they’ve stopped'],
@@ -39,7 +39,7 @@ const recoveryAdvice = {
 }
 
 beforeEach(() => {
-  Object.defineProperty(window, 'hermesDesktop', { configurable: true, writable: true, value: undefined })
+  Object.defineProperty(window, 'eirDesktop', { configurable: true, writable: true, value: undefined })
   $canonicalGroupBindings.set({})
   $groupChats.set({})
 })
@@ -47,7 +47,7 @@ afterEach(() => {
   cleanup()
   request.mockReset()
   localStorage.clear()
-  window.hermesDesktop = originalDesktop
+  window.eirDesktop = originalDesktop
 })
 
 function gateway(state: () => unknown, control: (method: string) => unknown, log = () => ({ events: [] })) {

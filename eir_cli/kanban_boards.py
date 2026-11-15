@@ -1,4 +1,4 @@
-"""``hermes kanban boards …`` — board directories, the ``current`` pointer and ``board.json``.
+"""``eir kanban boards …`` — board directories, the ``current`` pointer and ``board.json``.
 Filesystem-only, so every action works before ``kanban init`` and must ignore the shared
 ``--board`` task-routing override.
 """
@@ -8,13 +8,13 @@ from __future__ import annotations
 import argparse
 from typing import Optional
 
-from hermes_cli import kanban_db as kb
-from hermes_cli import kanban_db_connect as kbc
-from hermes_cli.kanban_output import _err, _fmt_counts, _json_out
+from eir_cli import kanban_db as kb
+from eir_cli import kanban_db_connect as kbc
+from eir_cli.kanban_output import _err, _fmt_counts, _json_out
 
 
 def _dispatch_boards(args: argparse.Namespace) -> int:
-    """``hermes kanban boards <action>`` — filesystem-only, so it works before ``kanban init``."""
+    """``eir kanban boards <action>`` — filesystem-only, so it works before ``kanban init``."""
     sub = getattr(args, "boards_action", None) or "list"
     handler = _BOARD_HANDLERS.get(sub)
     if handler is None:
@@ -58,7 +58,7 @@ def _cmd_boards_list(args: argparse.Namespace) -> int:
     if _json_out(args, boards):
         return 0
     if not boards:
-        print("(no boards — create one with `hermes kanban boards create <slug>`)")
+        print("(no boards — create one with `eir kanban boards create <slug>`)")
         return 0
     print(f"{'':2s}  {'SLUG':24s}  {'NAME':28s}  COUNTS")
     for b in boards:
@@ -67,7 +67,7 @@ def _cmd_boards_list(args: argparse.Namespace) -> int:
         print(f"{marker:2s}  {b['slug']:24s}  {name:28s}  {_fmt_counts(b['counts'] or {}, '(empty)')}")
     print(f"\nCurrent board: {current}")
     if len(boards) > 1:
-        print("Switch boards with `hermes kanban boards switch <slug>`.")
+        print("Switch boards with `eir kanban boards switch <slug>`.")
     return 0
 
 
@@ -87,7 +87,7 @@ def _cmd_boards_create(args: argparse.Namespace) -> int:
         kb.set_current_board(meta["slug"])
         print(f"  Switched to {meta['slug']!r}.")
     else:
-        print(f"  Use `hermes kanban boards switch {meta['slug']}` to make it current.")
+        print(f"  Use `eir kanban boards switch {meta['slug']}` to make it current.")
     return 0
 
 
@@ -116,7 +116,7 @@ def _cmd_boards_switch(args: argparse.Namespace) -> int:
     if not kb.board_exists(normed):
         return _err(
             f"kanban boards switch: board {normed!r} does not exist. "
-            f"Create it with `hermes kanban boards create {normed}`."
+            f"Create it with `eir kanban boards create {normed}`."
         )
     # An archived board has a tombstone board.json; switching to it would pin
     # `current` at a dead slug (#43243).
@@ -161,8 +161,8 @@ def _cmd_boards_set_default_workdir(args: argparse.Namespace) -> int:
 
 
 def _cmd_boards_export(args: argparse.Namespace) -> int:
-    from hermes_cli import kanban_transfer
-    from hermes_cli.sizefmt import format_bytes
+    from eir_cli import kanban_transfer
+    from eir_cli.sizefmt import format_bytes
 
     slug = args.slug or kb.get_current_board()
     output = args.output or f"{slug}.tar.gz"
@@ -180,12 +180,12 @@ def _cmd_boards_export(args: argparse.Namespace) -> int:
           f"  Tasks:       {counts['tasks']}\n"
           f"  Comments:    {counts['task_comments']}\n"
           f"  Attachments: {counts['attachment_files']}\n"
-          "Import it with `hermes kanban boards import <archive>`.")
+          "Import it with `eir kanban boards import <archive>`.")
     return 0
 
 
 def _cmd_boards_import(args: argparse.Namespace) -> int:
-    from hermes_cli import kanban_transfer
+    from eir_cli import kanban_transfer
 
     try:
         res = kanban_transfer.import_board(args.archive, args.as_slug, activate=args.switch)
@@ -202,7 +202,7 @@ def _cmd_boards_import(args: argparse.Namespace) -> int:
     if res["activated"]:
         print(f"  Active board is now {res['board']!r}.")
     else:
-        print(f"  Switch to it with `hermes kanban boards switch {res['board']}`.")
+        print(f"  Switch to it with `eir kanban boards switch {res['board']}`.")
     return 0
 
 

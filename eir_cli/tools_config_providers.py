@@ -1,4 +1,4 @@
-"""Provider rows, active-provider detection, model pickers and provider-selection persistence for `hermes tools`."""
+"""Provider rows, active-provider detection, model pickers and provider-selection persistence for `eir tools`."""
 
 from __future__ import annotations
 
@@ -7,19 +7,19 @@ import logging
 from functools import partial
 from typing import Callable, Optional
 
-from hermes_cli.cli_output import (
+from eir_cli.cli_output import (
     print_info as _print_info, print_success as _print_success, print_warning as _print_warning, prompt as _prompt,
 )
-from hermes_cli.colors import Colors, color
-from hermes_cli.config import (
+from eir_cli.colors import Colors, color
+from eir_cli.config import (
     cfg_get, clear_model_endpoint_credentials, get_env_value, load_config, save_config, save_env_value)
-from hermes_cli.nous_account import format_nous_portal_entitlement_message
-from hermes_cli.nous_subscription import MANAGED_FEATURE_COVERAGE_CATEGORY, NousSubscriptionFeatures
+from eir_cli.nous_account import format_nous_portal_entitlement_message
+from eir_cli.nous_subscription import MANAGED_FEATURE_COVERAGE_CATEGORY, NousSubscriptionFeatures
 from tools.tool_backend_helpers import NOUS_MANAGED_PROVIDER, fal_key_is_configured
 from tools.transcription_common import STT_MODEL_CATALOG, STT_MODEL_CONFIG_KEY
 from utils import base_url_hostname, is_truthy_value
 
-logger = logging.getLogger("hermes_cli.tools_config")
+logger = logging.getLogger("eir_cli.tools_config")
 
 # tools_config-internal names (TOOL_CATEGORIES, _cfg_section, _prompt_choice, ...) are imported lazily
 # inside the functions that need them: tools_config re-imports this module, and tests patch those names there.
@@ -29,7 +29,7 @@ def _plugin_registry(module: str):
     """Import a plugin registry module after plugin discovery; ``None`` on any failure."""
     try:
         registry = importlib.import_module(module)
-        from hermes_cli.plugins import _ensure_plugins_discovered
+        from eir_cli.plugins import _ensure_plugins_discovered
 
         _ensure_plugins_discovered()
         return registry
@@ -146,7 +146,7 @@ def _visible_providers(
     """Provider entries visible for the current auth/config state.
     Nous-managed rows (``managed_nous_feature``) are always shown, even logged-out/unentitled, to
     advertise the capability."""
-    from hermes_cli.tools_config import get_nous_subscription_features
+    from eir_cli.tools_config import get_nous_subscription_features
 
     if features is None:
         features = get_nous_subscription_features(config, force_fresh=force_fresh)
@@ -176,8 +176,8 @@ def provider_readiness_status(provider: dict, config: dict, *, features=None, is
     """Honest readiness state for a provider picker row.
     ``features`` avoids re-fetching portal state per row. ``is_active`` is the completed-setup fallback
     for post_setup hooks with no registered installed-check (selecting a row runs its hook)."""
-    from hermes_cli.tools_config import _POST_SETUP_READY, _provider_env_ready, get_nous_subscription_features
-    from hermes_cli.tools_config_post_setup import _POST_SETUP_AUTH_READY
+    from eir_cli.tools_config import _POST_SETUP_READY, _provider_env_ready, get_nous_subscription_features
+    from eir_cli.tools_config_post_setup import _POST_SETUP_AUTH_READY
 
     if provider.get("env_vars", []):
         return "ready" if _provider_env_ready(provider) else "needs_keys"
@@ -232,7 +232,7 @@ def _web_registry_readiness(provider: dict) -> str:
 
 def _toolset_needs_configuration_prompt(ts_key: str, config: dict, *, force_fresh: bool = False) -> bool:
     """Return True when enabling this toolset should open provider setup."""
-    from hermes_cli.tools_config import TOOL_CATEGORIES, _post_setup_already_installed, _toolset_has_keys
+    from eir_cli.tools_config import TOOL_CATEGORIES, _post_setup_already_installed, _toolset_has_keys
 
     cat = TOOL_CATEGORIES.get(ts_key)
     if not cat:
@@ -279,7 +279,7 @@ def _configure_tool_category(ts_key: str, cat: dict, config: dict, *, force_fres
     """Provider selection for a tool category, then API-key setup for the chosen row.
     ``reconfigure`` ("Reconfigure an existing tool"): no setup note / skip row / Nous marker, and the
     chosen provider goes through the key-update prompts instead of the new-enable prompts."""
-    from hermes_cli.tools_config import _prompt_choice, _provider_env_ready, get_nous_subscription_features
+    from eir_cli.tools_config import _prompt_choice, _provider_env_ready, get_nous_subscription_features
 
     name = cat["name"]
     providers = _visible_providers(cat, config, force_fresh=force_fresh)
@@ -389,7 +389,7 @@ def _web_backend_active(provider: dict, config: dict) -> bool:
     # the env var they configure, and the one whose var is set is what serves the call. A setup row needs its
     # var; the registry row also stays active keyless (explicit ``firecrawl`` with no key = anonymous cloud)
     # unless a sibling setup row's var is set instead.
-    from hermes_cli.tools_config import TOOL_CATEGORIES, _provider_env_ready
+    from eir_cli.tools_config import TOOL_CATEGORIES, _provider_env_ready
     if not provider.get("env_vars") or _provider_env_ready(provider):
         return True
     return bool(provider.get("web_search_plugin_name")) and not any(
@@ -412,7 +412,7 @@ def _has_marker(provider: dict, marker: str) -> bool:
 def _managed_provider_active(provider: dict, config: dict, managed_feature: str, force_fresh: bool) -> bool:
     """Active check for a Nous-managed row: the feature must be managed AND the category's selected
     provider must be the row's vendor or ``nous``."""
-    from hermes_cli.tools_config import get_nous_subscription_features
+    from eir_cli.tools_config import get_nous_subscription_features
 
     feature = get_nous_subscription_features(config, force_fresh=force_fresh).features.get(managed_feature)
     if feature is None:
@@ -496,7 +496,7 @@ def _is_provider_active(provider: dict, config: dict, *, force_fresh: bool = Fal
 
 def _detect_active_provider_index(providers: list, config: dict, *, force_fresh: bool = False) -> int:
     """Return the index of the currently active provider, or 0."""
-    from hermes_cli.tools_config import _provider_env_ready
+    from eir_cli.tools_config import _provider_env_ready
 
     for i, p in enumerate(providers):
         if _is_provider_active(p, config, force_fresh=force_fresh):
@@ -517,7 +517,7 @@ def _managed_image_catalog(config: dict):
 
     A free-pool account is funded for FAL only, so its picker never offers a Krea or Portal model it
     would be denied at generation time; a logged-out or paid account sees everything."""
-    from hermes_cli.tools_config import get_nous_subscription_features
+    from eir_cli.tools_config import get_nous_subscription_features
     from tools.image_generation_managed import managed_image_catalog
 
     acct = get_nous_subscription_features(config).account_info
@@ -559,7 +559,7 @@ def _pick_model_from_catalog(
     lands on it; a saved model belonging to another provider (shared config key) or a drifted catalog
     default never indexes the catalog. Safe when stdin is not a TTY — curses_radiolist keeps the current
     selection."""
-    from hermes_cli.tools_config import _cfg_section, _prompt_choice
+    from eir_cli.tools_config import _cfg_section, _prompt_choice
 
     if not catalog:
         return
@@ -619,7 +619,7 @@ _configure_videogen_model_for_plugin = partial(_configure_gen_model_for_plugin, 
 
 def _configure_xai_imagine_storage(section_name: str, config: dict) -> None:
     """Prompt for xAI Imagine stored public URL behavior."""
-    from hermes_cli.tools_config import _cfg_section, _prompt_choice
+    from eir_cli.tools_config import _cfg_section, _prompt_choice
 
     storage_cfg = _cfg_section(_cfg_section(_cfg_section(config, section_name), "xai"), "storage")
     _print_warning(
@@ -642,7 +642,7 @@ def _configure_xai_imagine_storage(section_name: str, config: dict) -> None:
 def _select_into(config: dict, section: str, key: str, vendor, managed) -> dict:
     """Write ``config[section][key] = vendor`` (``nous`` for a managed pick) and drop any legacy ``use_gateway``
     key so the old read-time shim cannot override the new choice. Returns the section dict."""
-    from hermes_cli.tools_config import _cfg_section
+    from eir_cli.tools_config import _cfg_section
 
     cfg = _cfg_section(config, section)
     cfg[key] = NOUS_MANAGED_PROVIDER if managed else vendor
@@ -665,11 +665,11 @@ _select_plugin_video_gen_provider = partial(_select_plugin_gen_provider, "video_
 
 def _configure_stt_model(stt_provider: str, config: dict) -> None:
     """Prompt for the STT model after a provider pick (static catalog, or DeepInfra's live one)."""
-    from hermes_cli.tools_config import _cfg_section, _prompt_choice
+    from eir_cli.tools_config import _cfg_section, _prompt_choice
 
     catalog = STT_MODEL_CATALOG.get(stt_provider)
     if catalog is None and stt_provider == "deepinfra":
-        from hermes_cli.models import deepinfra_model_ids
+        from eir_cli.models import deepinfra_model_ids
         catalog = deepinfra_model_ids("stt")
     if not catalog:
         return
@@ -695,7 +695,7 @@ def _write_provider_config(provider: dict, config: dict, *, managed_feature) -> 
     auth gating or model pickers) shared by the CLI and the GUI ``PUT .../provider`` endpoint. Each pick
     writes exactly ONE provider string per category (``nous`` for managed rows) and removes any legacy
     ``use_gateway`` key so the read-time shim cannot override the new choice."""
-    from hermes_cli.tools_config import TOOL_CATEGORIES
+    from eir_cli.tools_config import TOOL_CATEGORIES
 
     for marker, section_key in (("tts_provider", "tts"), ("stt_provider", "stt")):
         if provider.get(marker):
@@ -752,7 +752,7 @@ def apply_provider_selection(ts_key: str, provider_name: str, config: dict) -> N
     """Non-interactively persist a provider selection for a toolset (config keys only — API keys, post-setup
     hooks, auth gating and model pickers are separate GUI endpoints). ``provider_name`` is resolved among
     :func:`_visible_providers` rows; raises ``KeyError`` for an unknown toolset or provider."""
-    from hermes_cli.tools_config import TOOL_CATEGORIES
+    from eir_cli.tools_config import TOOL_CATEGORIES
 
     cat = TOOL_CATEGORIES.get(ts_key)
     if cat is None:
@@ -784,10 +784,10 @@ def _nous_provider_gate(provider: dict, config: dict, managed_feature, *, force_
     selecting one runs an inline Portal login (auth + entitlement only, no inference-provider switch).
     Pure pre-auth UX rows (``requires_nous_auth`` without a managed feature) keep the older logged-in +
     entitled gate."""
-    from hermes_cli.tools_config import get_nous_subscription_features
+    from eir_cli.tools_config import get_nous_subscription_features
 
     if managed_feature:
-        from hermes_cli.nous_subscription import ensure_nous_portal_access
+        from eir_cli.nous_subscription import ensure_nous_portal_access
 
         if not ensure_nous_portal_access(
             capability=f"{provider.get('name', 'the Nous Tool Gateway')}",
@@ -852,7 +852,7 @@ def _print_provider_selection(provider: dict, managed_feature, *, reconfigure: b
 def _show_portal_hint(provider: dict, config: dict, managed_feature, force_fresh: bool) -> bool:
     """True when a BYOK row shares its category with a Nous-managed sibling and the user is not authed to
     Nous — a single dim hint tells them the key is avoidable via a Portal subscription."""
-    from hermes_cli.tools_config import TOOL_CATEGORIES, get_nous_subscription_features
+    from eir_cli.tools_config import TOOL_CATEGORIES, get_nous_subscription_features
 
     if managed_feature or provider.get("requires_nous_auth"):
         return False
@@ -917,7 +917,7 @@ def _configure_provider(provider: dict, config: dict, *, force_fresh: bool = Tru
     ``reconfigure=False`` (new-enable): already-set keys are kept without asking and the post-setup hook
     only runs when every key was provided. ``reconfigure=True`` re-prompts every key and always runs the
     hook."""
-    from hermes_cli.tools_config import _run_post_setup
+    from eir_cli.tools_config import _run_post_setup
 
     env_vars = provider.get("env_vars", [])
     managed_feature = provider.get("managed_nous_feature")
@@ -957,10 +957,10 @@ def _reconfigure_provider(provider: dict, config: dict, *, force_fresh: bool = T
 
 def _configure_vision_backend() -> None:
     """Interactive vision-backend configuration (``auxiliary.vision.{provider,model,base_url}``).
-    Offers any authenticated provider + model (same surface as ``hermes model``) or a custom endpoint
+    Offers any authenticated provider + model (same surface as ``eir model``) or a custom endpoint
     rather than forcing OpenRouter. "Auto" leaves the keys empty so the resolver uses the main-model
     fallback chain."""
-    from hermes_cli.tools_config import _cfg_section, _prompt_choice
+    from eir_cli.tools_config import _cfg_section, _prompt_choice
 
     print()
     print(color("  Vision / Image Analysis needs a multimodal model.", Colors.YELLOW))
@@ -1002,7 +1002,7 @@ def _configure_vision_backend() -> None:
         # unless paired with a config api_key. Drop the block's api_key/key_env: they outrank OPENAI_API_KEY and
         # belong to the old endpoint; a moved route's api_mode is the old endpoint's wire mode (#141832).
         # OPENAI_API_KEY itself reaches only an OpenAI host or the paired OPENAI_BASE_URL (#153681).
-        from hermes_cli.config_route_guard import clear_aux_credentials_on_route_change
+        from eir_cli.config_route_guard import clear_aux_credentials_on_route_change
         clear_aux_credentials_on_route_change(vision_cfg, "custom", base_url)
         clear_model_endpoint_credentials(vision_cfg, clear_api_mode=False)
         vision_cfg["provider"] = "custom"
@@ -1019,13 +1019,13 @@ def _configure_vision_backend() -> None:
 
 def _configure_vision_provider_model(config: dict, vision_cfg: dict) -> None:
     """Provider + model picker for vision, mirroring the ``/model`` surface.
-    Rows come from ``build_aux_picker_rows()`` so this lists exactly what the ``hermes model`` aux-task
+    Rows come from ``build_aux_picker_rows()`` so this lists exactly what the ``eir model`` aux-task
     picker lists, including user-defined ``providers:`` / ``custom_providers:`` endpoints. Persists
     ``auxiliary.vision.provider`` + ``.model``."""
-    from hermes_cli.tools_config import _prompt_choice
+    from eir_cli.tools_config import _prompt_choice
 
     try:
-        from hermes_cli.inventory import build_aux_picker_rows, format_aux_picker_entries
+        from eir_cli.inventory import build_aux_picker_rows, format_aux_picker_entries
     except Exception as exc:  # pragma: no cover - import guard
         _print_warning(f"  Could not load provider list: {exc}")
         return
@@ -1043,7 +1043,7 @@ def _configure_vision_provider_model(config: dict, vision_cfg: dict) -> None:
 
     if not providers:
         _print_warning("  No authenticated providers found. Configure a provider first "
-                       "with `hermes model`, then re-run this.")
+                       "with `eir model`, then re-run this.")
         return
 
     provider_labels = [label for _slug, label, _models in format_aux_picker_entries(
@@ -1065,7 +1065,7 @@ def _configure_vision_provider_model(config: dict, vision_cfg: dict) -> None:
             _print_warning("  No model entered — cancelled")
             return
 
-    from hermes_cli.config_route_guard import clear_aux_credentials_on_route_change
+    from eir_cli.config_route_guard import clear_aux_credentials_on_route_change
     clear_aux_credentials_on_route_change(vision_cfg, slug)
     vision_cfg["provider"] = slug
     vision_cfg["model"] = model
@@ -1080,7 +1080,7 @@ def _configure_simple_requirements(ts_key: str, *, reconfigure: bool = False):
     """Fallback for toolsets that just need env vars (no provider selection).
     Vision has its own provider/model picker — run it directly so neither flow falls back to the generic
     single-key prompt (which would re-ask for OPENROUTER_API_KEY)."""
-    from hermes_cli.tools_config import TOOLSET_ENV_REQUIREMENTS, _toolset_has_keys, _toolset_label
+    from eir_cli.tools_config import TOOLSET_ENV_REQUIREMENTS, _toolset_has_keys, _toolset_label
 
     if ts_key == "vision":
         if reconfigure or not _toolset_has_keys("vision"):

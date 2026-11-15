@@ -1,5 +1,5 @@
 name: hermes-replicate
-title: Replicate for Hermes
+title: Replicate for Eir
 description: >-
   Native Replicate backends for image generation, video, transcription and speech,
   with user-configured models and schema-validated mappings. Disclosure: paid
@@ -13,7 +13,7 @@ version: "1.1.1"
 maintainer: jacebenson
 tier: community
 category: models
-requires_hermes: ">=0.23.1"
+requires_eir: ">=0.23.1"
 docs_url: https://github.com/jacebenson/hermes-replicate#readme
 image: https://raw.githubusercontent.com/jacebenson/hermes-replicate/3b3548eecebaf9613e4ad4e214a7443adbccffdc/docs/assets/banner-1200.png
 screenshots:

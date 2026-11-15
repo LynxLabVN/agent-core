@@ -1,7 +1,7 @@
 """Shared device-code / loopback-PKCE / browser / TLS helpers for interactive OAuth logins.
 
-Split out of ``hermes_cli/auth.py`` and re-exported there; origin helpers are imported lazily
-inside each function so ``hermes_cli.auth.<name>`` patches still intercept (and no import cycle).
+Split out of ``eir_cli/auth.py`` and re-exported there; origin helpers are imported lazily
+inside each function so ``eir_cli.auth.<name>`` patches still intercept (and no import cycle).
 """
 
 from __future__ import annotations
@@ -20,14 +20,14 @@ from pathlib import Path
 from socketserver import ThreadingMixIn
 from typing import Any, Callable, Dict, FrozenSet, Optional
 from urllib.parse import parse_qs, urlparse
-from hermes_cli.auth_constants import (
+from eir_cli.auth_constants import (
     AuthError, DEFAULT_NOUS_PORTAL_URL, DEVICE_AUTH_POLL_INTERVAL_CAP_SECONDS,
     DEVICE_CODE_GRANT_TYPE, OAUTH_OVER_SSH_DOCS_URL, httpx)
-from hermes_cli.auth_error_copy import DeviceCodeExpired
+from eir_cli.auth_error_copy import DeviceCodeExpired
 from utils import is_truthy_value
 
-# Log-record parity with the origin module (caplog tests pin "hermes_cli.auth").
-logger = logging.getLogger("hermes_cli.auth")
+# Log-record parity with the origin module (caplog tests pin "eir_cli.auth").
+logger = logging.getLogger("eir_cli.auth")
 
 # Console/text-mode browsers that ``webbrowser`` will launch INSIDE the terminal, hijacking the
 # user's TTY with an unusable text browser. When the resolved browser is one of these we refuse
@@ -199,7 +199,7 @@ def _print_loopback_ssh_hint(redirect_uri: str, *, docs_url: str | None = None) 
     The auth server redirects the browser to ``127.0.0.1:<port>/callback``; when the browser is
     on another machine (the SSH case) the redirect needs a local port forward to reach us.
     """
-    from hermes_cli.auth import _is_remote_session
+    from eir_cli.auth import _is_remote_session
     if not _is_remote_session():
         return
     try:
@@ -212,7 +212,7 @@ def _print_loopback_ssh_hint(redirect_uri: str, *, docs_url: str | None = None) 
     divider = "-" * 60
     print(
         f"\n{divider}\nRemote session detected — SSH tunnel required\n{divider}\n"
-        f"Hermes is waiting for the OAuth callback on {redirect_uri}\n"
+        f"Eir is waiting for the OAuth callback on {redirect_uri}\n"
         "but your browser is on a different machine. Run this command\n"
         "in a NEW terminal on your local machine BEFORE opening the URL:\n\n"
         f"  ssh -N -L {port}:127.0.0.1:{port} {_ssh_user_at_host()}\n\n"
@@ -245,14 +245,14 @@ def _default_verify() -> bool | ssl.SSLContext:
 def _resolve_verify(
     *, insecure: Optional[bool] = None, ca_bundle: Optional[str] = None,
     auth_state: Optional[dict[str, Any]] = None) -> bool | ssl.SSLContext:
-    from hermes_cli.auth import _default_verify
+    from eir_cli.auth import _default_verify
     tls_state = auth_state.get("tls") if isinstance(auth_state, dict) else {}
     tls_state = tls_state if isinstance(tls_state, dict) else {}
     effective_insecure = (
         is_truthy_value(insecure, default=False) if insecure is not None
         else is_truthy_value(tls_state.get("insecure", False), default=False))
     effective_ca = (
-        ca_bundle or tls_state.get("ca_bundle") or os.getenv("HERMES_CA_BUNDLE")
+        ca_bundle or tls_state.get("ca_bundle") or os.getenv("EIR_CA_BUNDLE")
         or os.getenv("SSL_CERT_FILE") or os.getenv("REQUESTS_CA_BUNDLE"))
     if effective_insecure:
         return False
@@ -298,7 +298,7 @@ def _nous_device_auth_timeout_message(portal_base_url: str) -> str:
         "  Portal sign-in is required before the device code can be approved.\n"
         "  If the browser showed a CAPTCHA / 'You did not pass CAPTCHA' error,\n"
         "  finish signing in at the Portal in a normal browser tab, then retry:\n"
-        "    hermes portal\n"
+        "    eir portal\n"
         f"  Portal login: {portal}/login")
 
 
@@ -416,7 +416,7 @@ def _poll_for_token(
 
     def _error(_response, error_payload) -> Exception:
         # Plain copy per OAuth error code; the raw ``code: description`` stays on a Details line.
-        from hermes_cli.auth_error_copy import device_flow_error
+        from eir_cli.auth_error_copy import device_flow_error
         return device_flow_error(
             str(error_payload.get("error", "") or ""),
             str(error_payload.get("error_description") or "Unknown authentication error"))
@@ -452,7 +452,7 @@ def _print_login_success(
     print()
     print("Login successful!")
     if show_auth_state:
-        from hermes_constants import display_hermes_home as _dhh
+        from eir_constants import display_eir_home as _dhh
         print(f"  Auth state: {_dhh()}/auth.json")
     print(f"  Config updated: {config_path} (model.provider={provider_id})")
 
@@ -466,12 +466,12 @@ def _offer_existing_oauth_credentials(
     *resolve* attempts a refresh, so a resolved token should be valid — but double-check the
     expiry before telling the user "Login successful!".
     """
-    from hermes_cli.auth import _update_config_for_provider
+    from eir_cli.auth import _update_config_for_provider
     try:
         existing = resolve()
         api_key = existing.get("api_key", "")
         if isinstance(api_key, str) and api_key and not is_expiring(api_key, 60):
-            print(f"Existing {display_name} credentials found in Hermes auth store.")
+            print(f"Existing {display_name} credentials found in Eir auth store.")
             if _prompt_yes_no("Use existing credentials? [Y/n]: ", default="y"):
                 config_path = _update_config_for_provider(
                     provider_id, existing.get("base_url", default_base_url))

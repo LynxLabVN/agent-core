@@ -1,10 +1,10 @@
-"""Migrate legacy ``HERMES_NEMO_RELAY_ATIF_*`` / ``ATOF_*`` exporter vars into a Relay ``plugins.toml``.
+"""Migrate legacy ``EIR_NEMO_RELAY_ATIF_*`` / ``ATOF_*`` exporter vars into a Relay ``plugins.toml``.
 
 The Relay cutover (Aug 2026) stopped honouring the legacy exporter variables. This module turns
 those variables into ``<profile home>/relay-plugins.toml`` (built from the
 ``nemo_relay.observability`` dataclasses so the file is exactly what Relay validates), points
-``HERMES_NEMO_RELAY_PLUGINS_TOML`` at it, and comments the legacy lines out. It runs from
-``hermes update`` for every profile home and from ``hermes migrate relay`` for the active one.
+``EIR_NEMO_RELAY_PLUGINS_TOML`` at it, and comments the legacy lines out. It runs from
+``eir update`` for every profile home and from ``eir migrate relay`` for the active one.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping, Optional
 
-from hermes_cli.relay_plugin_cutover import (
+from eir_cli.relay_plugin_cutover import (
     LEGACY_RELAY_EXPORT_ENV_VARS, RELAY_PLUGINS_CONFIG_ENV, configured_legacy_relay_env_vars)
 
 logger = logging.getLogger(__name__)
@@ -54,23 +54,23 @@ def relay_plugin_payload_from_legacy_env(env: Mapping[str, Any]) -> dict[str, An
     from nemo_relay import observability as obs
 
     atif = atof = None
-    if _truthy(env.get("HERMES_NEMO_RELAY_ATIF_ENABLED")):
+    if _truthy(env.get("EIR_NEMO_RELAY_ATIF_ENABLED")):
         kwargs: dict[str, Any] = {
             "enabled": True,
-            "agent_name": _s(env, "HERMES_NEMO_RELAY_ATIF_AGENT_NAME", "Hermes Agent"),
-            "model_name": _s(env, "HERMES_NEMO_RELAY_ATIF_MODEL_NAME", "unknown"),
-            "filename_template": _s(env, "HERMES_NEMO_RELAY_ATIF_FILENAME_TEMPLATE", "hermes-atif-{session_id}.json"),
+            "agent_name": _s(env, "EIR_NEMO_RELAY_ATIF_AGENT_NAME", "Eir Agent"),
+            "model_name": _s(env, "EIR_NEMO_RELAY_ATIF_MODEL_NAME", "unknown"),
+            "filename_template": _s(env, "EIR_NEMO_RELAY_ATIF_FILENAME_TEMPLATE", "eir-atif-{session_id}.json"),
         }
-        if _s(env, "HERMES_NEMO_RELAY_ATIF_OUTPUT_DIRECTORY"):
-            kwargs["output_directory"] = _s(env, "HERMES_NEMO_RELAY_ATIF_OUTPUT_DIRECTORY")
-        if _s(env, "HERMES_NEMO_RELAY_ATIF_AGENT_VERSION"):
-            kwargs["agent_version"] = _s(env, "HERMES_NEMO_RELAY_ATIF_AGENT_VERSION")
+        if _s(env, "EIR_NEMO_RELAY_ATIF_OUTPUT_DIRECTORY"):
+            kwargs["output_directory"] = _s(env, "EIR_NEMO_RELAY_ATIF_OUTPUT_DIRECTORY")
+        if _s(env, "EIR_NEMO_RELAY_ATIF_AGENT_VERSION"):
+            kwargs["agent_version"] = _s(env, "EIR_NEMO_RELAY_ATIF_AGENT_VERSION")
         atif = obs.AtifConfig(**kwargs)
-    if _truthy(env.get("HERMES_NEMO_RELAY_ATOF_ENABLED")):
-        mode = _s(env, "HERMES_NEMO_RELAY_ATOF_MODE", "append").lower()
+    if _truthy(env.get("EIR_NEMO_RELAY_ATOF_ENABLED")):
+        mode = _s(env, "EIR_NEMO_RELAY_ATOF_MODE", "append").lower()
         sink = obs.AtofFileSinkConfig(
-            output_directory=_s(env, "HERMES_NEMO_RELAY_ATOF_OUTPUT_DIRECTORY") or None,
-            filename=_s(env, "HERMES_NEMO_RELAY_ATOF_FILENAME", "hermes-atof.jsonl"),
+            output_directory=_s(env, "EIR_NEMO_RELAY_ATOF_OUTPUT_DIRECTORY") or None,
+            filename=_s(env, "EIR_NEMO_RELAY_ATOF_FILENAME", "eir-atof.jsonl"),
             mode="overwrite" if mode == "overwrite" else "append",
         )
         atof = obs.AtofConfig(enabled=True, sinks=[sink])
@@ -139,7 +139,7 @@ def validate_relay_plugin_payload(payload: Mapping[str, Any]) -> list:
 
 
 def _comment_out_legacy_lines(lines: list[str], names: set[str]) -> list[str]:
-    from hermes_cli.config import _env_line_defines_key
+    from eir_cli.config import _env_line_defines_key
     out = []
     for line in lines:
         if any(_env_line_defines_key(line, name) for name in names):
@@ -152,7 +152,7 @@ def _comment_out_legacy_lines(lines: list[str], names: set[str]) -> list[str]:
 def migrate_profile_relay_env(home: Path, *, validate: bool = True) -> RelayMigrationResult:
     """Migrate ONE profile home's ``.env``. Never raises for a no-op; a Relay import/validation failure
     leaves ``.env`` untouched and is reported in ``validation_error``."""
-    from hermes_cli.config import _env_line_defines_key, _quote_env_value, _read_env_lines, _write_env_lines
+    from eir_cli.config import _env_line_defines_key, _quote_env_value, _read_env_lines, _write_env_lines
     result = RelayMigrationResult(home=home)
     env_path = home / ".env"
     if not env_path.is_file():
@@ -173,7 +173,7 @@ def migrate_profile_relay_env(home: Path, *, validate: bool = True) -> RelayMigr
     if env.get(RELAY_PLUGINS_CONFIG_ENV, "").strip():
         result.skipped_reason = f"{RELAY_PLUGINS_CONFIG_ENV} already set"
         return result
-    if not (_truthy(env.get("HERMES_NEMO_RELAY_ATIF_ENABLED")) or _truthy(env.get("HERMES_NEMO_RELAY_ATOF_ENABLED"))):
+    if not (_truthy(env.get("EIR_NEMO_RELAY_ATIF_ENABLED")) or _truthy(env.get("EIR_NEMO_RELAY_ATOF_ENABLED"))):
         result.skipped_reason = "no exporter enabled by the legacy variables"
         return result
     try:
@@ -185,9 +185,9 @@ def migrate_profile_relay_env(home: Path, *, validate: bool = True) -> RelayMigr
         return result
     toml_path = home / RELAY_PLUGINS_TOML_NAME
     header = (
-        "# NeMo Relay plugin configuration for Hermes (selected via "
+        "# NeMo Relay plugin configuration for Eir (selected via "
         f"{RELAY_PLUGINS_CONFIG_ENV} in .env).\n"
-        "# Generated by `hermes update` from the legacy HERMES_NEMO_RELAY_ATIF_*/ATOF_* variables,\n"
+        "# Generated by `eir update` from the legacy EIR_NEMO_RELAY_ATIF_*/ATOF_* variables,\n"
         "# which Relay no longer reads. Edit this file to change exporters.\n"
     )
     toml_path.write_text(header + dumps_toml(payload), encoding="utf-8")
@@ -204,13 +204,13 @@ def migrate_profile_relay_env(home: Path, *, validate: bool = True) -> RelayMigr
 
 def migrate_all_profile_relay_envs(*, validate: bool = True) -> list[RelayMigrationResult]:
     """Default home + every live named profile (multiplex: each profile keeps its own TOML)."""
-    from hermes_cli.profiles import _get_default_hermes_home, _iter_named_profile_dirs
-    homes = [_get_default_hermes_home(), *_iter_named_profile_dirs()]
+    from eir_cli.profiles import _get_default_eir_home, _iter_named_profile_dirs
+    homes = [_get_default_eir_home(), *_iter_named_profile_dirs()]
     return [migrate_profile_relay_env(home, validate=validate) for home in homes]
 
 
 def print_relay_migration_report(results: list[RelayMigrationResult]) -> None:
-    """Loud, actionable notice for `hermes update` / `hermes migrate relay`."""
+    """Loud, actionable notice for `eir update` / `eir migrate relay`."""
     migrated = [r for r in results if r.migrated]
     failed = [r for r in results if r.validation_error]
     if not migrated and not failed:
@@ -218,7 +218,7 @@ def print_relay_migration_report(results: list[RelayMigrationResult]) -> None:
     print()
     if migrated:
         print("\033[1;33m⚠  NeMo Relay exporter configuration migrated\033[0m")
-        print("   Relay no longer reads the legacy HERMES_NEMO_RELAY_ATIF_*/ATOF_* variables.")
+        print("   Relay no longer reads the legacy EIR_NEMO_RELAY_ATIF_*/ATOF_* variables.")
         print("   Each profile below now has a generated relay-plugins.toml selected by")
         print(f"   {RELAY_PLUGINS_CONFIG_ENV} in its .env (legacy lines commented out, not deleted):")
         for r in migrated:
@@ -232,18 +232,18 @@ def print_relay_migration_report(results: list[RelayMigrationResult]) -> None:
 
 
 def run_relay_migration_after_update() -> None:
-    """`hermes update` hook: migrate every profile home, print the notice. Best-effort by contract."""
+    """`eir update` hook: migrate every profile home, print the notice. Best-effort by contract."""
     print_relay_migration_report(migrate_all_profile_relay_envs())
 
 
 def cmd_migrate_relay(args) -> None:
-    """``hermes migrate relay [--all-profiles] [--no-validate]``."""
-    from hermes_constants import get_hermes_home
+    """``eir migrate relay [--all-profiles] [--no-validate]``."""
+    from eir_constants import get_eir_home
     validate = not getattr(args, "no_validate", False)
     if getattr(args, "all_profiles", False):
         results = migrate_all_profile_relay_envs(validate=validate)
     else:
-        results = [migrate_profile_relay_env(get_hermes_home(), validate=validate)]
+        results = [migrate_profile_relay_env(get_eir_home(), validate=validate)]
     print_relay_migration_report(results)
     for r in results:
         if not r.migrated and not r.validation_error:

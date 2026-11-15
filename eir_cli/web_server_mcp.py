@@ -1,6 +1,6 @@
 """MCP dashboard helpers: create-payload normalisation, env redaction/summary, dashboard-driven MCP OAuth worker.
 
-Wraps the same config layer the CLI uses (hermes_cli.mcp_config); stdio ``env``
+Wraps the same config layer the CLI uses (eir_cli.mcp_config); stdio ``env``
 secrets are redacted on read.
 """
 
@@ -10,8 +10,8 @@ from typing import TYPE_CHECKING, Any, Dict, Optional
 
 if TYPE_CHECKING:  # pragma: no cover - annotation only
     from tools.mcp_dashboard_oauth import DashboardOAuthFlow
-from hermes_cli.config import redact_key
-from hermes_cli.web_models import MCPServerCreate
+from eir_cli.config import redact_key
+from eir_cli.web_models import MCPServerCreate
 
 
 def normalize_mcp_server_create(body: MCPServerCreate) -> tuple[str, dict[str, Any], Optional[str]]:
@@ -21,8 +21,8 @@ def normalize_mcp_server_create(body: MCPServerCreate) -> tuple[str, dict[str, A
     the shared Bearer helper once inside the intended profile scope. Shared by
     the MCP page and the Profile Builder so both enforce one transport/auth contract.
     """
-    from hermes_cli.mcp_config import _bearer_auth_headers, _strip_bearer_prefix
-    from hermes_cli.mcp_security import validate_mcp_server_entry
+    from eir_cli.mcp_config import _bearer_auth_headers, _strip_bearer_prefix
+    from eir_cli.mcp_security import validate_mcp_server_entry
 
     name = (body.name or "").strip()
     if not name:
@@ -111,34 +111,34 @@ _mcp_oauth_transactions_lock = threading.Lock()
 
 
 def _mcp_oauth_transaction(flow) -> threading.Lock:
-    key = (flow.hermes_home, flow.server_name)
+    key = (flow.eir_home, flow.server_name)
     with _mcp_oauth_transactions_lock:
         return _mcp_oauth_transactions.setdefault(key, threading.Lock())
 
 
 def _run_dashboard_mcp_oauth(flow, cfg: dict) -> None:
     """Run the normal MCP probe with dashboard redirect/callback handlers."""
-    from hermes_cli.mcp_config import _oauth_tokens_present, _probe_single_server, _save_mcp_server
+    from eir_cli.mcp_config import _oauth_tokens_present, _probe_single_server, _save_mcp_server
     try:
         from agent.secret_scope import build_profile_secret_scope, reset_secret_scope, set_secret_scope
-        from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+        from eir_constants import reset_eir_home_override, set_eir_home_override
         from tools.mcp_dashboard_oauth import dashboard_oauth_flow
-        from tools.mcp_oauth import HermesTokenStorage, force_interactive_oauth, login_connect_timeout
+        from tools.mcp_oauth import EirTokenStorage, force_interactive_oauth, login_connect_timeout
         from tools.mcp_oauth_manager import get_manager
 
         home_token = secret_token = None
         try:
-            home_token = set_hermes_home_override(flow.hermes_home)
+            home_token = set_eir_home_override(flow.eir_home)
             secret_token = set_secret_scope(
-                build_profile_secret_scope(Path(flow.hermes_home)), profile_home=flow.hermes_home)
+                build_profile_secret_scope(Path(flow.eir_home)), profile_home=flow.eir_home)
             transaction = _mcp_oauth_transaction(flow)
             with transaction, force_interactive_oauth(), dashboard_oauth_flow(flow):
                 manager = get_manager()
-                storage = HermesTokenStorage(flow.server_name)
+                storage = EirTokenStorage(flow.server_name)
                 backup = storage.snapshot()
                 previous_entry = None
                 try:
-                    previous_entry = manager.remove(flow.server_name, hermes_home=flow.hermes_home)
+                    previous_entry = manager.remove(flow.server_name, eir_home=flow.eir_home)
                     tools = _probe_single_server(
                         flow.server_name, cfg, connect_timeout=login_connect_timeout(cfg)
                     )
@@ -156,13 +156,13 @@ def _run_dashboard_mcp_oauth(flow, cfg: dict) -> None:
                         reconnect_mcp_server(flow.server_name)
                 except Exception:
                     storage.restore(backup, only_if_absent=True)
-                    manager.restore_entry(flow.server_name, previous_entry, hermes_home=flow.hermes_home)
+                    manager.restore_entry(flow.server_name, previous_entry, eir_home=flow.eir_home)
                     raise
         finally:
             if secret_token is not None:
                 reset_secret_scope(secret_token)
             if home_token is not None:
-                reset_hermes_home_override(home_token)
+                reset_eir_home_override(home_token)
     except Exception as exc:
         from tools.mcp_dashboard_oauth import exception_message
 

@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest'
 
 const { notify } = vi.hoisted(() => ({ notify: vi.fn() }))
-vi.mock('@hermes/plugin-sdk', async () => (await import('./group-test-utils')).pluginSdkMock({ notify }))
+vi.mock('@eir/plugin-sdk', async () => (await import('./group-test-utils')).pluginSdkMock({ notify }))
 
 import { readCanonicalGroupSend } from './canonical-group-send'
 import { groupActivityLabel } from './group-activity'

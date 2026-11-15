@@ -9,7 +9,7 @@ import shutil
 
 def recover_plugin_publication(project: Path, row: dict, journal: Path) -> None:
     """Recover a shipped caller's row through the stdlib boot-journal owner."""
-    from hermes_cli.runtime_state import _recover_plugin_publication
+    from eir_cli.runtime_state import _recover_plugin_publication
 
     _recover_plugin_publication(project, row, journal)
 
@@ -27,7 +27,7 @@ def publish_plugin(staged: Path, target: Path, old_metadata: dict, new_metadata:
     from pm.store import tree_digest
 
     if require_consent and not assume_consent:
-        from hermes_cli import plugins_cmd
+        from eir_cli import plugins_cmd
         from pm.workspace import enabled_plugin_dirs
 
         if target.resolve() in enabled_plugin_dirs(installing=target):
@@ -37,7 +37,7 @@ def publish_plugin(staged: Path, target: Path, old_metadata: dict, new_metadata:
                 outcome = ("Reinstall declined: {}. The installed plugin and active environment are unchanged."
                            if target.exists() else "Install declined: {}. Nothing was installed.")
                 # The refusal carries its closed class (plugins_cmd_install._ConsentRefusal).
-                from hermes_cli.observability.shared_metrics_fields import tagged_failure_class
+                from eir_cli.observability.shared_metrics_fields import tagged_failure_class
 
                 raise plugins_cmd.PluginOperationError(
                     outcome.format(reason), failure_class=tagged_failure_class(reason) or "other")
@@ -59,8 +59,8 @@ def _refresh_declared_dependencies(target: Path, staged: Path, manifest: dict, *
     rebuilt in the staged copy when its package.json/lock moved (custom pulls copy a stale
     node_modules; catalog re-pins clone without one).
     """
-    from hermes_cli import plugins_cmd as pc
-    from hermes_cli.runtime_state import _bytes
+    from eir_cli import plugins_cmd as pc
+    from eir_cli.runtime_state import _bytes
     from pm.plugin_declarations import read_python_declaration
     from pm.workspace import enabled_plugin_dirs, install_node_sidecar
 
@@ -73,7 +73,7 @@ def _refresh_declared_dependencies(target: Path, staged: Path, manifest: dict, *
                 f"Node dependencies could not be refreshed: {reason}. "
                 "The installed plugin and active environment are unchanged.")
     if target.resolve() not in enabled_plugin_dirs(installing=target):
-        return  # a disabled plugin's deps are admitted (and consented) by `hermes plugins enable`
+        return  # a disabled plugin's deps are admitted (and consented) by `eir plugins enable`
     before, after = read_python_declaration(target), read_python_declaration(staged)
     added = tuple(spec for spec in after.install_requirements if spec not in before.install_requirements)
     if not added and not (after.installs_packages and not before.installs_packages):
@@ -81,7 +81,7 @@ def _refresh_declared_dependencies(target: Path, staged: Path, manifest: dict, *
     if not interactive:
         raise pc.PluginOperationError(
             f"The update declares new Python dependencies ({', '.join(added) or 'in its pyproject.toml'}); "
-            f"run `hermes plugins update {target.name}` in a terminal to review them.")
+            f"run `eir plugins update {target.name}` in a terminal to review them.")
     consented, reason = pc._consent_python_deps(manifest.get("name", target.name), added, pc._console())
     if not consented:
         raise pc.PluginOperationError(
@@ -111,9 +111,9 @@ def update_plugin(
     refuse the candidate before it is scanned or published."""
     import tempfile
 
-    from hermes_cli import plugins_cmd as pc
-    from hermes_cli.plugins_cmd_catalog import RepinConsentRequired, refuse_if_installed_removed
-    from hermes_cli.plugins_cmd_git import _refuse_foreign_checkout
+    from eir_cli import plugins_cmd as pc
+    from eir_cli.plugins_cmd_catalog import RepinConsentRequired, refuse_if_installed_removed
+    from eir_cli.plugins_cmd_git import _refuse_foreign_checkout
     from pm.store import tree_digest
 
     target = target.resolve()
@@ -126,8 +126,8 @@ def update_plugin(
         raise pc.PluginOperationError(f"Plugin '{target.name}' has no owned Git checkout; reinstall from its source.")
     feed_revision = None
     if catalog_entry is None:
-        from hermes_cli.plugins_provenance import Provenance, ProvenanceClass
-        from hermes_cli.plugins_updates import check_local_provenance, default_fetch, parse_feed_yml
+        from eir_cli.plugins_provenance import Provenance, ProvenanceClass
+        from eir_cli.plugins_updates import check_local_provenance, default_fetch, parse_feed_yml
 
         checked = check_local_provenance(Provenance(target.name, ProvenanceClass.GIT, target, record))
         if checked.needs_fixing:
@@ -139,8 +139,8 @@ def update_plugin(
                 feed_revision = proposed.lower()
             elif proposed not in (source, source.split("#", 1)[0]):
                 raise pc.PluginOperationError("Update feed must select a commit or the recorded Git source.")
-            if feed.get("min_hermes"):
-                pc._check_manifest_version({"requires_hermes": feed["min_hermes"]}, target.name)
+            if feed.get("min_eir"):
+                pc._check_manifest_version({"requires_eir": feed["min_eir"]}, target.name)
     refuse_if_installed_removed(target.name, target)
     before = tree_digest(target)
     with tempfile.TemporaryDirectory(prefix=".update-", dir=target.parent) as directory:
@@ -165,7 +165,7 @@ def update_plugin(
                 )
                 record.pop("catalog_name", None)
                 record.pop("catalog_tier", None)
-                from hermes_cli.plugins_cmd_catalog import write_catalog_sidecar_record
+                from eir_cli.plugins_cmd_catalog import write_catalog_sidecar_record
                 write_catalog_sidecar_record(staged, catalog_record, revision)
             else:
                 # Copy Git metadata and local changes. Autostash only ever touches the copy.

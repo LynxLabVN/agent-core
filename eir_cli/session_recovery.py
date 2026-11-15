@@ -1,4 +1,4 @@
-"""Offline, non-destructive recovery for a damaged Hermes session database.
+"""Offline, non-destructive recovery for a damaged Eir session database.
 
 The source is never opened by SQLite: it and its WAL/SHM/journal sidecars are copied to a disposable
 work dir first. Canonical rows are copied into a fresh current-schema database; derived FTS tables and
@@ -16,10 +16,10 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Callable, Iterator, Optional
 
-from hermes_cli.timefmt import EPOCH_MAX, EPOCH_MIN
-from hermes_state import SessionDB
-from hermes_state_common import FTS_STORAGE_VERSION, SCHEMA_VERSION
-from hermes_state_repair import _db_opens_cleanly
+from eir_cli.timefmt import EPOCH_MAX, EPOCH_MIN
+from eir_state import SessionDB
+from eir_state_common import FTS_STORAGE_VERSION, SCHEMA_VERSION
+from eir_state_repair import _db_opens_cleanly
 
 
 ProgressCallback = Callable[[dict[str, Any]], None]
@@ -191,14 +191,14 @@ def _copy_source_bundle(source: Path, snapshot_dir: Path) -> tuple[Path, list[st
 
     The whole copy runs inside ``offline_file_access`` (holds the connection-lifecycle lock). Recovery
     normally runs as its own CLI process against an offline file, so the refusal should never fire; the
-    guard keeps this path consistent with ``hermes_state_repair._backup_db_file``.
+    guard keeps this path consistent with ``eir_state_repair._backup_db_file``.
 
     Checking for a live connection and *then* copying would be a check/use race: a connection could open in
     that window, and the copy's ``close()`` would cancel its POSIX advisory locks -- the failure class
-    ``hermes_cli.sqlite_safe_read`` exists to prevent (see #71724). Holding the lock means no connection can
+    ``eir_cli.sqlite_safe_read`` exists to prevent (see #71724). Holding the lock means no connection can
     appear mid-copy, across the main file and every sidecar.
     """
-    from hermes_cli.sqlite_safe_read import LiveConnectionError, offline_file_access
+    from eir_cli.sqlite_safe_read import LiveConnectionError, offline_file_access
     snapshot_source = snapshot_dir / source.name
     copied: list[str] = []
     try:
@@ -330,16 +330,16 @@ def _snapshot_and_inspect(
     source: Path, work_root: Path,
 ) -> tuple[tempfile.TemporaryDirectory[str], Path, dict[str, Any]]:
     before = _source_fingerprint(source)
-    temp_dir = tempfile.TemporaryDirectory(prefix="hermes-session-recovery-", dir=str(work_root))
+    temp_dir = tempfile.TemporaryDirectory(prefix="eir-session-recovery-", dir=str(work_root))
     try:
         snapshot_source, copied = _copy_source_bundle(source, Path(temp_dir.name))
         if _source_fingerprint(source) != before:
             raise SessionRecoverySafetyError(
-                "The source database bundle changed while it was being copied. Stop every Hermes process using this "
-                "profile and retry. This includes the interactive `hermes` CLI session this command may have been "
+                "The source database bundle changed while it was being copied. Stop every Eir process using this "
+                "profile and retry. This includes the interactive `eir` CLI session this command may have been "
                 "launched from: a running parent CLI writes session bookkeeping (compression ticks, context "
-                "tracking) to state.db in the background and counts as a Hermes process even after the gateway is "
-                "stopped. Run the recovery from a fresh shell with no `hermes` session open, or point --source at an "
+                "tracking) to state.db in the background and counts as a Eir process even after the gateway is "
+                "stopped. Run the recovery from a fresh shell with no `eir` session open, or point --source at an "
                 "immutable snapshot copy of the database."
             )
         conn = _connect(snapshot_source)
@@ -424,7 +424,7 @@ def _salvage_rowid_bounds(source: sqlite3.Connection, table: str) -> dict[str, A
         return result
 
     # An ordered LIMIT 1 walks the table b-tree and dies on a damaged edge leaf, while the
-    # aggregate lets the planner answer from any covering index (every Hermes table has at
+    # aggregate lets the planner answer from any covering index (every Eir table has at
     # least a PRIMARY KEY autoindex). Ask it before falling back to the synthetic domain:
     # bisecting from INT64_MIN burned the whole query budget on a 4-row table (#98050).
     missing = [edge for edge in ("low", "high") if rows[edge] is None]
@@ -932,7 +932,7 @@ def _sanitize_session_model_config(destination: sqlite3.Connection) -> int:
     ``integrity_check`` validates b-tree structure, never column *contents*: a row whose
     JSON was truncated by the damage verifies clean, and the recovered store then raises
     ``OperationalError: malformed JSON`` the first time ``reopen_session`` rewrites the
-    reset-child markers with ``json_set`` (``hermes_state_sessions.py::reopen_session``) —
+    reset-child markers with ``json_set`` (``eir_state_sessions.py::reopen_session``) —
     i.e. on the first resume of a parent session. Read paths are already guarded
     (``_sql_json_extract`` wraps every extract in ``CASE WHEN json_valid``), so this is
     about the write path. The blob is unrecoverable either way, so neutralise it at the
@@ -1031,7 +1031,7 @@ def _lost_and_found_plausibility_errors(
     ``started_at = 0.0`` when no timestamped message survived, so they are
     excluded from the denominator.
     """
-    from hermes_cli.session_lost_and_found import _EPOCH_LOW, STUB_TITLE_PREFIX
+    from eir_cli.session_lost_and_found import _EPOCH_LOW, STUB_TITLE_PREFIX
 
     errors: list[str] = []
     checks = (
@@ -1064,7 +1064,7 @@ def _recover_via_lost_and_found(
     """Best-effort page-level salvage when table schemas are unreadable: the sqlite3 CLI's ``.recover``
     (shell-only, not in Python's ``sqlite3``) rebuilds rows into a scratch lost_and_found database which
     is then heuristically mapped into a fresh current-schema database."""
-    from hermes_cli.session_lost_and_found import (
+    from eir_cli.session_lost_and_found import (
         SQLITE3_CLI_GUIDANCE, LostAndFoundError, find_sqlite3_cli, find_sqlite3_cli_refusal, map_lost_and_found_rows,
         rebuild_fts_indexes, run_cli_lost_and_found_recover, stub_missing_parent_sessions,
     )

@@ -1,4 +1,4 @@
-"""``hermes gateway enroll`` — enroll a self-hosted gateway with a relay connector.
+"""``eir gateway enroll`` — enroll a self-hosted gateway with a relay connector.
 
 Managed/hosted installs do NOT self-enroll: the orchestrator mints the secret and stamps it into the
 container env, so this refuses to run under ``is_managed()`` (mirrors ``dashboard register``).
@@ -24,7 +24,7 @@ def _default_gateway_id() -> str:
         host = socket.gethostname().strip()
     except Exception:
         host = ""
-    return f"gw-{host or 'hermes'}"
+    return f"gw-{host or 'eir'}"
 
 
 def _resolve_connector_url(override: Optional[str]) -> Optional[str]:
@@ -82,7 +82,7 @@ def _post_enroll(
         if exc.code == 401:
             message = (
                 "Connector rejected the caller identity (401). Your Nous Portal "
-                "token could not be verified — try `hermes auth add nous` and retry."
+                "token could not be verified — try `eir auth add nous` and retry."
             )
         elif exc.code == 403:
             message = detail or "Enrollment token invalid, expired, already used, or tenant mismatch (403)."
@@ -107,14 +107,14 @@ def _fail(*lines: str) -> None:
 
 def cmd_gateway_enroll(args) -> None:
     """Enroll this gateway with a relay connector; persist the auth creds to .env."""
-    from hermes_cli.auth import AuthError
-    from hermes_cli.config import is_managed, save_env_value
+    from eir_cli.auth import AuthError
+    from eir_cli.config import is_managed, save_env_value
 
     # Managed installs get GATEWAY_RELAY_* stamped in by the orchestrator; save_env_value refuses
     # to write there anyway.
     if is_managed():
         _fail(
-            "✗ `hermes gateway enroll` is not available in a managed/hosted install.\n"
+            "✗ `eir gateway enroll` is not available in a managed/hosted install.\n"
             "  The relay gateway secret is provisioned by the hosting platform."
         )
 
@@ -147,7 +147,7 @@ def cmd_gateway_enroll(args) -> None:
         if getattr(exc, "relogin_required", False):
             _fail(
                 "✗ You're not logged into Nous Portal.",
-                "  Run `hermes setup` (or `hermes auth add nous`) first, then retry.",
+                "  Run `eir setup` (or `eir auth add nous`) first, then retry.",
             )
         _fail(f"✗ Could not resolve a Nous Portal access token: {exc}")
     except Exception as exc:
@@ -166,7 +166,7 @@ def cmd_gateway_enroll(args) -> None:
     tenant = str(result.get("tenant") or "")
     resolved_gateway_id = str(result.get("gatewayId") or gateway_id)
 
-    # Persist idempotently; save_env_value writes the sensitive values to ~/.hermes/.env and never
+    # Persist idempotently; save_env_value writes the sensitive values to ~/.eir/.env and never
     # logs them. Explicitly supplied URLs are persisted too: the ws(s):// dial target so the runtime
     # needn't re-specify it, and the wake URL so self_provision_relay forwards it to the connector
     # (which pokes it when buffered work arrives while idle; omitted ⇒ drains on next reconnect).
@@ -189,7 +189,7 @@ def cmd_gateway_enroll(args) -> None:
         except Exception as exc:
             _fail(f"✗ Failed to write {key} to .env: {exc}")
 
-    from hermes_cli.config import get_env_path
+    from eir_cli.config import get_env_path
 
     print(f'✓ Enrolled gateway "{resolved_gateway_id}"' + (f" for tenant {tenant}" if tenant else ""))
     print()
@@ -214,11 +214,11 @@ def _warn_if_secondary_multiplex_profile() -> bool:
     """Warn when relay routing stamps landed in a secondary profile's .env that a multiplexed gateway
     will never read. Returns True when the warning fired (caller suppresses the restart text)."""
     try:
-        from hermes_constants import get_default_hermes_root
-        from hermes_cli.config import get_hermes_home
+        from eir_constants import get_default_eir_root
+        from eir_cli.config import get_eir_home
 
-        default_root = Path(get_default_hermes_root()).resolve()
-        home = Path(get_hermes_home()).resolve()
+        default_root = Path(get_default_eir_root()).resolve()
+        home = Path(get_eir_home()).resolve()
         try:
             home.relative_to(default_root / "profiles")
         except ValueError:
@@ -228,7 +228,7 @@ def _warn_if_secondary_multiplex_profile() -> bool:
         # wins, then a RAW read of the DEFAULT root's config.yaml — the active profile's
         # load_gateway_config() is the wrong owner and runs the full enablement pass, whose log output
         # has no place in enroll output). An unset flag is settled by the gateway at boot, not here.
-        from hermes_cli.gateway_multiplex_mode import default_gateway_multiplexes
+        from eir_cli.gateway_multiplex_mode import default_gateway_multiplexes
         if not default_gateway_multiplexes(default_root):
             return False
 

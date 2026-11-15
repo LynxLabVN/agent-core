@@ -20,10 +20,10 @@ import pytest
 
 from fastapi.testclient import TestClient
 
-from hermes_cli import web_server
-from hermes_cli.dashboard_auth import clear_providers, register_provider
-from hermes_cli.dashboard_auth.cookies import SESSION_AT_COOKIE
-from tests.hermes_cli.conftest_dashboard_auth import StubAuthProvider
+from eir_cli import web_server
+from eir_cli.dashboard_auth import clear_providers, register_provider
+from eir_cli.dashboard_auth.cookies import SESSION_AT_COOKIE
+from tests.eir_cli.conftest_dashboard_auth import StubAuthProvider
 
 
 @pytest.fixture
@@ -172,7 +172,7 @@ def _complete_stub_login(client) -> None:
     """Walk the stub OAuth round trip so ``client`` carries a valid session.
 
     TestClient persists Set-Cookie across calls, so after this returns the
-    client's cookie jar holds ``hermes_session_at`` / ``hermes_session_rt``
+    client's cookie jar holds ``eir_session_at`` / ``eir_session_rt``
     and subsequent gated requests authenticate.
     """
     r1 = client.get("/auth/login?provider=stub", follow_redirects=False)
@@ -225,7 +225,7 @@ def _proxied_gate(monkeypatch, surface: str | None) -> TestClient:
     """Gated all-interfaces bind reached through a proxy that is not in ``trusted_proxies``, with
     no ``public_url``: the server sees ``http://127.0.0.1:9119`` whatever URL the browser addressed.
     *surface* is the app's ``ui_surface`` (``None``: the standalone dashboard, as on main)."""
-    monkeypatch.delenv("HERMES_DASHBOARD_PUBLIC_URL", raising=False)
+    monkeypatch.delenv("EIR_DASHBOARD_PUBLIC_URL", raising=False)
     clear_providers()
     register_provider(StubAuthProvider())
     for key, value in (("bound_host", "0.0.0.0"), ("bound_port", 9119), ("auth_required", True),
@@ -249,7 +249,7 @@ def proxied_gated_webapp(monkeypatch):
 
 @pytest.fixture
 def proxied_gated_dashboard(monkeypatch):
-    """The standalone ``hermes dashboard`` behind the sign-in gate, reached through such a proxy."""
+    """The standalone ``eir dashboard`` behind the sign-in gate, reached through such a proxy."""
     yield _proxied_gate(monkeypatch, None)
     clear_providers()
 
@@ -287,7 +287,7 @@ def test_webapp_sign_out_from_another_origin_is_refused(proxied_gated_webapp):
 
 def test_dashboard_page_writes_behind_a_host_rewriting_http_proxy_are_admitted_as_on_main(
         proxied_gated_dashboard):
-    """With the Webapp off, the gated ``hermes dashboard`` keeps main's rule for cookie writes: the
+    """With the Webapp off, the gated ``eir dashboard`` keeps main's rule for cookie writes: the
     origin check belongs to the Webapp's listener. Behind a plain-HTTP proxy that forwards with the
     upstream's Host and no ``dashboard.public_url``, the browser sends no Fetch Metadata and only
     ``Origin: http://dash.lan``; the dashboard's own page still writes and signs out."""
@@ -406,7 +406,7 @@ def test_bearer_401_audits_client_facing_reason(gated_app, tmp_path):
     body = response.json()
     assert body["reason"] == "invalid_or_expired_session"
 
-    log_path = tmp_path / "hermes_test" / "logs" / "dashboard-auth.log"
+    log_path = tmp_path / "eir_test" / "logs" / "dashboard-auth.log"
     raw = log_path.read_text(encoding="utf-8")
     assert bearer not in raw
     rejected = [
@@ -537,12 +537,12 @@ class _UnreachableProvider(StubAuthProvider):
     display_name = "Unreachable IdP (test only)"
 
     def verify_session(self, *, access_token: str):
-        from hermes_cli.dashboard_auth.base import ProviderError
+        from eir_cli.dashboard_auth.base import ProviderError
 
         raise ProviderError("simulated: IDP/JWKS unreachable")
 
     def refresh_session(self, *, refresh_token: str):
-        from hermes_cli.dashboard_auth.base import ProviderError
+        from eir_cli.dashboard_auth.base import ProviderError
 
         raise ProviderError("simulated: IDP/JWKS unreachable")
 
@@ -553,12 +553,12 @@ def _mint_stub_at(stub: StubAuthProvider) -> str:
     ls = stub.start_login(redirect_uri="https://fly-app.fly.dev/auth/callback")
     state = dict(
         seg.split("=", 1)
-        for seg in ls.cookie_payload["hermes_session_pkce"].split(";")
+        for seg in ls.cookie_payload["eir_session_pkce"].split(";")
         if "=" in seg
     )["state"]
     verifier = dict(
         seg.split("=", 1)
-        for seg in ls.cookie_payload["hermes_session_pkce"].split(";")
+        for seg in ls.cookie_payload["eir_session_pkce"].split(";")
         if "=" in seg
     )["verifier"]
     session = stub.complete_login(

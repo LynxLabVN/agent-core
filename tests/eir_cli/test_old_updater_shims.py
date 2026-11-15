@@ -19,7 +19,7 @@ from tests.compat.old_updater_support import (
 @pytest.mark.parametrize(
     "module,name,args,kwargs,cached",
     [
-        *((f"hermes_cli.{module}", name, args, kwargs, None) for module, name, args, kwargs in [
+        *((f"eir_cli.{module}", name, args, kwargs, None) for module, name, args, kwargs in [
         ("managed_uv", "ensure_uv", (), {}),
         ("managed_uv", "ensure_uv", (), {"repair_observer": lambda result: pytest.fail("repair observer ran")}),
         ("managed_uv", "update_managed_uv", (), {}),
@@ -55,15 +55,15 @@ from tests.compat.old_updater_support import (
         ("update_cmd", "_reload_updated_runtime_modules", (), {}),
         ("update_cmd_maint", "_reload_updated_runtime_modules", (), {}),
     ]),
-        *(("hermes_cli.main", name, args, kwargs, None) for name, args, kwargs in [
+        *(("eir_cli.main", name, args, kwargs, None) for name, args, kwargs in [
         ("_desktop_stamp_path", (), {}),
         ("_expected_windows_pe_machines", (), {}),
-        ("_hermes_exe_shims", (Path("venv"),), {}),
+        ("_eir_exe_shims", (Path("venv"),), {}),
         ("_insert_python_pin", (["uv", "pip", "install", "-e", "."],), {}),
         ("_interpreter_scripts_dir", (), {}),
         ("_load_installable_optional_extras", (), {"group": "termux-all"}),
-        ("_parse_pe_machine", (Path("Hermes.exe"),), {}),
-        ("_quarantine_running_hermes_exe", (Path("venv"),), {"max_attempts": 1, "failed_out": []}),
+        ("_parse_pe_machine", (Path("Eir.exe"),), {}),
+        ("_quarantine_running_eir_exe", (Path("venv"),), {"max_attempts": 1, "failed_out": []}),
         ("_repair_broken_lazy_refresh_imports", (["uv", "pip"], ["certifi"]), {"env": {"VIRTUAL_ENV": "venv"}}),
         ("_run_install_with_heartbeat", (["uv", "pip", "install", "-e", "."],),
          {"env": {"VIRTUAL_ENV": "venv"}, "heartbeat_interval_seconds": 1}),
@@ -80,7 +80,7 @@ from tests.compat.old_updater_support import (
         ("_windows_native_machine", (), {}),
         ("_windows_shim_in_process_chain", (), {}),
     ]),
-        *(("hermes_cli.main", name, args, kwargs, cached) for name, args, kwargs in [
+        *(("eir_cli.main", name, args, kwargs, cached) for name, args, kwargs in [
         ("_capture_active_lazy_features", (), {}),
         ("_refresh_active_lazy_features", (), {}),
         ("_refresh_active_lazy_features", (["browser"],), {}),
@@ -91,19 +91,19 @@ from tests.compat.old_updater_support import (
         ("_write_update_incomplete_marker", (), {}),
         ("_reload_updated_runtime_modules", (), {}),
     ] for cached in (False, True)),
-        ("hermes_cli.main_web_build", "_run_with_idle_timeout", (["npm", "ci"], Path("web")), {}, None),
-        ("hermes_cli.main_web_build", "_run_npm_install_deterministic", ("npm", Path("web")), {}, None),
-        ("hermes_cli.main_web_build", "_nixos_build_env", (), {}, None),
-        ("hermes_cli.main", "_reexec_dependency_sync_off_windows_shim", (), {}, None),
-        ("hermes_cli.update_cmd", "get_default_hermes_root", (), {}, None),
-        ("hermes_cli.tools_config", "_pip_install", (["--quiet", "honcho-ai"],), {}, None),
-        ("hermes_cli.tools_config", "_pip_install", (["--quiet", "honcho-ai"],), {"timeout": 120, "capture_output": False}, None),
+        ("eir_cli.main_web_build", "_run_with_idle_timeout", (["npm", "ci"], Path("web")), {}, None),
+        ("eir_cli.main_web_build", "_run_npm_install_deterministic", ("npm", Path("web")), {}, None),
+        ("eir_cli.main_web_build", "_nixos_build_env", (), {}, None),
+        ("eir_cli.main", "_reexec_dependency_sync_off_windows_shim", (), {}, None),
+        ("eir_cli.update_cmd", "get_default_eir_root", (), {}, None),
+        ("eir_cli.tools_config", "_pip_install", (["--quiet", "honcho-ai"],), {}, None),
+        ("eir_cli.tools_config", "_pip_install", (["--quiet", "honcho-ai"],), {"timeout": 120, "capture_output": False}, None),
     ],
 )
 def test_retired_dependency_entrypoints_handoff_without_fallback(module, name, args, kwargs, cached, fresh_child, monkeypatch):
     # Some boundaries (notably psutil_android) hand off during import itself.
     # Resolve ordinary modules before the guard: their CLI startup is not a shim.
-    if module != "hermes_cli.psutil_android":
+    if module != "eir_cli.psutil_android":
         resolved = importlib.import_module(module)
         if cached is not None:
             # Reset lazy exports even when earlier rows warmed the facade.
@@ -120,10 +120,10 @@ def test_retired_dependency_entrypoints_handoff_without_fallback(module, name, a
 
 
 @pytest.mark.parametrize("module,name,specs,declares_version", [
-    ("hermes_cli.main", "cmd_update", [], True),
-    ("hermes_cli.update_cmd", "_cmd_update_impl", ["honcho-ai"], True),
+    ("eir_cli.main", "cmd_update", [], True),
+    ("eir_cli.update_cmd", "_cmd_update_impl", ["honcho-ai"], True),
     # 2026-07-26..08-16 updaters predate the pre_update_version local
-    ("hermes_cli.update_cmd", "_cmd_update_impl", [], False),
+    ("eir_cli.update_cmd", "_cmd_update_impl", [], False),
 ])
 def test_lazy_installer_inside_historical_update_hands_off(module, name, specs, declares_version, fresh_child):
     from tools.lazy_deps import install_specs
@@ -151,17 +151,17 @@ def test_current_updater_entrypoints_declare_the_handoff_sentinel():
     import sys
 
     # The sentinel local looks unused; deleting it would make a current
-    # `hermes update` frame hand off to the takeover child mid-run. Assert
+    # `eir update` frame hand off to the takeover child mid-run. Assert
     # against the shipped entrypoints in a fresh interpreter: importing
-    # hermes_cli.main probes the checkout's payload manifest, which the
-    # in-process home-I/O guard refuses for worktrees under ~/.hermes.
+    # eir_cli.main probes the checkout's payload manifest, which the
+    # in-process home-I/O guard refuses for worktrees under ~/.eir.
     code = (
-        "from hermes_cli import main as hermes_main\n"
-        "from hermes_cli import update_cmd\n"
-        "print('_hermes_current_updater_frame' in "
+        "from eir_cli import main as eir_main\n"
+        "from eir_cli import update_cmd\n"
+        "print('_eir_current_updater_frame' in "
         "update_cmd._cmd_update_impl.__code__.co_varnames)\n"
-        "print('_hermes_current_updater_frame' in "
-        "hermes_main.cmd_update.__wrapped__.__code__.co_varnames)\n"
+        "print('_eir_current_updater_frame' in "
+        "eir_main.cmd_update.__wrapped__.__code__.co_varnames)\n"
     )
     out = subprocess.run(
         [sys.executable, "-c", code], capture_output=True, text=True, check=True,
@@ -172,7 +172,7 @@ def test_current_updater_entrypoints_declare_the_handoff_sentinel():
 @pytest.mark.parametrize("unpack", [False, True], ids=["path-era", "tuple-era"])
 @pytest.mark.parametrize("status", [0, 19])
 def test_ensure_uv_stops_both_historical_return_contracts(unpack, status, fresh_child):
-    from hermes_cli.managed_uv import ensure_uv
+    from eir_cli.managed_uv import ensure_uv
 
     fresh_child.returncode = status
     with fresh_child.exits():
@@ -185,7 +185,7 @@ def test_ensure_uv_stops_both_historical_return_contracts(unpack, status, fresh_
 
 
 def test_retired_probes_and_refreshes_do_no_work(no_external_work, tmp_path):
-    from hermes_cli import _install_repair, backup, banner, config, main, update_cmd
+    from eir_cli import _install_repair, backup, banner, config, main, update_cmd
     from tools import browser_tool
 
     assert _install_repair._sync_windows_cli_launchers(tmp_path) == []
@@ -224,7 +224,7 @@ def old_updater():
     return old
 
 
-def _under_historical_update(fn, module="hermes_cli.update_cmd"):
+def _under_historical_update(fn, module="eir_cli.update_cmd"):
     """Run *fn* below a frame shaped like a historical ``_cmd_update_impl`` (no sentinel local):
     every shipped caller of the psutil Android installer ran inside that entrypoint."""
     namespace = {"__name__": module, "_fn": fn}
@@ -233,7 +233,7 @@ def _under_historical_update(fn, module="hermes_cli.update_cmd"):
 
 
 def test_old_android_updater_handoffs_before_download(old_updater, fresh_child, monkeypatch):
-    monkeypatch.delitem(sys.modules, "hermes_cli.psutil_android", raising=False)
+    monkeypatch.delitem(sys.modules, "eir_cli.psutil_android", raising=False)
     with fresh_child.exits():
         _under_historical_update(lambda: old_updater._install_psutil_android_compat(["uv", "pip"]))()
 
@@ -241,8 +241,8 @@ def test_old_android_updater_handoffs_before_download(old_updater, fresh_child, 
 def test_psutil_android_import_outside_an_update_starts_nothing(no_external_work, monkeypatch):
     # 2026-10-01: an import smoke imported this shim and the unconditional import-time
     # handoff ran a whole update takeover, which restarted the account's live gateway.
-    monkeypatch.delitem(sys.modules, "hermes_cli.psutil_android", raising=False)
-    module = importlib.import_module("hermes_cli.psutil_android")
+    monkeypatch.delitem(sys.modules, "eir_cli.psutil_android", raising=False)
+    module = importlib.import_module("eir_cli.psutil_android")
     assert module.PSUTIL_URL.endswith(".tar.gz")
 
 
@@ -277,7 +277,7 @@ def test_old_updater_retains_its_code_but_loads_new_managed_uv(old_updater, fres
 
 
 def test_live_windows_scan_does_not_use_the_retired_main_alias(monkeypatch, no_external_work):
-    from hermes_cli import main, process_identity, update_cmd_windows
+    from eir_cli import main, process_identity, update_cmd_windows
 
     # Routing, not OS emulation: lifecycle fallback accepts rows on any host.
     monkeypatch.setattr(main, "_detect_venv_python_processes", no_external_work)
@@ -285,6 +285,6 @@ def test_live_windows_scan_does_not_use_the_retired_main_alias(monkeypatch, no_e
     monkeypatch.setattr(update_cmd_windows, "_psutil", lambda: None)
     monkeypatch.setattr(
         update_cmd_windows, "_detect_venv_python_processes",
-        lambda: [(123, "python", "python -m hermes_cli.main serve")],
+        lambda: [(123, "python", "python -m eir_cli.main serve")],
     )
     assert update_cmd_windows._desktop_owns_gateway_lifecycle() is True

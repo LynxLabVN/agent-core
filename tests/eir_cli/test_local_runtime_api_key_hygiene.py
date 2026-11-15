@@ -12,7 +12,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from hermes_cli.local_runtime import supervisor
+from eir_cli.local_runtime import supervisor
 
 
 def _make_supervisor(tmp_path, monkeypatch, help_text):

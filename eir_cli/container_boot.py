@@ -1,7 +1,7 @@
 """Container-boot reconciliation of per-profile gateway s6 services.
 
 Wired into the image as /etc/cont-init.d/02-reconcile-profiles. Runs as root after
-01-hermes-setup (the stage2 hook) has chowned the volume and seeded $HERMES_HOME, but
+01-eir-setup (the stage2 hook) has chowned the volume and seeded $EIR_HOME, but
 before s6-rc starts user services.
 """
 from __future__ import annotations
@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Sequence
 
-from hermes_cli.gateway_multiplex_s6 import AUTOSTART_STATES as _AUTOSTART_STATES, fold_named_slot_intent
+from eir_cli.gateway_multiplex_s6 import AUTOSTART_STATES as _AUTOSTART_STATES, fold_named_slot_intent
 
 log = logging.getLogger(__name__)
 
@@ -67,9 +67,9 @@ def _slot_action(profile: str, profile_dir: Path, prior_state: str | None, start
                            folded_into_root=folded_into_root)
 
 
-def _named_profile_dirs(hermes_home: Path) -> list[tuple[str, Path]]:
-    """Every real named profile under ``$HERMES_HOME/profiles`` (``SOUL.md`` is the marker)."""
-    profiles_root = hermes_home / "profiles"
+def _named_profile_dirs(eir_home: Path) -> list[tuple[str, Path]]:
+    """Every real named profile under ``$EIR_HOME/profiles`` (``SOUL.md`` is the marker)."""
+    profiles_root = eir_home / "profiles"
     if not profiles_root.is_dir():
         return []
     found: list[tuple[str, Path]] = []
@@ -86,20 +86,20 @@ def _named_profile_dirs(hermes_home: Path) -> list[tuple[str, Path]]:
 
 
 def reconcile_profile_gateways(
-    *, hermes_home: Path, scandir: Path, dry_run: bool = False,
+    *, eir_home: Path, scandir: Path, dry_run: bool = False,
     container_argv: Sequence[str] | None = None) -> list[ReconcileAction]:
     """Recreate s6 service registrations for every persistent profile.
 
     Always registers a ``gateway-default`` slot for the root profile (the implicit profile at
-    the top of ``$HERMES_HOME``): ``hermes_cli.gateway`` maps an empty profile suffix to it,
-    so it is what ``hermes gateway start`` (no ``-p``) targets.
+    the top of ``$EIR_HOME``): ``eir_cli.gateway`` maps an empty profile suffix to it,
+    so it is what ``eir gateway start`` (no ``-p``) targets.
 
-    Without it, bare ``hermes gateway start`` inside the container would land on ``s6-svc -u
-    /run/hermes-service/gateway-default`` → uncaught ``CalledProcessError`` → traceback to the user (PR #30136
+    Without it, bare ``eir gateway start`` inside the container would land on ``s6-svc -u
+    /run/eir-service/gateway-default`` → uncaught ``CalledProcessError`` → traceback to the user (PR #30136
     review).
     """
     actions: list[ReconcileAction] = []
-    # ONE multiplexing gateway per container: named slots are registered (so `hermes -p X gateway
+    # ONE multiplexing gateway per container: named slots are registered (so `eir -p X gateway
     # start` has a target and `s6-svstat` can report them) but are never booted from their persisted
     # run intent, except a `gateway.standalone` profile's (below).
     # This is the s6 leg of the multiplex-only convergence: an image upgraded from a release that
@@ -108,19 +108,19 @@ def reconcile_profile_gateways(
     #
     # It used to be gated on `gateway.multiplex_profiles`, which made the UNSET default (on) boot
     # the slots anyway — the container shipped the opt-out topology by accident. The key is retired
-    # as a topology switch (hermes_cli/gateway_multiplex_mode.py), so there is nothing to read.
-    named = [(name, entry, _read_desired_state(entry)) for name, entry in _named_profile_dirs(hermes_home)]
+    # as a topology switch (eir_cli/gateway_multiplex_mode.py), so there is nothing to read.
+    named = [(name, entry, _read_desired_state(entry)) for name, entry in _named_profile_dirs(eir_home)]
     # The exception is a `gateway.standalone` profile: the root multiplexer never serves it
     # (profiles_to_serve excludes it), so it boots its own slot from its own intent, beside the root.
-    from hermes_cli.profiles import profile_is_standalone
+    from eir_cli.profiles import profile_is_standalone
     standalone = {name for name, entry, _prior in named if profile_is_standalone(entry)}
 
     # A legacy `gateway run` container with no state yet seeds `running` (pre-s6 behavior).
     legacy_default_state = _maybe_migrate_legacy_gateway_run_state(
-        hermes_home, container_argv=container_argv, dry_run=dry_run)
-    default_prior_state = legacy_default_state or _read_desired_state(hermes_home)
+        eir_home, container_argv=container_argv, dry_run=dry_run)
+    default_prior_state = legacy_default_state or _read_desired_state(eir_home)
     # The root slot INHERITS every named slot's autostart intent, because it is the one process
-    # that serves them. Without this an image only ever driven as `hermes -p coder gateway start`
+    # that serves them. Without this an image only ever driven as `eir -p coder gateway start`
     # booted with ZERO gateways: it has no root state (or "stopped"), every named slot is now
     # registered down unconditionally, and every action reported "registered" — a container that
     # looks healthy while nothing is listening.
@@ -131,15 +131,15 @@ def reconcile_profile_gateways(
     # s6 root slot from persisted intent as well puts two pollers on one bot token (#152152).
     # A standalone profile's foreground gateway serves only that profile, so the root slot stays.
     foreground = _foreground_gateway_profile(
-        tuple(container_argv) if container_argv is not None else _read_container_argv(), hermes_home)
+        tuple(container_argv) if container_argv is not None else _read_container_argv(), eir_home)
     if foreground is not None and foreground not in standalone:
         default_should_start = False
     if folded and default_prior_state not in _AUTOSTART_STATES:
         log.warning("%s", boot_notice(folded, foreground=not default_should_start))
     if not dry_run:
-        _cleanup_stale_runtime_files(hermes_home)
+        _cleanup_stale_runtime_files(eir_home)
         _register_service(scandir, "default", start=default_should_start)
-    actions.append(_slot_action("default", hermes_home, default_prior_state, default_should_start,
+    actions.append(_slot_action("default", eir_home, default_prior_state, default_should_start,
                                 folded_into_root=bool(folded)))
 
     for name, entry, prior_state in named:
@@ -152,7 +152,7 @@ def reconcile_profile_gateways(
         actions.append(_slot_action(name, entry, prior_state, should_start,
                                     folded_into_root=name in folded))
     if not dry_run:
-        _write_reconcile_log(hermes_home, actions)
+        _write_reconcile_log(eir_home, actions)
     return actions
 
 
@@ -168,13 +168,13 @@ def boot_notice(folded: Sequence[str], *, foreground: bool = False) -> str:
 
 
 def _maybe_migrate_legacy_gateway_run_state(
-    hermes_home: Path, *, container_argv: Sequence[str] | None, dry_run: bool) -> str | None:
+    eir_home: Path, *, container_argv: Sequence[str] | None, dry_run: bool) -> str | None:
     """Seed root gateway_state for pre-s6 `gateway run` containers (the tini image let users run
     the gateway as the container command; post-s6 it would register down and never start)."""
-    state_file = hermes_home / "gateway_state.json"
+    state_file = eir_home / "gateway_state.json"
     if state_file.exists():
         return None
-    if os.environ.get("HERMES_GATEWAY_NO_SUPERVISE", "").lower() in ("1", "true", "yes"):
+    if os.environ.get("EIR_GATEWAY_NO_SUPERVISE", "").lower() in ("1", "true", "yes"):
         return None
     argv = tuple(container_argv) if container_argv is not None else _read_container_argv()
     if not _is_legacy_gateway_run_request(argv):
@@ -218,7 +218,7 @@ def _read_container_argv() -> tuple[str, ...]:
 
 
 def _strip_container_argv_prefix(argv: Sequence[str]) -> list[str]:
-    """Strip the s6/wrapper prefix off the container argv, leaving the hermes args.
+    """Strip the s6/wrapper prefix off the container argv, leaving the eir args.
 
     Drops everything through the ``main-wrapper.sh`` token — the stable boundary the image
     owns — rather than peeling tokens positionally (which broke on the s6 v2→v3 bump).
@@ -231,7 +231,7 @@ def _strip_container_argv_prefix(argv: Sequence[str]) -> list[str]:
         args = args[1:]
     if args and args[0].endswith("entrypoint-dispatch.sh"):  # non-PID-1 dispatch shim
         args = args[1:]
-    if args and Path(args[0]).name == "hermes":  # the wrapper re-execs `hermes <subcommand>`
+    if args and Path(args[0]).name == "eir":  # the wrapper re-execs `eir <subcommand>`
         args = args[1:]
     return _strip_python_launcher(args)
 
@@ -241,40 +241,40 @@ _PYTHON_OPERAND_FLAGS = frozenset({"-X", "-W"})
 
 
 def _strip_python_launcher(args: list[str]) -> list[str]:
-    """Drop a ``python [opts] -m hermes_cli.main`` / ``python [opts] .../hermes_cli/main.py``
+    """Drop a ``python [opts] -m eir_cli.main`` / ``python [opts] .../eir_cli/main.py``
     launcher: main-wrapper.sh execs an executable CMD as-is, and that process is the same CLI."""
     if not args or not _PYTHON_RE.fullmatch(Path(args[0]).name):
         return args
     i = 1
     while i < len(args) and args[i].startswith("-") and args[i] != "-m":
         i += 2 if args[i] in _PYTHON_OPERAND_FLAGS else 1
-    if args[i:i + 2] == ["-m", "hermes_cli.main"]:
+    if args[i:i + 2] == ["-m", "eir_cli.main"]:
         return args[i + 2:]
-    if i < len(args) and args[i].replace("\\", "/").endswith("hermes_cli/main.py"):
+    if i < len(args) and args[i].replace("\\", "/").endswith("eir_cli/main.py"):
         return args[i + 1:]
     return args
 
 
 def _is_legacy_gateway_run_request(argv: Sequence[str]) -> bool:
     """True for Docker commands equivalent to `gateway run`."""
-    from hermes_cli._parser import gateway_run_no_supervise
+    from eir_cli._parser import gateway_run_no_supervise
     args = _strip_container_argv_prefix(argv)
     if gateway_run_no_supervise(args):
         return False
     return len(args) >= 2 and args[0] == "gateway" and args[1] == "run"
 
 
-def _foreground_gateway_profile(argv: Sequence[str], hermes_home: Path) -> str | None:
+def _foreground_gateway_profile(argv: Sequence[str], eir_home: Path) -> str | None:
     """The profile a container CMD's own foreground gateway serves, or None when the CMD runs no
     gateway outside s6. Foreground means ``gateway run`` with ``--no-supervise`` or
-    HERMES_GATEWAY_NO_SUPERVISE, parsed as the CLI does: the profile is ``-p``/``--profile``
+    EIR_GATEWAY_NO_SUPERVISE, parsed as the CLI does: the profile is ``-p``/``--profile``
     wherever it sits, else the sticky ``active_profile`` the unsupervised run follows (#22502)."""
     import shlex
 
     from gateway.status import looks_like_gateway_command_line
-    from hermes_cli._parser import gateway_run_no_supervise, scan_profile_flag_quietly
+    from eir_cli._parser import gateway_run_no_supervise, scan_profile_flag_quietly
     args = _strip_container_argv_prefix(argv)
-    if not looks_like_gateway_command_line(shlex.join(["hermes", *args])):
+    if not looks_like_gateway_command_line(shlex.join(["eir", *args])):
         return None
     scanned = scan_profile_flag_quietly(args)
     if scanned is None:  # an invalid -p: the CMD exits 2 itself and runs no gateway
@@ -283,12 +283,12 @@ def _foreground_gateway_profile(argv: Sequence[str], hermes_home: Path) -> str |
     if index is not None:  # stripped before argparse, as main._apply_profile_override does
         args = args[:index] + args[index + consumed:]
     # Bare `gateway` also runs, but only `gateway run` takes `--no-supervise`.
-    if not gateway_run_no_supervise(args) and os.environ.get("HERMES_GATEWAY_NO_SUPERVISE", "").lower() not in ("1", "true", "yes"):
+    if not gateway_run_no_supervise(args) and os.environ.get("EIR_GATEWAY_NO_SUPERVISE", "").lower() not in ("1", "true", "yes"):
         return None
     if profile is not None:
         return profile
-    from hermes_cli.profiles import get_active_profile
-    return get_active_profile(hermes_home)
+    from eir_cli.profiles import get_active_profile
+    return get_active_profile(eir_home)
 
 
 def _is_dashboard_container(argv: Sequence[str]) -> bool:
@@ -349,7 +349,7 @@ def _register_service(scandir: Path, profile: str, *, start: bool) -> None:
     """
     import shutil
 
-    from hermes_cli.service_manager import (
+    from eir_cli.service_manager import (
         S6ServiceManager, _seed_supervise_skeleton, validate_profile_name)
 
     validate_profile_name(profile)
@@ -368,10 +368,10 @@ def _register_service(scandir: Path, profile: str, *, start: bool) -> None:
         _write_exec(tmp_dir / "finish", S6ServiceManager._render_finish_script())
         (tmp_dir / "log").mkdir()
         _write_exec(tmp_dir / "log" / "run", S6ServiceManager._render_log_run(profile))
-        if not start:  # `hermes -p <profile> gateway start` brings it up later (s6-svc -u)
+        if not start:  # `eir -p <profile> gateway start` brings it up later (s6-svc -u)
             (tmp_dir / "down").touch()
-        # Pre-create supervise/ with hermes ownership BEFORE publishing so s6-supervise inherits
-        # it and runtime s6-svc calls as the hermes user won't EACCES.
+        # Pre-create supervise/ with eir ownership BEFORE publishing so s6-supervise inherits
+        # it and runtime s6-svc calls as the eir user won't EACCES.
         _seed_supervise_skeleton(tmp_dir)
         if service_dir.exists():
             shutil.rmtree(service_dir)
@@ -385,8 +385,8 @@ def _register_service(scandir: Path, profile: str, *, start: bool) -> None:
 _LOG_ROTATE_BYTES = 256 * 1024
 
 
-def _write_reconcile_log(hermes_home: Path, actions: list[ReconcileAction]) -> None:
-    """Append one line per profile to $HERMES_HOME/logs/container-boot.log (rotated to ``.1``) —
+def _write_reconcile_log(eir_home: Path, actions: list[ReconcileAction]) -> None:
+    """Append one line per profile to $EIR_HOME/logs/container-boot.log (rotated to ``.1``) —
     a separate greppable file for "why didn't my profile come back up".
 
     Size-bounded: when the file exceeds ``_LOG_ROTATE_BYTES`` (defaults to 256 KiB ≈ 3000 reconcile lines),
@@ -396,7 +396,7 @@ def _write_reconcile_log(hermes_home: Path, actions: list[ReconcileAction]) -> N
     item O3).
     """
     import time
-    log_dir = hermes_home / "logs"
+    log_dir = eir_home / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / "container-boot.log"
     try:
@@ -414,18 +414,18 @@ def _write_reconcile_log(hermes_home: Path, actions: list[ReconcileAction]) -> N
 
 def main() -> int:
     """Entry point invoked from /etc/cont-init.d/02-reconcile-profiles."""
-    # A dashboard-only container must not reconcile: with a shared bind-mounted HERMES_HOME both
+    # A dashboard-only container must not reconcile: with a shared bind-mounted EIR_HOME both
     # containers race to flock() the same s6-log files → "Resource busy" restart storm. Detected
     # from PID 1 argv, not an operator flag (a flag can be forgotten in a hand-written manifest).
     if _is_dashboard_container(_read_container_argv()):
         print("reconcile: skipping (dashboard container — does not need per-profile gateways)")
         return 0
 
-    from hermes_cli.service_manager import S6_DYNAMIC_SCANDIR
+    from eir_cli.service_manager import S6_DYNAMIC_SCANDIR
 
-    hermes_home = Path(os.environ.get("HERMES_HOME", "/opt/data"))
+    eir_home = Path(os.environ.get("EIR_HOME", "/opt/data"))
     scandir = Path(os.environ.get("S6_PROFILE_GATEWAY_SCANDIR", str(S6_DYNAMIC_SCANDIR)))
-    actions = reconcile_profile_gateways(hermes_home=hermes_home, scandir=scandir)
+    actions = reconcile_profile_gateways(eir_home=eir_home, scandir=scandir)
     folded = [a.profile for a in actions if a.profile != "default" and a.folded_into_root]
     if folded:
         print(boot_notice(folded, foreground=actions[0].action != "started"))

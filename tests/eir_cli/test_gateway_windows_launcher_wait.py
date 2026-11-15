@@ -9,8 +9,8 @@ from pathlib import Path
 
 import pytest
 
-from hermes_cli import gateway_windows
-from hermes_cli.gateway_runtime_service_identity import _vbs_identity
+from eir_cli import gateway_windows
+from eir_cli.gateway_runtime_service_identity import _vbs_identity
 
 
 def _launcher(tmp_path, monkeypatch, python):

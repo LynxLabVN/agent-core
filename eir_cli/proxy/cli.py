@@ -1,4 +1,4 @@
-"""CLI handlers for the ``hermes proxy`` subcommand."""
+"""CLI handlers for the ``eir proxy`` subcommand."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ import logging
 import sys
 from typing import Any
 
-from hermes_cli.proxy.adapters import ADAPTERS, get_adapter
-from hermes_cli.proxy.server import (
+from eir_cli.proxy.adapters import ADAPTERS, get_adapter
+from eir_cli.proxy.server import (
     AIOHTTP_AVAILABLE, DEFAULT_HOST, DEFAULT_PORT, run_server
 )
 
@@ -22,7 +22,7 @@ def _err(msg: str) -> None:
 def cmd_proxy_start(args: Any) -> int:
     """Run the proxy server in the foreground."""
     if not AIOHTTP_AVAILABLE:
-        _err("hermes proxy requires aiohttp. Run `hermes setup` to install it.")
+        _err("eir proxy requires aiohttp. Run `eir setup` to install it.")
         return 1
     provider = getattr(args, "provider", None) or "nous"
     try:
@@ -31,15 +31,15 @@ def cmd_proxy_start(args: Any) -> int:
         _err(f"Error: {exc}")
         return 2
     if not adapter.is_authenticated():
-        auth_hint = getattr(adapter, "auth_hint", f"hermes auth add {adapter.name}")
+        auth_hint = getattr(adapter, "auth_hint", f"eir auth add {adapter.name}")
         _err(f"Not logged into {adapter.display_name}. Run `{auth_hint}` first.")
         return 2
-    from hermes_cli.url_utils import format_url_host
+    from eir_cli.url_utils import format_url_host
 
     host = getattr(args, "host", None) or DEFAULT_HOST
     port = getattr(args, "port", None) or DEFAULT_PORT
     _err(
-        f"Starting Hermes proxy for {adapter.display_name}\n"
+        f"Starting Eir proxy for {adapter.display_name}\n"
         f"  Listening on:  http://{format_url_host(host)}:{port}/v1\n"
         f"  Forwarding to: (resolved per-request from your subscription)\n"
         f"  Use any bearer token in the client — the proxy attaches your real credential.\n"
@@ -58,7 +58,7 @@ def cmd_proxy_start(args: Any) -> int:
 
 def cmd_proxy_status(args: Any) -> int:
     """Print the status of each configured upstream adapter."""
-    print("Hermes proxy upstream adapters\n")
+    print("Eir proxy upstream adapters\n")
     for name in sorted(ADAPTERS):
         adapter = get_adapter(name)
         if not adapter.is_authenticated():
@@ -71,7 +71,7 @@ def cmd_proxy_status(args: Any) -> int:
             continue
         expires = f" (bearer expires {cred.expires_at})" if cred.expires_at else ""
         print(f"  [{name:8s}] {adapter.display_name} — ready{expires}")
-    print("\nStart the proxy with: hermes proxy start [--provider <name>]")
+    print("\nStart the proxy with: eir proxy start [--provider <name>]")
     return 0
 
 
@@ -93,20 +93,20 @@ _SUBCOMMANDS = {
 
 
 def cmd_proxy(args: Any) -> int:
-    """Dispatch ``hermes proxy <subcommand>``; no/unknown subcommand prints the short help."""
+    """Dispatch ``eir proxy <subcommand>``; no/unknown subcommand prints the short help."""
     handler = _SUBCOMMANDS.get(getattr(args, "proxy_command", None))
     if handler is not None:
         return handler(args)
     _err(
-        "hermes proxy — local OpenAI-compatible proxy that attaches your\n"
+        "eir proxy — local OpenAI-compatible proxy that attaches your\n"
         "OAuth-authenticated provider credentials to outbound requests.\n"
         "\n"
         "Subcommands:\n"
-        "  hermes proxy start [--provider nous|xai] [--host 127.0.0.1] [--port 8645]\n"
+        "  eir proxy start [--provider nous|xai] [--host 127.0.0.1] [--port 8645]\n"
         "      Run the proxy in the foreground.\n"
-        "  hermes proxy status\n"
+        "  eir proxy status\n"
         "      Show which upstream adapters are ready.\n"
-        "  hermes proxy providers\n"
+        "  eir proxy providers\n"
         "      List available upstream providers.\n"
     )
     return 0

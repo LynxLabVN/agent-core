@@ -1,7 +1,7 @@
 """Regression tests for #25106: CLI `/model <name> --global` never persisted
 ``model.base_url``/``model.api_mode`` to config.yaml, so a global provider
 switch left the PREVIOUS provider's endpoint/wire-protocol on disk. The next
-`hermes` launch re-read the stale base_url and routed the new model at the
+`eir` launch re-read the stale base_url and routed the new model at the
 old host.
 
 Both ``_handle_model_switch`` (typed ``/model <name>``) and
@@ -9,7 +9,7 @@ Both ``_handle_model_switch`` (typed ``/model <name>``) and
 persistence block wrote ``model.default``/``model.provider`` but never
 touched ``base_url``/``api_mode`` at all. Fix: sync both on every global
 switch, clearing to ``None`` when the resolved result doesn't need them — now the
-canonical ``hermes_cli.model_switch.persist_model_selection`` shape shared by every
+canonical ``eir_cli.model_switch.persist_model_selection`` shape shared by every
 surface.
 """
 
@@ -17,12 +17,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from hermes_cli.model_switch import ModelSwitchResult
+from eir_cli.model_switch import ModelSwitchResult
 
 
 @pytest.fixture(autouse=True)
 def model_config(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     path = tmp_path / "config.yaml"
     path.write_text(
         "model:\n  default: old-model\n  provider: copilot\n"
@@ -33,7 +33,7 @@ def model_config(tmp_path, monkeypatch):
 
 
 def _saved_model():
-    from hermes_cli.config import read_user_config_raw
+    from eir_cli.config import read_user_config_raw
     return {f"model.{key}": value for key, value in read_user_config_raw()["model"].items()}
 
 
@@ -60,7 +60,7 @@ class _StubCLI:
     def _stage_and_swap_model(self, result, old_model):
         # Staging + in-place swap lives in a helper; run the real one on this stub.
         import cli as _cli_mod
-        return _cli_mod.HermesCLI._stage_and_swap_model(self, result, old_model)
+        return _cli_mod.EirCLI._stage_and_swap_model(self, result, old_model)
 
 
     agent = None
@@ -83,7 +83,7 @@ class _StubCLI:
     ):
         import cli as cli_mod
 
-        return cli_mod.HermesCLI._confirm_and_apply_cli_model_switch(
+        return cli_mod.EirCLI._confirm_and_apply_cli_model_switch(
             self, result, persist_global, one_turn, custom_provs
         )
 
@@ -95,12 +95,12 @@ def _run_switch(monkeypatch, result, cmd="/model MiniMax-M3 --global"):
     import cli as cli_mod
 
     monkeypatch.setattr(cli_mod, "_cprint", lambda *a, **k: None)
-    monkeypatch.setattr("hermes_cli.model_switch.switch_model", lambda **kw: result)
+    monkeypatch.setattr("eir_cli.model_switch.switch_model", lambda **kw: result)
     monkeypatch.setattr(
-        "hermes_cli.inventory.load_picker_context",
+        "eir_cli.inventory.load_picker_context",
         lambda: (_ for _ in ()).throw(RuntimeError("no picker context in test")),
     )
-    cli_mod.HermesCLI._handle_model_switch(_StubCLI(), cmd)
+    cli_mod.EirCLI._handle_model_switch(_StubCLI(), cmd)
     return _saved_model()
 
 
@@ -122,13 +122,13 @@ def test_session_only_switch_does_not_touch_config(monkeypatch, model_config):
 
     monkeypatch.setattr(cli_mod, "_cprint", lambda *a, **k: None)
     original = model_config.read_bytes()
-    monkeypatch.setattr("hermes_cli.model_switch.switch_model", lambda **kw: _make_result())
+    monkeypatch.setattr("eir_cli.model_switch.switch_model", lambda **kw: _make_result())
     monkeypatch.setattr(
-        "hermes_cli.inventory.load_picker_context",
+        "eir_cli.inventory.load_picker_context",
         lambda: (_ for _ in ()).throw(RuntimeError("no picker context in test")),
     )
 
-    cli_mod.HermesCLI._handle_model_switch(_StubCLI(), "/model MiniMax-M3 --session")
+    cli_mod.EirCLI._handle_model_switch(_StubCLI(), "/model MiniMax-M3 --session")
 
     assert model_config.read_bytes() == original
 
@@ -142,7 +142,7 @@ def _run_apply(monkeypatch, result, persist_global=True):
     import cli as cli_mod
 
     monkeypatch.setattr(cli_mod, "_cprint", lambda *a, **k: None)
-    cli_mod.HermesCLI._apply_model_switch_result(_StubCLI(), result, persist_global)
+    cli_mod.EirCLI._apply_model_switch_result(_StubCLI(), result, persist_global)
     return _saved_model()
 
 

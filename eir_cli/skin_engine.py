@@ -1,11 +1,11 @@
-"""Hermes skin/theme engine — the theme SDK for every surface."""
+"""Eir skin/theme engine — the theme SDK for every surface."""
 
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from hermes_constants import get_hermes_home
+from eir_constants import get_eir_home
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +25,8 @@ class SkinConfig:
     branding: dict[str, str] = field(default_factory=dict)
     tool_prefix: str = "┊"
     tool_emojis: dict[str, str] = field(default_factory=dict)  # per-tool emoji overrides
-    banner_logo: str = ""    # Rich-markup ASCII art logo (replaces HERMES_AGENT_LOGO)
-    banner_hero: str = ""    # Rich-markup hero art (replaces HERMES_CADUCEUS)
+    banner_logo: str = ""    # Rich-markup ASCII art logo (replaces EIR_AGENT_LOGO)
+    banner_hero: str = ""    # Rich-markup hero art (replaces EIR_CADUCEUS)
     custom_css: str = ""     # Raw CSS injected as a <style> tag on the desktop GUI (32 KiB cap)
 
     def get_color(self, key: str, fallback: str = "") -> str:
@@ -56,13 +56,13 @@ def _wings(*glyphs) -> list[list[str]]:
             for g in glyphs]
 
 
-# Branding shared by every Hermes-named built-in (mono/daylight override help_header).
-_HERMES_BRANDING: dict[str, str] = _branding(
-    "Hermes", "☤", "Goodbye! ☤", prompt="❯", help_header="(^_^)? Available Commands")
+# Branding shared by every Eir-named built-in (mono/daylight override help_header).
+_EIR_BRANDING: dict[str, str] = _branding(
+    "Eir", "☤", "Goodbye! ☤", prompt="❯", help_header="(^_^)? Available Commands")
 
 _BUILTIN_SKINS: dict[str, dict[str, Any]] = {
     "default": {
-        "name": "default", "description": "Classic Hermes — gold and kawaii",
+        "name": "default", "description": "Classic Eir — gold and kawaii",
         # Dark-authored; values match the TUI's DARK_THEME so both render the same gold.
         "colors": {
             "banner_border": "#CD7F32", "banner_title": "#FFD700", "banner_accent": "#FFBF00",
@@ -92,7 +92,7 @@ _BUILTIN_SKINS: dict[str, dict[str, Any]] = {
             "completion_menu_bg": "#F5F5F5", "completion_menu_current_bg": "#E0D1BF",
             "selection_bg": "#D4E4F7", "status_bar_bg": "#F5F5F5", "voice_status_bg": "#F5F5F5"},
         "spinner": {},  # empty = hardcoded defaults in display.py
-        "branding": _HERMES_BRANDING,
+        "branding": _EIR_BRANDING,
         "tool_prefix": "┊"},
     "ares": {
         "name": "ares", "description": "War-god theme — crimson and bronze",
@@ -153,7 +153,7 @@ _BUILTIN_SKINS: dict[str, dict[str, Any]] = {
             "completion_menu_current_bg": "#464646", "selection_bg": "#505050",
             "shell_dollar": "#aaaaaa", "voice_status_bg": "#1F1F1F"},
         "spinner": {},
-        "branding": {**_HERMES_BRANDING, "help_header": "[?] Available Commands"},
+        "branding": {**_EIR_BRANDING, "help_header": "[?] Available Commands"},
         "tool_prefix": "┊"},
     "slate": {
         "name": "slate", "description": "Cool blue — developer-focused",
@@ -169,7 +169,7 @@ _BUILTIN_SKINS: dict[str, dict[str, Any]] = {
             "session_border": "#545E6B", "completion_menu_bg": "#151C2F",
             "completion_menu_current_bg": "#324867", "selection_bg": "#3A5375",
             "shell_dollar": "#7eb8f6", "voice_status_bg": "#151C2F"},
-        "spinner": {}, "branding": _HERMES_BRANDING, "tool_prefix": "┊"},
+        "spinner": {}, "branding": _EIR_BRANDING, "tool_prefix": "┊"},
     "daylight": {
         "name": "daylight",
         "description": "Light theme for bright terminals with dark text and cool blue accents",
@@ -187,7 +187,7 @@ _BUILTIN_SKINS: dict[str, dict[str, Any]] = {
             "completion_menu_meta_current_bg": "#BFDBFE", "selection_bg": "#D3E0FB",
             "shell_dollar": "#2563EB", "voice_status_bg": "#E5EDF8"},
         "spinner": {},
-        "branding": {**_HERMES_BRANDING, "help_header": "[?] Available Commands"},
+        "branding": {**_EIR_BRANDING, "help_header": "[?] Available Commands"},
         "tool_prefix": "│"},
     "warm-lightmode": {
         "name": "warm-lightmode",
@@ -205,7 +205,7 @@ _BUILTIN_SKINS: dict[str, dict[str, Any]] = {
             "completion_menu_current_bg": "#E8DCC8", "completion_menu_meta_bg": "#F0E8D8",
             "completion_menu_meta_current_bg": "#DFCFB0", "selection_bg": "#E8DAD0",
             "shell_dollar": "#8B4513", "voice_status_bg": "#F5F0E8"},
-        "spinner": {}, "branding": _HERMES_BRANDING, "tool_prefix": "┊"},
+        "spinner": {}, "branding": _EIR_BRANDING, "tool_prefix": "┊"},
     "poseidon": {
         "name": "poseidon", "description": "Ocean-god theme — deep blue and seafoam",
         "colors": {
@@ -350,26 +350,26 @@ _active_skin_by_home: dict[str, tuple[str, SkinConfig]] = {}
 
 
 def _routed_home_key() -> Optional[str]:
-    from hermes_constants import get_hermes_home_override, hermes_home_key
-    return None if get_hermes_home_override() is None else hermes_home_key()
+    from eir_constants import get_eir_home_override, eir_home_key
+    return None if get_eir_home_override() is None else eir_home_key()
 
 
 def _profile_config() -> dict:
     try:
-        from hermes_cli.config import load_config_readonly
+        from eir_cli.config import load_config_readonly
         return load_config_readonly() or {}
     except Exception:
         return {}
 
 
 def _skins_dir() -> Path:
-    return get_hermes_home() / "skins"
+    return get_eir_home() / "skins"
 
 
 def _load_skin_from_yaml(path: Path) -> Optional[dict[str, Any]]:
     """Load a skin definition from a YAML file; None on any failure."""
     try:
-        import hermes_yaml as yaml
+        import eir_yaml as yaml
         with open(path, "r", encoding="utf-8-sig") as f:
             data = yaml.safe_load(f)
         if isinstance(data, dict) and "name" in data:

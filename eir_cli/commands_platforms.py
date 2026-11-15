@@ -9,11 +9,11 @@ from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
 from agent.i18n import t
-from hermes_cli.commands import (
+from eir_cli.commands import (
     COMMAND_REGISTRY, _is_gateway_available, _iter_plugin_command_entries, _resolve_config_gates)
 
-# Logger name parity with the origin module (tests capture "hermes_cli.commands").
-logger = logging.getLogger("hermes_cli.commands")
+# Logger name parity with the origin module (tests capture "eir_cli.commands").
+logger = logging.getLogger("eir_cli.commands")
 
 _CMD_NAME_LIMIT = 32  # max command name length shared by Telegram and Discord
 
@@ -120,7 +120,7 @@ _TELEGRAM_MENU_PRIORITY = (
 def _telegram_command_menu_config() -> dict[str, Any]:
     """Normalized ``platforms.telegram.extra.command_menu`` config with safe defaults."""
     try:
-        from hermes_cli.config import read_raw_config
+        from eir_cli.config import read_raw_config
         node: Any = read_raw_config() or {}
     except Exception:
         node = {}
@@ -270,7 +270,7 @@ def _collect_gateway_skill_entries(
         return _clamp_command_names(out, reserved_names)
 
     def _plugin_rows():
-        from hermes_cli.plugins import get_plugin_commands
+        from eir_cli.plugins import get_plugin_commands
         plugin_cmds = get_plugin_commands()
         for cmd_name in sorted(plugin_cmds):
             meta = plugin_cmds[cmd_name]
@@ -336,7 +336,7 @@ def discord_skill_commands_by_category(
 
     Scan roots include the local ``SKILLS_DIR`` **and** any configured ``skills.external_dirs`` — matching
     the widened filter applied to the flat ``discord_skill_commands()`` collector in #18741. Without this
-    parity, external-dir skills are visible via ``hermes skills list`` and the agent's ``/skill-name``
+    parity, external-dir skills are visible via ``eir skills list`` and the agent's ``/skill-name``
     dispatch but silently absent from Discord's ``/skill`` autocomplete.
     The legacy 25-group × 25-subcommand caps (from the old nested ``/skill <cat> <name>`` layout) are
     **not** applied — the live caller (``_register_skill_group`` in ``gateway/platforms/discord.py``,
@@ -400,18 +400,18 @@ _SLACK_RESERVED_COMMANDS = frozenset({
     "me", "status", "away", "dnd", "shrug", "remind", "msg", "feed", "who", "collapse", "expand",
     "leave", "join", "open", "search", "topic", "mute", "pro", "shortcuts"})
 
-# Canonical commands deliberately routed through ``/hermes <command>`` on Slack only: the registry
+# Canonical commands deliberately routed through ``/eir <command>`` on Slack only: the registry
 # sits at Slack's 50-slash cap, so rather than let the clamp silently drop whichever command sorts
 # last (breaking the Telegram-parity test), low-frequency ones are demoted here. Rule: when a new
 # canonical command tips past the cap, demote a rarer one-off lookup (version, whoami, diff, ...)
 # rather than a recurring interactive surface (context, loop, save, approvals). Keep TIGHT — the
 # parity test reads this set. Aliases are never pinned ahead of canonicals.
-_SLACK_VIA_HERMES_ONLY = frozenset({
+_SLACK_VIA_EIR_ONLY = frozenset({
     "topup", "moa", "debug", "egress", "init", "version", "diff", "update", "heartbeat",
     "refine", "review", "pause", "whoami", "platform", "insights", "login",
-    # Recovery-only, after a restart lost a turn: `/hermes discard` reaches it.
+    # Recovery-only, after a restart lost a turn: `/eir discard` reaches it.
     "discard",
-    # One-time answer to the low-disk prompt; `/hermes autoprune on` reaches it.
+    # One-time answer to the low-disk prompt; `/eir autoprune on` reaches it.
     "autoprune"})
 
 
@@ -424,7 +424,7 @@ def slack_native_slashes() -> list[tuple[str, str, str]]:
     """(slash_name, description, usage_hint) triples for Slack: every gateway-available command
     (canonical names first so they win slots at the cap, then aliases, then plugins) becomes a
     standalone slash, deduped and clamped to the 50-command cap; Slack built-ins and
-    _SLACK_VIA_HERMES_ONLY are skipped. ``/hermes`` is always first for anything dropped."""
+    _SLACK_VIA_EIR_ONLY are skipped. ``/eir`` is always first for anything dropped."""
     available = _gateway_available_commands()
     wanted = [(cmd.name, cmd.describe(), cmd.args_hint or "") for cmd in available]
     wanted += [(alias, t("slash.shared.slack_alias_for", name=cmd.name, description=cmd.describe()),
@@ -432,12 +432,12 @@ def slack_native_slashes() -> list[tuple[str, str, str]]:
     wanted += [(name, desc, hint or "") for name, desc, hint in _iter_plugin_command_entries()]
 
     entries: list[tuple[str, str, str]] = [
-        ("hermes", t("slash.hermes.description"), "[subcommand] [args]")]
-    seen = {"hermes"}
+        ("eir", t("slash.eir.description"), "[subcommand] [args]")]
+    seen = {"eir"}
     for name, desc, hint in wanted:
         slack_name = _sanitize_slack_name(name)
         if (not slack_name or slack_name in seen or slack_name in _SLACK_RESERVED_COMMANDS
-                or slack_name in _SLACK_VIA_HERMES_ONLY
+                or slack_name in _SLACK_VIA_EIR_ONLY
                 or len(entries) >= _SLACK_MAX_SLASH_COMMANDS):
             continue
         # Slack description cap is 2000 chars; keep it short.
@@ -461,7 +461,7 @@ def slack_app_manifest(
 
 
 def slack_subcommand_map() -> dict[str, str]:
-    """name/alias -> "/command" for the Slack ``/hermes`` handler, plugin commands included."""
+    """name/alias -> "/command" for the Slack ``/eir`` handler, plugin commands included."""
     mapping: dict[str, str] = {
         name: f"/{name}"
         for cmd in _gateway_available_commands() for name in (cmd.name, *cmd.aliases)}

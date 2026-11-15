@@ -1,4 +1,4 @@
-"""Centralized logging setup for Hermes Agent.
+"""Centralized logging setup for Eir Agent.
 
 Log files: agent.log (INFO+, everything), errors.log (WARNING+), gateway.log (INFO+,
 gateway components; ``mode="gateway"``), gui.log (INFO+, dashboard/TUI-gateway;
@@ -20,8 +20,8 @@ from pathlib import Path
 from time import monotonic as _monotonic
 from typing import Optional, Sequence
 
-from hermes_constants import (
-    get_config_path, get_hermes_home, mkdir_under_hermes_home, named_profile_is_deleted,
+from eir_constants import (
+    get_config_path, get_eir_home, mkdir_under_eir_home, named_profile_is_deleted,
 )
 
 # setup_logging() is idempotent: a second call is a no-op unless ``force=True``.
@@ -56,7 +56,7 @@ def _portalocker_probe() -> bool:
     except Exception as exc:
         _WINDOWS_CLH_FALLBACK_REASON = repr(exc)
         return False
-    fd, path = tempfile.mkstemp(prefix="hermes-portalocker-")
+    fd, path = tempfile.mkstemp(prefix="eir-portalocker-")
     try:
         with os.fdopen(fd, "r+b") as stream:
             portalocker.lock(stream, portalocker.LOCK_EX)
@@ -75,7 +75,7 @@ def _portalocker_probe() -> bool:
 # Windows-ONLY swap (#44873): stdlib ``RotatingFileHandler.doRollover()`` calls
 # ``os.rename()``, which fails with ``PermissionError [WinError 32]`` whenever
 # another process holds an append handle on ``agent.log`` — essentially always
-# in Hermes (TUI, gateway, hy_memory, MCP servers, CLI commands all log) —
+# in Eir (TUI, gateway, hy_memory, MCP servers, CLI commands all log) —
 # pinning the file at the size threshold and spamming stderr on every emit.
 # ``concurrent-log-handler`` serializes rollover with a cross-process lock.
 # POSIX keeps stdlib: renames of open files work, and managed mode (NixOS)
@@ -221,7 +221,7 @@ def _warn_windows_lock_timeout_once() -> None:
         if _windows_lock_timeout_warned:
             return
         _windows_lock_timeout_warned = True
-    logging.getLogger("hermes_logging").warning(
+    logging.getLogger("eir_logging").warning(
         "concurrent-log-handler timed out acquiring the cross-process log "
         "lock; this and later records were dropped (the Desktop slash-worker "
         "surface stays clean, but file logging is degraded)."
@@ -268,7 +268,7 @@ def _install_session_record_factory() -> None:
     Idempotent via a marker attribute.
     """
     current_factory = logging.getLogRecordFactory()
-    if getattr(current_factory, "_hermes_session_injector", False):
+    if getattr(current_factory, "_eir_session_injector", False):
         return
 
     def _session_record_factory(*args, **kwargs):
@@ -279,11 +279,11 @@ def _install_session_record_factory() -> None:
         # ContextVar is gone; keep the resolved home on the record so a
         # multiplex desktop ticker can route to the job owner's files (#97489).
         try:
-            record.hermes_home = str(get_hermes_home().resolve())  # type: ignore[attr-defined]
+            record.eir_home = str(get_eir_home().resolve())  # type: ignore[attr-defined]
         except Exception:
-            record.hermes_home = ""  # type: ignore[attr-defined]
+            record.eir_home = ""  # type: ignore[attr-defined]
         return record
-    _session_record_factory._hermes_session_injector = True  # type: ignore[attr-defined]
+    _session_record_factory._eir_session_injector = True  # type: ignore[attr-defined]
     logging.setLogRecordFactory(_session_record_factory)
 
 
@@ -292,13 +292,13 @@ _install_session_record_factory()
 
 
 def canonical_logger_name(name: str) -> str:
-    """*name* without the ``hermes_agent.`` package prefix, so a module's logger keeps its component
+    """*name* without the ``eir_agent.`` package prefix, so a module's logger keeps its component
     and diagnostics scope whether it runs under its top-level name or inside the package."""
-    return name.removeprefix("hermes_agent.")
+    return name.removeprefix("eir_agent.")
 
 
 def display_record(record: logging.LogRecord) -> logging.LogRecord:
-    """*record* as Hermes log formats print it: with its canonical logger name. ``record.name`` itself,
+    """*record* as Eir log formats print it: with its canonical logger name. ``record.name`` itself,
     which filters and third-party handlers read, is left unchanged."""
     shown = canonical_logger_name(record.name)
     if shown == record.name:
@@ -326,18 +326,18 @@ class _ComponentFilter(logging.Filter):
         return canonical_logger_name(record.name).startswith(self._prefixes)
 
 
-# Logger name prefixes per component; used by _ComponentFilter and ``hermes logs --component``.
+# Logger name prefixes per component; used by _ComponentFilter and ``eir logs --component``.
 COMPONENT_PREFIXES = {
     # ``plugins.platforms``: messaging adapters that migrated out of
     # ``gateway/platforms/`` into bundled plugins (#41112) are still gateway
     # components and belong in gateway.log. ``agent.memory_caller_scope``: a multiplexed gateway's
     # memory-provider profile refusals (#140058), which the operator reads in gateway.log.
-    "gateway": ("gateway", "hermes_plugins", "plugins.platforms", "agent.memory_caller_scope"),
+    "gateway": ("gateway", "eir_plugins", "plugins.platforms", "agent.memory_caller_scope"),
     "agent": ("agent", "run_agent", "model_tools", "batch_runner"),
     "tools": ("tools",),
-    "cli": ("hermes_cli", "cli"),
+    "cli": ("eir_cli", "cli"),
     "cron": ("cron",),
-    "gui": ("hermes_cli.web_server", "hermes_cli.pty_bridge", "hermes_cli.desktop", "tui_gateway", "uvicorn"),
+    "gui": ("eir_cli.web_server", "eir_cli.pty_bridge", "eir_cli.desktop", "tui_gateway", "uvicorn"),
 }
 
 
@@ -374,14 +374,14 @@ def _adopt_secondary_home(home: Path) -> bool:
 
 def setup_logging(
     *,
-    hermes_home: Optional[Path] = None,
+    eir_home: Optional[Path] = None,
     log_level: Optional[str] = None,
     max_size_mb: Optional[int] = None,
     backup_count: Optional[int] = None,
     mode: Optional[str] = None,
     force: bool = False,
 ) -> Path:
-    """Configure the Hermes logging subsystem; returns the ``logs/`` directory.
+    """Configure the Eir logging subsystem; returns the ``logs/`` directory.
 
     Safe to call multiple times; the second call is a no-op unless *force*. Level and
     rotation defaults come from config.yaml ``logging.*``. ``mode="gateway"`` adds
@@ -389,8 +389,8 @@ def setup_logging(
     """
     global _logging_initialized
     global _fallback_warned
-    home = hermes_home or get_hermes_home()
-    log_dir = mkdir_under_hermes_home(home / "logs")
+    home = eir_home or get_eir_home()
+    log_dir = mkdir_under_eir_home(home / "logs")
 
     # Stdout is block-buffered when piped (no TTY); line-buffer it so a
     # headless supervisor's log stream tracks the agent loop incrementally
@@ -398,8 +398,8 @@ def setup_logging(
     # reaches this function gets it; a no-op once this stdout is line-buffered.
     _line_buffer_piped_stdout()
 
-    # A second Hermes home in a process that already logs for another one — a dashboard or
-    # ``hermes serve`` backend building agents for several profiles, a multiplexed gateway —
+    # A second Eir home in a process that already logs for another one — a dashboard or
+    # ``eir serve`` backend building agents for several profiles, a multiplexed gateway —
     # gets routed by record home. Stacking another file handler here would hand it EVERY
     # profile's records (the handlers carry no home filter), and a duplicate writer on top of
     # an existing router.
@@ -436,7 +436,7 @@ def setup_logging(
         # One-shot, and the file handlers above are already live, so this lands
         # in errors.log/agent.log — the fallback must never be invisible again.
         _fallback_warned = True
-        logging.getLogger("hermes_logging").warning(
+        logging.getLogger("eir_logging").warning(
             "concurrent-log-handler unavailable on this Windows install (%s); "
             "file logging fell back to stdlib rotation without rollover.",
             _WINDOWS_CLH_FALLBACK_REASON or "portalocker probe failed",
@@ -459,12 +459,12 @@ def setup_verbose_logging() -> None:
 
     root = logging.getLogger()
 
-    if any(getattr(h, "_hermes_verbose", False) for h in root.handlers):
+    if any(getattr(h, "_eir_verbose", False) for h in root.handlers):
         return
     handler = logging.StreamHandler(_safe_stderr())
     handler.setLevel(logging.DEBUG)
     handler.setFormatter(RedactingFormatter(_LOG_FORMAT_VERBOSE, datefmt="%H:%M:%S"))
-    handler._hermes_verbose = True  # type: ignore[attr-defined]
+    handler._eir_verbose = True  # type: ignore[attr-defined]
     root.addHandler(handler)
 
     if root.level > logging.DEBUG:
@@ -493,7 +493,7 @@ class _ManagedRotatingFileHandler(RotatingFileHandler):
     """
 
     def __init__(self, *args, **kwargs):
-        from hermes_cli.config import is_managed
+        from eir_cli.config import is_managed
         self._managed = is_managed()
         self._unavailable_reported = False
         # Set by _ProfileRoutingFileHandler: a vanished logs/ dir means the profile was deleted,
@@ -600,7 +600,7 @@ class _ManagedRotatingFileHandler(RotatingFileHandler):
             if not self._unavailable_reported:
                 self._unavailable_reported = True
                 _quietly(lambda: print(
-                    f"hermes_logging: {self.baseFilename} unavailable ({exc}); "
+                    f"eir_logging: {self.baseFilename} unavailable ({exc}); "
                     "file logging paused until it recovers", file=_safe_stderr()))
             if self.stream is not None:
                 _quietly(self.stream.close)
@@ -640,7 +640,7 @@ def _new_file_handler(
     path: Path, *, level: int, max_bytes: int, backup_count: int, formatter
 ) -> _ManagedRotatingFileHandler:
     """Create the ``logs/`` directory and a configured ``_ManagedRotatingFileHandler``."""
-    mkdir_under_hermes_home(path.parent)
+    mkdir_under_eir_home(path.parent)
     if _WINDOWS_CLH_FALLBACK:
         # stdlib fallback: no rollover, or the file pins at the size threshold
         # and every emit re-triggers the WinError 32 rename failure (#44873).
@@ -662,7 +662,7 @@ _PROFILE_LIVENESS_RECHECK_S = 2.0
 
 
 class _ProfileRoutingFileHandler(logging.Handler):
-    """Route queued records to the log file for their Hermes home.
+    """Route queued records to the log file for their Eir home.
 
     Used only behind the QueueListener, so its small routing lock never blocks an agent
     or dashboard event loop. Per-home handlers keep rotation, redaction and managed perms.
@@ -673,7 +673,7 @@ class _ProfileRoutingFileHandler(logging.Handler):
         super().__init__(level=existing.level)
         resolved = Path(existing.baseFilename).resolve()
         self.baseFilename = str(resolved)
-        self._hermes_routed_log_path = resolved
+        self._eir_routed_log_path = resolved
         self._default_home = resolved.parent.parent.resolve()
         self._profile_homes = {Path(home).expanduser().resolve() for home in profile_homes}
         self._filename = resolved.name
@@ -689,7 +689,7 @@ class _ProfileRoutingFileHandler(logging.Handler):
             self.addFilter(log_filter)
 
     def _home_for_record(self, record: logging.LogRecord) -> Path:
-        raw_home = getattr(record, "hermes_home", "")
+        raw_home = getattr(record, "eir_home", "")
         try:
             candidate = Path(raw_home).expanduser().resolve()
         except (TypeError, ValueError, OSError):
@@ -710,7 +710,7 @@ class _ProfileRoutingFileHandler(logging.Handler):
         self._liveness_checked_at[home] = _monotonic()
         if home.is_dir() and not named_profile_is_deleted(home):
             return False
-        # Deleted out of band (CLI ``hermes profile delete`` while this process runs; it
+        # Deleted out of band (CLI ``eir profile delete`` while this process runs; it
         # tombstones before rmtree). The startup snapshot still names it, so its handler would
         # retry the vanished logs/ path on every record (#103777). Release it the way an
         # in-process delete does: the stale fd is closed on this routed record and the home is
@@ -770,12 +770,12 @@ class _ProfileRoutingFileHandler(logging.Handler):
                 return
             # Formatted here, on the listener thread, where the record's profile scope is gone: bind its home so
             # RedactingFormatter applies THAT profile's redact_secrets policy and vault values, not the launch's.
-            from hermes_constants import reset_hermes_home_override, set_hermes_home_override
-            token = set_hermes_home_override(str(home))
+            from eir_constants import reset_eir_home_override, set_eir_home_override
+            token = set_eir_home_override(str(home))
             try:
                 handler.handle(record)
             finally:
-                reset_hermes_home_override(token)
+                reset_eir_home_override(token)
             # The write was skipped because logs/ is gone (an rmtree inside the liveness interval,
             # see _ManagedRotatingFileHandler.emit): re-check now, and keep the record in the
             # default log either way (a live profile whose logs/ was removed by hand included).
@@ -870,7 +870,7 @@ def _register_queued_handler(handler: logging.Handler) -> None:
         if _log_queue is None:
             _log_queue = queue.SimpleQueue()
             qh = _NonFormattingQueueHandler(_log_queue)
-            qh._hermes_queue = True  # type: ignore[attr-defined]
+            qh._eir_queue = True  # type: ignore[attr-defined]
             # Always on the root logger so records from any logger reach the queue.
             logging.getLogger().addHandler(qh)
         _queued_file_handlers.append(handler)
@@ -906,7 +906,7 @@ def drain_log_queue(timeout: float = 1.0) -> None:
     listener = _queue_listener
     if listener is None:
         return
-    t = threading.Thread(target=lambda: _quietly(listener.stop), name="hermes-log-drain", daemon=True)
+    t = threading.Thread(target=lambda: _quietly(listener.stop), name="eir-log-drain", daemon=True)
     t.start()
     t.join(timeout)
 
@@ -997,7 +997,7 @@ def _reset_queued_handlers() -> None:
     with _queue_state_lock:
         root = logging.getLogger()
         for h in list(root.handlers):
-            if getattr(h, "_hermes_queue", False):
+            if getattr(h, "_eir_queue", False):
                 root.removeHandler(h)
         for h in _queued_file_handlers:
             _quietly(h.close)
@@ -1019,7 +1019,7 @@ def _add_rotating_handler(
     for existing in _queued_file_handlers:
         # Already attached directly, or already covered by the profile router — for its default
         # home or any profile home it routes (a bare handler beside it would take every record).
-        if getattr(existing, "_hermes_routed_log_path", None) == resolved or (
+        if getattr(existing, "_eir_routed_log_path", None) == resolved or (
             isinstance(existing, RotatingFileHandler)
             and Path(getattr(existing, "baseFilename", "")).resolve() == resolved
         ):
@@ -1052,13 +1052,13 @@ def _read_logging_config():
     """Best-effort read of ``logging.*`` from config.yaml."""
     try:
         # Prefer the shared effective-config cache (managed overlay included, so an administrator
-        # can pin logging.*) so this reuses hermes_cli.main's early parse (one config.yaml parse
-        # per process); fall back to a direct parse for bare hermes_logging consumers.
+        # can pin logging.*) so this reuses eir_cli.main's early parse (one config.yaml parse
+        # per process); fall back to a direct parse for bare eir_logging consumers.
         try:
-            from hermes_cli.config_effective import load_user_config_effective
+            from eir_cli.config_effective import load_user_config_effective
             cfg = load_user_config_effective(get_config_path())
         except Exception:
-            from hermes_cli.config_backend import config_exists, read_config_doc
+            from eir_cli.config_backend import config_exists, read_config_doc
             config_path = get_config_path()
             cfg = (read_config_doc(config_path) or {}) if config_exists(config_path) else {}
         if not cfg:

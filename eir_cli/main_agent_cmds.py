@@ -1,6 +1,6 @@
 """Agent-facing subcommand handlers: memory, acp, tools, insights, monitoring, skills (+trust).
 
-Split out of ``hermes_cli/main.py``. Names that still live in main (``PROJECT_ROOT``, ...)
+Split out of ``eir_cli/main.py``. Names that still live in main (``PROJECT_ROOT``, ...)
 are imported lazily inside the functions that use them (avoids an import cycle).
 """
 
@@ -9,7 +9,7 @@ import sys
 
 
 def _cmd_memory_off():
-    from hermes_cli.config import load_config, save_config
+    from eir_cli.config import load_config, save_config
     config = load_config()
     if not isinstance(config.get("memory"), dict):
         config["memory"] = {}
@@ -20,8 +20,8 @@ def _cmd_memory_off():
 
 
 def _cmd_memory_reset(args):
-    from hermes_constants import get_hermes_home, display_hermes_home
-    mem_dir = get_hermes_home() / "memories"
+    from eir_constants import get_eir_home, display_eir_home
+    mem_dir = get_eir_home() / "memories"
     target = getattr(args, "target", "all")
     files_to_reset = []
     if target in {"all", "memory"}:
@@ -31,7 +31,7 @@ def _cmd_memory_reset(args):
 
     existing = [(f, desc) for f, desc in files_to_reset if (mem_dir / f).exists()]
     if not existing:
-        print(f"\n  Nothing to reset — no memory files found in {display_hermes_home()}/memories/\n")
+        print(f"\n  Nothing to reset — no memory files found in {display_eir_home()}/memories/\n")
         return
 
     print("\n  This will permanently erase the following memory files:")
@@ -54,7 +54,7 @@ def _cmd_memory_reset(args):
         print(f"  ✓ Deleted {f} ({desc})")
 
     print("\n  Memory reset complete. New sessions will start with a blank slate.")
-    print(f"  Files were in: {display_hermes_home()}/memories/\n")
+    print(f"  Files were in: {display_eir_home()}/memories/\n")
 
 
 def cmd_memory(args):
@@ -64,7 +64,7 @@ def cmd_memory(args):
     elif sub == "reset":
         _cmd_memory_reset(args)
     else:
-        from hermes_cli.memory_setup import memory_command
+        from eir_cli.memory_setup import memory_command
         memory_command(args)
 
 
@@ -78,16 +78,16 @@ _ACP_FLAGS = (
 
 
 def cmd_acp(args):
-    """Launch Hermes Agent as an ACP server."""
+    """Launch Eir Agent as an ACP server."""
     import os
     # The gateway-backed ACP server forwards launch flags from their documented env equivalents
     # (main() already exported --yolo / --safe-mode / --ignore-user-config).
-    for attr, name in (("accept_hooks", "HERMES_ACCEPT_HOOKS"), ("ignore_rules", "HERMES_IGNORE_RULES")):
+    for attr, name in (("accept_hooks", "EIR_ACCEPT_HOOKS"), ("ignore_rules", "EIR_IGNORE_RULES")):
         if getattr(args, attr, False):
             os.environ[name] = "1"
     # -m / --provider: the route a --safe-mode / --ignore-user-config session freezes (it reads no
     # profile default), carried like the TUI launcher's.
-    for attr, name in (("model", "HERMES_MODEL"), ("provider", "HERMES_INFERENCE_PROVIDER")):
+    for attr, name in (("model", "EIR_MODEL"), ("provider", "EIR_INFERENCE_PROVIDER")):
         if getattr(args, attr, None):
             os.environ[name] = getattr(args, attr)
     try:
@@ -95,35 +95,35 @@ def cmd_acp(args):
         acp_main([flag for attr, flag in _ACP_FLAGS if getattr(args, attr, False)])
     except ImportError as e:
         print("The ACP server can't start: its protocol packages are missing from this install.", file=sys.stderr)
-        print("From the Hermes environment, run: "
+        print("From the Eir environment, run: "
               f"{install_hint('acp')}", file=sys.stderr)
-        print("Then restart Hermes.", file=sys.stderr)
+        print("Then restart Eir.", file=sys.stderr)
         print(f"Details: {e}", file=sys.stderr)
         sys.exit(1)
 
 
 def cmd_tools(args):
-    from hermes_cli.main import _require_tty
+    from eir_cli.main import _require_tty
     action = getattr(args, "tools_action", None)
     if action in {"list", "disable", "enable"}:
-        from hermes_cli.tools_config import tools_disable_enable_command
+        from eir_cli.tools_config import tools_disable_enable_command
         tools_disable_enable_command(args)
     elif action == "post-setup":
-        from hermes_cli.tools_config import run_post_setup_command
+        from eir_cli.tools_config import run_post_setup_command
         sys.exit(run_post_setup_command(args))
     else:
         _require_tty("tools")
-        from hermes_cli.tools_config import tools_command
+        from eir_cli.tools_config import tools_command
         tools_command(args)
 
 
 def cmd_insights(args):
     db = None
     try:
-        from hermes_state import SessionDB
+        from eir_state import SessionDB
         from agent.insights import InsightsEngine
-        from hermes_cli.config import get_hermes_home
-        path = get_hermes_home() / "state.db"
+        from eir_cli.config import get_eir_home
+        path = get_eir_home() / "state.db"
         if not path.exists():
             from agent.i18n import t
             print(f"  {t('cli.insights.no_session_data')}")
@@ -150,7 +150,7 @@ def _dict_or_empty(value) -> dict:
 
 def cmd_monitoring(args):
     """Gateway monitoring status: health & diagnostics export posture."""
-    from hermes_cli.config import load_config
+    from eir_cli.config import load_config
     action = getattr(args, "monitoring_action", None) or "status"
     mon = _dict_or_empty(load_config().get("monitoring"))
 
@@ -176,7 +176,7 @@ def cmd_monitoring(args):
         else:
             print("  OTLP endpoint:  not configured (monitoring.export.otlp)")
         print(f"  OTel SDK:       {'installed' if otlp_exporter.is_available() else 'not installed'} "
-              f"(optional extra: hermes-agent[otlp])")
+              f"(optional extra: eir-agent[otlp])")
         print("\n  Scope: gateway service health + redacted diagnostics only.")
         print("  No prompts, messages, tool args/results, usage analytics, or traces.")
         return
@@ -186,21 +186,21 @@ def cmd_monitoring(args):
 
 
 def cmd_skills(args):
-    from hermes_cli.main import _require_tty
+    from eir_cli.main import _require_tty
     action = getattr(args, "skills_action", None)
     if action == "config":
         _require_tty("skills config")
-        from hermes_cli.skills_config import skills_command as skills_config_command
+        from eir_cli.skills_config import skills_command as skills_config_command
         skills_config_command(args)
     elif action in ("trust", "untrust"):
         _cmd_skills_trust(args)
     else:
-        from hermes_cli.skills_hub import skills_command
+        from eir_cli.skills_hub import skills_command
         return skills_command(args)
 
 
 def _cmd_skills_trust(args):
-    """``hermes skills trust|untrust [path]`` — manage ``skills.trusted_project_dirs``.
+    """``eir skills trust|untrust [path]`` — manage ``skills.trusted_project_dirs``.
 
     With no path, operates on the project root enclosing the current directory
     (nearest ancestor with ``.git``).
@@ -211,7 +211,7 @@ def _cmd_skills_trust(args):
         _candidate_project_skills_dirs,
         find_project_root,
         iter_skill_index_files)
-    from hermes_cli.config import load_config, save_config
+    from eir_cli.config import load_config, save_config
     action = args.skills_action
     raw_path = getattr(args, "path", None)
     if raw_path:

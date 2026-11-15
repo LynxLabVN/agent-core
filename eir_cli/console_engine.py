@@ -1,4 +1,4 @@
-"""Safe Hermes Console command engine."""
+"""Safe Eir Console command engine."""
 
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ class ConsoleCommand:
     path: tuple[str, ...]
     usage: str
     summary: str
-    handler: Callable[[HermesConsoleEngine, list[str]], str]
+    handler: Callable[[EirConsoleEngine, list[str]], str]
     mutating: bool = False
     confirmation: str = ""
 
@@ -93,7 +93,7 @@ def _strip_console_status_footer(text: str) -> str:
     if len(lines) < 2:
         return text.rstrip()
     last, prev = (_strip_ansi(lines[i]).strip() for i in (-1, -2))
-    if not (prev.startswith("Run 'hermes doctor'") and last.startswith("Run 'hermes setup'")):
+    if not (prev.startswith("Run 'eir doctor'") and last.startswith("Run 'eir setup'")):
         return text.rstrip()
     lines = lines[:-2]
     _drop_trailing_blank(lines)
@@ -111,7 +111,7 @@ def _split_line(line: str) -> list[str]:
     # Windows-safe splitter: plain shlex posix=True eats backslashes in paths.
     # See #78293.
     # See #83934.
-    from hermes_cli._subprocess_compat import split_command_line
+    from eir_cli._subprocess_compat import split_command_line
     try:
         return split_command_line(line)
     except ValueError as exc:
@@ -151,7 +151,7 @@ def _clean_summary(text: str | None) -> str:
     if not text or text is argparse.SUPPRESS:
         return ""
     summary = " ".join(str(text).split())
-    return "" if summary.startswith("Run `hermes ") else summary
+    return "" if summary.startswith("Run `eir ") else summary
 
 
 def _choice_help(action: argparse._SubParsersAction, name: str) -> str:
@@ -189,9 +189,9 @@ def _noop_console_command(_args: argparse.Namespace) -> None:
 @dataclass(frozen=True)
 class _CliSurface:
     """How a CLI subcommand module hangs its argparse tree off a root subparsers action.
-    ``extracted``: ``builder(subparsers, <handler>=fn)``, fn from hermes_cli.main.
+    ``extracted``: ``builder(subparsers, <handler>=fn)``, fn from eir_cli.main.
     ``registered``: ``register(subparsers.add_parser(root))``, optional module ``handler``.
-    ``builder``: ``top = builder(subparsers)``, func from hermes_cli.main.
+    ``builder``: ``top = builder(subparsers)``, func from eir_cli.main.
     ``adder``: self-wiring."""
     kind: Literal["extracted", "registered", "builder", "adder"]
     module: str
@@ -200,12 +200,12 @@ class _CliSurface:
 
     def build(self, root: str, *, live: bool) -> _ArgumentParser:
         """Build a throwaway parser; ``live=False`` wires no-op handlers (summary extraction)."""
-        parser = _ArgumentParser(prog="hermes", add_help=False)
+        parser = _ArgumentParser(prog="eir", add_help=False)
         subparsers = parser.add_subparsers(dest="_console_command")
         module = importlib.import_module(self.module)
         entry = getattr(module, self.builder)
         main_handler = (
-            (lambda: getattr(importlib.import_module("hermes_cli.main"), self.handler))
+            (lambda: getattr(importlib.import_module("eir_cli.main"), self.handler))
             if live else (lambda: _noop_console_command))
         if self.kind == "extracted":
             entry(subparsers, **{self.handler: main_handler()})
@@ -258,11 +258,11 @@ def _paths(spec: str) -> list[tuple[tuple[str, ...], bool]]:
 
 
 def _sub(module: str, builder: str, handler: str) -> _CliSurface:
-    return _CliSurface("extracted", f"hermes_cli.subcommands.{module}", builder, handler)
+    return _CliSurface("extracted", f"eir_cli.subcommands.{module}", builder, handler)
 
 
 def _reg(module: str, handler: str | None = None) -> _CliSurface:
-    return _CliSurface("registered", f"hermes_cli.{module}", "register_cli", handler)
+    return _CliSurface("registered", f"eir_cli.{module}", "register_cli", handler)
 
 
 # root -> (surface, subcommand paths as a ``_paths`` spec). Registered in this order.
@@ -306,13 +306,13 @@ _CLI_FAMILIES: dict[str, tuple[_CliSurface, str]] = {
         "list, show, info, *create, *use, *describe, *rename, *delete, *export, *import, "
         "*install, *update"),
     "cron": (_sub("cron", "build_cron_parser", "cmd_cron"), "*create, *edit, *remove, *tick"),
-    "portal": (_CliSurface("adder", "hermes_cli.portal_cli", "add_parser"), "info, tools"),
+    "portal": (_CliSurface("adder", "eir_cli.portal_cli", "add_parser"), "info, tools"),
     "project": (
-        _CliSurface("builder", "hermes_cli.projects_cmd", "build_parser", "cmd_project"),
+        _CliSurface("builder", "eir_cli.projects_cmd", "build_parser", "cmd_project"),
         "list, show, *create, *add-folder, *remove-folder, *rename, *set-primary, *use, "
         "*archive, *restore, *bind-board"),
     "kanban": (
-        _CliSurface("builder", "hermes_cli.kanban", "build_parser", "cmd_kanban"),
+        _CliSurface("builder", "eir_cli.kanban", "build_parser", "cmd_kanban"),
         "*init, boards list, *boards create, *boards rm, *boards switch, boards current, "
         "*boards rename, *boards set-workdir, *create, list, show, *assign, *reclaim, *reassign, "
         "diagnose, *link, *unlink, *claim, *comment, *complete, *edit, *block, *schedule, "
@@ -330,23 +330,23 @@ _CLI_FAMILIES: dict[str, tuple[_CliSurface, str]] = {
 # (builder/adder families never did).
 _CONFIRMED_KINDS = {"extracted", "registered"}
 
-_SEND_SURFACE = _CliSurface("adder", "hermes_cli.send_cmd", "register_send_subparser")
+_SEND_SURFACE = _CliSurface("adder", "eir_cli.send_cmd", "register_send_subparser")
 
 
 def _register_command_family(
-    engine: HermesConsoleEngine, root: str, surface: _CliSurface, paths: str) -> None:
+    engine: EirConsoleEngine, root: str, surface: _CliSurface, paths: str) -> None:
     summaries = _surface_summaries(surface, root)
     namespace_update = _apply_confirmed_defaults if surface.kind in _CONFIRMED_KINDS else None
     for child_path, mutating in _paths(paths):
         full_path = (root, *child_path)
         usage = " ".join(full_path)
 
-        def handler(_engine: HermesConsoleEngine, args: list[str], fixed=child_path) -> str:
+        def handler(_engine: EirConsoleEngine, args: list[str], fixed=child_path) -> str:
             return _dispatch(surface, root, fixed, args, namespace_update)
 
         engine.register(
-            full_path, usage, summaries.get(full_path) or f"Run `hermes {usage}`.", handler,
-            mutating=mutating, confirmation=f"Run `hermes {usage}`?")
+            full_path, usage, summaries.get(full_path) or f"Run `eir {usage}`.", handler,
+            mutating=mutating, confirmation=f"Run `eir {usage}`?")
 
 
 _BLOCKED_TOP = frozenset(
@@ -354,27 +354,27 @@ _BLOCKED_TOP = frozenset(
     "oneshot proxy serve setup uninstall update whatsapp whatsapp-cloud".split())
 
 _BLOCKED_PAIRS = {
-    ("config", "edit"): "`config edit` opens an editor and is not available in Hermes Console.",
-    ("profile", "alias"): "`profile alias` creates shell wrappers and is not available in Hermes Console.",
-    ("skills", "config"): "`skills config` is interactive and is not available in Hermes Console.",
-    ("skills", "publish"): "`skills publish` is not available in Hermes Console.",
-    ("portal", "login"): "`portal login` is interactive and is not available in Hermes Console.",
-    ("portal", "open"): "`portal open` opens a browser and is not available in Hermes Console.",
-    ("kanban", "tail"): "`kanban tail` streams output and is not available in Hermes Console.",
-    ("kanban", "watch"): "`kanban watch` streams output and is not available in Hermes Console.",
-    ("kanban", "daemon"): "`kanban daemon` starts a service and is not available in Hermes Console.",
-    ("kanban", "dispatcher"): "`kanban dispatcher` starts a worker and is not available in Hermes Console.",
-    ("kanban", "swarm"): "`kanban swarm` starts agent work and is not available in Hermes Console.",
-    ("kanban", "decompose"): "`kanban decompose` starts agent work and is not available in Hermes Console.",
-    ("kanban", "specify"): "`kanban specify` starts agent work and is not available in Hermes Console.",
-    ("kanban", "gc"): "`kanban gc` is not available in Hermes Console.",
-    ("sessions", "delete"): "`sessions delete` and `sessions prune` are not available in Hermes Console.",
-    ("sessions", "prune"): "`sessions delete` and `sessions prune` are not available in Hermes Console.",
+    ("config", "edit"): "`config edit` opens an editor and is not available in Eir Console.",
+    ("profile", "alias"): "`profile alias` creates shell wrappers and is not available in Eir Console.",
+    ("skills", "config"): "`skills config` is interactive and is not available in Eir Console.",
+    ("skills", "publish"): "`skills publish` is not available in Eir Console.",
+    ("portal", "login"): "`portal login` is interactive and is not available in Eir Console.",
+    ("portal", "open"): "`portal open` opens a browser and is not available in Eir Console.",
+    ("kanban", "tail"): "`kanban tail` streams output and is not available in Eir Console.",
+    ("kanban", "watch"): "`kanban watch` streams output and is not available in Eir Console.",
+    ("kanban", "daemon"): "`kanban daemon` starts a service and is not available in Eir Console.",
+    ("kanban", "dispatcher"): "`kanban dispatcher` starts a worker and is not available in Eir Console.",
+    ("kanban", "swarm"): "`kanban swarm` starts agent work and is not available in Eir Console.",
+    ("kanban", "decompose"): "`kanban decompose` starts agent work and is not available in Eir Console.",
+    ("kanban", "specify"): "`kanban specify` starts agent work and is not available in Eir Console.",
+    ("kanban", "gc"): "`kanban gc` is not available in Eir Console.",
+    ("sessions", "delete"): "`sessions delete` and `sessions prune` are not available in Eir Console.",
+    ("sessions", "prune"): "`sessions delete` and `sessions prune` are not available in Eir Console.",
 }
 
 
-class HermesConsoleEngine:
-    """Curated line-command executor for Hermes Console."""
+class EirConsoleEngine:
+    """Curated line-command executor for Eir Console."""
 
     def __init__(self, *, output_limit: int = 20000):
         self.output_limit = output_limit
@@ -388,14 +388,14 @@ class HermesConsoleEngine:
             return ConsoleResult("ok")
         try:
             tokens = _split_line(raw_line)
-            if tokens and tokens[0] == "hermes":
+            if tokens and tokens[0] == "eir":
                 tokens = tokens[1:]
             if not tokens:
                 return ConsoleResult("ok", output=self.help_text())
             if _contains_shell_syntax(raw_line, tokens):
                 raise ConsoleCommandError(
-                    "Hermes Console does not run shell syntax. Use one supported "
-                    "Hermes command at a time.")
+                    "Eir Console does not run shell syntax. Use one supported "
+                    "Eir command at a time.")
             builtin = self._execute_builtin(tokens)
             if builtin is not None:
                 if raw_line not in {"history", "clear"}:
@@ -417,7 +417,7 @@ class HermesConsoleEngine:
         if subject:
             command, _args = self._resolve_command(subject.split())
             return f"{command.usage}\n{command.summary}"
-        lines = ["Hermes Console", "", "Supported commands:"]
+        lines = ["Eir Console", "", "Supported commands:"]
         for command in sorted(self.commands.values(), key=lambda c: c.usage):
             marker = " *" if command.mutating else "  "
             lines.append(f"{marker} {command.usage:<32} {_table_summary(command.summary)}")
@@ -439,7 +439,7 @@ class HermesConsoleEngine:
 
     def register(
         self, path: Iterable[str], usage: str, summary: str,
-        handler: Callable[[HermesConsoleEngine, list[str]], str], *,
+        handler: Callable[[EirConsoleEngine, list[str]], str], *,
         mutating: bool = False, confirmation: str = "") -> None:
         key = tuple(path)
         self.commands[key] = ConsoleCommand(key, usage, summary, handler, mutating, confirmation)
@@ -471,14 +471,14 @@ class HermesConsoleEngine:
         probe = " ".join(tokens[:2]) if len(tokens) > 1 else tokens[0]
         suggestions = difflib.get_close_matches(probe, available, n=3, cutoff=0.45)
         suffix = f" Did you mean: {', '.join(suggestions)}?" if suggestions else ""
-        raise ConsoleCommandError(f"Unsupported Hermes Console command: {probe}.{suffix}")
+        raise ConsoleCommandError(f"Unsupported Eir Console command: {probe}.{suffix}")
 
     def _rejection_for(self, tokens: Sequence[str]) -> str:
         first = tokens[0]
         if first.startswith("-"):
-            return f"{first} is not available in Hermes Console."
+            return f"{first} is not available in Eir Console."
         if first in _BLOCKED_TOP:
-            return f"`hermes {first}` is not available in Hermes Console."
+            return f"`eir {first}` is not available in Eir Console."
         return _BLOCKED_PAIRS.get(tuple(tokens[:2]), "")
 
     def _cap_output(self, output: str) -> str:
@@ -505,14 +505,14 @@ def _parse(prog: str, args: Sequence[str], *specs) -> argparse.Namespace:
 def _captured(fn):
     """Handler decorator: run ``fn(engine, args)`` under ``_capture_output`` and return its text."""
     @functools.wraps(fn)
-    def wrapper(engine: HermesConsoleEngine, args: list[str]) -> str:
+    def wrapper(engine: EirConsoleEngine, args: list[str]) -> str:
         return _capture_output(lambda: fn(engine, args))
     return wrapper
 
 
 def _simple_command(usage: str, module: str, name: str, make_args=lambda: (), **kwargs):
     """Handler for no-arg commands that capture ``module.name(*make_args(), **kwargs)``."""
-    def handler(_engine: HermesConsoleEngine, args: list[str]) -> str:
+    def handler(_engine: EirConsoleEngine, args: list[str]) -> str:
         _expect_no_args(args, usage)
         fn = getattr(importlib.import_module(module), name)
         return _capture_output(lambda: fn(*make_args(), **kwargs))
@@ -538,7 +538,7 @@ def _apply_confirmed_defaults(args: argparse.Namespace) -> None:
         auth_type = getattr(args, "auth_type", None)
         if auth_type in {"api-key", "api_key"} and not getattr(args, "api_key", None):
             raise ConsoleCommandError(
-                "auth add --type api-key requires --api-key in Hermes Console.")
+                "auth add --type api-key requires --api-key in Eir Console.")
     if getattr(args, "import_name", None) is not None:
         return  # profile import has no prompt flag; leave it alone.
     if getattr(args, "skills_action", None) in {"install", "reset", "opt-out", "repair-official"}:
@@ -548,32 +548,32 @@ def _apply_confirmed_defaults(args: argparse.Namespace) -> None:
 
 
 _version = _simple_command(
-    "version", "hermes_cli._startup_fast", "print_fast_version_info", check_updates=True)
+    "version", "eir_cli._startup_fast", "print_fast_version_info", check_updates=True)
 
 
-def _status(_engine: HermesConsoleEngine, args: list[str]) -> str:
+def _status(_engine: EirConsoleEngine, args: list[str]) -> str:
     _expect_no_args(args, "status")
-    from hermes_cli.status import show_status
+    from eir_cli.status import show_status
     output = _capture_output(lambda: show_status(SimpleNamespace(full=True, deep=False)))
     return _strip_console_status_footer(output)
 
 
 _doctor = _simple_command(
-    "doctor", "hermes_cli.doctor", "run_doctor", lambda: (SimpleNamespace(fix=False, ack=None),))
-_config_show = _simple_command("config show", "hermes_cli.config_show", "show_config")
-_cron_status = _simple_command("cron status", "hermes_cli.cron", "cron_status")
+    "doctor", "eir_cli.doctor", "run_doctor", lambda: (SimpleNamespace(fix=False, ack=None),))
+_config_show = _simple_command("config show", "eir_cli.config_show", "show_config")
+_cron_status = _simple_command("cron status", "eir_cli.cron", "cron_status")
 
 
-def _logs(_engine: HermesConsoleEngine, args: list[str]) -> str:
+def _logs(_engine: EirConsoleEngine, args: list[str]) -> str:
     if "-f" in args or "--follow" in args:
-        raise ConsoleCommandError("`logs -f` is not available in Hermes Console.")
+        raise ConsoleCommandError("`logs -f` is not available in Eir Console.")
     ns = _parse(
         "logs", args, (("log_name",), dict(nargs="?", default="agent")),
         (("-n", "--lines"), dict(type=int, default=50)),
         "--level", "--session", "--since", "--component")
     if ns.lines < 1 or ns.lines > 500:
         raise ConsoleCommandError("logs --lines must be between 1 and 500")
-    from hermes_cli.logs import list_logs, tail_log
+    from eir_cli.logs import list_logs, tail_log
     if ns.log_name == "list":
         return _capture_output(list_logs)
     return _capture_output(
@@ -589,24 +589,24 @@ def _session_db(*, read_only: bool = True):
     reads attach ``read_only`` so they never add a writer connection beside it (#100896).
     Mutating commands pass ``read_only=False``.
     """
-    from hermes_state import SessionDB
+    from eir_state import SessionDB
     return closing(SessionDB(read_only=read_only))
 
 
-def _sessions_list(_engine: HermesConsoleEngine, args: list[str]) -> str:
+def _sessions_list(_engine: EirConsoleEngine, args: list[str]) -> str:
     ns = _parse("sessions list", args, (("--limit",), dict(type=int, default=20)))
     if ns.limit < 1 or ns.limit > 200:
         raise ConsoleCommandError("sessions list --limit must be between 1 and 200")
-    from hermes_state_sessions import INTERNAL_LISTING_SOURCES
+    from eir_state_sessions import INTERNAL_LISTING_SOURCES
     with _session_db() as db:
         sessions = db.list_sessions_rich(
             exclude_sources=list(INTERNAL_LISTING_SOURCES), limit=ns.limit, order_by_last_active=True)
     return _format_sessions(sessions)
 
 
-def _sessions_stats(_engine: HermesConsoleEngine, args: list[str]) -> str:
+def _sessions_stats(_engine: EirConsoleEngine, args: list[str]) -> str:
     _expect_no_args(args, "sessions stats")
-    from hermes_state_sessions import INTERNAL_LISTING_SOURCES
+    from eir_state_sessions import INTERNAL_LISTING_SOURCES
     with _session_db() as db:
         total = db.session_count()
         listable = db.session_count(exclude_children=True, exclude_sources=list(INTERNAL_LISTING_SOURCES))
@@ -621,23 +621,23 @@ def _sessions_stats(_engine: HermesConsoleEngine, args: list[str]) -> str:
         return "\n".join(lines)
 
 
-def _config_path(_engine: HermesConsoleEngine, args: list[str]) -> str:
+def _config_path(_engine: EirConsoleEngine, args: list[str]) -> str:
     _expect_no_args(args, "config path")
-    from hermes_cli.config import get_config_path
+    from eir_cli.config import get_config_path
     return str(get_config_path())
 
 
-def _config_set(_engine: HermesConsoleEngine, args: list[str]) -> str:
+def _config_set(_engine: EirConsoleEngine, args: list[str]) -> str:
     if len(args) < 2:
         raise ConsoleCommandError("Usage: config set <key> <value>")
-    from hermes_cli.config import set_config_value
+    from eir_cli.config import set_config_value
     return _capture_output(lambda: set_config_value(args[0], " ".join(args[1:])))
 
 
 @_captured
-def _config_migrate(_engine: HermesConsoleEngine, args: list[str]) -> None:
+def _config_migrate(_engine: EirConsoleEngine, args: list[str]) -> None:
     _expect_no_args(args, "config migrate")
-    from hermes_cli.config import migrate_config
+    from eir_cli.config import migrate_config
     results = migrate_config(interactive=False, quiet=False)
     for warning in results.get("warnings") or []:
         print(f"Warning: {warning}")
@@ -649,7 +649,7 @@ def _config_migrate(_engine: HermesConsoleEngine, args: list[str]) -> None:
 
 def _guard_exports(db, session_ids: list[str]) -> None:
     """Per-session export budget: only an individual runaway transcript trips it; 0 disables."""
-    from hermes_state import SessionExportTooLargeError
+    from eir_state import SessionExportTooLargeError
     try:
         db.assert_exports_safe(session_ids)
     except SessionExportTooLargeError as exc:
@@ -657,8 +657,8 @@ def _guard_exports(db, session_ids: list[str]) -> None:
 
 
 @_captured
-def _sessions_export(_engine: HermesConsoleEngine, args: list[str]) -> None:
-    from hermes_cli.session_export import export_projection
+def _sessions_export(_engine: EirConsoleEngine, args: list[str]) -> None:
+    from eir_cli.session_export import export_projection
 
     ns = _parse("sessions export", args, "output", "--source", "--session-id")
     with _session_db() as db:
@@ -685,7 +685,7 @@ def _sessions_export(_engine: HermesConsoleEngine, args: list[str]) -> None:
 
 
 @_captured
-def _sessions_rename(_engine: HermesConsoleEngine, args: list[str]) -> None:
+def _sessions_rename(_engine: EirConsoleEngine, args: list[str]) -> None:
     ns = _parse("sessions rename", args, "session_id", (("title",), dict(nargs="+")))
     with _session_db(read_only=False) as db:
         resolved_session_id = db.resolve_session_id(ns.session_id)
@@ -696,12 +696,12 @@ def _sessions_rename(_engine: HermesConsoleEngine, args: list[str]) -> None:
 
 
 @_captured
-def _sessions_optimize(_engine: HermesConsoleEngine, args: list[str]) -> None:
+def _sessions_optimize(_engine: EirConsoleEngine, args: list[str]) -> None:
     # --force is parsed HERE: the refusal below points at it, and a hint the surface cannot
     # accept would make this command refuse forever whenever a gateway is running.
     ns = _parse("sessions optimize", args, (("--force",), dict(action="store_true")))
     with _session_db(read_only=False) as db:
-        from hermes_state_holders import held_store_refusal
+        from eir_state_holders import held_store_refusal
         refusal = None if ns.force else held_store_refusal(
             db.db_path, command="optimize", force_hint="`sessions optimize --force`")
         if refusal:
@@ -710,12 +710,12 @@ def _sessions_optimize(_engine: HermesConsoleEngine, args: list[str]) -> None:
 
 
 @_captured
-def _sessions_repair(_engine: HermesConsoleEngine, args: list[str]) -> int | None:
+def _sessions_repair(_engine: EirConsoleEngine, args: list[str]) -> int | None:
     ns = _parse(
         "sessions repair", args, (("--check-only",), dict(action="store_true")),
         (("--no-backup",), dict(action="store_true")))
-    from hermes_state import DEFAULT_DB_PATH
-    from hermes_state_repair import HealthCheckUnavailable, _db_opens_cleanly, repair_state_db_schema
+    from eir_state import DEFAULT_DB_PATH
+    from eir_state_repair import HealthCheckUnavailable, _db_opens_cleanly, repair_state_db_schema
     db_path = DEFAULT_DB_PATH
     if not db_path.exists():
         print(f"No session database at {db_path} (nothing to repair).")
@@ -738,14 +738,14 @@ def _sessions_repair(_engine: HermesConsoleEngine, args: list[str]) -> int | Non
     print("Repaired session database.")
 
 
-def _profile_status(_engine: HermesConsoleEngine, args: list[str]) -> str:
+def _profile_status(_engine: EirConsoleEngine, args: list[str]) -> str:
     _expect_no_args(args, "profile")
     return _dispatch(_CLI_FAMILIES["profile"][0], "profile", (), ())
 
 
-def _cron_list(_engine: HermesConsoleEngine, args: list[str]) -> str:
+def _cron_list(_engine: EirConsoleEngine, args: list[str]) -> str:
     ns = _parse("cron list", args, (("--all",), dict(action="store_true")))
-    from hermes_cli.cron import cron_list
+    from eir_cli.cron import cron_list
     return _capture_output(lambda: cron_list(show_all=ns.all))
 
 
@@ -763,21 +763,21 @@ def _cron_job_action(args: list[str], usage: str, action: str, run) -> str:
     return _format_job(job, action)
 
 
-def _cron_pause(_engine: HermesConsoleEngine, args: list[str]) -> str:
+def _cron_pause(_engine: EirConsoleEngine, args: list[str]) -> str:
     from cron.jobs import pause_job
     return _cron_job_action(
         args, "cron pause <job>", "Paused",
-        lambda ref: pause_job(ref, reason="paused from hermes console"))
+        lambda ref: pause_job(ref, reason="paused from eir console"))
 
 
-def _cron_resume(_engine: HermesConsoleEngine, args: list[str]) -> str:
+def _cron_resume(_engine: EirConsoleEngine, args: list[str]) -> str:
     ns = _parse("cron resume", args, "job", "--at", (("--run-now",), dict(action="store_true")))
     if ns.at and ns.run_now:
         raise ConsoleCommandError("Use exactly one of --at or --run-now.")
-    from cron.jobs import AmbiguousJobReference, _hermes_now, rearm_oneshot, resume_job
+    from cron.jobs import AmbiguousJobReference, _eir_now, rearm_oneshot, resume_job
     try:
         job = (
-            rearm_oneshot(ns.job, _hermes_now().isoformat() if ns.run_now else ns.at)
+            rearm_oneshot(ns.job, _eir_now().isoformat() if ns.run_now else ns.at)
             if ns.at or ns.run_now else resume_job(ns.job))
     except (AmbiguousJobReference, ValueError) as exc:
         raise ConsoleCommandError(str(exc)) from exc
@@ -786,17 +786,17 @@ def _cron_resume(_engine: HermesConsoleEngine, args: list[str]) -> str:
     return _format_job(job, "Resumed")
 
 
-def _cron_run(_engine: HermesConsoleEngine, args: list[str]) -> str:
+def _cron_run(_engine: EirConsoleEngine, args: list[str]) -> str:
     from cron.jobs import trigger_job
     return _cron_job_action(args, "cron run <job>", "Triggered", trigger_job)
 
 
 # (path, usage, summary, handler, confirmation prompt) — a non-empty prompt marks it mutating.
 _BUILTIN_COMMANDS = (
-    (("status",), "status", "Show Hermes component status.", _status, ""),
-    (("version",), "version", "Show Hermes version information.", _version, ""),
+    (("status",), "status", "Show Eir component status.", _status, ""),
+    (("version",), "version", "Show Eir version information.", _version, ""),
     (("doctor",), "doctor", "Run diagnostics without auto-fix.", _doctor, ""),
-    (("logs",), "logs [name] [-n N]", "Show recent Hermes logs.", _logs, ""),
+    (("logs",), "logs [name] [-n N]", "Show recent Eir logs.", _logs, ""),
     (("sessions", "list"), "sessions list [--limit N]", "List recent sessions.", _sessions_list,
      ""),
     (("sessions", "stats"), "sessions stats", "Show session store statistics.", _sessions_stats,
@@ -807,7 +807,7 @@ _BUILTIN_COMMANDS = (
     (("cron", "status"), "cron status", "Show cron scheduler status.", _cron_status, ""),
     (("profile",), "profile", "Show active profile status.", _profile_status, ""),
     (("config", "set"), "config set <key> <value>", "Set a configuration value.", _config_set,
-     "Update Hermes configuration?"),
+     "Update Eir configuration?"),
     (("cron", "pause"), "cron pause <job>", "Pause a scheduled job.", _cron_pause,
      "Pause this cron job?"),
     (("cron", "resume"), "cron resume <job>", "Resume a paused cron job.", _cron_resume,
@@ -815,7 +815,7 @@ _BUILTIN_COMMANDS = (
     (("cron", "run"), "cron run <job>", "Run a job on the next scheduler tick.", _cron_run,
      "Trigger this cron job?"),
     (("config", "migrate"), "config migrate", "Update config with new options.", _config_migrate,
-     "Update Hermes configuration with missing defaults?"),
+     "Update Eir configuration with missing defaults?"),
     (("sessions", "export"), "sessions export <output> [--source SOURCE] [--session-id ID]",
      "Export sessions to JSONL.", _sessions_export, "Export session data?"),
     (("sessions", "rename"), "sessions rename <session> <title>", "Rename a session.",
@@ -829,19 +829,19 @@ _BUILTIN_COMMANDS = (
 
 def run_console_repl(
     *, stdin=None, stdout=None, stderr=None, interactive: bool | None = None) -> int:
-    """Run the local ``hermes console`` REPL."""
+    """Run the local ``eir console`` REPL."""
     stdin, stdout, stderr = stdin or sys.stdin, stdout or sys.stdout, stderr or sys.stderr
     if interactive is None:
         interactive = bool(getattr(stdin, "isatty", lambda: False)())
-    engine = HermesConsoleEngine()
+    engine = EirConsoleEngine()
 
     def say(text: str, **kw) -> None:
         if interactive:
             print(text, file=stdout, **kw)
 
-    say("Hermes Console. Type `help` for commands, `exit` to quit.")
+    say("Eir Console. Type `help` for commands, `exit` to quit.")
     while True:
-        say("hermes> ", end="", flush=True)
+        say("eir> ", end="", flush=True)
         line = stdin.readline()
         if line == "":
             say("")

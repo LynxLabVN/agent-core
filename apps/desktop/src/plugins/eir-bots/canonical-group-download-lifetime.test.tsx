@@ -5,7 +5,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { expectDownloaded, observeDownloads } from './canonical-download-test-utils'
 
 const request = vi.hoisted(() => vi.fn())
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@eir/plugin-sdk', async () => {
   const { en } = await import('@/i18n/en')
   const { Textarea } = await import('@/components/ui/textarea')
   const { captureGroupRequests } = await import('./canonical-group-contract-test-utils')
@@ -26,13 +26,13 @@ import { CanonicalGroupWorkspace } from './canonical-group-workspace'
 
 const binding = { connectionId: 'owner-a', profile: 'reviewer', roomId: 'room-one' }
 const attachment = { attachment_id: 'att_00000000000000000000000000000001', kind: 'file', name: 'retained.txt', mime: 'text/plain', size: 1 }
-const originalDesktop = window.hermesDesktop
-afterEach(() => { cleanup(); request.mockReset(); vi.restoreAllMocks(); vi.unstubAllGlobals(); localStorage.clear(); window.hermesDesktop = originalDesktop })
+const originalDesktop = window.eirDesktop
+afterEach(() => { cleanup(); request.mockReset(); vi.restoreAllMocks(); vi.unstubAllGlobals(); localStorage.clear(); window.eirDesktop = originalDesktop })
 
 function setup() {
   const observed = observeDownloads()
   const cache = vi.fn().mockResolvedValue('/private/composer-images/not-a-user-download')
-  window.hermesDesktop = { saveImageBuffer: cache } as unknown as typeof window.hermesDesktop
+  window.eirDesktop = { saveImageBuffer: cache } as unknown as typeof window.eirDesktop
   let release!: (value: unknown) => void
   const held = new Promise(resolve => { release = resolve })
   request.mockImplementation(async (_route, method) => {

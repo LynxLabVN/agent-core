@@ -1,11 +1,11 @@
-"""``hermes moa`` subcommand parser."""
+"""``eir moa`` subcommand parser."""
 
 from __future__ import annotations
 
 
 def build_moa_parser(subparsers) -> None:
     """Attach the ``moa`` subcommand to ``subparsers``."""
-    from hermes_cli.moa_cmd import cmd_moa
+    from eir_cli.moa_cmd import cmd_moa
 
     moa_parser = subparsers.add_parser(
         "moa", help="Configure Mixture of Agents provider/model slots",

@@ -18,7 +18,7 @@ if TYPE_CHECKING:  # pragma: no cover - annotation only
     import uvicorn
 
 # Same logger the code used before extraction (record parity).
-_log = logging.getLogger("hermes_cli.web_server")
+_log = logging.getLogger("eir_cli.web_server")
 
 
 def _process_start_marker(pid: int) -> str:
@@ -147,13 +147,13 @@ def _warm_gateway_module() -> None:
     thread (#60800). Warm them all off-loop while the socket is already open.
     """
     for mod in (
-        "hermes_cli.gateway",
-        "hermes_cli.auth",  # provider auth state
+        "eir_cli.gateway",
+        "eir_cli.auth",  # provider auth state
         "providers",  # provider plugin discovery (below) imports every profile's module chain
-        "hermes_cli.runtime_provider",
-        "hermes_cli.skin_engine",  # resolve_skin() config + skin engine init
-        "hermes_cli.inventory",  # provider catalogs + models.dev cache
-        "hermes_cli.model_switch",
+        "eir_cli.runtime_provider",
+        "eir_cli.skin_engine",  # resolve_skin() config + skin engine init
+        "eir_cli.inventory",  # provider catalogs + models.dev cache
+        "eir_cli.model_switch",
     ):
         try:
             __import__(mod)
@@ -169,7 +169,7 @@ def _warm_gateway_module() -> None:
 
 def _resolve_restart_drain_timeout() -> float:
     try:
-        from hermes_cli.gateway import _get_restart_drain_timeout
+        from eir_cli.gateway import _get_restart_drain_timeout
         return _get_restart_drain_timeout()
     except ImportError:
         from gateway.restart import DEFAULT_GATEWAY_RESTART_DRAIN_TIMEOUT
@@ -185,12 +185,12 @@ def _eager_reconcile_own_session_db() -> None:
     two-writer corruption vector, #107688 / #100896). Access-mode semantics
     (no bootstrap of a missing store; one additive catch-up of a store that lags
     SCHEMA_SQL, only while no gateway owns it, #79531 / #140315) live in the routers' own-store opener,
-    :func:`hermes_cli.web_server_sessions._open_session_db_at_path`. Never
+    :func:`eir_cli.web_server_sessions._open_session_db_at_path`. Never
     raises: an unfixable store still gets the per-poll read-probe heal.
     """
     try:
-        from hermes_cli.web_server_sessions import _open_session_db_for_profile
-        from hermes_state_registry import release_or_close
+        from eir_cli.web_server_sessions import _open_session_db_for_profile
+        from eir_state_registry import release_or_close
 
         release_or_close(_open_session_db_for_profile(None, read_only=True))
     except Exception as exc:
@@ -208,12 +208,12 @@ def _read_bound_port(server: "uvicorn.Server", fallback: int) -> int:
 
 
 def _write_dashboard_ready_file(actual_port: int) -> None:
-    """Publish the port through an atomic ready file when ``HERMES_DESKTOP_READY_FILE`` is set.
+    """Publish the port through an atomic ready file when ``EIR_DESKTOP_READY_FILE`` is set.
 
     Windows Desktop launches via ``pythonw.exe`` (no console flash) cannot use
     stdout for the port announcement, so Electron waits for this JSON instead.
     """
-    target = os.environ.get("HERMES_DESKTOP_READY_FILE")
+    target = os.environ.get("EIR_DESKTOP_READY_FILE")
     if not target:
         return
 
@@ -242,7 +242,7 @@ def _maybe_open_browser(host: str, actual_port: int, open_browser: bool, initial
         )
         return
 
-    from hermes_cli.url_utils import format_url_host
+    from eir_cli.url_utils import format_url_host
 
     _display_host = host if host not in ("0.0.0.0", "::") else "127.0.0.1"
     _open_url = f"http://{format_url_host(_display_host)}:{actual_port}"
@@ -269,8 +269,8 @@ def _is_serve_orphaned(
 ) -> bool:
     """True when the exact Desktop process that owns this backend is gone.
 
-    ``HERMES_PARENT_PID`` is the Electron PID, not necessarily our PPID (the
-    Windows ``hermes.exe`` launcher adds shims), so never compare getppid().
+    ``EIR_PARENT_PID`` is the Electron PID, not necessarily our PPID (the
+    Windows ``eir.exe`` launcher adds shims), so never compare getppid().
     The start marker (newer Desktops) defeats PID recycling; PID-only probing
     stays for older ones. Any inconclusive failure keeps serving (fail-safe).
     """
@@ -303,7 +303,7 @@ def _is_serve_orphaned(
 #: Ceiling on the post-orphan graceful unwind before the hard exit takes over.
 #: The desktop is already gone, so nothing escalates for us and this is the
 #: whole budget: comfortably past the 5s exit-flush budget
-#: (``HERMES_TUI_EXIT_FLUSH_BUDGET_S``), still short enough to keep the reap prompt.
+#: (``EIR_TUI_EXIT_FLUSH_BUDGET_S``), still short enough to keep the reap prompt.
 _ORPHAN_EXIT_CEILING_S = 10.0
 
 
@@ -336,10 +336,10 @@ def _start_parent_death_watchdog() -> None:
     reuse) plus a per-spawn nonce (makes mixed-version plumbing fail safe:
     marker without nonce or vice versa disables the watchdog).
     """
-    raw_pid = os.environ.get("HERMES_PARENT_PID")
+    raw_pid = os.environ.get("EIR_PARENT_PID")
     # Empty inherited values mean "absent", not "marker present but blank".
-    start_marker = os.environ.get("HERMES_PARENT_START_MARKER") or None
-    nonce = os.environ.get("HERMES_PARENT_NONCE") or None
+    start_marker = os.environ.get("EIR_PARENT_START_MARKER") or None
+    nonce = os.environ.get("EIR_PARENT_NONCE") or None
 
     try:
         desktop_pid = int(raw_pid or "")
@@ -355,7 +355,7 @@ def _start_parent_death_watchdog() -> None:
         # Disarming is fail-safe (the backend keeps serving) but must not be
         # traceless: this backend will never reap itself if the Desktop dies.
         _log.warning(
-            "Parent-death watchdog disabled: unusable HERMES_PARENT_START_MARKER=%r / nonce; "
+            "Parent-death watchdog disabled: unusable EIR_PARENT_START_MARKER=%r / nonce; "
             "falling back to no parent tracking for desktop PID %s.",
             start_marker,
             desktop_pid,
@@ -363,7 +363,7 @@ def _start_parent_death_watchdog() -> None:
         return
 
     try:
-        poll = max(0.5, float(os.environ.get("HERMES_SERVE_WATCHDOG_POLL_S", "2.0")))
+        poll = max(0.5, float(os.environ.get("EIR_SERVE_WATCHDOG_POLL_S", "2.0")))
     except (TypeError, ValueError):
         poll = 2.0
 
@@ -460,7 +460,7 @@ def _report_port_in_use(host: str, port: int) -> None:
     _write_machine_sentinel_line(_PORT_IN_USE_SENTINEL.format(port=port))
     print(
         f"  Port {port} on {host} is already in use — likely another "
-        "'hermes serve' / 'hermes dashboard' backend or the Hermes gateway. "
+        "'eir serve' / 'eir dashboard' backend or the Eir gateway. "
         "Stop the other process, or pass --port <other> "
         "(--port 0 picks a free ephemeral port).",
         flush=True,
@@ -532,7 +532,7 @@ def _uvicorn_console_logging() -> None:
     ``logging.shutdown()`` on every live handler: a multiplexed gateway's profile log routers are
     already installed when its listener is built, and a closed router stays closed. The listeners
     pass ``log_config=None`` and get uvicorn's handlers here instead: ``uvicorn`` to stderr,
-    ``uvicorn.access`` to stdout, neither propagating into the Hermes log files.
+    ``uvicorn.access`` to stdout, neither propagating into the Eir log files.
     """
     from uvicorn.config import LOGGING_CONFIG
     from uvicorn.logging import AccessFormatter, DefaultFormatter
@@ -567,8 +567,8 @@ def build_listener_server(served_app, host: str, port: int, *, auth_required: bo
     both (SSH-isolated Desktop backends).
     """
     import uvicorn
-    from hermes_cli.config import load_config
-    from hermes_cli.web_server_boundary import _DESKTOP_ATTACHMENT_WS_MAX_BYTES, _LOOPBACK_HOST_VALUES
+    from eir_cli.config import load_config
+    from eir_cli.web_server_boundary import _DESKTOP_ATTACHMENT_WS_MAX_BYTES, _LOOPBACK_HOST_VALUES
 
     try:
         dash_cfg = load_config().get("dashboard") or {}

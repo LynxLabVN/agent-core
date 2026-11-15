@@ -6,7 +6,7 @@ const host = vi.hoisted(() => ({
   state: { connectionId: { get: vi.fn() }, profile: { get: vi.fn() } }
 }))
 
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@eir/plugin-sdk', async () => {
   const { captureGroupRequests } = await import('./canonical-group-contract-test-utils')
 
   const { pluginSdkMock } = await import('./group-test-utils')

@@ -1,7 +1,7 @@
 """Session lifecycle for the interactive CLI: new/resume/save, undo/retry rewinds, yolo
 persistence, manual compression, and exit summary.
 
-Mixin bound onto ``HermesCLI`` via the MRO. cli.py-internal symbols are imported LAZILY
+Mixin bound onto ``EirCLI`` via the MRO. cli.py-internal symbols are imported LAZILY
 inside each method (``from cli import ...``) — never at module load time (import cycle).
 """
 
@@ -13,8 +13,8 @@ import shutil
 import sys
 
 from agent.i18n import t
-from hermes_constants import get_hermes_home
-from hermes_state_ids import new_session_id
+from eir_constants import get_eir_home
+from eir_state_ids import new_session_id
 from pathlib import Path
 from rich.console import Console
 from rich.markup import escape as _escape
@@ -75,7 +75,7 @@ def _reset_model_to_config_default(cli, silent: bool) -> None:
     if not _config_model or _config_model == getattr(cli, "model", None):
         return
     try:
-        from hermes_cli.model_switch import switch_model as _switch_model
+        from eir_cli.model_switch import switch_model as _switch_model
 
         r = _switch_model(
             raw_input=_config_model,
@@ -114,7 +114,7 @@ def _reset_model_to_config_default(cli, silent: bool) -> None:
 def _apply_new_session_title(cli, title: str) -> Optional[str]:
     """Sanitize + persist a /new title; returns the stored title or None (untitled)."""
     from cli import _cprint
-    from hermes_state import SessionDB
+    from eir_state import SessionDB
     try:
         sanitized = SessionDB.sanitize_title(title)
     except ValueError as e:
@@ -141,13 +141,13 @@ def _print_save_refusal(error) -> None:
 
 
 def _export_on_gateway(connection, session_id, fmt, filename, redact):
-    """The owner's ``/save`` rendering of its stored row (``session.export``: the snapshot ``hermes
+    """The owner's ``/save`` rendering of its stored row (``session.export``: the snapshot ``eir
     sessions export`` writes, with title, metadata and archived rows), never this process's
     in-memory history. Nothing is written on the gateway host, so a remote owner's disk is never
     taken for this machine's. None when refused (printed), and also None when an older gateway
     without ``session.export`` was handed to ``_save_on_older_gateway`` (which may save on the
     gateway host and prints its own outcome)."""
-    from hermes_cli.gateway_client import GatewayClientError, GatewayRPCError
+    from eir_cli.gateway_client import GatewayClientError, GatewayRPCError
     try:
         content = (connection.call("session.export", session_id=session_id, format=fmt,
                                    redact=redact) or {}).get("content")
@@ -166,7 +166,7 @@ def _export_on_gateway(connection, session_id, fmt, filename, redact):
 def _save_on_older_gateway(connection, session_id, fmt, filename, redact):
     """An owner without ``session.export``: its ``session.save`` writes default-named, unredacted
     JSON on the gateway host, so only a plain ``/save json`` may use it (as Desktop does)."""
-    from hermes_cli.gateway_client import GatewayClientError
+    from eir_cli.gateway_client import GatewayClientError
     if redact or fmt != "json" or filename:
         print("(._.) This gateway predates this CLI: only a plain /save json works until it restarts "
               "(it saves on the gateway host).")
@@ -182,9 +182,9 @@ def _save_on_older_gateway(connection, session_id, fmt, filename, redact):
 
 def _write_save(session_id, fmt, filename, render):
     """Write a ``/save`` export on this machine: ``filename`` as typed (relative to the cwd), else
-    ``sessions/saved/hermes_conversation_<ts>.<fmt>`` under this CLI's home."""
+    ``sessions/saved/eir_conversation_<ts>.<fmt>`` under this CLI's home."""
     from cli import datetime
-    saved_dir = get_hermes_home() / "sessions" / "saved"
+    saved_dir = get_eir_home() / "sessions" / "saved"
     try:
         saved_dir.mkdir(parents=True, exist_ok=True)
     except OSError as e:
@@ -196,7 +196,7 @@ def _write_save(session_id, fmt, filename, render):
             path = Path.cwd() / path
     else:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        path = saved_dir / f"hermes_conversation_{timestamp}.{fmt}"
+        path = saved_dir / f"eir_conversation_{timestamp}.{fmt}"
 
     try:
         content = render()
@@ -245,7 +245,7 @@ class CLISessionMixin:
 
     def _restore_session_yolo(self, session_meta: dict, *, quiet: bool = False) -> None:
         """Re-arm the session row's persisted /yolo on every resume path (``tools.approval_yolo``)."""
-        from hermes_state import SessionDB
+        from eir_state import SessionDB
         from tools.approval_yolo import restore_session_yolo
         if restore_session_yolo(self.session_id or "default", SessionDB.session_yolo_enabled(session_meta)):
             _dim_notice(self, t("cli.session.yolo_restored"), quiet)
@@ -275,11 +275,11 @@ class CLISessionMixin:
     def _show_status(self):
         """Show compact startup status line."""
         from cli import get_tool_definitions
-        from hermes_cli.gateway_tools_notify import gateway_store
+        from eir_cli.gateway_tools_notify import gateway_store
         store = gateway_store(self)  # a gateway session's tools are the gateway's: never enumerated here
         inventory = store.banner_inventory() if store is not None else None
         # Avoid pulling the full tool registry into the bare Termux prompt path.
-        if os.environ.get("HERMES_DEFER_AGENT_STARTUP") == "1" or (store is not None and inventory is None):
+        if os.environ.get("EIR_DEFER_AGENT_STARTUP") == "1" or (store is not None and inventory is None):
             tool_status = t("cli.session.status_tools_deferred")
         elif inventory is not None:
             tool_status = t("cli.session.status_tools_count", count=len(inventory["tools"] or []))
@@ -293,7 +293,7 @@ class CLISessionMixin:
             model_short = model_short[:27] + "..."
         api_indicator = "[green bold]●[/]" if self.api_key else "[red bold]●[/]"
         try:
-            from hermes_cli.skin_engine import get_active_skin
+            from eir_cli.skin_engine import get_active_skin
             skin = get_active_skin()
             separator_color = skin.get_color("banner_dim", "#B8860B")
             accent_color = skin.get_color("ui_accent", "#FFBF00")
@@ -313,7 +313,7 @@ class CLISessionMixin:
 
     def _show_session_status(self):
         """Show gateway-style status for the current CLI session."""
-        from hermes_cli.status_report import build_status_fields, status_lines
+        from eir_cli.status_report import build_status_fields, status_lines
         session_meta = {}
         if self._session_db:
             with contextlib.suppress(Exception):
@@ -378,8 +378,8 @@ class CLISessionMixin:
         if not self._session_db:
             return []
         try:
-            from hermes_cli.session_listing import query_session_listing
-            from hermes_state_sessions import INTERNAL_LISTING_SOURCES
+            from eir_cli.session_listing import query_session_listing
+            from eir_state_sessions import INTERNAL_LISTING_SOURCES
 
             return query_session_listing(
                 self._session_db, source="cli", current_session_id=self.session_id,
@@ -398,7 +398,7 @@ class CLISessionMixin:
         if not sessions:
             return False
 
-        from hermes_cli.timefmt import relative_time as _relative_time
+        from eir_cli.timefmt import relative_time as _relative_time
 
         _cli_visible_print()
         if reason == "history":
@@ -479,7 +479,7 @@ class CLISessionMixin:
                 continue
 
             _cli_visible_print(
-                f"\n  {t('cli.session.history_assistant_header', agent_name='Hermes', index=visible_index)}{_ts_suffix(msg)}")
+                f"\n  {t('cli.session.history_assistant_header', agent_name='Eir', index=visible_index)}{_ts_suffix(msg)}")
             n_calls = len(msg.get("tool_calls") or [])
             if not content_text:
                 suffix = ""
@@ -496,7 +496,7 @@ class CLISessionMixin:
         """Fire a session-boundary plugin hook (on_session_finalize / on_session_reset).
         Non-blocking; errors swallowed. Safe from shutdown, /new, /reset."""
         with contextlib.suppress(Exception):
-            from hermes_cli.lifecycle import finalize_session, invoke_hook
+            from eir_cli.lifecycle import finalize_session, invoke_hook
 
             context = {
                 "session_id": self.agent.session_id if self.agent else None,
@@ -504,7 +504,7 @@ class CLISessionMixin:
                 "reason": "new_session" if event_type == "on_session_reset" else "session_boundary"}
             if event_type == "on_session_finalize":
                 from cli import _cli_visible_print
-                from hermes_cli.lifecycle import session_end_messages
+                from eir_cli.lifecycle import session_end_messages
                 for message in session_end_messages(finalize_session(**context)):
                     _cli_visible_print(message)
             else:
@@ -522,7 +522,7 @@ class CLISessionMixin:
         if getattr(self, "conversation_history", None):
             return False
         try:
-            from hermes_constants import get_hermes_home as _ghh
+            from eir_constants import get_eir_home as _ghh
             return self._session_db.delete_session_if_empty(
                 session_id, sessions_dir=_ghh() / "sessions")
         except Exception:
@@ -562,7 +562,7 @@ class CLISessionMixin:
         from cli import (
             CLI_CONFIG, _parse_service_tier_config,
             _sync_process_session_id, datetime)
-        from hermes_cli.cli_model_switch_mixin import _resolve_cli_reasoning
+        from eir_cli.cli_model_switch_mixin import _resolve_cli_reasoning
         old_session_id = self.session_id
         _boundary_snapshot = None
         if self.agent:
@@ -571,7 +571,7 @@ class CLISessionMixin:
                 # rotation) so /new never blocks on the LLM-bound call.
                 _boundary_snapshot = self._launch_session_boundary_memory_flush(
                     list(self.conversation_history), session_id=old_session_id)
-            from hermes_cli.cli_shutdown import _gateway_owns_session_end
+            from eir_cli.cli_shutdown import _gateway_owns_session_end
             if not _gateway_owns_session_end(self.agent):  # the gateway finalizes at end_session below
                 self._notify_session_boundary("on_session_finalize")
 
@@ -632,7 +632,7 @@ class CLISessionMixin:
                     self.agent._session_db_created = False
                     self._session_db.create_session(
                         session_id=self.session_id,
-                        source=os.environ.get("HERMES_SESSION_SOURCE", "cli"),
+                        source=os.environ.get("EIR_SESSION_SOURCE", "cli"),
                         model=self.model,
                         model_config={
                             "max_iterations": self.max_turns, "reasoning_config": self.reasoning_config,
@@ -654,7 +654,7 @@ class CLISessionMixin:
                     _mm.on_session_switch(
                         self.session_id, parent_session_id=old_session_id or "",
                         reset=True, reason="new_session")
-            from hermes_cli.cli_shutdown import _gateway_owns_session_end
+            from eir_cli.cli_shutdown import _gateway_owns_session_end
             if not _gateway_owns_session_end(self.agent):  # the gateway resets when end_session closes it
                 self._notify_session_boundary("on_session_reset")
 
@@ -699,7 +699,7 @@ class CLISessionMixin:
         the live session stays resumable regardless. ``redact`` runs the force-mode secret
         redaction pass before writing.
         """
-        from hermes_cli.session_export import (
+        from eir_cli.session_export import (
             SAVE_USAGE, load_save_snapshot, normalize_save_format, render_session_for_save)
 
         parts = cmd.split()[1:]
@@ -716,7 +716,7 @@ class CLISessionMixin:
             print(SAVE_USAGE)
             return
         filename = parts[1] if len(parts) > 1 else None
-        from hermes_cli.gateway_tools_notify import gateway_store
+        from eir_cli.gateway_tools_notify import gateway_store
         store = gateway_store(self)
         if store is not None:  # the gateway owns the session: it renders its stored row, this machine writes it
             if not self.conversation_history:  # as Ink: nothing said yet, nothing exported
@@ -733,7 +733,7 @@ class CLISessionMixin:
         _db = getattr(self, "_session_db", None)
         _sid = getattr(self, "session_id", None)
         if _db and _sid:
-            from hermes_state import SessionExportTooLargeError
+            from eir_state import SessionExportTooLargeError
             try:
                 session_data = load_save_snapshot(_db, _sid, fmt)
             except SessionExportTooLargeError as e:
@@ -749,7 +749,7 @@ class CLISessionMixin:
                 "id": self.session_id, "model": self.model,
                 "started_at": self.session_start.timestamp(), "messages": self.conversation_history}
         if redact:
-            from hermes_cli.session_export_md import redact_session_data
+            from eir_cli.session_export_md import redact_session_data
 
             session_data = redact_session_data(session_data)
         _write_save(self.session_id, fmt, filename, lambda: render_session_for_save(session_data, fmt))
@@ -903,11 +903,11 @@ class CLISessionMixin:
         return ""
 
     def _write_terminal_breadcrumb(self) -> None:
-        """Record this terminal's live session for bare ``hermes -c``. Called whenever
+        """Record this terminal's live session for bare ``eir -c``. Called whenever
         ``self.session_id`` is (re)assigned so a later bare ``-c`` in THIS terminal resumes
         this conversation's live tip. Best-effort; no-op without a terminal identity."""
         with contextlib.suppress(Exception):
-            from hermes_cli.terminal_breadcrumbs import write_breadcrumb
+            from eir_cli.terminal_breadcrumbs import write_breadcrumb
 
             write_breadcrumb(self.session_id)
 
@@ -928,13 +928,13 @@ class CLISessionMixin:
         """Toggle per-session YOLO mode (skip dangerous-command approvals).
 
         Mirrors the gateway/TUI ``/yolo`` handlers. Deliberately does NOT touch
-        ``HERMES_YOLO_MODE``: that env var is frozen into ``tools.approval._YOLO_MODE_FROZEN``
+        ``EIR_YOLO_MODE``: that env var is frozen into ``tools.approval._YOLO_MODE_FROZEN``
         at import (so prompt-injected skills can't flip the bypass), making a later set a
         silent no-op. ``run_conversation`` binds ``self.session_id`` as the active approval
         key, so the bypass applies to the very next dangerous command.
         """
         from cli import _cprint
-        from hermes_cli.colors import Colors as _Colors
+        from eir_cli.colors import Colors as _Colors
         from tools.approval import _YOLO_MODE_FROZEN
 
         # A frozen process-level bypass short-circuits the approval gate ahead of the session
@@ -1028,7 +1028,7 @@ class CLISessionMixin:
                     print(f"     {summary['note']}")
             except Exception as e:
                 finalize_context_engine_compression_notification(self.agent, committed=False)
-                from hermes_cli.cli_chat_error_copy import refusal_text
+                from eir_cli.cli_chat_error_copy import refusal_text
                 print(f"  {t('cli.session.compress_failed', error=refusal_text(e))}")
 
     def _persist_prompt_summary(self, icon: str, label: str, detail: str, outcome: str) -> None:
@@ -1060,7 +1060,7 @@ class CLISessionMixin:
             try:
                 import subprocess
 
-                from hermes_cli._subprocess_compat import windows_hide_flags
+                from eir_cli._subprocess_compat import windows_hide_flags
 
                 if os.name == "nt":
                     argv = ["cmd", "/c", "cls"]  # `cls` is a cmd builtin, not an exe
@@ -1182,7 +1182,7 @@ class CLISessionMixin:
         msg_count = len(self.conversation_history)
         if not msg_count:
             try:
-                from hermes_cli.skin_engine import get_active_goodbye
+                from eir_cli.skin_engine import get_active_goodbye
                 goodbye = get_active_goodbye(t("cli.session.goodbye"))
             except Exception:
                 goodbye = t("cli.session.goodbye")
@@ -1208,16 +1208,16 @@ class CLISessionMixin:
 
         print(t("cli.session.exit_resume_hint"))
         # Session IDs are profile-constrained: non-default profiles need `-p <profile>` in
-        # the hint ("default"/"custom" use the standard HERMES_HOME).
+        # the hint ("default"/"custom" use the standard EIR_HOME).
         try:
-            from hermes_cli.profiles import get_active_profile_name
+            from eir_cli.profiles import get_active_profile_name
             _active_profile = get_active_profile_name()
         except Exception:
             _active_profile = "default"
         profile_flag = "" if _active_profile in ("default", "custom") else f" -p {_active_profile}"
-        print(f"  hermes --resume {self.session_id}{profile_flag}")
+        print(f"  eir --resume {self.session_id}{profile_flag}")
         if session_title:
-            print(f"  hermes -c \"{session_title}\"{profile_flag}")
+            print(f"  eir -c \"{session_title}\"{profile_flag}")
         print()
         print(t("cli.session.exit_label_session", session_id=self.session_id))
         if session_title:

@@ -5,10 +5,10 @@ read/wrote the dashboard process's own (root) ``.env`` via ``load_env()`` /
 ``save_env_value()`` — so a dashboard switched to a freshly created profile
 still displayed and persisted the ROOT install's messaging credentials.
 These tests pin the new behavior: reads and writes land in the REQUESTED
-profile's HERMES_HOME, and the dashboard's own profile stays untouched.
+profile's EIR_HOME, and the dashboard's own profile stays untouched.
 """
 import pytest
-import hermes_yaml as yaml
+import eir_yaml as yaml
 import gateway.status as _gw_status
 
 
@@ -17,12 +17,12 @@ _VALID_BODY_BOT_TOKEN = "987654321:ZYXWVUTSRQPONMLKJIHGFEDCBA_4321"
 
 
 @pytest.fixture
-def isolated_profiles(tmp_path, monkeypatch, _isolate_hermes_home):
+def isolated_profiles(tmp_path, monkeypatch, _isolate_eir_home):
     """Isolated default home + one named profile, each with its own .env."""
-    from hermes_constants import get_hermes_home
-    from hermes_cli import profiles
+    from eir_constants import get_eir_home
+    from eir_cli import profiles
 
-    default_home = get_hermes_home()
+    default_home = get_eir_home()
     profiles_root = default_home / "profiles"
     worker_home = profiles_root / "worker_alpha"
     for home in (default_home, worker_home):
@@ -34,7 +34,7 @@ def isolated_profiles(tmp_path, monkeypatch, _isolate_hermes_home):
     )
     (worker_home / ".env").write_text("", encoding="utf-8")
 
-    monkeypatch.setattr(profiles, "_get_default_hermes_home", lambda: default_home)
+    monkeypatch.setattr(profiles, "_get_default_eir_home", lambda: default_home)
     monkeypatch.setattr(profiles, "_get_profiles_root", lambda: profiles_root)
     return {"default": default_home, "worker_alpha": worker_home}
 
@@ -46,11 +46,11 @@ def client(monkeypatch, isolated_profiles):
     except ImportError:
         pytest.skip("fastapi/starlette not installed")
 
-    import hermes_state
-    from hermes_constants import get_hermes_home
-    from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
+    import eir_state
+    from eir_constants import get_eir_home
+    from eir_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
 
-    monkeypatch.setattr(hermes_state, "DEFAULT_DB_PATH", get_hermes_home() / "state.db")
+    monkeypatch.setattr(eir_state, "DEFAULT_DB_PATH", get_eir_home() / "state.db")
     # The dashboard process's os.environ may carry root-install credentials;
     # make sure the scoped path never falls back to them.
     monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
@@ -81,7 +81,7 @@ def no_platform_env(monkeypatch):
 
 
 @pytest.mark.parametrize("platform_id, config, env, enabled, configured", [
-    # Dashboard QR onboarding writes both; ``hermes whatsapp`` writes only the env flag.
+    # Dashboard QR onboarding writes both; ``eir whatsapp`` writes only the env flag.
     pytest.param("whatsapp", _on("whatsapp"), "WHATSAPP_ENABLED=true\n", True, True, id="whatsapp-paired"),
     pytest.param("whatsapp", {}, "WHATSAPP_ENABLED=true\n", True, True, id="whatsapp-env-flag-only"),
     # Declared but never paired: the gateway would not start the bridge.
@@ -225,7 +225,7 @@ class TestProfileScopedMessagingReads:
     def test_scoped_read_returns_profile_path_command_and_startup_failure(
         self, client, isolated_profiles, monkeypatch
     ):
-        from hermes_cli import web_server
+        from eir_cli import web_server
 
         worker_home = isolated_profiles["worker_alpha"]
         (worker_home / ".env").write_text(
@@ -244,7 +244,7 @@ class TestProfileScopedMessagingReads:
             "read_runtime_status",
             # Accepts path= : the profile-scoped read now passes the
             # profile's own gateway_state.json explicitly rather than
-            # relying on process-level HERMES_HOME resolution (#71211).
+            # relying on process-level EIR_HOME resolution (#71211).
             lambda *a, **k: {
                 "gateway_state": "startup_failed",
                 "exit_reason": "all configured messaging platforms failed to connect",
@@ -260,7 +260,7 @@ class TestProfileScopedMessagingReads:
         payload = resp.json()
         assert payload["env_path"] == str(worker_home / ".env")
         assert payload["gateway_start_command"] == (
-            "hermes -p worker_alpha gateway start"
+            "eir -p worker_alpha gateway start"
         )
         telegram = _telegram(payload)
         assert telegram["state"] == "startup_failed"
@@ -402,18 +402,18 @@ class TestMultiplexPortBindingGuard:
             assert resp.status_code == 200
 
 def test_named_current_home_matches_unscoped(client, isolated_profiles, monkeypatch):
-    from hermes_cli.web_server_profiles import _config_profile_scope, _hermes_home_scope
-    from hermes_constants import get_hermes_home
+    from eir_cli.web_server_profiles import _config_profile_scope, _eir_home_scope
+    from eir_constants import get_eir_home
 
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "root-token")
     for scope in (None, "current", "default"):
         response = client.get("/api/messaging/platforms", params={"profile": scope} if scope else {})
         assert response.status_code == 200
         assert _telegram(response.json())["enabled"] is True
-    with _hermes_home_scope(isolated_profiles["worker_alpha"]):
+    with _eir_home_scope(isolated_profiles["worker_alpha"]):
         with _config_profile_scope("default") as scoped:
             assert scoped is None
-            assert get_hermes_home() == isolated_profiles["default"]
+            assert get_eir_home() == isolated_profiles["default"]
 
 
 def test_scoped_enablement_uses_only_own_credentials(client, isolated_profiles, monkeypatch):
@@ -426,7 +426,7 @@ def test_scoped_enablement_uses_only_own_credentials(client, isolated_profiles, 
     assert _telegram(payload)["enabled"] is True
     assert _telegram(payload)["configured"] is True
     assert _telegram(payload)["state"] != "disabled"
-    from hermes_cli.web_server_messaging import _messaging_platform_catalog
+    from eir_cli.web_server_messaging import _messaging_platform_catalog
     empty = {entry["id"] for entry in _messaging_platform_catalog() if not entry["required_env"]}
     for platform in payload["platforms"]:
         if platform["id"] in empty:
@@ -444,9 +444,9 @@ def test_scoped_enablement_uses_only_own_credentials(client, isolated_profiles, 
 def test_credential_write_hot_serves_a_multiplexed_profile(client, isolated_profiles, monkeypatch, topology):
     """A token saved for a profile the live multiplexer serves is handed to the multiplexer right
     away (``hot_served``), so the UI skips its restart banner. Both Desktop topologies: the dashboard's
-    ``?profile=`` and a pooled ``hermes --profile X serve`` that receives the PUT unscoped (#109088)."""
-    import hermes_cli.gateway as gateway_cli
-    import hermes_cli.gateway_multiplex_served as served_mod
+    ``?profile=`` and a pooled ``eir --profile X serve`` that receives the PUT unscoped (#109088)."""
+    import eir_cli.gateway as gateway_cli
+    import eir_cli.gateway_multiplex_served as served_mod
     notified = []
     monkeypatch.setattr(gateway_cli, "named_profile_served_by_running_multiplexer", lambda name=None: name == "worker_alpha")
     monkeypatch.setattr(served_mod, "notify_multiplexer_profiles_changed", lambda name, **kw: notified.append(name) or ["default", name])
@@ -465,7 +465,7 @@ def test_credential_write_hot_serves_a_multiplexed_profile(client, isolated_prof
 def test_credential_write_on_default_profile_is_not_hot_served(client, isolated_profiles, monkeypatch):
     """The default profile is the multiplexer itself (its own adapters are restart-managed): never
     claim a hot serve for it."""
-    import hermes_cli.gateway_multiplex_served as served_mod
+    import eir_cli.gateway_multiplex_served as served_mod
     monkeypatch.setattr(served_mod, "notify_multiplexer_profiles_changed",
                         lambda name, **kw: pytest.fail("default profile must not ping the multiplexer"))
     resp = client.put("/api/messaging/platforms/telegram",

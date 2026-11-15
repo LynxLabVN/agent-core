@@ -1,10 +1,10 @@
-"""state.db file-level health helpers, split out of ``hermes_state.py``.
+"""state.db file-level health helpers, split out of ``eir_state.py``.
 
 Header probes (application_id / zeroed-file detection), deleted-WAL-sidecar
 holder scans, quarantine of zeroed databases, ``collect_state_db_stats`` and
-holder-process classification.  Helpers that hermes_state itself imports and
-calls (``_connect_tracked_db`` & co) are looked up lazily from ``hermes_state`` at
-call time, so tests that monkeypatch ``hermes_state.<name>`` keep intercepting.
+holder-process classification.  Helpers that eir_state itself imports and
+calls (``_connect_tracked_db`` & co) are looked up lazily from ``eir_state`` at
+call time, so tests that monkeypatch ``eir_state.<name>`` keep intercepting.
 """
 
 from __future__ import annotations
@@ -25,14 +25,14 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from hermes_state_holders import canonical_sqlite_path, read_only_db_uri
-from hermes_state_common import (
+from eir_state_holders import canonical_sqlite_path, read_only_db_uri
+from eir_state_common import (
     FTS_REBUILD_DEFERRAL_KEY, path_is_under, stat_db_file_identity as _stat_db_file_identity
 )
-from hermes_state_lockguard import own_descriptors
+from eir_state_lockguard import own_descriptors
 
-# Log-record parity with the origin module (caplog tests pin "hermes_state").
-logger = logging.getLogger("hermes_state")
+# Log-record parity with the origin module (caplog tests pin "eir_state").
+logger = logging.getLogger("eir_state")
 
 
 def _prepare_connection_retirement():
@@ -65,12 +65,12 @@ def _prepare_connection_retirement():
 # _read_sqlite_application_id runs on EVERY write (_raise_if_db_replaced) against the LIVE
 # state.db.  A bare open()/read()/close() there is the howtocorrupt §2.2 bug: close() cancels
 # every POSIX advisory lock this process holds on the file, dropping the writer's WAL-mode DMS
-# shared lock (see hermes_cli/sqlite_safe_read.py) so another process can treat this writer as
+# shared lock (see eir_cli/sqlite_safe_read.py) so another process can treat this writer as
 # dead and rerun WAL-index recovery underneath it.  So the probe preads through a per-path fd
 # cached for the life of the process (opening never cancels locks).  When the path is re-pointed
 # at a new inode (the very replacement this probe detects) the stale fd is RETIRED, never closed
 # — closing it would cancel the live connection's locks.  Replacements are rare and halt writes.
-# close_all_under (hermes_state_registry) closes a home's probes, but only once no other
+# close_all_under (eir_state_registry) closes a home's probes, but only once no other
 # descriptor in the process is open on the inode: the only lock-safe time to close.
 _HEADER_PROBE_LOCK = threading.Lock()
 # close_header_probe_if_unchanged runs while _live_lock is held (offline_file_access), and a
@@ -149,7 +149,7 @@ def _pread_db_range(db_path: Path, offset: int, length: int) -> Optional[bytes]:
     """Lock-safe raw read of a possibly-live SQLite database: POSIX preads from a cached,
     never-closed fd (rebound when the path names a new inode); Windows reads plainly, since
     advisory-lock cancellation is a POSIX-only hazard."""
-    from hermes_state import _IS_WINDOWS
+    from eir_state import _IS_WINDOWS
     if _IS_WINDOWS:
         with contextlib.suppress(OSError), db_path.open("rb") as handle:
             handle.seek(offset)
@@ -244,7 +244,7 @@ def _pread_db_header(db_path: Path, length: int) -> Optional[bytes]:
 
 def _read_sqlite_application_id(db_path: Path) -> Optional[int]:
     """application_id from the SQLite header, via the lock-safe :func:`_pread_db_header`."""
-    from hermes_state_errors import _STATE_DB_APPLICATION_ID_OFFSET
+    from eir_state_errors import _STATE_DB_APPLICATION_ID_OFFSET
     end = _STATE_DB_APPLICATION_ID_OFFSET + 4
     header = _pread_db_header(db_path, end)
     if header is None or len(header) < end or header[:16] != b"SQLite format 3\x00":
@@ -266,7 +266,7 @@ def _watched_sqlite_sidecar_paths(db_path) -> dict[str, str]:
     literal = (literal_base + "-wal", literal_base + "-shm")
     watched = {canonical_sqlite_path(path): path for path in literal}
     # /proc reports the kernel-resolved dentry, so the watched canonicals must also resolve
-    # symlinks -- with abspath alone a symlinked HERMES_HOME makes every deleted sidecar
+    # symlinks -- with abspath alone a symlinked EIR_HOME makes every deleted sidecar
     # invisible to the scan. Both spellings are watched: the fully resolved path, which is
     # where current SQLite places -wal/-shm when the database file itself is a symlink, and
     # the realpath'd parent with the literal basename, which is where they land when SQLite
@@ -310,7 +310,7 @@ def _fd_is_truly_unlinked(fd_path: str, watched_path: str) -> bool:
     except OSError as exc:
         # ENOENT: the descriptor was closed after /proc was read. ESRCH: the whole
         # process exited mid-scan. Neither can keep a retired generation alive, so
-        # do not turn this scan race into a refusal (mirrors hermes_state_holders).
+        # do not turn this scan race into a refusal (mirrors eir_state_holders).
         if exc.errno in (errno.ENOENT, errno.ESRCH):
             return False
         return True
@@ -511,8 +511,8 @@ def iter_deleted_sqlite_sidecar_holders(db_path) -> list[tuple[int, str]]:
 def refuse_deleted_wal_generation(db_path) -> None:
     """Raise if any process holds a deleted WAL/SHM generation for *db_path*; called
     *before* ``sqlite3.connect`` so a second opener cannot mint a replacement WAL inode."""
-    from hermes_state import DeletedWalGenerationError
-    from hermes_state_errors import _DELETED_WAL_GENERATION_MSG
+    from eir_state import DeletedWalGenerationError
+    from eir_state_errors import _DELETED_WAL_GENERATION_MSG
     if not iter_deleted_sqlite_sidecar_holders(db_path):
         return
     logger.error(_DELETED_WAL_GENERATION_MSG)
@@ -533,7 +533,7 @@ RETIRED_GENERATION_DIR_SUFFIX = ".retired-wal-"
 RETIRED_GENERATION_MANIFEST = "manifest.json"
 RETIRED_GENERATION_MANIFEST_VERSION = 1
 # Up to this size the main image is copied whole, so the artifact is a self-contained state.db + -wal
-# pair that `hermes sessions recover --source <dir>/state.db` can open. Above it only the 100-byte
+# pair that `eir sessions recover --source <dir>/state.db` can open. Above it only the 100-byte
 # header is kept (the manifest says so): unlike the WAL inode, the main file survives process exit at
 # its path, and a multi-GB copy inside a shutdown path is a worse failure than a header-only artifact.
 RETIRED_GENERATION_MAIN_IMAGE_MAX_BYTES = 512 * 1024 * 1024
@@ -548,7 +548,7 @@ class RetiredGenerationCaptureError(RuntimeError):
 def _fsync_path(path: Path) -> None:
     """fsync a file or directory we own. Never used on the live database: opening and closing a
     descriptor on a file SQLite has locked would cancel this process's POSIX advisory locks."""
-    from hermes_state import _IS_WINDOWS
+    from eir_state import _IS_WINDOWS
     if _IS_WINDOWS:
         return  # directories cannot be opened; file writes fsync their own handle
     fd = os.open(path, os.O_RDONLY)
@@ -615,7 +615,7 @@ def _parse_sqlite_header(header: bytes) -> dict[str, Any]:
     if len(header) < _SQLITE_HEADER_BYTES or header[:16] != b"SQLite format 3\x00":
         return {"valid": False}
     raw_page_size = struct.unpack(">H", header[16:18])[0]
-    from hermes_state_errors import _STATE_DB_APPLICATION_ID_OFFSET
+    from eir_state_errors import _STATE_DB_APPLICATION_ID_OFFSET
     fields = {"change_counter": 24, "page_count": 28, "user_version": 60,
               "application_id": _STATE_DB_APPLICATION_ID_OFFSET, "version_valid_for": 92}
     parsed = {name: struct.unpack(">I", header[off:off + 4])[0] for name, off in fields.items()}
@@ -673,7 +673,7 @@ def capture_retired_wal_generation(
                 suffix: list(ident) for suffix, ident in _stat_sqlite_sidecar_identity(db_path).items()},
             "note": ("Frames in the captured WAL were committed by the retired generation. Whether they "
                      "belong on top of the main file now at the path is an operator decision; inspect "
-                     "the copied image with `hermes sessions recover --inspect-only` first."),
+                     "the copied image with `eir sessions recover --inspect-only` first."),
         }
         shm_identity = tuple(sidecar_identity.get("-shm") or ())
         shm_fd = _own_descriptor_for_identity(shm_identity) if shm_identity else None
@@ -715,15 +715,15 @@ def _connect_tracked_db(path, tracking_path=None, **kwargs):
     """``sqlite3.connect`` that registers the open fd so byte-level probes of a live file are
     refused (an ``open()``/``close()`` would cancel every POSIX lock, even a running VACUUM's
     EXCLUSIVE).  The ONLY tolerated fallback is the helper being absent (scaffold/embed installs
-    without hermes_cli); a real connection failure must propagate — a silent untracked retry
+    without eir_cli); a real connection failure must propagate — a silent untracked retry
     would disable the guard for that connection."""
     try:
-        from hermes_cli.sqlite_safe_read import connect_tracked
+        from eir_cli.sqlite_safe_read import connect_tracked
     except ImportError:
-        logger.debug("hermes_cli.sqlite_safe_read unavailable; opening %s untracked "
+        logger.debug("eir_cli.sqlite_safe_read unavailable; opening %s untracked "
                      "(byte-probe guard inactive in this install)", path)
         return sqlite3.connect(str(path), **kwargs)
-    # Open through THIS module's sqlite3.connect so tests patching hermes_state.sqlite3.connect keep control.
+    # Open through THIS module's sqlite3.connect so tests patching eir_state.sqlite3.connect keep control.
     return connect_tracked(path, tracking_path=tracking_path, connect_fn=sqlite3.connect, **kwargs)
 
 
@@ -736,7 +736,7 @@ def _preopen_header(path: Path, probe_bytes: int, force: bool) -> Optional[bytes
         if not path.is_file():
             return None
         path.stat()
-        from hermes_cli.sqlite_safe_read import has_live_connection, read_header_bytes_preopen
+        from eir_cli.sqlite_safe_read import has_live_connection, read_header_bytes_preopen
         if not force and has_live_connection(path):
             return None
         return read_header_bytes_preopen(path, length=max(16, probe_bytes), force=force)
@@ -746,10 +746,10 @@ def _preopen_header(path: Path, probe_bytes: int, force: bool) -> Optional[bytes
 
 def is_zeroed_state_db(path: Path, *, probe_bytes: int = 100, force: bool = False) -> bool:
     """Detect the zeroed state.db signature (0-byte or NUL header).  Prefers
-    ``hermes_cli.backup.is_zeroed_sqlite_file``; this copy keeps SessionDB openable without the CLI
+    ``eir_cli.backup.is_zeroed_sqlite_file``; this copy keeps SessionDB openable without the CLI
     package in constrained embed paths."""
     with contextlib.suppress(Exception):
-        from hermes_cli.backup import is_zeroed_sqlite_file
+        from eir_cli.backup import is_zeroed_sqlite_file
         return is_zeroed_sqlite_file(path, probe_bytes=probe_bytes, force=force)
     head = _preopen_header(path, probe_bytes, force)
     # b"" (0-byte file) is zeroed; all() over an empty header is True.
@@ -845,9 +845,9 @@ def quarantine_invalid_state_db(path: Path, *, already_locked: bool = False) -> 
         if not acquired:
             logger.error("quarantine lock for %s not acquired within 5s — refusing to "
                          "quarantine without the cross-process lock. The invalid file "
-                         "is left in place. If sessions fail to load, run `hermes sessions recover "
+                         "is left in place. If sessions fail to load, run `eir sessions recover "
                          "--source <state.db> --inspect-only`, or restore a snapshot with "
-                         "`/snapshot list` / `/snapshot restore <id>` (terminal `hermes` chat only).",
+                         "`/snapshot list` / `/snapshot restore <id>` (terminal `eir` chat only).",
                          path)
             return None
         return _do_quarantine()
@@ -860,7 +860,7 @@ def collect_state_db_stats(db_path: Path) -> dict[str, Any]:
     Deliberately does NOT instantiate :class:`SessionDB` — its constructor runs DDL.
     ``wal_size_bytes`` is 0 when the sidecar is absent; ``fts_storage_version`` None means the
     legacy inline layout; ``fts_rebuild_deferral`` is the durable blocked-repair diagnostic."""
-    from hermes_state import _connect_tracked_db
+    from eir_state import _connect_tracked_db
     stats: dict[str, Any] = dict.fromkeys((
         "page_count", "page_size", "freelist_count", "logical_size_bytes", "wal_size_bytes", "journal_mode",
         "messages", "sessions", "fts_tables", "fts_storage_version", "fts_storage_upgrade_needed",
@@ -913,7 +913,7 @@ def collect_state_db_stats(db_path: Path) -> dict[str, Any]:
         # Raw state_meta reads — cheap, and independent of SessionDB.
         stats["fts_storage_version"] = _meta_int("fts_storage_version")
         with contextlib.suppress(Exception):
-            from hermes_state_fts import fts_layout_drift
+            from eir_state_fts import fts_layout_drift
             stats["fts_storage_upgrade_needed"] = bool(fts_layout_drift(conn.cursor()))
         with contextlib.suppress(Exception):
             # Demoted old-index tables still awaiting teardown: an optimize-storage run stopped after its backfill.

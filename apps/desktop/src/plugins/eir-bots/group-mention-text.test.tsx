@@ -17,7 +17,7 @@ import type { GroupMember } from './types'
 
 const selectedLocale = vi.hoisted(() => ({ value: 'en' }))
 
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@eir/plugin-sdk', async () => {
   const { atom } = await import('nanostores')
 
   return {
@@ -33,7 +33,7 @@ vi.mock('@hermes/plugin-sdk', async () => {
   }
 })
 
-vi.mock('./shared', () => ({ getPluginCtx: () => null, ID: 'hermes-bots' }))
+vi.mock('./shared', () => ({ getPluginCtx: () => null, ID: 'eir-bots' }))
 
 const members = [
   { name: 'planner', handle: 'planner' },

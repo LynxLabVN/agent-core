@@ -5,7 +5,7 @@ import type { ComponentProps } from 'react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 const request = vi.hoisted(() => vi.fn())
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@eir/plugin-sdk', async () => {
   const { pluginSdkMock, createGroupGateway } = await import('./group-test-utils')
   const gateway = createGroupGateway()
   const { en } = await import('@/i18n/en')
@@ -22,7 +22,7 @@ vi.mock('@hermes/plugin-sdk', async () => {
     RowButton: (p: ComponentProps<'button'>) => <button type="button" {...p} />,
     host: { ...gateway.host, requestProfile: captureGroupRequests(request).request } }
 })
-import { host } from '@hermes/plugin-sdk'
+import { host } from '@eir/plugin-sdk'
 
 import { CANONICAL_GROUP_CAPABILITIES, LEGACY_STANDALONE_GROUP_CAPABILITIES, STANDALONE_GROUP_CAPABILITIES } from './canonical-group-contract-test-utils'
 import { CANONICAL_GROUP_LOCALES } from './canonical-group-locales'
@@ -32,9 +32,9 @@ import { CanonicalGroupWorkspace } from './canonical-group-workspace'
 import { renderGatewayRooms } from './gateway-group-rooms-test-harness'
 import { $groupChatWorkspace } from './group-chat'
 import { GroupChatWorkspace } from './group-chat-view'
-const originalDesktop = window.hermesDesktop
-beforeEach(() => { Object.defineProperty(window, 'hermesDesktop', { configurable: true, writable: true, value: undefined }) })
-afterEach(() => { cleanup(); request.mockReset(); localStorage.clear(); window.hermesDesktop = originalDesktop; vi.unstubAllGlobals(); vi.useRealTimers() })
+const originalDesktop = window.eirDesktop
+beforeEach(() => { Object.defineProperty(window, 'eirDesktop', { configurable: true, writable: true, value: undefined }) })
+afterEach(() => { cleanup(); request.mockReset(); localStorage.clear(); window.eirDesktop = originalDesktop; vi.unstubAllGlobals(); vi.useRealTimers() })
 // What gateway/session_group_controls.py answers for groups.send.
 const receipt = (params: { event_id?: string }) => ({ event: {}, client_event_id: params.event_id, accepted: true, driver_started: true })
 
@@ -110,7 +110,7 @@ it('blocks Send until journal restore and durable preparation complete', async (
     })
   }
 
-  window.hermesDesktop = { preparedSubmissions: native } as unknown as typeof window.hermesDesktop
+  window.eirDesktop = { preparedSubmissions: native } as unknown as typeof window.eirDesktop
   request.mockImplementation(async (_route, method, params) => method === 'groups.state'
     ? { room: { name: 'Room' }, driver_status: {} } : method === 'groups.log' ? { events: [] } : receipt(params))
   render(<CanonicalGroupWorkspace binding={{ connectionId: 'remote', profile: 'team', roomId: 'new' }} />)
@@ -796,7 +796,7 @@ it('reopens a message the gateway proved unsent as an editable draft, not a rest
   expect(await readCanonicalGroupSend(binding)).toBeUndefined()
 })
 
-// Send outcomes. Seams: `host.requestProfile` is the gateway transport; `window.hermesDesktop.preparedSubmissions`
+// Send outcomes. Seams: `host.requestProfile` is the gateway transport; `window.eirDesktop.preparedSubmissions`
 // is the native journal's IPC (an in-memory compare-and-set owner here), or absent for the browser-storage
 // journal. A refusal carries `admitted: false` only when the gateway refused before the user event committed
 // (HostedRoomService.send).
@@ -826,7 +826,7 @@ function room(sendReply: (params: Record<string, unknown>, attempt: number) => u
 function nativeJournal(beforeMutation?: (call: number, entry: string | null) => Promise<void> | void) {
   const journal: Record<string, unknown> = {}
   let calls = 0
-  window.hermesDesktop = { preparedSubmissions: {
+  window.eirDesktop = { preparedSubmissions: {
     read: async () => JSON.stringify(journal),
     compareAndSet: async (key: string, expected: string | null, entry: string | null) => {
       await beforeMutation?.(++calls, entry)
@@ -838,7 +838,7 @@ function nativeJournal(beforeMutation?: (call: number, entry: string | null) => 
 
       return { applied: true, current: entry }
     }
-  } } as unknown as typeof window.hermesDesktop
+  } } as unknown as typeof window.eirDesktop
 
   return journal
 }
@@ -991,13 +991,13 @@ it('keeps a first Send refused after its room closed for the next open, as an ed
   expect((await readCanonicalGroupSend(binding))?.attempts).toBe(0)
 })
 
-// Both surfaces Desktop dials: the session gateway (4001 + reason) and `hermes serve`
+// Both surfaces Desktop dials: the session gateway (4001 + reason) and `eir serve`
 // (tui_gateway/methods_groups.py: 4111 room errors, 4123 no worker, 5112 anything else).
 it.each([
   ['the gateway refuses the payload', refusal('invalid_params', false)],
-  ['hermes serve finds the room ended', frame('hosted room not found', 4111, { admitted: false })],
-  ['hermes serve has no Group Chat worker', frame('Group Chat worker is unavailable.', 4123, { admitted: false })],
-  ['hermes serve refuses the payload', frame('user payload text must be a bounded string', 5112, { admitted: false })]
+  ['eir serve finds the room ended', frame('hosted room not found', 4111, { admitted: false })],
+  ['eir serve has no Group Chat worker', frame('Group Chat worker is unavailable.', 4123, { admitted: false })],
+  ['eir serve refuses the payload', frame('user payload text must be a bounded string', 5112, { admitted: false })]
 ])('hands the words back for editing when %s before admitting the Send', async (_case, refused) => {
   const binding = { connectionId: 'local', profile: 'team', roomId: 'refused-before-admission' }
   room((params, attempt) => attempt === 1 ? Promise.reject(refused) : receipt(params))
@@ -1016,8 +1016,8 @@ it.each([
 // AM4: the same reasons and codes also follow a committed user event, without `admitted: false`.
 it.each([
   ['an invalid_params from the gateway', refusal('invalid_params')],
-  ['a room error from hermes serve', frame('hosted room not found', 4111)],
-  ['a failure from hermes serve', frame('storage is full', 5112)]
+  ['a room error from eir serve', frame('hosted room not found', 4111)],
+  ['a failure from eir serve', frame('storage is full', 5112)]
 ])('keeps the identity of a first Send after %s that does not prove nothing was admitted', async (_case, failed) => {
   const binding = { connectionId: 'local', profile: 'team', roomId: 'post-commit' }
   room((params, attempt) => attempt === 1 ? Promise.reject(failed) : receipt(params))
@@ -1127,10 +1127,10 @@ it('does not resend words handed back for editing once another window finished w
 it('offers a read-only retry when the Send journal cannot be read, then restores its pending intent', async () => {
   const binding = { connectionId: 'local', profile: 'team', roomId: 'unreadable' }
   const entry = await prepareCanonicalGroupSend(binding, { text: 'Saved before the failure', attachments: [] })
-  const saved = localStorage.getItem('hermes.desktop.canonicalGroupSends.v1')!
+  const saved = localStorage.getItem('eir.desktop.canonicalGroupSends.v1')!
   const compareAndSet = vi.fn()
   const read = vi.fn().mockRejectedValueOnce(new Error('EACCES: journal unreadable')).mockResolvedValue(saved)
-  window.hermesDesktop = { preparedSubmissions: { read, compareAndSet } } as unknown as typeof window.hermesDesktop
+  window.eirDesktop = { preparedSubmissions: { read, compareAndSet } } as unknown as typeof window.eirDesktop
   room(params => receipt(params))
   render(<CanonicalGroupWorkspace binding={binding} />)
   await screen.findByText(/Saved messages couldn’t be loaded/)

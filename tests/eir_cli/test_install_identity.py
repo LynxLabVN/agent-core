@@ -6,8 +6,8 @@ import time
 import pytest
 
 from gateway.hosted_rooms import local_authority_gateway_id
-from hermes_cli import install_identity
-from hermes_cli.install_identity import read_or_create_install_id
+from eir_cli import install_identity
+from eir_cli.install_identity import read_or_create_install_id
 
 
 def _race_first_install_id(
@@ -106,7 +106,7 @@ def test_independent_first_callers_return_the_single_committed_identity(tmp_path
 
     assert returned == [persisted, persisted]
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     monkeypatch.setattr(
         install_identity,
         "_INSTALL_ID_CACHE",

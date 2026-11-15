@@ -1,9 +1,9 @@
 """Guards for CLI startup performance regression.
 
-``hermes_cli.main`` skips eager plugin discovery at argparse-setup time
+``eir_cli.main`` skips eager plugin discovery at argparse-setup time
 when the invocation is clearly targeting a known built-in subcommand.
-This saves 500-650ms on ``hermes --help``, ``hermes --version``,
-``hermes logs``, etc., by not importing ``google.cloud.pubsub_v1``,
+This saves 500-650ms on ``eir --help``, ``eir --version``,
+``eir logs``, etc., by not importing ``google.cloud.pubsub_v1``,
 ``aiohttp``, ``grpc``, and friends.
 
 Invariants: ``_plugin_cli_discovery_needed()`` classifies flag/positional argv
@@ -16,7 +16,7 @@ from __future__ import annotations
 import sys
 from unittest.mock import patch
 
-from hermes_cli.main import (
+from eir_cli.main import (
     _resolve_deferred_platform_cli_command,
 )
 
@@ -31,7 +31,7 @@ def test_deferred_platform_loader_registers_cli_command_before_parser_table():
     before argparse builds plugin command subparsers (issue #54678 review).
 
     Existing unit tests mock ``platform_registry.get`` and only assert the
-    helper calls it. This regression exercises the full chain hermes-sweeper
+    helper calls it. This regression exercises the full chain eir-sweeper
     asked for:
 
     1. a deferred platform loader is pending on a real ``PlatformRegistry``
@@ -45,7 +45,7 @@ def test_deferred_platform_loader_registers_cli_command_before_parser_table():
     import argparse
 
     from gateway.platform_registry import PlatformRegistry
-    from hermes_cli.plugins import PluginContext, PluginManager, PluginManifest
+    from eir_cli.plugins import PluginContext, PluginManager, PluginManifest
 
     mgr = PluginManager()
     manifest = PluginManifest(name="fake-photon-platform")
@@ -53,7 +53,7 @@ def test_deferred_platform_loader_registers_cli_command_before_parser_table():
 
     def _fake_loader():
         # Mirrors what a real platform adapter does on import: register its
-        # top-level hermes <name> CLI command via PluginContext.
+        # top-level eir <name> CLI command via PluginContext.
         ctx = PluginContext(manifest, mgr)
         ctx.register_cli_command(
             name=command_name,
@@ -83,7 +83,7 @@ def test_deferred_platform_loader_registers_cli_command_before_parser_table():
     assert cmd_info["plugin"] == "fake-photon-platform"
 
     # Same parser-table assembly main() uses after reading _cli_commands.
-    parser = argparse.ArgumentParser(prog="hermes")
+    parser = argparse.ArgumentParser(prog="eir")
     subparsers = parser.add_subparsers(dest="command")
     for info in mgr._cli_commands.values():
         plugin_parser = subparsers.add_parser(

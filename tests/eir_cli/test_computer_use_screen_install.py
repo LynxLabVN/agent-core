@@ -1,11 +1,11 @@
-"""`hermes computer-use screen install` shares the Desktop pane's installer (one lock, list-form spawn)."""
+"""`eir computer-use screen install` shares the Desktop pane's installer (one lock, list-form spawn)."""
 
 from __future__ import annotations
 
 import argparse
 import subprocess
 
-from hermes_cli.subcommands.computer_use_screen import build_screen_parser
+from eir_cli.subcommands.computer_use_screen import build_screen_parser
 from tools.bot_desktop import install, runtime
 
 

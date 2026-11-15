@@ -1,4 +1,4 @@
-"""A key stored for one endpoint is never sent to the endpoint ``hermes model`` switches to.
+"""A key stored for one endpoint is never sent to the endpoint ``eir model`` switches to.
 
 Writers covered: the custom-endpoint flow (blank key), the named custom-provider flow (keyless
 entry) and the Vercel AI Gateway flow. A same-endpoint re-entry with a blank key keeps the key.
@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 import pytest
 
-from hermes_cli.config import get_config_path, get_hermes_home
+from eir_cli.config import get_config_path, get_eir_home
 
 A_URL = "https://a.example.com/v1"
 A_SECRET = "sk-ENDPOINT-A-MARKER"
@@ -22,15 +22,15 @@ def _seed_endpoint_a(monkeypatch, key_shape: str) -> None:
            "key_env": "  key_env: CUSTOM_A_EXAMPLE_COM_API_KEY\n"}[key_shape]
     get_config_path().write_text(
         f"model:\n  provider: custom\n  default: a-model\n  base_url: {A_URL}\n{ref}")
-    (get_hermes_home() / ".env").write_text(f"CUSTOM_A_EXAMPLE_COM_API_KEY={A_SECRET}\n")
+    (get_eir_home() / ".env").write_text(f"CUSTOM_A_EXAMPLE_COM_API_KEY={A_SECRET}\n")
     monkeypatch.setenv("CUSTOM_A_EXAMPLE_COM_API_KEY", A_SECRET)  # what the launch-time .env load does
 
 
 def _run_custom_flow(monkeypatch, url: str) -> None:
-    import hermes_cli.main_provider_setup as mps
-    import hermes_cli.model_setup_flows_custom as flows
-    from hermes_cli import secret_prompt
-    from hermes_cli.config import load_config
+    import eir_cli.main_provider_setup as mps
+    import eir_cli.model_setup_flows_custom as flows
+    from eir_cli import secret_prompt
+    from eir_cli.config import load_config
 
     answers = iter([url, "", "endpoint"])
     monkeypatch.setattr(flows, "line_input", lambda *a, **k: next(answers))
@@ -43,20 +43,20 @@ def _run_custom_flow(monkeypatch, url: str) -> None:
 
 
 def _run_named_custom_flow(monkeypatch) -> None:
-    from hermes_cli.model_setup_flows_custom import _model_flow_named_custom
+    from eir_cli.model_setup_flows_custom import _model_flow_named_custom
 
     entry = {"name": "lab-b", "base_url": B_URL, "api_key": "", "model": "b-model", "discover_models": False}
-    with patch("hermes_cli.curses_ui.curses_radiolist", side_effect=ImportError), \
+    with patch("eir_cli.curses_ui.curses_radiolist", side_effect=ImportError), \
             patch("builtins.input", return_value="1"):
         _model_flow_named_custom({}, entry)
 
 
 def _run_ai_gateway_flow(monkeypatch) -> None:
-    from hermes_cli import auth
-    import hermes_cli.main_provider_setup as mps
-    import hermes_cli.model_setup_flows as flows
-    from hermes_cli import models
-    import hermes_cli.models_pricing as pricing
+    from eir_cli import auth
+    import eir_cli.main_provider_setup as mps
+    import eir_cli.model_setup_flows as flows
+    from eir_cli import models
+    import eir_cli.models_pricing as pricing
 
     monkeypatch.setenv("AI_GATEWAY_API_KEY", "vck-GATEWAY-MARKER")
     monkeypatch.setattr(mps, "_prompt_api_key", lambda *a, **k: ("vck-GATEWAY-MARKER", False))
@@ -67,12 +67,12 @@ def _run_ai_gateway_flow(monkeypatch) -> None:
 
 
 def _key_sent_next_launch() -> str:
-    from hermes_cli.runtime_provider import resolve_runtime_provider
+    from eir_cli.runtime_provider import resolve_runtime_provider
     return str(resolve_runtime_provider().get("api_key") or "")
 
 
 def _ai_gateway_secret() -> str:
-    from hermes_cli.auth import PROVIDER_REGISTRY, _resolve_api_key_provider_secret
+    from eir_cli.auth import PROVIDER_REGISTRY, _resolve_api_key_provider_secret
     return _resolve_api_key_provider_secret("ai-gateway", PROVIDER_REGISTRY["ai-gateway"])[0]
 
 
@@ -104,8 +104,8 @@ def test_stored_key_follows_the_endpoint_it_was_entered_for(monkeypatch, switch,
 def test_switch_probe_treats_a_saved_entry_on_another_origin_as_moved(address_field):
     """The /model probe must not reload the saved key when the saved copy (under any address field)
     points at another host than the edited entry."""
-    from hermes_cli.config import load_config, save_config
-    from hermes_cli.model_switch_providers import _saved_entry_on_other_origin
+    from eir_cli.config import load_config, save_config
+    from eir_cli.model_switch_providers import _saved_entry_on_other_origin
 
     cfg = load_config()
     cfg["providers"] = {"myep": {"name": "myep", address_field: A_URL, "key_env": "MYEP_KEY"}}

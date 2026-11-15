@@ -44,7 +44,7 @@ def _zero_width(seq: str) -> str:
 
 
 def _passthrough(seq: str) -> str:
-    from hermes_cli.cli_terminal_mixin import _tmux_passthrough
+    from eir_cli.cli_terminal_mixin import _tmux_passthrough
     return _tmux_passthrough(seq) if os.environ.get("TMUX") else seq
 
 

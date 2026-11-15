@@ -1,26 +1,26 @@
-"""HERMES_HOME state checks for hermes doctor: directories, memory files, state.db health, skills hub, memory provider, profiles.
-Split out of ``hermes_cli/doctor.py``, which re-exports every name so ``hermes_cli.doctor.<name>`` keeps resolving (and monkeypatching)."""
+"""EIR_HOME state checks for eir doctor: directories, memory files, state.db health, skills hub, memory provider, profiles.
+Split out of ``eir_cli/doctor.py``, which re-exports every name so ``eir_cli.doctor.<name>`` keeps resolving (and monkeypatching)."""
 
 from __future__ import annotations
 
 import os
 import subprocess
 from pathlib import Path
-from hermes_cli.doctor_report import (
+from eir_cli.doctor_report import (
     Finding, _fail_and_issue, _section, check_bool, check_info, check_ok, check_warn, doctor_check, ensure_dir,
     warn_on_error,
 )
-from hermes_cli.sizefmt import format_bytes as _human_bytes
-from hermes_state_holders import read_only_db_uri
+from eir_cli.sizefmt import format_bytes as _human_bytes
+from eir_state_holders import read_only_db_uri
 
 
-def _doctor_memory_config(hermes_home: Path | None = None) -> dict:
+def _doctor_memory_config(eir_home: Path | None = None) -> dict:
     """Return the effective memory section used by doctor diagnostics."""
-    from hermes_cli.config_backend import config_exists
-    from hermes_cli.doctor import HERMES_HOME
+    from eir_cli.config_backend import config_exists
+    from eir_cli.doctor import EIR_HOME
     try:
-        from hermes_cli.config_effective import load_user_config_effective
-        config_path = (hermes_home if hermes_home is not None else HERMES_HOME) / "config.yaml"
+        from eir_cli.config_effective import load_user_config_effective
+        config_path = (eir_home if eir_home is not None else EIR_HOME) / "config.yaml"
         if not config_exists(config_path):
             return {}
         section = load_user_config_effective(config_path).get("memory")
@@ -92,7 +92,7 @@ def _render_state_db_stats(stats: dict, holders=None, host_note: str = "") -> li
             lines.append(("warn", f"state.db FTS repair is blocked after {deferral.get('attempts') or '?'} deferral(s) "
                           f"by PID(s) {pids}",
                           "(stop the listed processes; the host gateway's own retry then rebuilds, or run "
-                          "'hermes sessions optimize-storage' with every holder stopped)"))
+                          "'eir sessions optimize-storage' with every holder stopped)"))
     # Oversized DB: suggest auto_prune, plus the offline optimize-storage pass when the FTS rebuild is
     # pending, an earlier run stopped before tearing down the old index, or the stored FTS layout is an
     # older release's (not just a lagging marker).
@@ -100,41 +100,41 @@ def _render_state_db_stats(stats: dict, holders=None, host_note: str = "") -> li
         detail = "consider enabling sessions.auto_prune in config.yaml to bound growth"
         structural_fts_upgrade = bool(stats.get("fts_storage_upgrade_needed"))
         if stats.get("fts_rebuild_pending") or stats.get("fts_teardown_pending") or structural_fts_upgrade:
-            detail += "; run 'hermes sessions optimize-storage' offline (with the host gateway stopped) to compact FTS storage"
+            detail += "; run 'eir sessions optimize-storage' offline (with the host gateway stopped) to compact FTS storage"
         lines.append(("warn", f"state.db is large ({_human_bytes(logical)})", f"({detail})"))
     # WAL runaway is deliberately NOT warned here: _state_db_wal already warns above 50 MB and offers --fix.
     return lines
 
 
-def _memory_store_flags(hermes_home: Path) -> tuple:
+def _memory_store_flags(eir_home: Path) -> tuple:
     from tools.memory_tool import get_builtin_memory_store_flags
-    return get_builtin_memory_store_flags({"memory": _doctor_memory_config(hermes_home)})
+    return get_builtin_memory_store_flags({"memory": _doctor_memory_config(eir_home)})
 
 
 def check_legacy_desktop_checkout() -> None:
     """Report the unused legacy checkout under an embedded desktop install.
 
     Before the embedded runtime existed, the desktop app installed a git
-    checkout at $HERMES_HOME/hermes-agent. An embedded app never uses it,
+    checkout at $EIR_HOME/eir-agent. An embedded app never uses it,
     so it sits on disk (1-2 GB of tree + venv). Doctor only REPORTS the
     checkout and its size — it never suggests a deletion command, and
     never deletes anything itself: a pristineness probe cannot prove no
     other client uses the tree or that every local commit is published,
     so the review-and-decide step belongs to the user.
     """
-    from hermes_cli.steward import STEWARD_DESKTOP, sealed_steward
+    from eir_cli.steward import STEWARD_DESKTOP, sealed_steward
 
     try:
-        from hermes_cli.main import PROJECT_ROOT
+        from eir_cli.main import PROJECT_ROOT
     except Exception:
         return
 
     if sealed_steward(Path(PROJECT_ROOT)) != STEWARD_DESKTOP:
         return
 
-    from hermes_cli.doctor import HERMES_HOME, _DHH
+    from eir_cli.doctor import EIR_HOME, _DHH
 
-    checkout = HERMES_HOME / "hermes-agent"
+    checkout = EIR_HOME / "eir-agent"
     if not (checkout / ".git").exists():
         return
 
@@ -171,13 +171,13 @@ def check_legacy_desktop_checkout() -> None:
 
     if pristine:
         check_warn(
-            f"Unused checkout at {_DHH}/hermes-agent{size_note}",
+            f"Unused checkout at {_DHH}/eir-agent{size_note}",
             "(the desktop app runs embedded and does not use it; the tree is clean)",
         )
         print("    Review it and decide whether to keep or remove it — doctor does not delete anything.")
     else:
         check_info(
-            f"A checkout exists at {_DHH}/hermes-agent but holds local work "
+            f"A checkout exists at {_DHH}/eir-agent but holds local work "
             "(changes, a branch, or stashes). The desktop app does not use "
             "it; review it before you remove anything."
         )
@@ -185,23 +185,23 @@ def check_legacy_desktop_checkout() -> None:
 
 @doctor_check()
 def _check_directory_structure(should_fix: bool, f: Finding) -> None:
-    """HERMES_HOME, expected subdirs, SOUL.md, and the enabled built-in memory files."""
+    """EIR_HOME, expected subdirs, SOUL.md, and the enabled built-in memory files."""
     try:
         check_legacy_desktop_checkout()
     except Exception:
         pass  # best-effort report; must never break the directory check
-    from hermes_cli.doctor import HERMES_HOME, _DHH
-    hermes_home = HERMES_HOME
-    ensure_dir(f, should_fix, hermes_home, f"{_DHH} directory exists", f"Created {_DHH} directory", f"{_DHH} not found")
-    _memory_enabled, _user_profile_enabled = _memory_store_flags(hermes_home)
+    from eir_cli.doctor import EIR_HOME, _DHH
+    eir_home = EIR_HOME
+    ensure_dir(f, should_fix, eir_home, f"{_DHH} directory exists", f"Created {_DHH} directory", f"{_DHH} not found")
+    _memory_enabled, _user_profile_enabled = _memory_store_flags(eir_home)
     memory_on = bool(_memory_enabled or _user_profile_enabled)
     # The built-in file store neither creates nor consumes memories/ when both targets are disabled.
     for subdir_name in ["cron", "sessions", "logs", "skills"] + (["memories"] if memory_on else []):
-        ensure_dir(f, should_fix, hermes_home / subdir_name, f"{_DHH}/{subdir_name}/ exists",
+        ensure_dir(f, should_fix, eir_home / subdir_name, f"{_DHH}/{subdir_name}/ exists",
                    f"Created {_DHH}/{subdir_name}/", f"{_DHH}/{subdir_name}/ not found")
-    _check_scratch_dir(hermes_home, _DHH)
+    _check_scratch_dir(eir_home, _DHH)
     # SOUL.md persona file
-    soul_path = hermes_home / "SOUL.md"
+    soul_path = eir_home / "SOUL.md"
     if soul_path.exists():
         lines = soul_path.read_text(encoding="utf-8-sig").strip().splitlines()
         if any(l.strip() and not l.strip().startswith(("<!--", "-->", "#")) for l in lines):
@@ -209,16 +209,16 @@ def _check_directory_structure(should_fix: bool, f: Finding) -> None:
         else:  # template comments only (no real content)
             check_info(f"{_DHH}/SOUL.md exists but is empty — edit it to customize personality")
     else:
-        check_warn(f"{_DHH}/SOUL.md not found", "(create it to give Hermes a custom personality)")
+        check_warn(f"{_DHH}/SOUL.md not found", "(create it to give Eir a custom personality)")
         if should_fix:
             soul_path.parent.mkdir(parents=True, exist_ok=True)
-            soul_path.write_text("# Hermes Agent Persona\n\n<!-- Edit this file to customize how Hermes communicates. -->\n\n"
-                                 "You are Hermes, a helpful AI assistant.\n", encoding="utf-8")
+            soul_path.write_text("# Eir Agent Persona\n\n<!-- Edit this file to customize how Eir communicates. -->\n\n"
+                                 "You are Eir, a helpful AI assistant.\n", encoding="utf-8")
             check_ok(f"Created {_DHH}/SOUL.md with basic template")
             f.fixed += 1
     # Only enabled built-in stores: users can disable either legacy file target, and stale migration files
     # must not read as active memory usage.
-    memories_dir = hermes_home / "memories"
+    memories_dir = eir_home / "memories"
     if not memory_on:
         return check_info("Built-in memory files disabled by config")
     existed = memories_dir.exists()
@@ -236,14 +236,14 @@ _UNPRUNED_CACHE_WARN_BYTES = 1 << 30
 _PRUNED_CACHE_DIRS = frozenset({"scratch", "terminal"})
 
 
-def unpruned_cache_hogs(hermes_home: Path, min_bytes: int = _UNPRUNED_CACHE_WARN_BYTES) -> list[tuple[str, int]]:
+def unpruned_cache_hogs(eir_home: Path, min_bytes: int = _UNPRUNED_CACHE_WARN_BYTES) -> list[tuple[str, int]]:
     """``(name, bytes)`` for ``cache/`` entries outside the pruned dirs that exceed *min_bytes*.
 
     Finished campaign trees parked at the cache root sat for weeks (95 GB on one host)
     because only ``scratch/`` and ``terminal/`` are reaped; doctor is where that shows."""
-    from hermes_constants import scratch_dir_usage_bytes
+    from eir_constants import scratch_dir_usage_bytes
 
-    cache = hermes_home / "cache"
+    cache = eir_home / "cache"
     hogs: list[tuple[str, int]] = []
     try:
         entries = [e for e in cache.iterdir() if e.is_dir() and not e.is_symlink() and e.name not in _PRUNED_CACHE_DIRS]
@@ -256,17 +256,17 @@ def unpruned_cache_hogs(hermes_home: Path, min_bytes: int = _UNPRUNED_CACHE_WARN
     return sorted(hogs, key=lambda item: -item[1])
 
 
-def _check_scratch_dir(hermes_home: Path, _DHH: str) -> None:
+def _check_scratch_dir(eir_home: Path, _DHH: str) -> None:
     """Report the scratch dir (TMPDIR target) and its size; a user-set TMPDIR elsewhere is shown, not judged."""
-    from hermes_constants import (
+    from eir_constants import (
         SCRATCH_DIR_MARKER_ENV, SCRATCH_MAX_IDLE_HOURS, get_scratch_dir, scratch_dir_usage_bytes)
-    scratch = get_scratch_dir(hermes_home, prune=False)
+    scratch = get_scratch_dir(eir_home, prune=False)
     size = _human_bytes(scratch_dir_usage_bytes(scratch))
     check_ok(f"{_DHH}/cache/scratch/ is the scratch dir (TMPDIR; {size}, entries pruned after {SCRATCH_MAX_IDLE_HOURS}h idle)")
-    from hermes_constants_scratch_stuck import removal_hint, stuck_entries
+    from eir_constants_scratch_stuck import removal_hint, stuck_entries
     for entry in stuck_entries(scratch):
         check_warn(f"{_DHH}/cache/scratch/{entry.name}/ holds files you may not delete, so the prune skips it — {removal_hint(entry)}")
-    for name, nbytes in unpruned_cache_hogs(hermes_home):
+    for name, nbytes in unpruned_cache_hogs(eir_home):
         check_warn(
             f"{_DHH}/cache/{name}/ is {_human_bytes(nbytes)} and outside every pruner "
             f"(only cache/scratch/ and cache/terminal/ are reaped) — move task files under "
@@ -274,11 +274,11 @@ def _check_scratch_dir(hermes_home: Path, _DHH: str) -> None:
         )
     tmpdir = os.environ.get("TMPDIR", "")
     if tmpdir and tmpdir != os.environ.get(SCRATCH_DIR_MARKER_ENV, ""):
-        check_info(f"TMPDIR={tmpdir} is set by you or the OS, so Hermes leaves it alone")
+        check_info(f"TMPDIR={tmpdir} is set by you or the OS, so Eir leaves it alone")
 
 
 def _session_count(state_db_path: Path):
-    from hermes_cli.sqlite_safe_read import connect_tracked
+    from eir_cli.sqlite_safe_read import connect_tracked
     # mode=ro: doctor is a reader; a writable open of a gateway-held WAL DB is the second-writer class (#103339).
     conn = connect_tracked(read_only_db_uri(state_db_path), uri=True, tracking_path=state_db_path)
     try:
@@ -295,18 +295,18 @@ def _write_health_reason(state_db_path: Path, *, should_fix: bool):
     """FTS/write-health probe (a rolled-back BEGIN IMMEDIATE). Against a store a live writer holds,
     that probe is the second-writer class (#103339), so probe a read-only snapshot instead; a quiet
     store is probed in place. Returns the failure reason, or None when healthy or skipped."""
-    from hermes_state_repair import _db_opens_cleanly, _live_writer_holds_db
+    from eir_state_repair import _db_opens_cleanly, _live_writer_holds_db
     if not _live_writer_holds_db(state_db_path):
         return _db_opens_cleanly(state_db_path)
     if not should_fix and state_db_path.stat().st_size > _WRITE_PROBE_SNAPSHOT_MAX_BYTES:
         check_info("state.db write-health probe skipped: store is held by a live writer and larger than 1 GB "
-                   "(run 'hermes doctor --fix' to probe it)")
+                   "(run 'eir doctor --fix' to probe it)")
         return None
     import sqlite3
     import tempfile
     with tempfile.TemporaryDirectory() as tmp:
         snapshot = Path(tmp) / "state.db"
-        from hermes_cli.sqlite_safe_read import connect_tracked
+        from eir_cli.sqlite_safe_read import connect_tracked
         src = connect_tracked(read_only_db_uri(state_db_path), uri=True, timeout=1.0, tracking_path=state_db_path)
         try:
             dest = sqlite3.connect(str(snapshot))  # health: allow HX015 -- temp snapshot this function owns
@@ -326,16 +326,16 @@ _STATE_DB_REPAIRS = {
     "fts": ("Repaired state.db FTS write health",
             "state.db FTS write-health repair did not recover automatically",
             "state.db FTS write corruption and auto-repair failed — restore from the backup copy beside state.db",
-            "state.db FTS write corruption — run 'hermes doctor --fix' (or 'hermes sessions repair') to rebuild the FTS index"),
+            "state.db FTS write corruption — run 'eir doctor --fix' (or 'eir sessions repair') to rebuild the FTS index"),
     "schema": ("Repaired state.db schema ({count} sessions recovered)",
                "state.db schema repair did not recover automatically",
                "state.db schema malformed and auto-repair failed — restore from the backup copy beside state.db",
-               "state.db schema malformed — run 'hermes doctor --fix' (or 'hermes sessions repair') to recover hidden sessions"),
+               "state.db schema malformed — run 'eir doctor --fix' (or 'eir sessions repair') to recover hidden sessions"),
 }
 _STATE_DB_STRUCTURAL_ISSUE = (
     "state.db structural corruption (canonical tables/indexes damaged, not the FTS index) — an FTS rebuild "
-    "cannot repair it. Stop the gateway, then run 'hermes {profile_arg}sessions recover --source {db_path} "
-    "--inspect-only' and, if it reports recoverable, 'hermes {profile_arg}sessions recover --source {db_path} "
+    "cannot repair it. Stop the gateway, then run 'eir {profile_arg}sessions recover --source {db_path} "
+    "--inspect-only' and, if it reports recoverable, 'eir {profile_arg}sessions recover --source {db_path} "
     "--output recovered-state.db'. Do NOT restore a .malformed-backup copy beside state.db: it is a snapshot "
     "of the same corrupt file."
 )
@@ -344,13 +344,13 @@ _STATE_DB_STRUCTURAL_ISSUE = (
 def _repair_state_db(f: Finding, should_fix: bool, state_db_path: Path, kind: str) -> None:
     """Shared --fix path for both state.db corruption classes (FTS write health, malformed schema)."""
     if kind == "structural":
-        from hermes_constants import profile_cli_selector
+        from eir_constants import profile_cli_selector
         return f.manual_issues.append(_STATE_DB_STRUCTURAL_ISSUE.format(
             profile_arg=profile_cli_selector(), db_path=state_db_path))
     ok_label, not_fixed_label, failed_issue, fix_hint = _STATE_DB_REPAIRS[kind]
     if not should_fix:
         return f.issues.append(fix_hint)
-    from hermes_state_repair import repair_state_db_schema
+    from eir_state_repair import repair_state_db_schema
     report = repair_state_db_schema(state_db_path)
     if not report.get("repaired"):
         check_warn(not_fixed_label, f"({report.get('error')}; backup: {report.get('backup_path')})")
@@ -367,7 +367,7 @@ def _repair_state_db(f: Finding, should_fix: bool, state_db_path: Path, kind: st
 
 def _report_structural_damage(f: Finding, should_fix: bool, state_db_path: Path, _DHH: str, reason) -> bool:
     """True (and reported/repaired) when the canonical b-tree, not just the FTS index, is damaged."""
-    from hermes_state_repair import state_db_has_structural_damage
+    from eir_state_repair import state_db_has_structural_damage
     if not state_db_has_structural_damage(state_db_path):
         return False
     check_warn(f"{_DHH}/state.db has structural corruption (canonical tables/indexes damaged, "
@@ -378,7 +378,7 @@ def _report_structural_damage(f: Finding, should_fix: bool, state_db_path: Path,
 
 def _classify_unreadable_state_db(f: Finding, should_fix: bool, state_db_path: Path, _DHH: str, exc: Exception) -> None:
     """Structural damage first; only then schema repair. Avoids SessionDB auto-repair side effects."""
-    from hermes_state import is_malformed_db_error
+    from eir_state import is_malformed_db_error
     if _report_structural_damage(f, should_fix, state_db_path, _DHH, exc):
         return
     if not is_malformed_db_error(exc):
@@ -397,7 +397,7 @@ def _state_db_health(f: Finding, should_fix: bool, state_db_path: Path, _DHH: st
         _write_reason = _write_health_reason(state_db_path, should_fix=should_fix)
     except Exception as e:
         return _classify_unreadable_state_db(f, should_fix, state_db_path, _DHH, e)
-    from hermes_state_repair import HealthCheckUnavailable
+    from eir_state_repair import HealthCheckUnavailable
     if isinstance(_write_reason, HealthCheckUnavailable):
         return check_warn(f"{_DHH}/state.db write-health probe could not run", f"({_write_reason})")
     if _write_reason is not None:
@@ -411,7 +411,7 @@ def _state_db_stats(issues: list, state_db_path: Path) -> None:
     """Health/stats snapshot: strictly read-only (mode=ro) so it is safe against a live DB held by
     the gateway; any failure degrades to one info line rather than failing doctor."""
     with warn_on_error("state.db stats unavailable ({e})", "", report=lambda t, _d: check_info(t)):
-        from hermes_state_dbfile import collect_state_db_stats, count_db_holders
+        from eir_state_dbfile import collect_state_db_stats, count_db_holders
         rows = _render_state_db_stats(collect_state_db_stats(state_db_path), holders=count_db_holders(state_db_path),
                                       host_note=host_gateway_note())
         for _kind, _text, _detail in rows:
@@ -421,7 +421,7 @@ def _state_db_stats(issues: list, state_db_path: Path) -> None:
             check_warn(_text, _detail)
             if "auto_prune" in _detail:
                 issues.append("state.db is large — enable sessions.auto_prune in config.yaml"
-                              + (" and run 'hermes sessions optimize-storage' offline (gateway stopped)" if "optimize-storage" in _detail else ""))
+                              + (" and run 'eir sessions optimize-storage' offline (gateway stopped)" if "optimize-storage" in _detail else ""))
 
 
 def _state_db_wal(f: Finding, should_fix: bool, state_db_path: Path) -> None:
@@ -435,10 +435,10 @@ def _state_db_wal(f: Finding, should_fix: bool, state_db_path: Path) -> None:
             # joins the live WAL — under a running gateway that second-writer handling corrupts state.db.
             # Holder scan first (any other process holding the DB, or an unknown, fails closed), then run the
             # checkpoint on the exclusive repair guard so an opener arriving in between is refused, not joined.
-            from hermes_state_repair import _exclusive_repair_db_guard, _live_writer_holds_db
+            from eir_state_repair import _exclusive_repair_db_guard, _live_writer_holds_db
             title = f"WAL file is large ({size // (1024*1024)} MB)"
             _SKIP = ("Large WAL file — cannot prove state.db is quiet (stop the profile's gateway first, then "
-                     "run 'hermes doctor --fix' to checkpoint)")
+                     "run 'eir doctor --fix' to checkpoint)")
             # Honest disjunction (gate C1): a True here means "held OR unprovable" — never assert a live
             # writer as fact.
             if _live_writer_holds_db(state_db_path):
@@ -450,11 +450,11 @@ def _state_db_wal(f: Finding, should_fix: bool, state_db_path: Path) -> None:
             check_warn(title, "(may indicate missed checkpoints)")
             if not should_fix:
                 return f.issues.append(
-                    "Large WAL file — stop the profile's gateway, then run 'hermes doctor --fix' to checkpoint")
+                    "Large WAL file — stop the profile's gateway, then run 'eir doctor --fix' to checkpoint")
             with _exclusive_repair_db_guard(state_db_path) as (guard, guard_error):
                 if guard is None:
                     check_warn("WAL checkpoint skipped: could not take exclusive ownership of state.db",
-                               f"({guard_error}; stop the profile's gateway and re-run 'hermes doctor --fix')")
+                               f"({guard_error}; stop the profile's gateway and re-run 'eir doctor --fix')")
                     return f.issues.append(_SKIP)
                 guard.execute("PRAGMA wal_checkpoint(PASSIVE)")
             check_ok(f"WAL checkpoint performed ({size // 1024}K → {wal_size() // 1024}K)")
@@ -467,9 +467,9 @@ def _retired_wal_holders(f: Finding, state_db_path: Path, _DHH: str) -> bool:
     """Name the processes holding a retired -wal/-shm generation (#110054). Every SessionDB open is
     refused while they live, and the current inode has no holders, so the plain holder count says
     "0 holding the DB open" beside a green state.db line — the opposite of the truth."""
-    from hermes_constants import profile_cli_selector
-    from hermes_state_dbfile import iter_deleted_sqlite_sidecar_holders
-    from hermes_state_holders import describe_holder_pid
+    from eir_constants import profile_cli_selector
+    from eir_state_dbfile import iter_deleted_sqlite_sidecar_holders
+    from eir_state_holders import describe_holder_pid
     pids = list(dict.fromkeys(pid for pid, _ in iter_deleted_sqlite_sidecar_holders(state_db_path)))
     if not pids:
         return False
@@ -477,17 +477,17 @@ def _retired_wal_holders(f: Finding, state_db_path: Path, _DHH: str) -> bool:
     check_warn(f"{_DHH}/state.db: {len(pids)} process(es) still hold a retired WAL generation ({rendered})",
                "(every new session refuses to open until they exit; health/stats probes skipped)")
     f.issues.append(f"state.db retired WAL generation held by {rendered}{host_gateway_note()} — stop the host "
-                    f"gateway, dashboard and cron writers among them ('hermes {profile_cli_selector()}gateway "
+                    f"gateway, dashboard and cron writers among them ('eir {profile_cli_selector()}gateway "
                     "stop' stops the ONE host process serving every profile, quit the Desktop app), do not "
-                    "delete the WAL yourself, then rerun 'hermes doctor'")
+                    "delete the WAL yourself, then rerun 'eir doctor'")
     return True
 
 
 @doctor_check()
 def _check_state_db(should_fix: bool, f: Finding) -> None:
     """state.db session count, FTS write health, schema repair, stats snapshot, WAL size."""
-    from hermes_cli.doctor import HERMES_HOME, _DHH
-    state_db_path = HERMES_HOME / "state.db"
+    from eir_cli.doctor import EIR_HOME, _DHH
+    state_db_path = EIR_HOME / "state.db"
     # A read-only connect on the new generation is itself another opener, so nothing below may run.
     if _retired_wal_holders(f, state_db_path, _DHH):
         return
@@ -502,9 +502,9 @@ def _check_state_db(should_fix: bool, f: Finding) -> None:
 @doctor_check()
 def _check_cron_store(should_fix: bool, f: Finding) -> None:
     """The cron store accepts writes and its filesystem is not nearly full (jobs skip otherwise)."""
-    from hermes_cli.doctor import HERMES_HOME, _DHH
+    from eir_cli.doctor import EIR_HOME, _DHH
     from cron.store_health import LOW_FREE_BYTES, free_bytes, probe_report
-    cron_dir = HERMES_HOME / "cron"
+    cron_dir = EIR_HOME / "cron"
     if (report := probe_report(cron_dir)) is not None:
         check_warn(f"{_DHH}/cron/ is NOT writable ({report['error']}) — scheduled cron jobs are being skipped")
         return f.issues.append(f"Cron store {report['store']} is not writable: {report['fix']}")
@@ -526,8 +526,8 @@ def _check_checkpoint_store(should_fix: bool, f: Finding) -> None:
 
 def _plugin_provenance_rows(plugins_dir) -> list:
     """Report local provenance using the update checker's admission rules."""
-    from hermes_cli.plugins_provenance import ProvenanceClass, plugins_provenance
-    from hermes_cli.plugins_updates import check_local_provenance
+    from eir_cli.plugins_provenance import ProvenanceClass, plugins_provenance
+    from eir_cli.plugins_updates import check_local_provenance
 
     if plugins_dir is None or not Path(plugins_dir).is_dir():
         return [("info", "No plugins directory yet (nothing to check provenance for)", "")]
@@ -553,10 +553,10 @@ def _plugin_provenance_rows(plugins_dir) -> list:
 @doctor_check("")
 def _check_update_provenance(should_fix: bool, f: Finding) -> None:
     """Inspect local plugin update provenance without network or writes."""
-    from hermes_constants import get_hermes_home
+    from eir_constants import get_eir_home
 
     printers = {"warn": check_warn, "ok": check_ok, "info": lambda text, detail: check_info(f"{text} {detail}".rstrip())}
-    for kind, text, detail in _plugin_provenance_rows(get_hermes_home() / "plugins"):
+    for kind, text, detail in _plugin_provenance_rows(get_eir_home() / "plugins"):
         printers[kind](text, detail)
 
 
@@ -569,7 +569,7 @@ def _gh_authenticated() -> bool:
     launch failure (a Store/MSIX shim, a deleted binary) reads as "not authenticated" rather
     than crashing the Skills Hub check.
     """
-    from hermes_cli.doctor_tools import _safe_which
+    from eir_cli.doctor_tools import _safe_which
 
     if not _safe_which("gh"):
         return False
@@ -582,9 +582,9 @@ def _gh_authenticated() -> bool:
 
 @doctor_check()
 def _check_skills_hub(should_fix: bool, f: Finding) -> None:
-    from hermes_cli.doctor import HERMES_HOME, _DHH
-    hub_dir = HERMES_HOME / "skills" / ".hub"
-    if check_bool(hub_dir.exists(), "Skills Hub directory exists", ("Skills Hub directory not initialized", "(run: hermes skills list)")):
+    from eir_cli.doctor import EIR_HOME, _DHH
+    hub_dir = EIR_HOME / "skills" / ".hub"
+    if check_bool(hub_dir.exists(), "Skills Hub directory exists", ("Skills Hub directory not initialized", "(run: eir skills list)")):
         lock_file = hub_dir / "lock.json"
         if lock_file.exists():
             with warn_on_error("Lock file", "(corrupted or unreadable)"):
@@ -595,7 +595,7 @@ def _check_skills_hub(should_fix: bool, f: Finding) -> None:
         q_count = sum(1 for d in quarantine.iterdir() if d.is_dir()) if quarantine.exists() else 0
         if q_count > 0:
             check_warn(f"{q_count} skill(s) in quarantine", "(pending review)")
-    from hermes_cli.config import get_env_value
+    from eir_cli.config import get_env_value
     if get_env_value("GITHUB_TOKEN") or get_env_value("GH_TOKEN"):
         check_ok("GitHub token configured", "(validity checked under API Connectivity)")
     else:
@@ -615,26 +615,26 @@ def _memory_provider_generic(name: str) -> None:
     if _provider and _provider.is_available():
         check_ok(f"{name} provider active")
     elif _provider:
-        check_warn(f"{name} configured but not available", "run: hermes memory status")
+        check_warn(f"{name} configured but not available", "run: eir memory status")
     else:
         from plugins.memory import find_provider_dir
-        from hermes_cli.memory_provider_migration import catalog_install_hint
+        from eir_cli.memory_provider_migration import catalog_install_hint
         hint = catalog_install_hint(name, category="memory") if find_provider_dir(name) is None else None
-        check_warn(f"{name} plugin not found", f"run: {hint or 'hermes memory setup'}")
+        check_warn(f"{name} plugin not found", f"run: {hint or 'eir memory setup'}")
 
 
 @doctor_check()
 def _check_memory_provider(should_fix: bool, f: Finding) -> None:
-    from hermes_cli.doctor import HERMES_HOME
+    from eir_cli.doctor import EIR_HOME
     from agent.memory_provider import is_core_memory_provider
-    name = _doctor_memory_config(HERMES_HOME).get("provider", "")
+    name = _doctor_memory_config(EIR_HOME).get("provider", "")
     if is_core_memory_provider(name):
         check_ok("Built-in memory active", "(no external provider configured — this is fine)")
         return
     from plugins.memory import parked_provider_notice
     if parked_provider_notice(name):
         check_warn(f"{name} is turned off", "(plugins.disabled lists it, so built-in memory is used)")
-        f.manual_issues.append(f"Memory provider '{name}' is turned off — run: hermes plugins enable {name}")
+        f.manual_issues.append(f"Memory provider '{name}' is turned off — run: eir plugins enable {name}")
         return
     checker, missing_row, missing_issue, label = _MEMORY_PROVIDER_CHECKS.get(name, (None, None, None, name))
     try:
@@ -651,9 +651,9 @@ def _check_memory_provider(should_fix: bool, f: Finding) -> None:
 @doctor_check("")  # best-effort: an unreadable config is the config check's finding
 def _check_plugins_disabled_by_update(should_fix: bool, f: Finding) -> None:
     """Plugins an update turned off (pm.plugin_eviction): every later update retries them."""
-    from hermes_cli.doctor import HERMES_HOME
+    from eir_cli.doctor import EIR_HOME
     from pm.plugins_state import RECORD, read_home_selection
-    plugins = (read_home_selection(HERMES_HOME) or {}).get("plugins") or {}
+    plugins = (read_home_selection(EIR_HOME) or {}).get("plugins") or {}
     record, disabled = plugins.get(RECORD), set(plugins.get("disabled") or ())
     entries = {name: entry for name, entry in record.items() if name in disabled} if isinstance(record, dict) else {}
     if not entries:
@@ -663,14 +663,14 @@ def _check_plugins_disabled_by_update(should_fix: bool, f: Finding) -> None:
         reason = entry.get("reason", "") if isinstance(entry, dict) else ""
         check_warn(f"{name} is off", f"({reason})" if reason else "")
         f.manual_issues.append(f"Plugin '{name}' was turned off by an update; a later update retries it, "
-                               f"or run: hermes plugins enable {name}")
+                               f"or run: eir plugins enable {name}")
 
 
 @doctor_check("")  # best-effort: an unreadable config is the config check's finding
 def _check_plugins_in_both_lists(should_fix: bool, f: Finding) -> None:
     """A plugin in both plugins.enabled and plugins.disabled loads nowhere (the disable wins). Older
     updates left plugins in that state when they had to turn them off. Judged by the loader's gate."""
-    from hermes_cli.plugins_discovery import plugins_in_both_lists
+    from eir_cli.plugins_discovery import plugins_in_both_lists
     both = plugins_in_both_lists()
     if not both:
         return
@@ -678,15 +678,15 @@ def _check_plugins_in_both_lists(should_fix: bool, f: Finding) -> None:
     for name in both:
         check_warn(f"{name} will not load", "(plugins.disabled wins)")
         f.manual_issues.append(f"Plugin '{name}' is in both plugins.enabled and plugins.disabled, so it is off. "
-                               f"Turn it on with `hermes plugins enable {name}` (a memory provider also needs "
-                               f"memory.provider set), or keep it off with `hermes plugins disable {name}`")
+                               f"Turn it on with `eir plugins enable {name}` (a memory provider also needs "
+                               f"memory.provider set), or keep it off with `eir plugins disable {name}`")
 
 
 @doctor_check("")  # best-effort: profile enumeration must never break doctor
 def _check_profiles(should_fix: bool, f: Finding) -> None:
-    from hermes_constants import PROFILE_ID_RE
-    from hermes_cli.config_backend import config_exists
-    from hermes_cli.profiles import _wrapper_path, list_profiles, _get_wrapper_dir, profile_exists
+    from eir_constants import PROFILE_ID_RE
+    from eir_cli.config_backend import config_exists
+    from eir_cli.profiles import _wrapper_path, list_profiles, _get_wrapper_dir, profile_exists
     import re as _re
     named_profiles = [p for p in list_profiles() if not p.is_default]
     if not named_profiles:
@@ -706,14 +706,14 @@ def _check_profiles(should_fix: bool, f: Finding) -> None:
             if not wrapper.is_file():
                 continue
             with warn_on_error(""):
-                _m = _re.search(r"hermes -p (\S+)", wrapper.read_text(encoding="utf-8-sig"))
+                _m = _re.search(r"eir -p (\S+)", wrapper.read_text(encoding="utf-8-sig"))
                 if _m and not profile_exists(_m.group(1)):
                     alias = wrapper.stem if _wrapper_path(wrapper.stem) == wrapper else wrapper.name
-                    fix = f"hermes profile alias {alias} --remove" if PROFILE_ID_RE.match(alias) else f"delete {wrapper}"
+                    fix = f"eir profile alias {alias} --remove" if PROFILE_ID_RE.match(alias) else f"delete {wrapper}"
                     check_warn(f"Orphan alias: {alias} → profile '{_m.group(1)}' no longer exists", f"(remove with: {fix})")
     # Same helper as the multiplex migration preflight, so doctor names the duplicates that make
-    # `hermes gateway migrate --multiplex` refuse (and made pre-multiplex standalone gateways race).
-    from hermes_cli.gateway_migrate import duplicate_credential_findings
+    # `eir gateway migrate --multiplex` refuse (and made pre-multiplex standalone gateways race).
+    from eir_cli.gateway_migrate import duplicate_credential_findings
     for line in duplicate_credential_findings():
         check_warn("Duplicate platform credential across profiles", f"({line})")
         f.manual_issues.append(line)

@@ -23,8 +23,8 @@ except ImportError:
     web = None  # type: ignore[assignment]
     AIOHTTP_AVAILABLE = False
 
-from hermes_cli.proxy.adapters.base import UpstreamAdapter, UpstreamCredential
-from hermes_cli.proxy.sse_done import DONE_SSE_FRAME, SseDoneTracker, content_type_is_sse
+from eir_cli.proxy.adapters.base import UpstreamAdapter, UpstreamCredential
+from eir_cli.proxy.sse_done import DONE_SSE_FRAME, SseDoneTracker, content_type_is_sse
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ MAX_REQUEST_BYTES = 10_000_000
 
 def _require_aiohttp() -> None:
     if not AIOHTTP_AVAILABLE:
-        raise RuntimeError("aiohttp is required for `hermes proxy`. Run `hermes setup` to install it.")
+        raise RuntimeError("aiohttp is required for `eir proxy`. Run `eir setup` to install it.")
 
 
 def _json_error(status: int, message: str, code: str = "proxy_error") -> web.Response:

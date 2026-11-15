@@ -1,4 +1,4 @@
-"""Post-setup install hooks and installed-state predicates for `hermes tools` provider rows."""
+"""Post-setup install hooks and installed-state predicates for `eir tools` provider rows."""
 
 from __future__ import annotations
 
@@ -8,11 +8,11 @@ import shutil
 import sys
 from typing import Set
 
-from hermes_cli.cli_output import (
+from eir_cli.cli_output import (
     print_error as _print_error, print_info as _print_info, print_success as _print_success,
     print_warning as _print_warning)
-from hermes_cli.config import get_env_value
-from hermes_cli.tools_config_cua import _cua_driver_install_ready, install_cua_driver
+from eir_cli.config import get_env_value
+from eir_cli.tools_config_cua import _cua_driver_install_ready, install_cua_driver
 from tools.transcription_common import DEFAULT_LOCAL_MODEL, STT_MODEL_CATALOG
 
 _LOCAL_STT_MODEL_SUMMARY = ", ".join(
@@ -28,14 +28,14 @@ def _info_lines(*lines: str) -> None:
 
 def _ensure_browser_use_cli() -> None:
     """Confirm browser_exec's engine is runnable. It is browser-harness, a core dependency of
-    Hermes's own venv, so there is nothing to download; a miss means the venv needs a re-sync."""
+    Eir's own venv, so there is nothing to download; a miss means the venv needs a re-sync."""
     from tools.browser_use_cli import _find_cli
 
     if _find_cli() is not None:
-        _print_success("    browser_exec ready (browser-harness, bundled with Hermes)")
+        _print_success("    browser_exec ready (browser-harness, bundled with Eir)")
     else:
-        _print_warning("    browser-harness is missing from Hermes's Python environment")
-        _print_info("    Re-sync it with: hermes update")
+        _print_warning("    browser-harness is missing from Eir's Python environment")
+        _print_info("    Re-sync it with: eir update")
 
 
 def _post_setup_lightpanda() -> None:
@@ -50,15 +50,15 @@ def _post_setup_lightpanda() -> None:
         _print_warning("    lightpanda binary not found on PATH, ~/.lightpanda or ~/.local/bin")
         _print_info(f"    {LIGHTPANDA_INSTALL_HINT}")
         if os.name == "nt":
-            _print_info("    Lightpanda has no native Windows build; run Hermes under WSL2.")
+            _print_info("    Lightpanda has no native Windows build; run Eir under WSL2.")
 
 
 def _post_setup_chromium() -> None:
-    """Local Browser row: browser_exec launches pm's Chromium. Termux (system Chromium) and the Hermes
+    """Local Browser row: browser_exec launches pm's Chromium. Termux (system Chromium) and the Eir
     Docker image (its baked build) own their payloads, so a miss there is a hint, never a download."""
     import pm
-    from hermes_cli.browser_runtime import BAKED_EXECUTABLE_FILE, chromium_executable, chromium_missing_hint
-    from hermes_constants import is_termux
+    from eir_cli.browser_runtime import BAKED_EXECUTABLE_FILE, chromium_executable, chromium_missing_hint
+    from eir_constants import is_termux
 
     _ensure_browser_use_cli()
     if chromium_executable() is None and not (is_termux() or BAKED_EXECUTABLE_FILE.exists()):
@@ -66,7 +66,7 @@ def _post_setup_chromium() -> None:
             pm.ensure("chromium", explicit=True)
         except (RuntimeError, OSError) as exc:  # pm.InstallError, a download or worker failure
             _print_warning(f"    Chromium install failed: {exc}")
-            _info_lines("Retry with: hermes tools post-setup chromium")
+            _info_lines("Retry with: eir tools post-setup chromium")
             return
     found = chromium_executable()
     if found is None:
@@ -121,9 +121,9 @@ def _post_setup_python(spec: dict) -> None:
         pm.sync_venv([spec["extra"]], explicit=True)
     except (pm.InstallError, OSError, ValueError) as exc:
         _print_warning(f"    {label} install failed: {exc}")
-        _info_lines("Retry with: hermes tools")
+        _info_lines("Retry with: eir tools")
         return
-    _print_success(f"    {label} dependencies ready. Restart Hermes to use them.")
+    _print_success(f"    {label} dependencies ready. Restart Eir to use them.")
     _info_lines(*spec["on_install"], *spec["always"])
 
 
@@ -133,7 +133,7 @@ def _post_setup_xai_grok() -> None:
     …). Accepts a SuperGrok-tier OAuth token (preferred — billed to the existing subscription) or a raw
     XAI_API_KEY; the rows declare empty env_vars so the auth UX lives here."""
     try:
-        from hermes_cli.auth import get_xai_oauth_auth_status
+        from eir_cli.auth import get_xai_oauth_auth_status
         oauth_logged_in = bool(get_xai_oauth_auth_status().get("logged_in"))
     except Exception:
         oauth_logged_in = False
@@ -146,31 +146,31 @@ def _post_setup_xai_grok() -> None:
 
     _print_info("    xAI needs credentials. Choose one:")
     try:
-        from hermes_cli.setup import prompt_choice, prompt as _setup_prompt
-        from hermes_cli.setup_tts import _run_xai_oauth_login_from_setup
-        from hermes_cli.config import save_env_value
+        from eir_cli.setup import prompt_choice, prompt as _setup_prompt
+        from eir_cli.setup_tts import _run_xai_oauth_login_from_setup
+        from eir_cli.config import save_env_value
     except Exception as exc:
         _print_warning(f"    Could not load setup helpers: {exc}")
-        _info_lines("Run later: hermes auth add xai-oauth   (or set XAI_API_KEY)")
+        _info_lines("Run later: eir auth add xai-oauth   (or set XAI_API_KEY)")
         return
 
     idx = prompt_choice(
         "    How do you want xAI to authenticate?", default=0,
         choices=["Sign in with xAI Grok OAuth (SuperGrok / Premium+) — browser login",
                  "Paste an xAI API key (console.x.ai)",
-                 "Skip — configure later via `hermes auth add xai-oauth`"])
+                 "Skip — configure later via `eir auth add xai-oauth`"])
     if idx == 0:
         if _run_xai_oauth_login_from_setup():
             _print_success("    Logged in — xAI will use these OAuth credentials")
         else:
-            _print_warning("    xAI Grok OAuth login did not complete. Run later: hermes auth add xai-oauth")
+            _print_warning("    xAI Grok OAuth login did not complete. Run later: eir auth add xai-oauth")
     elif idx == 1:
         api_key = _setup_prompt("    xAI API key", password=True)
         if api_key:
             save_env_value("XAI_API_KEY", api_key)
             _print_success("    XAI_API_KEY saved")
         else:
-            _print_warning("    No API key provided. Run later: hermes auth add xai-oauth")
+            _print_warning("    No API key provided. Run later: eir auth add xai-oauth")
     else:
         _print_info("    xAI will remain inactive until credentials are configured.")
 
@@ -178,7 +178,7 @@ def _post_setup_xai_grok() -> None:
 def _codex_credentials_present() -> bool:
     """Cheap offline check for Codex/ChatGPT OAuth credentials (auth store + pool only)."""
     try:
-        from hermes_cli.auth import get_codex_auth_status
+        from eir_cli.auth import get_codex_auth_status
         return bool(get_codex_auth_status().get("logged_in"))
     except Exception:
         return False
@@ -192,11 +192,11 @@ def _post_setup_openai_codex() -> None:
         _print_success("    Image generation will use your existing Codex/ChatGPT OAuth credentials")
         return
 
-    relogin = "hermes auth add openai-codex"
+    relogin = "eir auth add openai-codex"
     _print_info("    OpenAI (Codex auth) needs credentials.")
     try:
-        from hermes_cli.auth import _codex_device_code_login, _save_codex_tokens
-        from hermes_cli.setup import is_noninteractive, prompt_choice
+        from eir_cli.auth import _codex_device_code_login, _save_codex_tokens
+        from eir_cli.setup import is_noninteractive, prompt_choice
     except Exception as exc:
         _print_warning(f"    Could not load setup helpers: {exc}")
         _info_lines(f"Run later: {relogin}")
@@ -224,7 +224,7 @@ def _post_setup_openai_codex() -> None:
 
 
 def _xai_credentials_ready() -> bool:
-    from hermes_cli.tools_config import _xai_credentials_present  # facade binding: tests patch it there
+    from eir_cli.tools_config import _xai_credentials_present  # facade binding: tests patch it there
     return _xai_credentials_present()
 
 
@@ -258,7 +258,7 @@ def valid_post_setup_keys() -> set[str]:
     """Return the set of post-setup keys declared by any visible provider (``TOOL_CATEGORIES`` plus
     plugin-registered providers). This is the allowlist ``post-setup`` and the dashboard endpoint
     validate against, so a caller cannot drive ``_run_post_setup`` with an arbitrary key."""
-    from hermes_cli.tools_config import (
+    from eir_cli.tools_config import (
         TOOL_CATEGORIES, _plugin_browser_providers, _plugin_image_gen_providers,
         _plugin_video_gen_providers, _plugin_web_search_providers)
 
@@ -275,11 +275,11 @@ def valid_post_setup_keys() -> set[str]:
 
 
 def run_post_setup_command(args) -> int:
-    """``hermes tools post-setup <key>`` — non-interactive runner the dashboard spawns so the GUI can drive
+    """``eir tools post-setup <key>`` — non-interactive runner the dashboard spawns so the GUI can drive
     backend setup without re-implementing install logic. Exit code: 0 ok, 2 unknown key."""
     key = getattr(args, "post_setup_key", None)
     if not key:
-        _print_error("Usage: hermes tools post-setup <key>")
+        _print_error("Usage: eir tools post-setup <key>")
         return 2
     valid = valid_post_setup_keys()
     if key not in valid:
@@ -324,7 +324,7 @@ def _module_installed(module_name: str) -> bool:
 def _chromium_installed() -> bool:
     """Everything ``_run_post_setup("chromium")`` provides is present: browser-harness and a Chromium, so
     "Run setup" flips to installed only when re-running it would be a no-op."""
-    from hermes_cli.browser_runtime import chromium_executable
+    from eir_cli.browser_runtime import chromium_executable
 
     return _browser_harness_installed() and chromium_executable() is not None
 

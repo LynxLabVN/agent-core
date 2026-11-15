@@ -1,4 +1,4 @@
-"""``hermes profile create --clone`` leaves messaging channels behind (``hermes_cli.profile_channels``).
+"""``eir profile create --clone`` leaves messaging channels behind (``eir_cli.profile_channels``).
 
 Invariant, not snapshot: the clone's credential fingerprint set — computed by the gateway's own
 ``_adapter_credential_fingerprint`` through the migrate preflight — is DISJOINT from the source's,
@@ -12,14 +12,14 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-import hermes_yaml as yaml
+import eir_yaml as yaml
 
-import hermes_constants
-from hermes_cli import gateway_migrate as gm
-from hermes_cli.profile_channels import (
+import eir_constants
+from eir_cli import gateway_migrate as gm
+from eir_cli.profile_channels import (
     channel_platforms_configured, shared_channel_credentials, strip_channel_config, strip_channel_env_file,
 )
-from hermes_cli.profiles import create_profile
+from eir_cli.profiles import create_profile
 
 _SOURCE_ENV = (
     "OPENAI_API_KEY=sk-model-key\n"
@@ -47,11 +47,11 @@ _SOURCE_CONFIG = {
 
 @pytest.fixture
 def home(tmp_path, monkeypatch):
-    root = tmp_path / ".hermes"
+    root = tmp_path / ".eir"
     root.mkdir()
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(root))
-    monkeypatch.setattr(hermes_constants, "_default_hermes_root_memo", None)
+    monkeypatch.setenv("EIR_HOME", str(root))
+    monkeypatch.setattr(eir_constants, "_default_eir_root_memo", None)
     for name in ("TELEGRAM_BOT_TOKEN", "DISCORD_BOT_TOKEN", "API_SERVER_KEY", "WHATSAPP_ENABLED",
                  "GATEWAY_MULTIPLEX_PROFILES", "TELEGRAM_ALLOWED_USERS"):
         monkeypatch.delenv(name, raising=False)
@@ -156,7 +156,7 @@ _LINKED_KEEPERS = {".env": "OPENAI_API_KEY=sk-model-key", "config.yaml": "gpt-5"
 @pytest.mark.parametrize("layout", ["default-outside", "named-outside", "named-linked-dir", "default-skipped-dir",
                                     "default-absolute"])
 def test_clone_all_copies_a_linked_root_file_as_the_source_resolves_it(home, tmp_path, layout, name):
-    """GNU Stow links ``config.yaml -> ../dotfiles/hermes/config.yaml``, relative to the source profile's
+    """GNU Stow links ``config.yaml -> ../dotfiles/eir/config.yaml``, relative to the source profile's
     directory (#142943). Resolved from the staged copy, which sits elsewhere, it named another path and the
     clone silently ran on defaults; so did a link into a folder the clone skips, or one in a named profile
     whose own folder is a link (``..`` is physical). Named sources otherwise worked only by staging depth."""
@@ -166,7 +166,7 @@ def test_clone_all_copies_a_linked_root_file_as_the_source_resolves_it(home, tmp
     if real != src:
         src.parent.mkdir(parents=True, exist_ok=True)
         src.symlink_to(real)  # profiles kept on another disk
-    target = (home / "bin" if layout == "default-skipped-dir" else tmp_path / "dotfiles" / "hermes") / name
+    target = (home / "bin" if layout == "default-skipped-dir" else tmp_path / "dotfiles" / "eir") / name
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_bytes((home / name).read_bytes())
     (real / name).unlink(missing_ok=True)
@@ -186,8 +186,8 @@ def test_clone_all_copies_a_linked_root_file_as_the_source_resolves_it(home, tmp
 def test_clone_all_drops_a_root_file_link_that_dangles_in_the_source(home, tmp_path):
     """A source link to a missing file is still dropped and the clone seeded like a fresh profile; the
     seeding never writes through the link (that would create the missing target)."""
-    from hermes_cli.profiles import _PLACEHOLDER_ENV
-    missing = tmp_path / "dotfiles" / "hermes" / ".env"
+    from eir_cli.profiles import _PLACEHOLDER_ENV
+    missing = tmp_path / "dotfiles" / "eir" / ".env"
     missing.parent.mkdir(parents=True)
     (home / ".env").unlink()
     (home / ".env").symlink_to(os.path.relpath(missing, home))
@@ -203,7 +203,7 @@ def test_clone_all_drops_a_root_file_link_that_dangles_in_the_source(home, tmp_p
 @pytest.mark.parametrize("linked", [False, True], ids=["regular", "stow-linked"])
 def test_clone_all_env_is_private_when_source_mode_is_loose(home, tmp_path, linked):
     """--clone-all copies .env owner-only even if the source (or its Stow link target) is 0644."""
-    target = tmp_path / "dotfiles" / "hermes" / ".env" if linked else home / ".env"
+    target = tmp_path / "dotfiles" / "eir" / ".env" if linked else home / ".env"
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text("OPENAI_API_KEY=sk-model-key\n", encoding="utf-8")
     target.chmod(0o644)
@@ -236,7 +236,7 @@ def test_clone_all_never_writes_through_a_symlinked_source_env(home, tmp_path):
 def test_clone_is_published_atomically_after_stripping(home, monkeypatch):
     """The multiplexer enumerates ``profiles/`` while a clone is built; the final directory must not
     exist (and no listable profile may appear) until the channel strip has run."""
-    from hermes_cli import profile_channels, profiles
+    from eir_cli import profile_channels, profiles
     seen = {}
     real_strip = profile_channels.strip_channel_settings
 
@@ -257,7 +257,7 @@ def test_clone_is_published_atomically_after_stripping(home, monkeypatch):
 def test_clone_channels_refusal_lives_in_create_profile(home, monkeypatch):
     """REST/TUI call ``create_profile`` directly: the live-multiplexer refusal must fire there, not
     only in the CLI, and ``--clone-channels`` without a clone source is an error, not a no-op."""
-    from hermes_cli import gateway_multiplex_served as served_mod
+    from eir_cli import gateway_multiplex_served as served_mod
     monkeypatch.setattr(served_mod, "recorded_served_profiles", lambda root=None: ["default", "other"])
     with pytest.raises(ValueError, match="already serves"):
         create_profile("twin", clone_config=True, no_alias=True, clone_channels=True)

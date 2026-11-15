@@ -10,15 +10,15 @@ import logging
 
 import pytest
 
-from hermes_cli.plugin_host import PluginHost
-from hermes_constants import hermes_home_key
-from tests.hermes_cli import test_plugin_secondary_profile_host as secondary
+from eir_cli.plugin_host import PluginHost
+from eir_constants import eir_home_key
+from tests.eir_cli import test_plugin_secondary_profile_host as secondary
 
 daemon = secondary.daemon
 
 
 def _answers_with_cookies(monkeypatch):
-    from hermes_cli import web_server_plugin_profiles
+    from eir_cli import web_server_plugin_profiles
     monkeypatch.setattr(web_server_plugin_profiles, "_cookie_droppers", set(), raising=False)
 
     def asgi_request(host, *args, **kwargs):
@@ -45,7 +45,7 @@ def test_hosted_plugin_answer_reaches_the_browser_without_set_cookie(daemon, mon
     _answers_with_cookies(monkeypatch)
     url, credentials, home = setup(daemon)
 
-    with caplog.at_level(logging.WARNING, logger="hermes_cli.web_server"):
+    with caplog.at_level(logging.WARNING, logger="eir_cli.web_server"):
         first = daemon.client.get(url, headers=credentials())
         second = daemon.client.get(url, headers=credentials())
 
@@ -58,4 +58,4 @@ def test_hosted_plugin_answer_reaches_the_browser_without_set_cookie(daemon, mon
     warnings = [r for r in caplog.records if "Set-Cookie" in r.getMessage()]
     assert len(warnings) == 1
     # names which profile's copy of the plugin did it (as a home key: Windows normcases the launch home)
-    assert hermes_home_key(warnings[0].args[1]) == hermes_home_key(home)
+    assert eir_home_key(warnings[0].args[1]) == eir_home_key(home)

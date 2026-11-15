@@ -21,7 +21,7 @@ import {
   RowButton,
   useI18n,
   useValue
-} from '@hermes/plugin-sdk'
+} from '@eir/plugin-sdk'
 import { useEffect, useMemo, useState } from 'react'
 
 import {

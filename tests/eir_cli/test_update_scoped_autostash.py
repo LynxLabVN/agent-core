@@ -1,4 +1,4 @@
-"""``hermes update`` moves only the local changes the update would collide with, and asks before stashing.
+"""``eir update`` moves only the local changes the update would collide with, and asks before stashing.
 
 An untracked directory the update never writes (a 55 GB leftover worktree copy) used to be hashed into
 the autostash and deleted from disk on every update; declining the restore then parked it in git stash.
@@ -7,8 +7,8 @@ the autostash and deleted from disk on every update; declining the restore then 
 import subprocess
 import sys
 
-import hermes_cli.main as cli_main
-from hermes_cli import update_cmd, update_cmd_stash
+import eir_cli.main as cli_main
+from eir_cli import update_cmd, update_cmd_stash
 
 
 def _git(cwd, *args):

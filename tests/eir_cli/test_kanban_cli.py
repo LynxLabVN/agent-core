@@ -1,4 +1,4 @@
-"""Tests for the kanban CLI surface (hermes_cli.kanban)."""
+"""Tests for the kanban CLI surface (eir_cli.kanban)."""
 
 from __future__ import annotations
 
@@ -9,16 +9,16 @@ from pathlib import Path
 
 import pytest
 
-from hermes_cli import kanban as kc
-from hermes_cli import kanban_db as kb
-from hermes_cli import kanban_db_connect as kbc
+from eir_cli import kanban as kc
+from eir_cli import kanban_db as kb
+from eir_cli import kanban_db_connect as kbc
 
 
 @pytest.fixture
 def kanban_home(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     kb.init_db()
     return home
@@ -43,8 +43,8 @@ def kanban_home(tmp_path, monkeypatch):
 def test_kanban_list_json_includes_session_id(kanban_home):
     """JSON output exposes `session_id` so external clients (Scarf, web
     dashboards) don't need a side query to filter by chat session."""
-    from hermes_cli import kanban_db as kb
-    from hermes_cli import kanban_db_connect as kbc
+    from eir_cli import kanban_db as kb
+    from eir_cli import kanban_db_connect as kbc
     with kbc.connect() as conn:
         kb.create_task(
             conn, title="acp task", assignee="alice", session_id="acp-x"
@@ -162,8 +162,8 @@ def test_worker_link_preserves_foreign_child_rules(kanban_home, monkeypatch):
         running_child = kb.create_task(conn, title="foreign running child")
         assert kb.claim_task(conn, running_child, claimer="other") is not None
 
-    monkeypatch.setenv("HERMES_KANBAN_TASK", worker)
-    monkeypatch.setenv("HERMES_KANBAN_RUN_ID", str(worker_run_id))
+    monkeypatch.setenv("EIR_KANBAN_TASK", worker)
+    monkeypatch.setenv("EIR_KANBAN_RUN_ID", str(worker_run_id))
 
     assert kc._cmd_link(argparse.Namespace(
         parent_id=parent, child_id=ready_child,
@@ -173,7 +173,7 @@ def test_worker_link_preserves_foreign_child_rules(kanban_home, monkeypatch):
             parent_id=parent, child_id=running_child,
         ))
     # Owner handoff: the worker links its own running card, proving ownership
-    # with HERMES_KANBAN_RUN_ID — the one path _cmd_link forwards a run id for.
+    # with EIR_KANBAN_RUN_ID — the one path _cmd_link forwards a run id for.
     assert kc._cmd_link(argparse.Namespace(
         parent_id=parent, child_id=worker,
     )) == 0
@@ -188,7 +188,7 @@ def test_board_override_is_isolated_per_concurrent_call(kanban_home, monkeypatch
     kb.create_board("alpha")
     kb.create_board("beta")
 
-    parser = argparse.ArgumentParser(prog="hermes", add_help=False)
+    parser = argparse.ArgumentParser(prog="eir", add_help=False)
     sub = parser.add_subparsers(dest="command")
     kc.build_parser(sub)
 
@@ -247,7 +247,7 @@ def test_run_slash_reclaim_running_task(kanban_home):
     import re
     import time
     import secrets
-    from hermes_cli import kanban_db_connect as kbc
+    from eir_cli import kanban_db_connect as kbc
 
     out1 = kc.run_slash("create 'stuck worker task' --assignee broken-model")
     m = re.search(r"(t_[a-f0-9]+)", out1)

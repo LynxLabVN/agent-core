@@ -1,4 +1,4 @@
-"""Idle-exit for Desktop-owned ``hermes serve --isolated`` backends reached over SSH (#101626).
+"""Idle-exit for Desktop-owned ``eir serve --isolated`` backends reached over SSH (#101626).
 
 That backend is deliberately detached (``setsid``/``nohup``, PPID 1) so it survives the SSH channel
 closing, and every teardown path lives on the CLIENT. A laptop that sleeps mid-session (dark wake
@@ -115,7 +115,7 @@ def busy_ledger() -> Optional[str]:
     global _probe_failure_logged
     try:
         import tui_gateway.server as gateway
-        from hermes_cli.backend_retirement import retirement
+        from eir_cli.backend_retirement import retirement
 
         if retirement.active_count():
             return "retirement_admission"

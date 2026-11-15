@@ -15,15 +15,15 @@ import tarfile
 
 import pytest
 
-from hermes_cli.profiles import export_profile
+from eir_cli.profiles import export_profile
 
 pytestmark = pytest.mark.platforms("posix")  # Unix sockets and FIFOs are not available on Windows
 
 
 def _patch_named_profile(monkeypatch, profiles_root, profile_dir):
-    monkeypatch.setattr("hermes_cli.profiles._get_profiles_root", lambda: profiles_root)
-    monkeypatch.setattr("hermes_cli.profiles.get_profile_dir", lambda n: profile_dir)
-    monkeypatch.setattr("hermes_cli.profiles.validate_profile_name", lambda n: None)
+    monkeypatch.setattr("eir_cli.profiles._get_profiles_root", lambda: profiles_root)
+    monkeypatch.setattr("eir_cli.profiles.get_profile_dir", lambda n: profile_dir)
+    monkeypatch.setattr("eir_cli.profiles.validate_profile_name", lambda n: None)
 
 
 def _bind_unix_socket(monkeypatch, path):
@@ -70,7 +70,7 @@ def test_named_profile_export_survives_unix_socket(tmp_path, monkeypatch):
 
 def test_default_profile_export_survives_unix_socket(tmp_path, monkeypatch):
     """The default-profile export skips suffixless sockets in allowed dirs."""
-    profile_dir = tmp_path / "hermes_home"
+    profile_dir = tmp_path / "eir_home"
     sessions_dir = profile_dir / "sessions"
     sessions_dir.mkdir(parents=True)
 

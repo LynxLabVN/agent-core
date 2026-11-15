@@ -3,14 +3,14 @@
 The sign-in page (``dashboard_auth/login_page.py``) loads its brand fonts from ``/fonts/``. Those
 files ship in the dashboard's ``web/public`` tree, which the dashboard build copies into its own
 dist, but the Webapp serves ``apps/desktop/dist-webapp`` and has no ``fonts/`` dir. A font missing
-from the served dist is read from the packaged dashboard dist (``HERMES_WEB_DIST`` / ``web_dist``,
+from the served dist is read from the packaged dashboard dist (``EIR_WEB_DIST`` / ``web_dist``,
 which is all a Nix or wheel install ships, since those exclude ``web/``), then from a source
 checkout's ``web/public``.
 """
 from __future__ import annotations
 
 from pathlib import Path
-from hermes_cli._startup_fast import project_root_str
+from eir_cli._startup_fast import project_root_str
 
 # Requests under these prefixes are files, never client-side routes, so a miss is a 404 rather
 # than the SPA shell (a font answered with HTML renders in a fallback face, silently).

@@ -2,7 +2,7 @@
 
 Every acquisition of an entry's pool (main runtime, auxiliary clients, a delegated child, the
 primary restored after a fallback) takes the same origin-bound view, so a key added through
-``hermes auth add`` or the dashboard, or a built-in's seeded account, never follows the entry to a
+``eir auth add`` or the dashboard, or a built-in's seeded account, never follows the entry to a
 new host.
 """
 
@@ -16,17 +16,17 @@ BUILTIN = "sk-deepseek-builtin-0123456789"
 
 
 @pytest.fixture
-def client(_isolate_hermes_home):
+def client(_isolate_eir_home):
     from starlette.testclient import TestClient
 
-    from hermes_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
+    from eir_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
     c = TestClient(app)
     c.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
     return c
 
 
 def _entry(name="myep", **fields):
-    from hermes_cli.config import load_config, save_config
+    from eir_cli.config import load_config, save_config
     cfg = load_config()
     cfg["providers"] = {name: {"name": name, "base_url": OLD, "model": "m", "models": {"m": {}}, **fields}}
     save_config(cfg)
@@ -38,13 +38,13 @@ def _move(client, name="myep", **extra):
 
 
 def _main_key(requested="custom:myep"):
-    from hermes_cli.runtime_provider import resolve_runtime_provider
+    from eir_cli.runtime_provider import resolve_runtime_provider
     return str(resolve_runtime_provider(requested=requested).get("api_key"))
 
 
 def _bare_key_at_new():
-    from hermes_cli.config import load_config, save_config
-    from hermes_cli.runtime_provider import resolve_runtime_provider
+    from eir_cli.config import load_config, save_config
+    from eir_cli.runtime_provider import resolve_runtime_provider
     cfg = load_config()
     cfg["model"] = {"provider": "custom", "base_url": NEW, "default": "m"}
     save_config(cfg)
@@ -76,8 +76,8 @@ def _restore_pool_keys(base_url, requested="custom:myep"):
 
 
 def _stored_rows(key):
-    from hermes_constants import get_hermes_home
-    return json.loads((get_hermes_home() / "auth.json").read_text())["credential_pool"][key]
+    from eir_constants import get_eir_home
+    return json.loads((get_eir_home() / "auth.json").read_text())["credential_pool"][key]
 
 
 def test_dashboard_added_key_stays_on_its_origin_after_a_desktop_move(client):
@@ -105,30 +105,30 @@ def test_key_added_for_a_builtin_named_proxy_entry_records_the_proxy(client, nam
     assert _main_key(f"custom:{name}") == POOLED
 
 
-def test_anthropic_oauth_token_is_bound_to_anthropic_even_with_a_proxy_entry(_isolate_hermes_home, monkeypatch):
+def test_anthropic_oauth_token_is_bound_to_anthropic_even_with_a_proxy_entry(_isolate_eir_home, monkeypatch):
     """The Anthropic browser login mints the token at Anthropic: a providers.anthropic proxy never gets it."""
     from types import SimpleNamespace
 
-    from hermes_cli.auth import PROVIDER_REGISTRY
-    from hermes_cli.auth_commands import auth_add_command
+    from eir_cli.auth import PROVIDER_REGISTRY
+    from eir_cli.auth_commands import auth_add_command
     _entry("anthropic")
-    monkeypatch.setattr("agent.anthropic_credentials.run_hermes_oauth_login_pure",
+    monkeypatch.setattr("agent.anthropic_credentials.run_eir_oauth_login_pure",
                         lambda *_a, **_k: {"access_token": POOLED, "refresh_token": "r", "expires_at_ms": 4102444800000})
     auth_add_command(SimpleNamespace(provider="anthropic", auth_type="oauth", api_key=None,
                                      label="browser", timeout=None, no_browser=True))
-    assert [r.get("base_url") for r in _stored_rows("anthropic") if r.get("source") == "manual:hermes_pkce"] == [
+    assert [r.get("base_url") for r in _stored_rows("anthropic") if r.get("source") == "manual:eir_pkce"] == [
         PROVIDER_REGISTRY["anthropic"].inference_base_url]
     assert _main_key("custom:anthropic") != POOLED
 
 
-def test_openrouter_pkce_key_is_bound_to_openrouter_even_with_a_proxy_entry(_isolate_hermes_home, monkeypatch):
+def test_openrouter_pkce_key_is_bound_to_openrouter_even_with_a_proxy_entry(_isolate_eir_home, monkeypatch):
     """The browser login mints the key at openrouter.ai: it is never the proxy's key."""
     from types import SimpleNamespace
 
-    from hermes_cli.auth_commands import auth_add_command
-    from hermes_constants import OPENROUTER_BASE_URL
+    from eir_cli.auth_commands import auth_add_command
+    from eir_constants import OPENROUTER_BASE_URL
     _entry("openrouter")
-    monkeypatch.setattr("hermes_cli.auth._openrouter_pkce_login", lambda **_kw: {"api_key": POOLED})
+    monkeypatch.setattr("eir_cli.auth._openrouter_pkce_login", lambda **_kw: {"api_key": POOLED})
     auth_add_command(SimpleNamespace(provider="openrouter", auth_type="oauth", api_key=None,
                                      label="browser", timeout=None, no_browser=True))
     assert [r.get("base_url") for r in _stored_rows("openrouter")
@@ -153,9 +153,9 @@ def test_cli_added_key_reaches_no_aux_delegate_or_restore_path_after_a_move(clie
 def test_unrecorded_legacy_row_is_bound_to_the_entry_address_and_left_behind_by_a_move(client):
     """A manual row written before writers recorded an address is bound to the entry's address on
     first use (persisted once), and the move guard treats it as the old host's credential."""
-    from hermes_constants import get_hermes_home
+    from eir_constants import get_eir_home
     _entry()
-    (get_hermes_home() / "auth.json").write_text(json.dumps({"version": 1, "providers": {}, "credential_pool": {
+    (get_eir_home() / "auth.json").write_text(json.dumps({"version": 1, "providers": {}, "credential_pool": {
         "myep": [{"id": "leg001", "label": "old", "auth_type": "api_key", "priority": 0,
                   "source": "manual", "access_token": POOLED}]}}), encoding="utf-8")
 
@@ -169,9 +169,9 @@ def test_unrecorded_legacy_row_is_bound_to_the_entry_address_and_left_behind_by_
 @pytest.mark.parametrize("stored", [{}, {"extra_headers": {"X-Org": "a"}}, {"key_env": "MYEP_OLD_KEY"}])
 def test_unrecorded_legacy_row_is_bound_by_the_move_guard_even_if_never_used(client, stored):
     """Config credentials on the entry must not skip the binding, or the row follows the move."""
-    from hermes_constants import get_hermes_home
+    from eir_constants import get_eir_home
     _entry(**stored)
-    (get_hermes_home() / "auth.json").write_text(json.dumps({"version": 1, "providers": {}, "credential_pool": {
+    (get_eir_home() / "auth.json").write_text(json.dumps({"version": 1, "providers": {}, "credential_pool": {
         "myep": [{"id": "leg002", "label": "old", "auth_type": "api_key", "priority": 0,
                   "source": "manual", "access_token": POOLED}]}}), encoding="utf-8")
     assert _move(client, api_key="").status_code == 200
@@ -180,7 +180,7 @@ def test_unrecorded_legacy_row_is_bound_by_the_move_guard_even_if_never_used(cli
 
 
 def test_builtin_seeded_row_never_follows_a_credential_less_moved_entry(client, monkeypatch):
-    from hermes_cli.config import save_env_value
+    from eir_cli.config import save_env_value
     _entry("deepseek", key_env="DEEPSEEK_API_KEY")
     save_env_value("DEEPSEEK_API_KEY", BUILTIN)
     monkeypatch.setenv("DEEPSEEK_API_KEY", BUILTIN)
@@ -199,7 +199,7 @@ def _add_row(key="myep", base_url=OLD):
 
 
 def _set(**sections):
-    from hermes_cli.config import load_config, save_config
+    from eir_cli.config import load_config, save_config
     cfg = load_config()
     cfg.update(sections)
     save_config(cfg)
@@ -275,7 +275,7 @@ def test_switch_model_onto_a_moved_bare_slug_reloads_no_old_origin_row(client, m
 
 
 @pytest.mark.parametrize("provider", ["custom:myep", "myep"])
-def test_aux_task_base_url_override_never_receives_the_entry_origin_key(_isolate_hermes_home, provider):
+def test_aux_task_base_url_override_never_receives_the_entry_origin_key(_isolate_eir_home, provider):
     from agent.credential_pool import load_pool
     from agent.custom_entry_pool import pool_for_aux_provider
     _entry()
@@ -288,14 +288,14 @@ def test_aux_task_base_url_override_never_receives_the_entry_origin_key(_isolate
     assert POOLED in {e.access_token for e in pool_for_aux_provider(provider, "myep", load_pool, OLD).entries()}
 
 
-def test_resolving_a_same_named_entry_never_moves_the_builtin_pool_to_the_entry_host(_isolate_hermes_home, monkeypatch):
+def test_resolving_a_same_named_entry_never_moves_the_builtin_pool_to_the_entry_host(_isolate_eir_home, monkeypatch):
     """A built-in's manual row with no recorded address belongs to the built-in's own address: a
     ``providers.deepseek`` proxy entry neither stamps it with the proxy URL nor sends it there."""
-    from hermes_constants import get_hermes_home
-    from hermes_cli.runtime_provider import resolve_runtime_provider
+    from eir_constants import get_eir_home
+    from eir_cli.runtime_provider import resolve_runtime_provider
     proxy = "https://proxy.example/v1"
     monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
-    (get_hermes_home() / "auth.json").write_text(json.dumps({"version": 1, "providers": {}, "credential_pool": {
+    (get_eir_home() / "auth.json").write_text(json.dumps({"version": 1, "providers": {}, "credential_pool": {
         "deepseek": [{"id": "dash01", "label": "dash", "auth_type": "api_key", "priority": 0,
                       "source": "manual", "access_token": BUILTIN}]}}), encoding="utf-8")
     builtin = resolve_runtime_provider(requested="deepseek")
@@ -312,24 +312,24 @@ def test_resolving_a_same_named_entry_never_moves_the_builtin_pool_to_the_entry_
 
 
 @pytest.mark.parametrize("key_env", [None, "ENTRY_KEY_VAR"])
-def test_delegated_child_on_a_builtin_named_entry_leases_no_builtin_key(_isolate_hermes_home, monkeypatch, key_env):
+def test_delegated_child_on_a_builtin_named_entry_leases_no_builtin_key(_isolate_eir_home, monkeypatch, key_env):
     """``delegation.provider: deepseek`` with a ``providers.deepseek`` proxy: the child keeps the bare
     slug, whose pool is also the built-in's. Its startup lease must not bind the built-in's
     dashboard row or env key to the proxy, nor replace the entry's own key_env credential."""
     from types import SimpleNamespace
 
-    from hermes_constants import get_hermes_home
+    from eir_constants import get_eir_home
     from tools.delegate_tool_child_run import _lease_child_credential
     from tools.delegate_tool_config import _resolve_child_credential_pool, _resolve_delegation_credentials
     proxy = "https://proxy.example/v1"
     monkeypatch.setenv("DEEPSEEK_API_KEY", BUILTIN)
     monkeypatch.setenv("ENTRY_KEY_VAR", "sk-entry-0123456789")
-    (get_hermes_home() / "auth.json").write_text(json.dumps({"version": 1, "providers": {}, "credential_pool": {
+    (get_eir_home() / "auth.json").write_text(json.dumps({"version": 1, "providers": {}, "credential_pool": {
         "deepseek": [{"id": "dash01", "label": "dash", "auth_type": "api_key", "priority": 0,
                       "source": "manual", "access_token": POOLED}]}}), encoding="utf-8")
     _entry("deepseek", base_url=proxy, **({"key_env": key_env} if key_env else {}))
     _set(delegation={"provider": "deepseek", "model": "m"})
-    from hermes_cli.config import load_config
+    from eir_cli.config import load_config
     parent = SimpleNamespace(provider="openrouter", requested_provider="openrouter", base_url="", _credential_pool=None, model="m")
 
     creds = _resolve_delegation_credentials(load_config()["delegation"], parent)

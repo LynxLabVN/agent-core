@@ -1,8 +1,8 @@
-"""``hermes -z`` exit-code contract: the outcome is judged from the turn result, not from
+"""``eir -z`` exit-code contract: the outcome is judged from the turn result, not from
 whether any text was printed (#111770 — an incomplete or failed run that left an explanation on
 stdout used to exit 0, so scripts treated a half-done job as success)."""
 
-from hermes_cli import oneshot
+from eir_cli import oneshot
 
 
 def _run(monkeypatch, tmp_path, response, result):

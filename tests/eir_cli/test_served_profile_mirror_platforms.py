@@ -16,26 +16,26 @@ import pytest
 
 @pytest.fixture
 def served_root(tmp_path, monkeypatch):
-    root = tmp_path / "hermes"
+    root = tmp_path / "eir"
     (root / "profiles" / "alpha").mkdir(parents=True)
     (root / "config.yaml").write_text("gateway: {multiplex_profiles: true}\n", encoding="utf-8")
-    (root / "gateway.pid").write_text(json.dumps({"pid": os.getpid(), "hermes_home": str(root)}), encoding="utf-8")
+    (root / "gateway.pid").write_text(json.dumps({"pid": os.getpid(), "eir_home": str(root)}), encoding="utf-8")
     (root / "gateway_state.json").write_text(json.dumps({
-        "pid": os.getpid(), "hermes_home": str(root), "gateway_state": "running",
+        "pid": os.getpid(), "eir_home": str(root), "gateway_state": "running",
         "served_profiles": ["default", "alpha", "beta"],
         "platforms": {
             "api_server": {"state": "connected", "listener_base": "http://127.0.0.1:45719"},
             "webhook": {"state": "fatal", "error_code": "port_in_use"},
             "alpha:telegram": {"state": "connected"},
         }}), encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(root))
+    monkeypatch.setenv("EIR_HOME", str(root))
     monkeypatch.delenv("GATEWAY_MULTIPLEX_PROFILES", raising=False)
-    import hermes_constants
+    import eir_constants
     from gateway import status
     # Liveness is a verified identity; this pytest process passes as the default gateway only by
     # wearing a gateway command line.
-    monkeypatch.setattr(status, "_read_process_cmdline", lambda pid: "hermes gateway run")
-    monkeypatch.setattr(hermes_constants, "_default_hermes_root_memo", None)
+    monkeypatch.setattr(status, "_read_process_cmdline", lambda pid: "eir gateway run")
+    monkeypatch.setattr(eir_constants, "_default_eir_root_memo", None)
     return root
 
 
@@ -44,7 +44,7 @@ def test_messaging_card_shows_mirrored_api_server_enabled_without_local_config(s
     409s: the shared listener already serves ``/p/<profile>/v1``), so the REAL enablement
     reads (False, False) from its own empty config and the card printed Disabled over a
     live mirror. No ``_platform_enablement`` monkeypatch here: that mask hid the bug."""
-    from hermes_cli.web_routers import messaging
+    from eir_cli.web_routers import messaging
     entry = {"id": "api_server", "name": "API server", "description": "", "docs_url": "", "env_vars": [],
              "required_env": []}
     alpha = served_root / "profiles" / "alpha"
@@ -96,28 +96,28 @@ def test_default_profile_keeps_its_flat_adapters_when_rekeyed(served_root):
 
 def test_messaging_card_for_the_default_home_rekeys_by_the_profile_not_the_dirname(tmp_path, monkeypatch):
     """The multiplexer fold keys on the profile NAME; ``_platform_payloads`` used to pass
-    ``own_home.name`` — the directory basename, ``.hermes`` for the shipped default root or any
-    custom ``HERMES_HOME`` name, equal to the profile id only for secondaries under
+    ``own_home.name`` — the directory basename, ``.eir`` for the shipped default root or any
+    custom ``EIR_HOME`` name, equal to the profile id only for secondaries under
     ``profiles/<name>``. On the default home the fold came back empty and the Channels card read
     "Restart needed" forever while the multiplexer served its flat-keyed adapters (#123088)."""
     from gateway import status
-    from hermes_cli.web_routers import messaging
-    root = tmp_path / ".hermes"  # the shipped default root's literal name — never equal to "default"
+    from eir_cli.web_routers import messaging
+    root = tmp_path / ".eir"  # the shipped default root's literal name — never equal to "default"
     root.mkdir()
     (root / "config.yaml").write_text("gateway: {multiplex_profiles: true}\n", encoding="utf-8")
     record = {
-        "pid": os.getpid(), "hermes_home": str(root), "gateway_state": "running",
+        "pid": os.getpid(), "eir_home": str(root), "gateway_state": "running",
         "served_profiles": ["default", "route-runner"],
         "platforms": {"telegram": {"state": "connected"}},
     }
-    monkeypatch.setenv("HERMES_HOME", str(root))
-    import hermes_constants
-    monkeypatch.setattr(hermes_constants, "_default_hermes_root_memo", None)
+    monkeypatch.setenv("EIR_HOME", str(root))
+    import eir_constants
+    monkeypatch.setattr(eir_constants, "_default_eir_root_memo", None)
     # A launch-service gateway's record fails the own-rung argv check (inline ``-c``), so the card
     # falls through to the multiplexer rung — mirrored here by an absent own record.
     monkeypatch.setattr(messaging, "read_runtime_status", lambda *a, **k: None)
     monkeypatch.setattr(status, "multiplexer_liveness_for_profile", lambda home: (os.getpid(), record))
-    monkeypatch.setattr(status, "_read_process_cmdline", lambda pid: "hermes gateway run")
+    monkeypatch.setattr(status, "_read_process_cmdline", lambda pid: "eir gateway run")
     monkeypatch.setattr(messaging, "_platform_enablement", lambda *a, **k: (True, True, None))
     entry = {"id": "telegram", "name": "Telegram", "description": "", "docs_url": "", "env_vars": [],
              "required_env": []}
@@ -127,7 +127,7 @@ def test_messaging_card_for_the_default_home_rekeys_by_the_profile_not_the_dirna
 
 
 def test_messaging_card_for_a_served_profile_reads_connected_not_restart_needed(served_root, monkeypatch):
-    from hermes_cli.web_routers import messaging
+    from eir_cli.web_routers import messaging
     monkeypatch.setattr(messaging, "_platform_enablement", lambda *a, **k: (True, True, None))
     entry = {"id": "api_server", "name": "API server", "description": "", "docs_url": "", "env_vars": [],
              "required_env": []}
@@ -143,7 +143,7 @@ def test_messaging_card_ignores_a_served_profiles_stale_own_runtime_record(serve
     pre-multiplex or standalone run (``stopped``, empty platforms) used to shadow the multiplexer's
     record: the fallback only ran when the file was missing, the bare-key lookup found nothing, and
     the card read "Restart needed" forever for a platform that was connected (#112765)."""
-    from hermes_cli.web_routers import messaging
+    from eir_cli.web_routers import messaging
     monkeypatch.setattr(messaging, "_platform_enablement", lambda *a, **k: (True, True, None))
     entry = {"id": "telegram", "name": "Telegram", "description": "", "docs_url": "", "env_vars": [],
              "required_env": []}
@@ -168,19 +168,19 @@ def test_messaging_card_keeps_a_live_own_gateway_record_over_the_multiplexer(ser
     own record (rung 3) before the multiplexer (rung 4); the card must read the same record, or
     liveness and platform state come from two different gateways."""
     from gateway import status
-    from hermes_cli.web_routers import messaging
+    from eir_cli.web_routers import messaging
     monkeypatch.setattr(messaging, "_platform_enablement", lambda *a, **k: (True, True, None))
     alpha = served_root / "profiles" / "alpha"
     # Two live gateways: this process is the default multiplexer; a second (fake, never signalled)
     # PID wears alpha's argv. Only the live guard sees a foreign PID, so existence is stubbed.
     own_pid = 2 ** 22 - 1
     (alpha / "gateway_state.json").write_text(json.dumps({
-        "pid": own_pid, "hermes_home": str(alpha), "gateway_state": "running",
+        "pid": own_pid, "eir_home": str(alpha), "gateway_state": "running",
         "platforms": {"telegram": {"state": "retrying", "error_code": "network"}}}), encoding="utf-8")
     real_pid_exists = status._pid_exists
     monkeypatch.setattr(status, "_pid_exists", lambda pid: pid == own_pid or real_pid_exists(pid))
     monkeypatch.setattr(status, "_read_process_cmdline",
-                        lambda pid: "hermes -p alpha gateway run" if pid == own_pid else "hermes gateway run")
+                        lambda pid: "eir -p alpha gateway run" if pid == own_pid else "eir gateway run")
     assert status.multiplexer_liveness_for_profile(alpha) is not None
     entry = {"id": "telegram", "name": "Telegram", "description": "", "docs_url": "", "env_vars": [],
              "required_env": []}
@@ -204,7 +204,7 @@ def test_served_profile_mirrors_the_default_relay(served_root, monkeypatch, rela
     read the default's live state, not fall through to ``pending_restart`` ("Restart needed"
     forever for a channel that is answering), and the profile's own enable/disable still decides."""
     from gateway.status import profile_platforms_from_multiplexer, resolve_gateway_liveness
-    from hermes_cli.web_routers import messaging
+    from eir_cli.web_routers import messaging
     if relay_url:
         monkeypatch.setenv("GATEWAY_RELAY_URL", relay_url)
     else:
@@ -239,7 +239,7 @@ def test_served_profile_reads_a_dead_default_relay_as_its_own_failure(
 ):
     """The default's Relay adapter serves every profile, so when it is fatal the served profile's
     Relay is too: show that failure, not "Restart needed" (a restart of the profile changes nothing)."""
-    from hermes_cli.web_routers import messaging
+    from eir_cli.web_routers import messaging
     monkeypatch.setenv("GATEWAY_RELAY_URL", "https://connector.example")
     record = json.loads((served_root / "gateway_state.json").read_text(encoding="utf-8"))
     record["platforms"]["relay"] = {"state": "fatal", "error_code": "relay_auth_failed",

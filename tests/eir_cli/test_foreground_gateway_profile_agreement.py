@@ -9,33 +9,33 @@ from pathlib import Path
 
 import pytest
 
-from hermes_cli.container_boot import reconcile_profile_gateways
+from eir_cli.container_boot import reconcile_profile_gateways
 
 
 @pytest.mark.parametrize("flag", ["--no-supervise", "--no-supervis"])
 def test_sticky_standalone_profile_foreground_run_is_served_once(tmp_path, monkeypatch, flag):
-    root = tmp_path / ".hermes"
+    root = tmp_path / ".eir"
     solo = root / "profiles" / "solo"
     solo.mkdir(parents=True)
     (solo / "SOUL.md").write_text("x", encoding="utf-8")
     (solo / "config.yaml").write_text("gateway:\n  standalone: true\n", encoding="utf-8")
     (solo / "gateway_state.json").write_text(json.dumps({"desired_state": "running"}), encoding="utf-8")
     (root / "active_profile").write_text("solo", encoding="utf-8")
-    for var in ("HERMES_GATEWAY_NO_SUPERVISE", "HERMES_SUPERVISED_CHILD", "HERMES_S6_SUPERVISED_CHILD",
-                "INVOCATION_ID", "HERMES_GATEWAY_EXTERNAL_SUPERVISOR", "HERMES_GATEWAY_PROFILE_PIN"):
+    for var in ("EIR_GATEWAY_NO_SUPERVISE", "EIR_SUPERVISED_CHILD", "EIR_S6_SUPERVISED_CHILD",
+                "INVOCATION_ID", "EIR_GATEWAY_EXTERNAL_SUPERVISOR", "EIR_GATEWAY_PROFILE_PIN"):
         monkeypatch.delenv(var, raising=False)
     cmd = ["gateway", "run", flag]
 
-    actions = reconcile_profile_gateways(hermes_home=root, scandir=tmp_path / "scan",
-                                         container_argv=["/init", "/opt/hermes/docker/main-wrapper.sh", *cmd])
+    actions = reconcile_profile_gateways(eir_home=root, scandir=tmp_path / "scan",
+                                         container_argv=["/init", "/opt/eir/docker/main-wrapper.sh", *cmd])
     assert [a.action for a in actions if a.profile == "solo"] == ["registered"]  # boot: the CMD serves solo
 
-    monkeypatch.setattr("hermes_constants._get_platform_default_hermes_home", lambda: root)
+    monkeypatch.setattr("eir_constants._get_platform_default_eir_home", lambda: root)
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setattr("hermes_cli.service_manager._s6_running", lambda: True)
-    monkeypatch.setenv("HERMES_HOME", str(root))
-    monkeypatch.setattr(sys, "argv", ["hermes", *cmd])
-    from hermes_cli.main import _apply_profile_override
+    monkeypatch.setattr("eir_cli.service_manager._s6_running", lambda: True)
+    monkeypatch.setenv("EIR_HOME", str(root))
+    monkeypatch.setattr(sys, "argv", ["eir", *cmd])
+    from eir_cli.main import _apply_profile_override
     _apply_profile_override()
 
-    assert os.environ["HERMES_HOME"] == str(solo)  # the command really runs solo
+    assert os.environ["EIR_HOME"] == str(solo)  # the command really runs solo

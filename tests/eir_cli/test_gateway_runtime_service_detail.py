@@ -18,18 +18,18 @@ import pytest
 def _installed_vbs(home, configured, *, extra_env="", extra_line=""):
     script = home / "gateway.vbs"
     script.write_text("\n".join([
-        "' Hermes Agent Gateway", "Option Explicit", "Dim sh, env, existing_pp",
+        "' Eir Agent Gateway", "Option Explicit", "Dim sh, env, existing_pp",
         'Set sh = CreateObject("WScript.Shell")', 'Set env = sh.Environment("PROCESS")',
-        f'env.Item("HERMES_HOME") = "{configured}"',
-        'env.Item("HERMES_SUPERVISED_CHILD") = "1"',
+        f'env.Item("EIR_HOME") = "{configured}"',
+        'env.Item("EIR_SUPERVISED_CHILD") = "1"',
         *([f'env.Item("{extra_env}") = "1"'] if extra_env else []),
         *([extra_line] if extra_line else []),
-        'env.Item("VIRTUAL_ENV") = "C:\\\\Hermes"',
+        'env.Item("VIRTUAL_ENV") = "C:\\\\Eir"',
         'existing_pp = env.Item("PYTHONPATH")', 'If Len(existing_pp) > 0 Then',
-        '  env.Item("PYTHONPATH") = "C:\\\\Hermes;" & existing_pp', 'Else',
-        '  env.Item("PYTHONPATH") = "C:\\\\Hermes"', 'End If',
+        '  env.Item("PYTHONPATH") = "C:\\\\Eir;" & existing_pp', 'Else',
+        '  env.Item("PYTHONPATH") = "C:\\\\Eir"', 'End If',
         f'sh.CurrentDirectory = "{home}"',
-        f'sh.Run "{sys.executable} -m hermes_cli.main gateway run", 0, False',
+        f'sh.Run "{sys.executable} -m eir_cli.main gateway run", 0, False',
     ]) + "\n", encoding="utf-8")
     return script
 
@@ -37,15 +37,15 @@ def _installed_vbs(home, configured, *, extra_env="", extra_line=""):
 def _windows_refusal(tmp_path, monkeypatch, *, xml_rc=0, whoami=None, launcher_env="", run_level="",
                      launcher_home=None, launcher_line="", launcher_edit=None,
                      xml_error="ERROR: Access is denied.\r\n"):
-    from hermes_cli import gateway_runtime_service as service
-    from hermes_cli.gateway_windows import _build_scheduled_task_xml
+    from eir_cli import gateway_runtime_service as service
+    from eir_cli.gateway_windows import _build_scheduled_task_xml
 
     home = tmp_path / "profile"
     home.mkdir()
     script = _installed_vbs(home, str(launcher_home or home), extra_env=launcher_env, extra_line=launcher_line)
     if launcher_edit:
         script.write_text(script.read_text(encoding="utf-8").replace(*launcher_edit), encoding="utf-8")
-    name = "Hermes_Gateway_" + service.service_suffix(home)
+    name = "Eir_Gateway_" + service.service_suffix(home)
     account, sid = "DESKTOP-1\\owner", "S-1-5-21-123"
     xml = _build_scheduled_task_xml(name, script, account)
     if run_level:
@@ -81,14 +81,14 @@ def test_an_unexpected_whoami_answer_is_named(tmp_path, monkeypatch):
 @pytest.mark.parametrize("case,needles", [
     ("elevated", ["RunLevel", "HighestAvailable"]),
     ("launcher_env", ["PYTHONSTARTUP"]),
-    ("foreign_home", ["another Hermes home", "elsewhere"]),
+    ("foreign_home", ["another Eir home", "elsewhere"]),
 ])
 def test_a_task_that_breaks_a_rule_names_the_rule(case, needles, tmp_path, monkeypatch):
     refused = _windows_refusal(
         tmp_path, monkeypatch,
         run_level="HighestAvailable" if case == "elevated" else "",
         launcher_env="PYTHONSTARTUP" if case == "launcher_env" else "",
-        launcher_home=tmp_path / "elsewhere" / ".hermes" if case == "foreign_home" else None,
+        launcher_home=tmp_path / "elsewhere" / ".eir" if case == "foreign_home" else None,
     )
     assert refused.reason == "service_identity_unverified"
     assert all(needle in refused.detail for needle in needles), refused.detail
@@ -130,8 +130,8 @@ def test_a_broken_launcher_tail_names_the_line_that_broke(edit, number, needle, 
 
 def test_child_output_in_a_refusal_is_redacted(tmp_path, monkeypatch):
     refused = _windows_refusal(tmp_path, monkeypatch, xml_rc=1,
-                               xml_error=f"HERMES_API_KEY={_OPAQUE} rejected\r\n")
-    assert "/XML exited 1" in refused.detail and "HERMES_API_KEY=" in refused.detail, refused.detail
+                               xml_error=f"EIR_API_KEY={_OPAQUE} rejected\r\n")
+    assert "/XML exited 1" in refused.detail and "EIR_API_KEY=" in refused.detail, refused.detail
     assert _OPAQUE not in refused.detail, refused.detail
 
 
@@ -142,22 +142,22 @@ def test_child_output_in_a_refusal_is_redacted(tmp_path, monkeypatch):
     ("environment_unreadable", ["show-environment exited 3", "Failed to connect to bus"]),
 ])
 def test_ensure_reports_which_unit_check_failed(case, needles, tmp_path, monkeypatch):
-    from hermes_cli import gateway as gw
-    from hermes_cli import gateway_runtime as runtime
-    from hermes_cli.gateway_runtime_service import service_suffix
+    from eir_cli import gateway as gw
+    from eir_cli import gateway_runtime as runtime
+    from eir_cli.gateway_runtime_service import service_suffix
 
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     home = tmp_path / "custom root"
     home.mkdir(mode=0o700)
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    unit = tmp_path / ".config/systemd/user" / f"hermes-gateway-{service_suffix(home)}.service"
+    monkeypatch.setenv("EIR_HOME", str(home))
+    unit = tmp_path / ".config/systemd/user" / f"eir-gateway-{service_suffix(home)}.service"
     unit.parent.mkdir(parents=True)
     unit.write_text("[Service]\n", encoding="utf-8")
-    command = "/bin/echo hermes_cli.main gateway run" if case == "wrong_command" else (
-        f"{sys.executable} -m hermes_cli.main gateway run")
+    command = "/bin/echo eir_cli.main gateway run" if case == "wrong_command" else (
+        f"{sys.executable} -m eir_cli.main gateway run")
     props = dict(LoadState="loaded", ActiveState="inactive", SubState="dead", UnitFileState="enabled",
                  User=str(os.getuid()), DynamicUser="yes" if case == "dynamic_user" else "no",
-                 Environment=f'"HERMES_HOME={home}" "HERMES_SUPERVISED_CHILD=1"',
+                 Environment=f'"EIR_HOME={home}" "EIR_SUPERVISED_CHILD=1"',
                  EnvironmentFiles="", PassEnvironment="", UnsetEnvironment="", PAMName="",
                  RootDirectory="", RootImage="", ExecStartPre="", ExecCondition="", DropInPaths="",
                  ExecStart=f"{{ path={command.split()[0]} ; argv[]={command} ; ignore_errors=no ; }}")

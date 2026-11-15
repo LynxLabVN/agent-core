@@ -24,7 +24,7 @@ _result: int | None = None
 # audit list is wider on purpose (helpers run *under* these frames and are found
 # by the frame walk).
 _HISTORICAL_UPDATE_FRAMES = (
-    ("hermes_cli.update_cmd", "hermes_cli.main"),
+    ("eir_cli.update_cmd", "eir_cli.main"),
     ("_cmd_update_impl", "cmd_update"),
 )
 
@@ -36,9 +36,9 @@ def _is_historical_update_frame(frame: Any) -> bool:
     module = frame.f_globals.get("__name__")
     if module in modules:
         return True
-    # `python -m hermes_cli.main update` runs the updater as `__main__`; releases from before
+    # `python -m eir_cli.main update` runs the updater as `__main__`; releases from before
     # update_cmd.py was split out keep cmd_update/_cmd_update_impl there. Recognize them by the
-    # file the code was compiled from: this checkout's own hermes_cli/main.py.
+    # file the code was compiled from: this checkout's own eir_cli/main.py.
     if module != "__main__":
         return False
     try:
@@ -51,7 +51,7 @@ def _is_historical_update_frame(frame: Any) -> bool:
 def in_historical_update() -> bool:
     """True when an ancestor frame is a historical updater entrypoint.
 
-    The current tree's updater sets ``_hermes_current_updater_frame`` in its
+    The current tree's updater sets ``_eir_current_updater_frame`` in its
     entrypoints; no historical on-disk version contains that local, so its
     presence proves the caller is current code that must keep running rather
     than hand control to a takeover child.
@@ -60,7 +60,7 @@ def in_historical_update() -> bool:
     try:
         while frame is not None:
             if (_is_historical_update_frame(frame)
-                    and "_hermes_current_updater_frame" not in frame.f_code.co_varnames):
+                    and "_eir_current_updater_frame" not in frame.f_code.co_varnames):
                 return True
             frame = frame.f_back
     finally:
@@ -97,7 +97,7 @@ def _historical_context() -> tuple[dict, list[dict], Any]:
             frame = frame.f_back
     finally:
         del frame
-    receipt_module = sys.modules.get("hermes_cli.update_receipt")
+    receipt_module = sys.modules.get("eir_cli.update_receipt")
     receipt_slot = vars(receipt_module).get("_current") if receipt_module else None
     get_current = getattr(receipt_slot, "get", None)
     current = get_current() if get_current is not None else receipt_slot
@@ -124,15 +124,15 @@ def _historical_context() -> tuple[dict, list[dict], Any]:
 def _run_child(request: dict) -> tuple[int, dict]:
     """One JSON exchange; the old process never imports the updated graph."""
     root = Path(__file__).resolve().parents[1]
-    home = os.environ.get("HERMES_HOME")
-    constants = sys.modules.get("hermes_constants")
-    # The running process may hold any historical hermes_constants: older ones keep the override in
-    # a module ContextVar, newer ones behind get_hermes_home_override() (the runtime scope state).
-    override = vars(constants).get("_HERMES_HOME_OVERRIDE") if constants else None
+    home = os.environ.get("EIR_HOME")
+    constants = sys.modules.get("eir_constants")
+    # The running process may hold any historical eir_constants: older ones keep the override in
+    # a module ContextVar, newer ones behind get_eir_home_override() (the runtime scope state).
+    override = vars(constants).get("_EIR_HOME_OVERRIDE") if constants else None
     if override is not None:
         value = override.get()
     else:
-        read_override = getattr(constants, "get_hermes_home_override", None) if constants else None
+        read_override = getattr(constants, "get_eir_home_override", None) if constants else None
         value = read_override() if callable(read_override) else None
     if isinstance(value, (str, Path)) and value:
         home = str(value)
@@ -140,20 +140,20 @@ def _run_child(request: dict) -> tuple[int, dict]:
     env = {key: value for key, value in os.environ.items()
            if not key.startswith(("PYTHON", "UV_")) and key != "VIRTUAL_ENV"}
     if home:
-        env["HERMES_HOME"] = home
-    env.setdefault("HERMES_UPDATE_HANDOFF_PID", str(os.getpid()))
+        env["EIR_HOME"] = home
+    env.setdefault("EIR_UPDATE_HANDOFF_PID", str(os.getpid()))
     # Everything the user saw so far came from the OLD updater; say so before the
     # new one (package manager) takes over, so logs show where the switch happened.
     # ASCII only, like every line printed before the child starts: a Windows pipe encodes this
     # process's stdout in the ANSI code page, and a non-cp1252 character raised here, before the
     # takeover ever ran (review S1).
     print("-> Handing off to the new updater (package manager) for the rest of this update...", flush=True)
-    with tempfile.TemporaryDirectory(prefix="hermes-update-takeover-") as directory:
+    with tempfile.TemporaryDirectory(prefix="eir-update-takeover-") as directory:
         context = Path(directory) / "request.json"
         result = Path(directory) / "result.json"
         context.write_text(json.dumps(request), encoding="utf-8")
         code = _run_in_custody(
-            [sys.executable, "-I", "-S", "-B", "-X", "utf8", str(root / "hermes_cli/_update_takeover.py"),
+            [sys.executable, "-I", "-S", "-B", "-X", "utf8", str(root / "eir_cli/_update_takeover.py"),
              str(context), str(result)], root, cwd=root, env=env,
         )
         completed = json.loads(result.read_text(encoding="utf-8-sig")) if result.is_file() else {}
@@ -168,7 +168,7 @@ def _run_in_custody(argv: list, root: Path, **kwargs) -> int:
     suspended, bound to this updater's kill-on-close job, then resumed; a refused bind still runs
     (the update committed) and the takeover joins the lock holding its own lease. Releases
     without these helpers hold no checkout lock, and the takeover acquires it itself."""
-    lock = sys.modules.get("hermes_cli.update_lock")
+    lock = sys.modules.get("eir_cli.update_lock")
     bind, resume = (getattr(lock, name, None) for name in ("bind_child_to_update_tree", "resume_suspended_child"))
     if os.name != "nt" or bind is None or resume is None or getattr(lock, "_HELD", None) is None:
         # Unbounded for the same reason as the Windows wait below (review L7): the takeover is
@@ -196,7 +196,7 @@ def _checkout_custody(root: Path) -> dict:
     """The takeover child keeps the checkout lock this (old) updater holds: its fd, read from the
     update_lock module ALREADY loaded in this process (nothing new is imported here). Releases
     without a checkout lock hold none, and the takeover acquires it itself."""
-    held = getattr(sys.modules.get("hermes_cli.update_lock"), "checkout_lock_fds", None)
+    held = getattr(sys.modules.get("eir_cli.update_lock"), "checkout_lock_fds", None)
     try:
         fds = tuple(held(root)) if held is not None and os.name == "posix" else ()
     except Exception:  # health: allow BLE001 -- any older release's checkout_lock_fds; no fds = takeover locks itself
@@ -214,12 +214,12 @@ def stop_for_relaunch(*, incomplete: bool = False) -> NoReturn:
         # A newly retired completion hook has no complete captured worklist.
         # It must not start another update or invent a successful receipt. It names its stop on
         # the receipt the loaded update_receipt keeps open (an older one lacks the call: no-op).
-        record = getattr(sys.modules.get("hermes_cli.update_receipt"), "record_stop_reason", None)
+        record = getattr(sys.modules.get("eir_cli.update_receipt"), "record_stop_reason", None)
         if record is not None:
             record("old_version_handoff")
         print(
-            "You're updating from an older version of Hermes Agent. "
-            "To complete this update, run `hermes update` again.",
+            "You're updating from an older version of Eir Agent. "
+            "To complete this update, run `eir update` again.",
             file=sys.stderr,
         )
         raise SystemExit(1)
@@ -237,7 +237,7 @@ def stop_for_relaunch(*, incomplete: bool = False) -> NoReturn:
             if hasattr(receipt_slot, "set"):
                 receipt_slot.set(None)
             elif receipt_slot is not None:
-                vars(sys.modules["hermes_cli.update_receipt"])["_current"] = None
+                vars(sys.modules["eir_cli.update_receipt"])["_current"] = None
     except (OSError, ValueError, TypeError) as exc:
         _result = 1
         print(f"Update takeover failed: {exc}", file=sys.stderr, flush=True)

@@ -1,4 +1,4 @@
-"""Gateway SSH connections: a ControlMaster tunnel to a remote ``hermes serve``.
+"""Gateway SSH connections: a ControlMaster tunnel to a remote ``eir serve``.
 
 Server-side port of Desktop's SSH attach path (``apps/desktop/electron/ssh-connection.ts`` +
 ``remote-lifecycle.ts``). ``ensure_tunnel`` opens (or reuses) a ControlMaster to the registry
@@ -20,7 +20,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from hermes_cli.gateway_connections_ssh_remote import (
+from eir_cli.gateway_connections_ssh_remote import (
     DEFAULT_READY_TIMEOUT_S,
     ConnectDeps,
     Connected,
@@ -28,7 +28,7 @@ from hermes_cli.gateway_connections_ssh_remote import (
     connect,
     disconnect_remote,
 )
-from hermes_cli.gateway_connections_ssh_transport import (
+from eir_cli.gateway_connections_ssh_transport import (
     SshConnection,
     SshEndpoint,
     SshReachError,
@@ -54,7 +54,7 @@ class SshTarget:
     remote_port: int
     pid: int
     reused: bool
-    hermes_version: str
+    eir_version: str
 
 
 @dataclass
@@ -80,20 +80,20 @@ def store_root(root: Path | None = None) -> Path:
     """The gateway-connections store root: a profile home names its root (ui_preferences rule)."""
     if root is not None:
         return Path(os.path.realpath(root))
-    from hermes_constants import get_hermes_home
+    from eir_constants import get_eir_home
 
-    home = Path(os.path.abspath(get_hermes_home()))
+    home = Path(os.path.abspath(get_eir_home()))
     return (home.parent.parent if home.parent.name.lower() == "profiles" else home).resolve()
 
 
 def ownership_id(root: Path, connection_id: str) -> str:
-    return hashlib.sha256(f"hermes-gateway-connections\0{root}\0{connection_id}".encode()).hexdigest()[:32]
+    return hashlib.sha256(f"eir-gateway-connections\0{root}\0{connection_id}".encode()).hexdigest()[:32]
 
 
 def _http_get(url: str, token: str = ""):
     import httpx
 
-    headers = {"X-Hermes-Session-Token": token} if token else {}
+    headers = {"X-Eir-Session-Token": token} if token else {}
     return httpx.get(url, headers=headers, timeout=_HTTP_TIMEOUT_S, trust_env=False)
 
 
@@ -133,13 +133,13 @@ def _endpoint(connection: dict, root: Path, oid: str) -> SshEndpoint:
 
 
 def _fingerprint(connection: dict) -> tuple:
-    return tuple(str(connection.get(k) or "") for k in ("host", "user", "port", "keyPath", "remoteHermesPath",
+    return tuple(str(connection.get(k) or "") for k in ("host", "user", "port", "keyPath", "remoteEirPath",
                                                          "remoteProfile"))
 
 
 def _target(tunnel: _Tunnel) -> SshTarget:
     c = tunnel.connected
-    return SshTarget(c.base_url, c.token, c.local_port, c.remote_port, c.pid, c.reused, c.hermes_version)
+    return SshTarget(c.base_url, c.token, c.local_port, c.remote_port, c.pid, c.reused, c.eir_version)
 
 
 def _live_reuse(tunnel: _Tunnel) -> bool:
@@ -194,7 +194,7 @@ def _bootstrap(connection: dict, root: Path, previous: _Tunnel | None) -> SshTar
         connected = connect(ConnectDeps(
             ssh=ssh, ownership_id=oid, pick_local_port=pick_local_port, wait_for_health=_wait_for_health,
             probe_reuse_proof=_probe_reuse_proof, profile=str(connection.get("remoteProfile") or ""),
-            remote_hermes_path=str(connection.get("remoteHermesPath") or ""), reuse_token=reuse_token,
+            remote_eir_path=str(connection.get("remoteEirPath") or ""), reuse_token=reuse_token,
             ready_timeout_s=DEFAULT_READY_TIMEOUT_S))
     except BaseException:
         ssh.close()
@@ -245,4 +245,4 @@ def tunnel_status(connection_id: str) -> dict | None:
         return None
     c = tunnel.connected
     return {"localPort": c.local_port, "remotePort": c.remote_port, "pid": c.pid, "reused": c.reused,
-            "hermesVersion": c.hermes_version, "host": tunnel.host}
+            "eirVersion": c.eir_version, "host": tunnel.host}

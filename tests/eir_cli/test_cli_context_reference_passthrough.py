@@ -11,11 +11,11 @@ class _Staged(Exception):
 
 
 def test_chat_submits_at_references_unexpanded(tmp_path, monkeypatch):
-    from cli import HermesCLI
+    from cli import EirCLI
 
     (tmp_path / "example.py").write_text("CLIENT-SIDE-CONTENT", encoding="utf-8")
     monkeypatch.chdir(tmp_path)
-    cli = HermesCLI.__new__(HermesCLI)
+    cli = EirCLI.__new__(EirCLI)
     cli.model = "gpt-5.6-terra"
     cli.base_url = "https://chatgpt.com/backend-api/codex"
     cli.api_key = "token"

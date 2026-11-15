@@ -1,27 +1,27 @@
 """Config writers keep credentials in ``.env`` and put only a reference into ``config.yaml``.
 
 ``config.yaml`` is settings; ``.env`` is secrets (#77471). A writer that receives a credential for a
-config field (``hermes config set model.api_key``, the dashboard model / auxiliary pickers, the
-``hermes model`` custom-endpoint and auxiliary flows) saves the value to the profile's ``.env`` under
+config field (``eir config set model.api_key``, the dashboard model / auxiliary pickers, the
+``eir model`` custom-endpoint and auxiliary flows) saves the value to the profile's ``.env`` under
 a deterministic name and stores ``${NAME}`` in the field. ``load_config`` expands the reference, so
 resolution is unchanged, and ``save_config`` keeps the template (``_preserve_env_ref_templates``).
 Inline values a user already has keep working; nothing is migrated.
 
 Names follow the conventions already in the tree:
 
-- ``model.api_key`` -> ``HERMES_MODEL_API_KEY``
+- ``model.api_key`` -> ``EIR_MODEL_API_KEY``
 - ``auxiliary.<task>.api_key`` -> ``AUXILIARY_<TASK>_API_KEY`` (the legacy aux env-var spelling;
   a task key that is not lowercase ASCII also gets ``_<HASH>``)
-- ``delegation.api_key`` -> ``HERMES_DELEGATION_API_KEY``
+- ``delegation.api_key`` -> ``EIR_DELEGATION_API_KEY``
 - ``providers.<name>.api_key`` -> ``provider_name_key_env(name)``
 - ``custom_providers[N].api_key`` -> ``endpoint_api_key_env(row base_url)`` (by name for a row with no URL)
-- a custom endpoint the dashboard or ``hermes model`` saves -> ``endpoint_api_key_env(base_url)``
+- a custom endpoint the dashboard or ``eir model`` saves -> ``endpoint_api_key_env(base_url)``
 
 The derived names carry a hash of the exact endpoint / name: a readable slug alone folds ``-``, ``.``,
 ``/``, ``:`` and ``_`` together, so ``my-host.com`` and ``my.host.com`` would share one variable and
 one host's key would be sent to the other.
 
-Every name is stripped from terminal / subprocess children (``_is_hermes_internal_secret``).
+Every name is stripped from terminal / subprocess children (``_is_eir_internal_secret``).
 """
 
 from __future__ import annotations
@@ -40,14 +40,14 @@ def _env_slug(text: str) -> str:
 
 
 def model_api_key_env() -> str:
-    return "HERMES_MODEL_API_KEY"
+    return "EIR_MODEL_API_KEY"
 
 
 def aux_api_key_env(task: str) -> str:
     """``AUXILIARY_<TASK>_API_KEY``; ``delegation`` (stored in its own top-level section) gets
-    ``HERMES_DELEGATION_API_KEY``."""
+    ``EIR_DELEGATION_API_KEY``."""
     if task == "delegation":
-        return "HERMES_DELEGATION_API_KEY"
+        return "EIR_DELEGATION_API_KEY"
     # Injective over task keys: ``upper()`` is one-to-one on lowercase ASCII keys (every built-in,
     # and ``my_task`` / ``my__task`` / ``_my_task`` keep their underscores), so those keep the
     # legacy spelling. Any other key (``My_Task``, a non-ASCII letter) would fold onto another
@@ -89,18 +89,18 @@ def endpoint_identity(base_url: str) -> str:
 
 
 def endpoint_api_key_env(base_url: str) -> str:
-    """``HERMES_CUSTOM_<HOST[_PORT][_PATH]>_<HASH>_API_KEY``; ``HERMES_MODEL_API_KEY`` when the URL
+    """``EIR_CUSTOM_<HOST[_PORT][_PATH]>_<HASH>_API_KEY``; ``EIR_MODEL_API_KEY`` when the URL
     has no host."""
-    from hermes_cli.config import custom_endpoint_key_env
+    from eir_cli.config import custom_endpoint_key_env
     identity = endpoint_identity(base_url)
     return custom_endpoint_key_env(identity) if identity else model_api_key_env()
 
 
 def provider_name_key_env(name: str) -> str:
-    """``HERMES_PROVIDER_<NAME>_<HASH>_API_KEY`` for a credential addressed by provider NAME
+    """``EIR_PROVIDER_<NAME>_<HASH>_API_KEY`` for a credential addressed by provider NAME
     (``providers.<name>``, a ``custom_providers`` row): its own prefix, so a name never lands on an
     endpoint's variable, and a hash of the exact name, so ``my.host`` and ``my-host`` stay apart."""
-    return f"HERMES_PROVIDER_{_env_slug(name) or 'CUSTOM'}_{_digest(str(name))}_API_KEY"
+    return f"EIR_PROVIDER_{_env_slug(name) or 'CUSTOM'}_{_digest(str(name))}_API_KEY"
 
 
 def _credential_blocks(cfg: dict) -> list[dict]:
@@ -126,7 +126,7 @@ def env_reference_owners(cfg: dict, env_name: str) -> list[dict]:
 def env_still_referenced(cfg: dict, env_name: str) -> bool:
     """True when a block of ``cfg`` (raw or ``load_config``-expanded) still reads ``env_name``; an
     expanded ``${NAME}`` shows up as the variable's value, so a block holding that value counts."""
-    from hermes_cli.config import load_env
+    from eir_cli.config import load_env
     if env_reference_owners(cfg, env_name):
         return True
     value = load_env().get(env_name)
@@ -141,7 +141,7 @@ def other_endpoint_reads(env_name: str, base_url: str, own_provider: Any = None)
     """True when a RAW config block for an endpoint other than ``base_url`` reads ``env_name``.
     ``own_provider`` is the ``providers.<key>`` being saved: its on-disk row is the caller itself,
     even when this save changes its ``base_url``."""
-    from hermes_cli.config import read_raw_config
+    from eir_cli.config import read_raw_config
     raw = read_raw_config()
     providers = raw.get("providers")
     own = providers.get(own_provider) if own_provider is not None and isinstance(providers, dict) else None
@@ -153,7 +153,7 @@ def other_endpoint_reads(env_name: str, base_url: str, own_provider: Any = None)
 def _refuse_cross_endpoint_overwrite(env_name: str, value: str, base_url: str, own_provider: Any = None) -> None:
     """Refuse to change ``env_name`` when a config block for ANOTHER endpoint reads it: the new value
     is this endpoint's key, and overwriting would send it to that other host."""
-    from hermes_cli.config import load_env
+    from eir_cli.config import load_env
     current = load_env().get(env_name)
     if not current or current == value:
         return
@@ -163,18 +163,18 @@ def _refuse_cross_endpoint_overwrite(env_name: str, value: str, base_url: str, o
 
 
 def _endpoint_key_envs(cfg: dict, base_url: str):
-    """``(name, shared)`` for each Hermes-written ``key_env`` of a block registered for ``base_url``;
+    """``(name, shared)`` for each Eir-written ``key_env`` of a block registered for ``base_url``;
     ``shared`` when another endpoint also reads the name (an older release keyed rows by host:port)."""
     wanted = _canonical_endpoint(base_url)
     for block in _credential_blocks(cfg):
         name = str(block.get("key_env") or "")
-        if (name.startswith(("HERMES_CUSTOM_", "HERMES_PROVIDER_")) and _block_base_url(block)
+        if (name.startswith(("EIR_CUSTOM_", "EIR_PROVIDER_")) and _block_base_url(block)
                 and _canonical_endpoint(_block_base_url(block)) == wanted):
             yield name, other_endpoint_reads(name, base_url)
 
 
 def known_endpoint_key_env(cfg: dict, base_url: str) -> str:
-    """The Hermes-written ``key_env`` of a ``providers`` / ``custom_providers`` row already registered
+    """The Eir-written ``key_env`` of a ``providers`` / ``custom_providers`` row already registered
     for ``base_url``, so a save for that endpoint updates the row's variable instead of forking a
     second one. User-chosen names (``OPENAI_API_KEY``) are never reused: they may serve elsewhere, and
     neither is a name another endpoint also reads (:func:`shared_endpoint_key_envs`)."""
@@ -200,12 +200,12 @@ def repoint_endpoint_key_env(cfg: dict, base_url: str, old_env: str, new_env: st
 
 
 def dashboard_endpoint_key_env(entry: dict, endpoint_id: str) -> str:
-    """The ``.env`` name for a dashboard ``providers.<id>`` endpoint's key: the Hermes-written
-    ``key_env`` the row already has (an older release's ``HERMES_CUSTOM_<ID>_API_KEY`` keeps
+    """The ``.env`` name for a dashboard ``providers.<id>`` endpoint's key: the Eir-written
+    ``key_env`` the row already has (an older release's ``EIR_CUSTOM_<ID>_API_KEY`` keeps
     working), else :func:`provider_name_key_env`, whose hash keeps ``my-host`` / ``my_host`` apart.
     A user-chosen ``key_env`` (``OPENAI_API_KEY``) is never written over: it may serve elsewhere."""
     current = str(entry.get("key_env") or "")
-    if current.startswith(("HERMES_CUSTOM_", "HERMES_PROVIDER_")):
+    if current.startswith(("EIR_CUSTOM_", "EIR_PROVIDER_")):
         return current
     return provider_name_key_env(endpoint_id)
 
@@ -217,7 +217,7 @@ def is_env_reference(value: Any) -> bool:
 def refs_supported() -> bool:
     """Only a file-backed config shares the machine's ``.env``. Under Remote Config the document is
     served to every host while ``.env`` stays local, so a reference would not resolve elsewhere."""
-    from hermes_cli.config_backend import supports_file_tooling
+    from eir_cli.config_backend import supports_file_tooling
     return supports_file_tooling()
 
 
@@ -226,7 +226,7 @@ def store_secret(env_name: str, value: str, base_url: str = "", own_provider: An
     Raises ``ValueError`` when the ``.env`` write lock forbids the name, or when ``base_url`` (the
     endpoint the key is for) is given and another endpoint's block reads ``env_name``, so the caller
     refuses the whole write instead of pointing config.yaml at a variable that was never saved."""
-    from hermes_cli.config import require_env_writable, save_env_value
+    from eir_cli.config import require_env_writable, save_env_value
     require_env_writable(env_name, "set")
     if base_url:
         _refuse_cross_endpoint_overwrite(env_name, value, base_url, own_provider)
@@ -253,7 +253,7 @@ def _literal_path(parts: list[str], user_config: dict) -> list[str]:
     """``parts`` regrouped the way ``_set_nested`` walks them: an existing literal key containing
     dots (``providers["lab.example"]``) is one segment, so ``providers.lab.example.api_key`` is
     classified as the provider block it writes, not as an unknown 4-part path."""
-    from hermes_cli.config import _greedy_literal_match
+    from eir_cli.config import _greedy_literal_match
     out: list[str] = []
     node: Any = user_config
     i = 0
@@ -293,7 +293,7 @@ def _custom_provider_entry_key_env(entry: dict, index: str) -> str:
 
 
 def config_path_api_key_env(parts: list[str], user_config: dict) -> Optional[str]:
-    """The ``.env`` name for a credential config path ``hermes config set`` stores by reference, or
+    """The ``.env`` name for a credential config path ``eir config set`` stores by reference, or
     None for paths it writes as given."""
     if not parts or parts[-1] != "api_key":
         return None
@@ -313,10 +313,10 @@ def config_path_api_key_env(parts: list[str], user_config: dict) -> Optional[str
 
 
 def config_set_secret_value(key: str, value: Any, user_config: dict) -> Any:
-    """``hermes config set``'s credential routing: the value to write at ``key``. A literal secret
+    """``eir config set``'s credential routing: the value to write at ``key``. A literal secret
     for a path in :func:`config_path_api_key_env` is saved to ``.env`` (a note names the variable)
     and its ``${VAR}`` reference returned; a refused ``.env`` write exits without writing."""
-    from hermes_cli.config import _exit_invalid, _split_key_path
+    from eir_cli.config import _exit_invalid, _split_key_path
     parts = _literal_path(_split_key_path(key), user_config)
     env_name = config_path_api_key_env(parts, user_config)
     if env_name is None:
@@ -331,12 +331,12 @@ def config_set_secret_value(key: str, value: Any, user_config: dict) -> Any:
 
 
 def masked_display_value(key: str, value: Any) -> Any:
-    """The value ``hermes config set`` echoes: masked when the (possibly nested) key is
+    """The value ``eir config set`` echoes: masked when the (possibly nested) key is
     credential-shaped, e.g. ``model.api_key`` (lowercase, so it misses the .env routing). A
     ``${VAR}`` reference is not a secret and is shown as is. A mapping or list value gets its nested
     credential keys masked, as ``config get`` does."""
-    from hermes_cli.config import _is_secret_config_key
-    from hermes_cli.config_secret_display import _maskable_secret_text, redact_config_value
+    from eir_cli.config import _is_secret_config_key
+    from eir_cli.config_secret_display import _maskable_secret_text, redact_config_value
     if not (text := _maskable_secret_text(value)):
         return redact_config_value(value)
     if _is_secret_config_key(key) and not is_env_reference(text):

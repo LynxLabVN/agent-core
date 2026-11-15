@@ -12,8 +12,8 @@ from __future__ import annotations
 import argparse
 
 
-from hermes_cli.subcommands.config import build_config_parser
-from hermes_cli.subcommands.login import build_login_parser
+from eir_cli.subcommands.config import build_config_parser
+from eir_cli.subcommands.login import build_login_parser
 
 
 
@@ -29,8 +29,8 @@ def _h(name):
 
 
 def test_config_get_unset_subcommands_parse():
-    """`hermes config get/unset` parse key args (and --json for get)."""
-    parser = argparse.ArgumentParser(prog="hermes")
+    """`eir config get/unset` parse key args (and --json for get)."""
+    parser = argparse.ArgumentParser(prog="eir")
     sub = parser.add_subparsers(dest="command")
     handler = _h("config")
     build_config_parser(sub, cmd_config=handler)
@@ -49,11 +49,11 @@ def test_config_get_unset_subcommands_parse():
 
 
 
-# ── deprecated `hermes login` fails gracefully, not with argparse error ────
+# ── deprecated `eir login` fails gracefully, not with argparse error ────
 #
-# `hermes login` is a removed command; its handler (`login_command` in
-# `hermes_cli/auth.py`) prints a deprecation notice pointing at `hermes auth` /
-# `hermes model` and exits 0.  Two behavior contracts guard the UX:
+# `eir login` is a removed command; its handler (`login_command` in
+# `eir_cli/auth.py`) prints a deprecation notice pointing at `eir auth` /
+# `eir model` and exits 0.  Two behavior contracts guard the UX:
 #   1. ANY `--provider <value>` (including ones the user actually wants, like
 #      `anthropic`) must parse and reach the handler — never crash in argparse
 #      with `invalid choice` before the friendly redirect is printed (#24756).
@@ -65,13 +65,13 @@ def test_config_get_unset_subcommands_parse():
 
 
 def test_login_subparser_help_is_suppressed():
-    """The deprecated `login` row must not appear in `hermes --help`.
+    """The deprecated `login` row must not appear in `eir --help`.
 
     Must hold without leaking argparse's literal `==SUPPRESS==` placeholder,
     which `help=argparse.SUPPRESS` emits for a top-level subparser on 3.12+.
     The fix omits the `help=` kwarg entirely instead.
     """
-    parser = argparse.ArgumentParser(prog="hermes")
+    parser = argparse.ArgumentParser(prog="eir")
     sub = parser.add_subparsers(dest="command")
     build_login_parser(sub, cmd_login=_h("login"))
     help_text = parser.format_help()

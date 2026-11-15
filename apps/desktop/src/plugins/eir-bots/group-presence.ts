@@ -1,4 +1,4 @@
-import { computed } from '@hermes/plugin-sdk'
+import { computed } from '@eir/plugin-sdk'
 
 import { botRosterKey } from './data'
 import { $groupChats } from './group-chat'

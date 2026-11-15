@@ -39,9 +39,9 @@ class Engine:
 
 def runtimes_root() -> Path:
     """Machine-scoped presets and server state. Binaries belong to PM's store."""
-    from hermes_constants import get_default_hermes_root
+    from eir_constants import get_default_eir_root
 
-    return get_default_hermes_root() / "runtimes" / "llamacpp"
+    return get_default_eir_root() / "runtimes" / "llamacpp"
 
 
 def pinned_tag(backend: str) -> str:
@@ -92,7 +92,7 @@ def resolve_backend(requested: str = "auto", *, gpu_vendor: str | None = None,
                     target: str | None = None) -> str:
     """Explicit choices are strict. Auto only falls back to compatible pinned builds."""
     if requested == "auto" and target is None and gpu_vendor is None:
-        from hermes_cli.local_runtime.bootstrap import _detect_gpu_vendor
+        from eir_cli.local_runtime.bootstrap import _detect_gpu_vendor
 
         gpu_vendor = _detect_gpu_vendor()
     target = target or pm.current_target()
@@ -117,7 +117,7 @@ def installed_engine(backend: str = "auto", *, allow_outdated: bool = True) -> E
     """Boot may retain a prior PM pin and moves a pre-PM engine into PM's store once; it never downloads."""
     vendor = None
     if backend == "auto":
-        from hermes_cli.local_runtime.bootstrap import _detect_gpu_vendor
+        from eir_cli.local_runtime.bootstrap import _detect_gpu_vendor
 
         vendor = _detect_gpu_vendor()
     candidates = _candidates(backend, vendor, pm.current_target())
@@ -127,7 +127,7 @@ def installed_engine(backend: str = "auto", *, allow_outdated: bool = True) -> E
     return engine
 
 
-# Before PM owned binaries, Hermes installed each engine to runtimes/llamacpp/b<tag>/<backend>/
+# Before PM owned binaries, Eir installed each engine to runtimes/llamacpp/b<tag>/<backend>/
 # and wrote a manifest.json with the archive digests and the llama-server --version it saw.
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 _ADOPTION_LOCK = threading.Lock()
@@ -180,7 +180,7 @@ def _store_lock(root: Path) -> Iterator[bool]:
 def adopt_legacy_engine(backend: str) -> bool:
     """Move the newest pre-PM install of ``backend`` into PM's store and record it as installed.
 
-    A machine that already ran a Hermes-installed engine keeps it across the update to PM. The
+    A machine that already ran a Eir-installed engine keeps it across the update to PM. The
     manifest's archive digests become the PM identity, so a tag that matches the pin counts as
     current and an older tag counts as outdated, which offers the update. ``os.rename`` only:
     instant on one volume, and a store on another volume leaves the engine where it is. Never

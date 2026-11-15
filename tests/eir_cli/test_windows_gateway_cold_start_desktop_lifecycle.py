@@ -22,12 +22,12 @@ import json
 
 import pytest
 
-from hermes_cli import gateway as hermes_gateway
-from hermes_cli import gateway_windows
-from hermes_cli import main as cli_main
-from hermes_cli import process_identity
-from hermes_cli import update_cmd
-from hermes_cli import update_cmd_windows
+from eir_cli import gateway as eir_gateway
+from eir_cli import gateway_windows
+from eir_cli import main as cli_main
+from eir_cli import process_identity
+from eir_cli import update_cmd
+from eir_cli import update_cmd_windows
 
 
 def _live_serve_ledger_entry() -> dict:
@@ -43,8 +43,8 @@ def _live_serve_ledger_entry() -> dict:
 def test_control_plane_argv_is_not_a_gateway():
     from gateway.status import looks_like_gateway_command_line
 
-    serve = "C:\\Hermes\\.venv\\Scripts\\python.exe -m hermes_cli.main serve --host 127.0.0.1"
-    run = "C:\\Hermes\\.venv\\Scripts\\python.exe -m hermes_cli.main gateway run"
+    serve = "C:\\Eir\\.venv\\Scripts\\python.exe -m eir_cli.main serve --host 127.0.0.1"
+    run = "C:\\Eir\\.venv\\Scripts\\python.exe -m eir_cli.main gateway run"
 
     assert update_cmd._looks_like_desktop_control_plane(serve) is True
     assert looks_like_gateway_command_line(serve) is False
@@ -55,7 +55,7 @@ def test_control_plane_classifier_is_token_based_not_substring():
     """#90778/#91869 class: flag values and lookalike tokens must not read
     as a control plane. The salvage swapped the original substring check
     for the parser-derived subcommand classifier."""
-    py = "C:\\Hermes\\.venv\\Scripts\\python.exe -m hermes_cli.main"
+    py = "C:\\Eir\\.venv\\Scripts\\python.exe -m eir_cli.main"
     # "dashboard" as a FLAG VALUE, real subcommand is chat
     assert update_cmd._looks_like_desktop_control_plane(f"{py} -m dashboard chat") is False
     # "--preserve-cache" contains "serve"; real subcommand is kanban
@@ -78,7 +78,7 @@ def test_ledger_live_serve_with_live_spawner_owns_lifecycle(monkeypatch):
         process_identity, "ledger_entries", lambda **_k: [_live_serve_ledger_entry()]
     )
     monkeypatch.setattr(process_identity, "spawner_is_dead", lambda _e: False)
-    monkeypatch.setattr("hermes_cli.update_cmd_windows._detect_venv_python_processes", list)
+    monkeypatch.setattr("eir_cli.update_cmd_windows._detect_venv_python_processes", list)
 
     assert update_cmd._desktop_owns_gateway_lifecycle() is True
 
@@ -87,7 +87,7 @@ def test_orphaned_control_plane_does_not_own_lifecycle(monkeypatch):
         process_identity, "ledger_entries", lambda **_k: [_live_serve_ledger_entry()]
     )
     monkeypatch.setattr(process_identity, "spawner_is_dead", lambda _e: True)
-    monkeypatch.setattr("hermes_cli.update_cmd_windows._detect_venv_python_processes", list)
+    monkeypatch.setattr("eir_cli.update_cmd_windows._detect_venv_python_processes", list)
 
     assert update_cmd._desktop_owns_gateway_lifecycle() is False
 
@@ -95,11 +95,11 @@ def test_orphaned_control_plane_does_not_own_lifecycle(monkeypatch):
 def _running_beta_pause_fixture(monkeypatch, tmp_path):
     """Windows update with ``beta`` (PID 777) running and the default profile home at ``tmp_path``."""
     from types import SimpleNamespace
-    import hermes_cli.profiles as profiles_mod
+    import eir_cli.profiles as profiles_mod
 
     homes = {"default": tmp_path, "beta": tmp_path / "profiles" / "beta"}
     homes["beta"].mkdir(parents=True)
-    monkeypatch.setattr("hermes_cli.config.get_hermes_home", lambda: str(tmp_path))
+    monkeypatch.setattr("eir_cli.config.get_eir_home", lambda: str(tmp_path))
     monkeypatch.setattr(update_cmd, "_desktop_owns_gateway_lifecycle", lambda: True)
     monkeypatch.setattr(update_cmd_windows, "_desktop_owns_gateway_lifecycle", lambda: True)
     beta = SimpleNamespace(pid=777, profile="beta")
@@ -113,7 +113,7 @@ def _running_beta_pause_fixture(monkeypatch, tmp_path):
     # Resume side.
     monkeypatch.setattr(cli_main, "_refresh_windows_gateway_launchers", lambda: None)
     relaunched: set = set()
-    monkeypatch.setattr(hermes_gateway, "launch_detached_profile_gateway_restart",
+    monkeypatch.setattr(eir_gateway, "launch_detached_profile_gateway_restart",
                         lambda p, o: relaunched.add(p) or True)
     ready_probes: list = []
     monkeypatch.setattr(gateway_windows, "_wait_for_gateway_ready", lambda *a, **k: ready_probes.append(k) or [4242])
@@ -200,7 +200,7 @@ def test_service_supervised_running_profile_is_not_cold_started(monkeypatch, tmp
 
     homes = _running_beta_pause_fixture(monkeypatch, tmp_path)
     svc_proc = SimpleNamespace(pid=900, profile="beta", path=homes["beta"])
-    service = SimpleNamespace(name="HermesGw-beta", profile="beta", service_pid=800, gateway_pid=900,
+    service = SimpleNamespace(name="EirGw-beta", profile="beta", service_pid=800, gateway_pid=900,
                               descendant_identities=(), service_create_time=1.0, gateway_create_time=2.0)
     monkeypatch.setattr(update_cmd_windows, "_discover_windows_gateways", lambda: ({900: svc_proc}, [service], {900}, [900]))
     monkeypatch.setattr(update_cmd_windows, "_request_socket_pauses", lambda *a, **k: ({}, [], []))
@@ -209,6 +209,6 @@ def test_service_supervised_running_profile_is_not_cold_started(monkeypatch, tmp
 
     token = update_cmd._pause_windows_gateways_for_update()
 
-    assert token["services"] == ["HermesGw-beta"]
+    assert token["services"] == ["EirGw-beta"]
     assert token["profiles"] == {}
     assert "cold_start_profiles" not in token

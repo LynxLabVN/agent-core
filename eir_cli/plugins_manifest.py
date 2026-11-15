@@ -1,6 +1,6 @@
 """Plugin manifest model and parsing (``plugin.yaml`` v1/v2, portable ``plugin.json``).
 
-Split out of :mod:`hermes_cli.plugins`; validation warns and never fails a load.
+Split out of :mod:`eir_cli.plugins`; validation warns and never fails a load.
 """
 
 from __future__ import annotations
@@ -15,44 +15,44 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional, Set, Tuple, Union
 
 from utils import fast_safe_load
-from hermes_cli.plugin_capabilities import parse_declared_capabilities as _parse_declared_capabilities
+from eir_cli.plugin_capabilities import parse_declared_capabilities as _parse_declared_capabilities
 
 try:
-    import hermes_yaml as yaml
+    import eir_yaml as yaml
 except ImportError:  # pragma: no cover – yaml is optional at import time
     yaml = None  # type: ignore[assignment]
 
-logger = logging.getLogger("hermes_cli.plugins")
+logger = logging.getLogger("eir_cli.plugins")
 
 _VALID_PLUGIN_KINDS: set[str] = {"standalone", "backend", "exclusive", "platform", "model-provider"}
 
 # Unknown plugin.yaml fields are forward-compat surface: warn (debug for v1 files, warning for v2+)
-# and continue loading. ``capabilities``/``emits``/``listens``/``hermes``/``depends`` are reserved.
+# and continue loading. ``capabilities``/``emits``/``listens``/``eir``/``depends`` are reserved.
 # ── Manifest v2 (#64165) parsing helpers ──────────────────────────────────
 _KNOWN_MANIFEST_FIELDS: set[str] = {
     "name", "version", "description", "author", "requires_env", "provides_tools", "provides_hooks",
     "kind", "hooks", "label", "optional_env", "platforms", "external_dependencies",
     "pip_dependencies", "provides_browser_providers", "provides_web_providers",
     "manifest_version", "api_version", "requires_plugins", "python_dependencies", "config_schema",
-    "license", "homepage", "tags", "capabilities", "emits", "listens", "hermes", "depends",
-    "requires_hermes", "python_runtime", "provides_locales", "requires_auth", "oauth", "config_keys",
+    "license", "homepage", "tags", "capabilities", "emits", "listens", "eir", "depends",
+    "requires_eir", "python_runtime", "provides_locales", "requires_auth", "oauth", "config_keys",
 }
 
-# Highest manifest schema version this Hermes understands.
+# Highest manifest schema version this Eir understands.
 SUPPORTED_MANIFEST_VERSION = 2
 
 _CONFIG_SCHEMA_TYPES: dict[str, tuple] = {
     "str": (str,), "string": (str,), "int": (int,), "integer": (int,), "float": (int, float),
     "number": (int, float), "bool": (bool,), "boolean": (bool,), "list": (list,), "array": (list,),
     "dict": (dict,), "object": (dict,),
-    # ``secret`` values live in ``.env`` (see hermes_cli.plugins_settings), so a config.yaml copy is
+    # ``secret`` values live in ``.env`` (see eir_cli.plugins_settings), so a config.yaml copy is
     # only ever a stray string.
     "secret": (str,),
 }
 
 
 def _plugins_debug() -> bool:
-    from hermes_cli import plugins as _origin
+    from eir_cli import plugins as _origin
     return _origin._PLUGINS_DEBUG
 
 
@@ -169,7 +169,7 @@ def _parse_manifest_v2_fields(data: Mapping, key: str) -> dict[str, Any]:
                        "Plugin %s: manifest_version %r is not an integer; treating as 1", 1)
     if mv > SUPPORTED_MANIFEST_VERSION:
         logger.warning(
-            "Plugin %s: manifest_version %d is newer than this Hermes "
+            "Plugin %s: manifest_version %d is newer than this Eir "
             "supports (%d); loading anyway and ignoring unknown fields", key, mv, SUPPORTED_MANIFEST_VERSION,
         )
     raw_api = data.get("api_version")
@@ -259,7 +259,7 @@ def resolve_plugin_load_order(manifests: Mapping[str, PluginManifest]) -> list[s
                 logger.warning(
                     "Plugin %s requires plugin '%s' which is not enabled/"
                     "installed; loading anyway (probe availability at runtime "
-                    "via ctx.has_plugin). Run `hermes plugins enable %s` if it is installed.",
+                    "via ctx.has_plugin). Run `eir plugins enable %s` if it is installed.",
                     k, dep_id, dep_id,
                 )
             elif resolved == k:
@@ -375,12 +375,12 @@ class PluginManifest:
     # <category>.provider; own discovery, general scanner skips) | ``platform`` (gateway adapter; bundled
     # auto-load, user-installed gated as untrusted code).
     kind: str = "standalone"
-    # Path-derived registry key used by plugins.enabled/disabled and `hermes plugins list`: ``disk-cleanup``
+    # Path-derived registry key used by plugins.enabled/disabled and `eir plugins list`: ``disk-cleanup``
     # for a flat plugin, ``image_gen/openai`` for a category plugin. Empty -> name.
     key: str = ""
-    # Hermes version requirement (``">=0.19"``, comma-separated clauses allowed). Unsatisfied plugins are
-    # recorded with an error and skipped before import — see ``requires_hermes_error``.
-    requires_hermes: str = ""
+    # Eir version requirement (``">=0.19"``, comma-separated clauses allowed). Unsatisfied plugins are
+    # recorded with an error and skipped before import — see ``requires_eir_error``.
+    requires_eir: str = ""
     portable: bool = False
     # ``plugin-data/<data_namespace>`` for a portable plugin; its skills are named after the plugin
     # itself (``<name>:<skill>``), like every native plugin's.
@@ -397,7 +397,7 @@ class PluginManifest:
     # Advisory deps [{"id", "version_range"}]: missing ones warn but load; they order the load.
     requires_plugins: list[dict[str, Any]] = field(default_factory=list)
     # Declared pip deps — VALIDATED AND SURFACED ONLY, never auto-installed.
-    # VALIDATED AND SURFACED ONLY — Hermes never auto-installs these (isolation design for the install seam
+    # VALIDATED AND SURFACED ONLY — Eir never auto-installs these (isolation design for the install seam
     # is a deferred follow-up; see #64165 round-2 review and #15220).
     python_dependencies: list[str] = field(default_factory=list)
     # Schema for plugins.entries.<id>.settings; mismatches warn, never fail.
@@ -414,8 +414,8 @@ class PluginManifest:
     # ``{endonym, rtl}`` from the mapping form of a ``provides_locales`` entry.
     provides_locales: list[str] = field(default_factory=list)
     locale_metadata: dict[str, dict[str, Any]] = field(default_factory=dict)
-    # Dotted paths in Hermes' own config sections the plugin reads (``memory.retaindb``), so
-    # ``hermes config get/set`` recognizes them while the plugin is active (hermes_cli/config_runtime_keys.py).
+    # Dotted paths in Eir' own config sections the plugin reads (``memory.retaindb``), so
+    # ``eir config get/set`` recognizes them while the plugin is active (eir_cli/config_runtime_keys.py).
     config_keys: list[str] = field(default_factory=list)
 
 
@@ -454,13 +454,13 @@ def parse_provides_locales(raw: Any, key: str = "") -> tuple[list[str], dict[str
     return ids, metadata
 
 
-# ── requires_hermes version gate ─────────────────────────────────────────────
+# ── requires_eir version gate ─────────────────────────────────────────────
 _VERSION_COMPARATOR_RE = re.compile(r"^\s*(>=|<=|==|!=|>|<)\s*(.+?)\s*$")
 
 
-def running_hermes_version() -> str:
-    """Base release version of the Hermes code that is running."""
-    from hermes_cli.version_info import get_version_info
+def running_eir_version() -> str:
+    """Base release version of the Eir code that is running."""
+    from eir_cli.version_info import get_version_info
 
     return get_version_info().base_version
 
@@ -499,20 +499,20 @@ def version_satisfies(spec: str, current: str) -> bool:
     return True
 
 
-def requires_hermes_error(manifest: PluginManifest | Mapping[str, Any]) -> Optional[str]:
-    """Load-blocking reason when the manifest's ``requires_hermes`` rejects the running version."""
-    spec = manifest.get("requires_hermes", "") if isinstance(manifest, Mapping) else manifest.requires_hermes
+def requires_eir_error(manifest: PluginManifest | Mapping[str, Any]) -> Optional[str]:
+    """Load-blocking reason when the manifest's ``requires_eir`` rejects the running version."""
+    spec = manifest.get("requires_eir", "") if isinstance(manifest, Mapping) else manifest.requires_eir
     if not spec:
         return None
-    current = running_hermes_version()
+    current = running_eir_version()
     if version_satisfies(spec, current):
         return None
-    return f"requires hermes {spec}, running {current}"
+    return f"requires eir {spec}, running {current}"
 
 
 def portable_plugin_manifest(child: Path, source: str, prefix: str) -> PluginManifest:
     """Build the manifest for a portable Agent Plugin directory (``plugin.json``); diagnostics warn."""
-    from hermes_cli.agent_plugins import manifest_config_schema, manifest_hermes_extension, read_agent_plugin_manifest
+    from eir_cli.agent_plugins import manifest_config_schema, manifest_eir_extension, read_agent_plugin_manifest
     data, diagnostics = read_agent_plugin_manifest(child)
     for diagnostic in diagnostics:
         logger.warning("Agent Plugin '%s': %s", child, diagnostic.message)
@@ -522,7 +522,7 @@ def portable_plugin_manifest(child: Path, source: str, prefix: str) -> PluginMan
         author=_display_author(data.get("author", "")), source=source, path=str(child), key=key,
         portable=True, data_namespace=_portable_data_namespace(key),
         config_schema=_config_schema_entries(key, manifest_config_schema(data)),
-        config_keys=manifest_config_keys(manifest_hermes_extension(data), key),
+        config_keys=manifest_config_keys(manifest_eir_extension(data), key),
     )
 
 
@@ -575,7 +575,7 @@ def parse_manifest_file(
             # ``hooks:`` is the spelling the bundled manifests carried for months; external copies of it
             # must keep declaring the same thing (#108371).
             provides_hooks=data.get("provides_hooks", data.get("hooks", [])), source=source, path=str(plugin_dir),
-            kind=kind, key=key, requires_hermes=str(data.get("requires_hermes") or "").strip(),
+            kind=kind, key=key, requires_eir=str(data.get("requires_eir") or "").strip(),
             capabilities=_parse_declared_capabilities(data.get("capabilities"), name),
             **_parse_manifest_v2_fields(data, key), emits=data.get("emits") or [],
             listens=data.get("listens") or [],

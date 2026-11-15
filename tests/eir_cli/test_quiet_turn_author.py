@@ -1,4 +1,4 @@
-"""``hermes chat -Q`` passes the dispatcher's HERMES_TURN_AUTHOR to ``run_conversation`` as ``turn_author``.
+"""``eir chat -Q`` passes the dispatcher's EIR_TURN_AUTHOR to ``run_conversation`` as ``turn_author``.
 
 A bot-to-bot delivery runs the recipient's turn as a ``-Q`` subprocess with that variable set.
 A human's ``-Q`` run has it unset and the turn stays unattributed.
@@ -20,12 +20,12 @@ AUTHOR = {"id": "bot:coder", "name": "coder", "is_bot": True}
 
 @pytest.fixture(autouse=True)
 def _plain_one_shot_env(monkeypatch):
-    monkeypatch.delenv("HERMES_KANBAN_GOAL_MODE", raising=False)
-    monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
+    monkeypatch.delenv("EIR_KANBAN_GOAL_MODE", raising=False)
+    monkeypatch.delenv("EIR_KANBAN_TASK", raising=False)
 
 
 def _run(monkeypatch, env_value, run_conversation=None):
-    """One quiet turn with HERMES_TURN_AUTHOR set to ``env_value`` (unset for None); returns the recorded call kwargs."""
+    """One quiet turn with EIR_TURN_AUTHOR set to ``env_value`` (unset for None); returns the recorded call kwargs."""
     if env_value is None:
         monkeypatch.delenv(TURN_AUTHOR_ENV, raising=False)
     else:
@@ -65,15 +65,15 @@ def test_quiet_one_shot_consumes_the_variable_before_the_turn(monkeypatch):
 def test_quiet_one_shot_resumes_nested_notify_on_this_session_not_parent(monkeypatch, capsys):
     """A nested Bot Mode completion keyed to B wakes B even when the parent env still names A.
 
-    ``chat -Q`` used to inherit the dispatcher's HERMES_SESSION_KEY and exit after the
+    ``chat -Q`` used to inherit the dispatcher's EIR_SESSION_KEY and exit after the
     dispatch ack, so C's reply was saved but B never resumed.
     """
     from tools.approval_context import get_current_session_key
     from tools.process_registry import process_registry
 
-    monkeypatch.delenv("HERMES_KANBAN_GOAL_MODE", raising=False)
-    monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
-    monkeypatch.setenv("HERMES_SESSION_KEY", "session-A")
+    monkeypatch.delenv("EIR_KANBAN_GOAL_MODE", raising=False)
+    monkeypatch.delenv("EIR_KANBAN_TASK", raising=False)
+    monkeypatch.setenv("EIR_SESSION_KEY", "session-A")
     calls = []
 
     def run_conversation(**kwargs):
@@ -113,7 +113,7 @@ def test_quiet_notify_loop_shares_one_linger_budget(monkeypatch):
     A fresh per-round deadline (the pre-fix bug) would pass round 1 as 600 and
     round 2 as 600 again; the shared deadline yields 600 then the remainder.
     """
-    from hermes_cli import quiet_single_query as qsq
+    from eir_cli import quiet_single_query as qsq
     from tools import process_registry as pr
 
     waits = []
@@ -145,7 +145,7 @@ def test_quiet_notify_loop_shares_one_linger_budget(monkeypatch):
 
 def test_quiet_notify_loop_stops_after_timeout_with_drained_texts(monkeypatch):
     """A timed-out process is waited on no further: drained texts still run, then the loop stops."""
-    from hermes_cli import quiet_single_query as qsq
+    from eir_cli import quiet_single_query as qsq
     from tools import process_registry as pr
 
     waits = []
@@ -195,7 +195,7 @@ def test_quiet_notify_loop_injects_owned_async_delegation_events(monkeypatch):
     one-shot's only consumer, so an owned async_delegation text is injected as a
     follow-up turn exactly like a completion.
     """
-    from hermes_cli import quiet_single_query as qsq
+    from eir_cli import quiet_single_query as qsq
     from tools import process_registry as pr
 
     monkeypatch.setattr(pr.process_registry, "wait_for_pending_completions",
@@ -229,7 +229,7 @@ def _quiet_policy(tmp_path, monkeypatch, setting):
     import json
     home = tmp_path / f"home-{setting}"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     display = {} if setting is None else {"suppress_warning_notifications": setting}
     (home / "config.yaml").write_text(json.dumps({"display": display}))
 
@@ -239,7 +239,7 @@ def test_quiet_diagnostic_only_wake_runs_but_reply_displaces_result_only_when_vi
     """Grid sweep: -Q linger had no diagnostic admission rule. A wake made only of automatic early
     failure notices still runs (the agent may act on it) but under suppression its reply must not
     replace the requested one-shot answer; absent/false keep legacy displacement."""
-    from hermes_cli import quiet_single_query as qsq
+    from eir_cli import quiet_single_query as qsq
     _quiet_policy(tmp_path, monkeypatch, setting)
     _quiet_drain(monkeypatch, [({"type": "completion", "task_failure_notice": True, "session_key": "s"},
                                 "[Background process failed early: exit 7]")])
@@ -251,7 +251,7 @@ def test_quiet_diagnostic_only_wake_runs_but_reply_displaces_result_only_when_vi
 
 
 def test_quiet_requested_completion_wake_never_muted(tmp_path, monkeypatch):
-    from hermes_cli import quiet_single_query as qsq
+    from eir_cli import quiet_single_query as qsq
     _quiet_policy(tmp_path, monkeypatch, True)
     _quiet_drain(monkeypatch, [({"type": "completion", "session_key": "s"}, "[Background process finished: OK]"),
                                 ({"type": "completion", "task_failure_notice": True, "session_key": "s"}, "[failed early]")])

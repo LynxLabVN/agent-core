@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-import hermes_constants
+import eir_constants
 
 pytestmark = pytest.mark.platforms("posix")  # POSIX permission bits
 
@@ -20,12 +20,12 @@ pytestmark = pytest.mark.platforms("posix")  # POSIX permission bits
 @pytest.fixture
 def home(tmp_path, monkeypatch):
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    for name in ("HERMES_MANAGED", "HERMES_CONTAINER", "HERMES_SKIP_CHMOD"):
+    monkeypatch.setenv("EIR_HOME", str(home))
+    for name in ("EIR_MANAGED", "EIR_CONTAINER", "EIR_SKIP_CHMOD"):
         monkeypatch.delenv(name, raising=False)
-    monkeypatch.setattr(hermes_constants, "_detect_container", lambda: False)
+    monkeypatch.setattr(eir_constants, "_detect_container", lambda: False)
     (home / "config.yaml").write_text("model:\n  default: old\n", encoding="utf-8")
     os.chmod(home / "config.yaml", 0o666)
     return home
@@ -36,18 +36,18 @@ def _mode(path):
 
 
 def test_snapshot_restore(home):
-    from hermes_cli.backup import create_quick_snapshot, restore_quick_snapshot
-    snap_id = create_quick_snapshot(hermes_home=home)
+    from eir_cli.backup import create_quick_snapshot, restore_quick_snapshot
+    snap_id = create_quick_snapshot(eir_home=home)
     snap_config = home / "state-snapshots" / snap_id / "config.yaml"
     os.chmod(snap_config, 0o666)  # a snapshot taken while the file was wide
 
-    assert restore_quick_snapshot(snap_id, hermes_home=home)
+    assert restore_quick_snapshot(snap_id, eir_home=home)
 
     assert _mode(home / "config.yaml") == 0o660
 
 
 def test_backup_import(home, tmp_path, monkeypatch):
-    from hermes_cli import backup
+    from eir_cli import backup
     monkeypatch.setattr(backup, "_revive_gateway_after_import", lambda _root: None)
     archive = tmp_path / "backup.zip"
     with zipfile.ZipFile(archive, "w") as zf:
@@ -60,8 +60,8 @@ def test_backup_import(home, tmp_path, monkeypatch):
 
 
 def test_profile_clone(home):
-    from hermes_cli.config import DEFAULT_CONFIG
-    from hermes_cli.profiles import create_profile
+    from eir_cli.config import DEFAULT_CONFIG
+    from eir_cli.profiles import create_profile
     # Current version: no migration rewrite (save_config) runs on the clone.
     (home / "config.yaml").write_text(f"_config_version: {DEFAULT_CONFIG['_config_version']}\n", encoding="utf-8")
 
@@ -71,7 +71,7 @@ def test_profile_clone(home):
 
 
 def test_distribution_install(home, tmp_path):
-    from hermes_cli.profile_distribution import DistributionManifest, install_distribution, write_manifest
+    from eir_cli.profile_distribution import DistributionManifest, install_distribution, write_manifest
     staged = tmp_path / "staged"
     staged.mkdir()
     (staged / "config.yaml").write_text("model:\n  default: dist\n", encoding="utf-8")
@@ -84,19 +84,19 @@ def test_distribution_install(home, tmp_path):
 
 
 def test_snapshot_restore_env_is_owner_only(home):
-    from hermes_cli.backup import create_quick_snapshot, restore_quick_snapshot
+    from eir_cli.backup import create_quick_snapshot, restore_quick_snapshot
     (home / ".env").write_text("OPENAI_API_KEY=" + "sk-" + "fake\n", encoding="utf-8")
-    snap_id = create_quick_snapshot(hermes_home=home)
+    snap_id = create_quick_snapshot(eir_home=home)
     os.chmod(home / "state-snapshots" / snap_id / ".env", 0o666)
 
-    assert restore_quick_snapshot(snap_id, hermes_home=home)
+    assert restore_quick_snapshot(snap_id, eir_home=home)
 
     assert _mode(home / ".env") == 0o600
 
 
 def test_profile_import(home, tmp_path):
     import tarfile
-    from hermes_cli.profiles import import_profile
+    from eir_cli.profiles import import_profile
     src = tmp_path / "src" / "evil"
     src.mkdir(parents=True)
     for name, body in (("config.yaml", "model:\n  default: x\n"), (".env", "A=" + "b\n")):

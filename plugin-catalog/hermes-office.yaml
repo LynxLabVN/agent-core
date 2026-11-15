@@ -1,7 +1,7 @@
 name: hermes-office
 repo: https://github.com/Adolanium/hermes-office
 sha: 614f3cb69670bd16c1421866ae1bb20d4178ee0c
-description: View and manage Bot Mode agents in a shared office in Hermes Desktop.
+description: View and manage Bot Mode agents in a shared office in Eir Desktop.
 maintainer: Adolanium
 tier: community
 category: desktop

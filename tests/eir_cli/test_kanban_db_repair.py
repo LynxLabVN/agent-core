@@ -1,5 +1,5 @@
 """Tests for kanban DB corruption repair, backup retention, WAL checkpointing,
-and the ``hermes kanban repair`` CLI verb."""
+and the ``eir kanban repair`` CLI verb."""
 
 from __future__ import annotations
 
@@ -9,9 +9,9 @@ from pathlib import Path
 
 import pytest
 
-from hermes_cli import kanban_db as kb
-from hermes_cli import kanban_db_connect as kbc
-from hermes_cli import kanban_db_dispatch as kbd
+from eir_cli import kanban_db as kb
+from eir_cli import kanban_db_connect as kbc
+from eir_cli import kanban_db_dispatch as kbd
 
 
 # ---------------------------------------------------------------------------
@@ -203,7 +203,7 @@ def test_dispatch_tick_runs_wal_checkpoint_at_interval(tmp_path, monkeypatch):
     interval elapses the next tick checkpoints again."""
     db_path = tmp_path / "kanban.db"
     _build_board_db(db_path, tasks=1)
-    monkeypatch.setenv("HERMES_KANBAN_DB", str(db_path))
+    monkeypatch.setenv("EIR_KANBAN_DB", str(db_path))
     # Fresh per-path clock so previous tests can't have claimed the slot.
     monkeypatch.setattr(kbc, "_LAST_WAL_CHECKPOINT", {})
 
@@ -239,14 +239,14 @@ def test_dispatch_tick_runs_wal_checkpoint_at_interval(tmp_path, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# repair_db() API + `hermes kanban repair` CLI verb
+# repair_db() API + `eir kanban repair` CLI verb
 # ---------------------------------------------------------------------------
 
 def _run_kanban_cli(argv: list[str]) -> int:
-    """Drive the real argparse surface exactly like `hermes kanban …`."""
+    """Drive the real argparse surface exactly like `eir kanban …`."""
     import argparse
 
-    from hermes_cli import kanban as kc
+    from eir_cli import kanban as kc
 
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="command")
@@ -257,10 +257,10 @@ def _run_kanban_cli(argv: list[str]) -> int:
 
 @pytest.fixture
 def cli_home(tmp_path, monkeypatch):
-    """Isolated HERMES_HOME so kanban_db_path() resolves inside tmp_path."""
-    home = tmp_path / ".hermes"
+    """Isolated EIR_HOME so kanban_db_path() resolves inside tmp_path."""
+    home = tmp_path / ".eir"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     return home
 

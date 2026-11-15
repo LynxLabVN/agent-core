@@ -1,6 +1,6 @@
 """Kanban worker transcripts must not resume as ordinary write-capable sessions (#68779).
 
-Behaviour tests for the centralized guard (`hermes_cli/kanban_resume_guard.py`) and the two
+Behaviour tests for the centralized guard (`eir_cli/kanban_resume_guard.py`) and the two
 CLI resume surfaces it protects: startup `--resume` (`_preload_resumed_session`) and mid-chat
 `/resume`. The gateway surface is covered in `tests/tui_gateway/test_kanban_resume_guard.py`.
 """
@@ -8,7 +8,7 @@ CLI resume surfaces it protects: startup `--resume` (`_preload_resumed_session`)
 from io import StringIO
 from unittest.mock import patch
 
-from hermes_state import SessionDB
+from eir_state import SessionDB
 
 
 def _db(tmp_path, *, source="cli", flip_source_to=None, parent=None, end_reason=None,
@@ -65,7 +65,7 @@ def test_branch_child_of_kanban_worker_is_not_owned(tmp_path):
 # ── the centralized guard ────────────────────────────────────────────
 
 def _refusal(db, sid):
-    from hermes_cli.kanban_resume_guard import kanban_resume_refusal
+    from eir_cli.kanban_resume_guard import kanban_resume_refusal
     return kanban_resume_refusal(db, sid)
 
 
@@ -83,10 +83,10 @@ def test_guard_allows_ordinary_session(tmp_path):
 
 
 def test_guard_exempts_dispatcher_owned_run(tmp_path, monkeypatch):
-    """A process holding HERMES_KANBAN_TASK is a dispatcher-owned run — the supervised
+    """A process holding EIR_KANBAN_TASK is a dispatcher-owned run — the supervised
     continuation — and may resume (env beats no other signal)."""
     db = _db(tmp_path, source="kanban", session_id="worker-1")
-    monkeypatch.setenv("HERMES_KANBAN_TASK", "task-42")
+    monkeypatch.setenv("EIR_KANBAN_TASK", "task-42")
     assert _refusal(db, "worker-1") is None
 
 
@@ -103,7 +103,7 @@ def test_guard_fails_open_on_probe_error(tmp_path):
 # ── CLI startup --resume / -c ────────────────────────────────────────
 
 def _make_cli(resume=None):
-    from cli import HermesCLI
+    from cli import EirCLI
     import cli as _cli_mod
 
     _clean_config = {
@@ -115,10 +115,10 @@ def _make_cli(resume=None):
     }
     with (
         patch("cli.get_tool_definitions", return_value=[]),
-        patch.dict("os.environ", {"LLM_MODEL": "", "HERMES_MAX_ITERATIONS": ""}, clear=False),
+        patch.dict("os.environ", {"LLM_MODEL": "", "EIR_MAX_ITERATIONS": ""}, clear=False),
         patch.dict(_cli_mod.__dict__, {"CLI_CONFIG": _clean_config}),
     ):
-        return HermesCLI(resume=resume)
+        return EirCLI(resume=resume)
 
 
 def test_startup_resume_refuses_kanban_session_and_starts_fresh(tmp_path):

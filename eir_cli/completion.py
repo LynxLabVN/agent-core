@@ -1,4 +1,4 @@
-"""Shell completion script generation for hermes CLI. Walks the live argparse parser tree, so
+"""Shell completion script generation for eir CLI. Walks the live argparse parser tree, so
 completion scripts never go stale; no extra dependencies."""
 
 from __future__ import annotations
@@ -54,7 +54,7 @@ def generate_bash(parser: argparse.ArgumentParser) -> str:
                 f"                    return\n"
                 f"                    ;;\n"
                 f"                {'|'.join(_PROFILE_NAME_ACTIONS)})\n"
-                f"                    COMPREPLY=($(compgen -W \"$(_hermes_profiles)\" -- \"$cur\"))\n"
+                f"                    COMPREPLY=($(compgen -W \"$(_eir_profiles)\" -- \"$cur\"))\n"
                 f"                    return\n"
                 f"                    ;;\n"
                 f"            esac\n"
@@ -67,12 +67,12 @@ def generate_bash(parser: argparse.ArgumentParser) -> str:
                 f"            return\n"
                 f"            ;;")
     cases_str = "\n".join(cases)
-    return f"""# Hermes Agent bash completion
+    return f"""# Eir Agent bash completion
 # Add to ~/.bashrc:
-#   eval "$(hermes completion bash)"
+#   eval "$(eir completion bash)"
 
-_hermes_profiles() {{
-    local profiles_dir="$HOME/.hermes/profiles"
+_eir_profiles() {{
+    local profiles_dir="$HOME/.eir/profiles"
     local profiles="default"
     if [ -d "$profiles_dir" ]; then
         for f in "$profiles_dir"/*/; do
@@ -82,7 +82,7 @@ _hermes_profiles() {{
     echo "$profiles"
 }}
 
-_hermes_completion() {{
+_eir_completion() {{
     local cur prev
     COMPREPLY=()
     cur="${{COMP_WORDS[COMP_CWORD]}}"
@@ -90,7 +90,7 @@ _hermes_completion() {{
 
     # Complete profile names after -p / --profile
     if [[ "$prev" == "-p" || "$prev" == "--profile" ]]; then
-        COMPREPLY=($(compgen -W "$(_hermes_profiles)" -- "$cur"))
+        COMPREPLY=($(compgen -W "$(_eir_profiles)" -- "$cur"))
         return
     fi
 
@@ -105,7 +105,7 @@ _hermes_completion() {{
     fi
 }}
 
-complete -F _hermes_completion hermes
+complete -F _eir_completion eir
 """
 
 
@@ -129,7 +129,7 @@ def generate_zsh(parser: argparse.ArgumentParser) -> str:
                 f"                profile)\n"
                 f"                    case ${{line[2]}} in\n"
                 f"                        {'|'.join(_PROFILE_NAME_ACTIONS)})\n"
-                f"                            _hermes_profiles\n"
+                f"                            _eir_profiles\n"
                 f"                            ;;\n"
                 f"                        *)\n"
                 f"                            local -a profile_cmds\n"
@@ -152,28 +152,28 @@ def generate_zsh(parser: argparse.ArgumentParser) -> str:
                 f"                    _describe '{cmd} command' {safe}_cmds\n"
                 f"                    ;;")
     sub_cases_str = "\n".join(sub_cases)
-    return f"""#compdef hermes
-# Hermes Agent zsh completion
+    return f"""#compdef eir
+# Eir Agent zsh completion
 # Add to ~/.zshrc:
-#   eval "$(hermes completion zsh)"
+#   eval "$(eir completion zsh)"
 
-_hermes_profiles() {{
+_eir_profiles() {{
     local -a profiles
     profiles=(default)
-    if [[ -d "$HOME/.hermes/profiles" ]]; then
-        profiles+=($HOME/.hermes/profiles/*(N/:t))
+    if [[ -d "$HOME/.eir/profiles" ]]; then
+        profiles+=($HOME/.eir/profiles/*(N/:t))
     fi
     _describe 'profile' profiles
 }}
 
-_hermes() {{
+_eir() {{
     local context state line
     typeset -A opt_args
 
     _arguments -C \\
         '(-)'{{-h,--help}}'[Show help and exit]' \\
         '(-)'{{-V,--version}}'[Show version and exit]' \\
-        '(-)'{{-p,--profile}}'[Profile name]:profile:_hermes_profiles' \\
+        '(-)'{{-p,--profile}}'[Profile name]:profile:_eir_profiles' \\
         '1:command:->commands' \\
         '*::arg:->args'
 
@@ -183,7 +183,7 @@ _hermes() {{
             subcmds=(
 {top_cmds_str}
             )
-            _describe 'hermes command' subcmds
+            _describe 'eir command' subcmds
             ;;
         args)
             case ${{line[1]}} in
@@ -193,7 +193,7 @@ _hermes() {{
     esac
 }}
 
-compdef _hermes hermes
+compdef _eir eir
 """
 
 
@@ -201,31 +201,31 @@ def generate_fish(parser: argparse.ArgumentParser) -> str:
     subcommands = _sorted_subcommands(parser)
     top_cmds_str = " ".join(cmd for cmd, _ in subcommands)
     lines: list[str] = [
-        "# Hermes Agent fish completion",
+        "# Eir Agent fish completion",
         "# Add to your config:",
-        "#   hermes completion fish | source",
+        "#   eir completion fish | source",
         "",
         "# Helper: list available profiles",
-        "function __hermes_profiles",
+        "function __eir_profiles",
         "    echo default",
-        "    if test -d $HOME/.hermes/profiles",
-        "        for d in $HOME/.hermes/profiles/*/",
+        "    if test -d $HOME/.eir/profiles",
+        "        for d in $HOME/.eir/profiles/*/",
         "            basename $d",
         "        end",
         "    end",
         "end",
         "",
         "# Disable file completion by default",
-        "complete -c hermes -f",
+        "complete -c eir -f",
         "",
         "# Complete profile names after -p / --profile",
-        "complete -c hermes -f -s p -l profile"
-        " -d 'Profile name' -xa '(__hermes_profiles)'",
+        "complete -c eir -f -s p -l profile"
+        " -d 'Profile name' -xa '(__eir_profiles)'",
         "",
         "# Top-level subcommands"]
     for cmd, info in subcommands:
         lines.append(
-            f"complete -c hermes -f "
+            f"complete -c eir -f "
             f"-n 'not __fish_seen_subcommand_from {top_cmds_str}' "
             f"-a {cmd} -d '{_clean(info.get('help', ''))}'")
     lines += ["", "# Subcommand completions"]
@@ -235,15 +235,15 @@ def generate_fish(parser: argparse.ArgumentParser) -> str:
         lines.append(f"# {cmd}")
         for sc, sinfo in sorted(info["subcommands"].items()):
             lines.append(
-                f"complete -c hermes -f "
+                f"complete -c eir -f "
                 f"-n '__fish_seen_subcommand_from {cmd}' "
                 f"-a {sc} -d '{_clean(sinfo.get('help', ''))}'")
         if cmd == "profile":  # profile names for the actions that take one
             for action in sorted(_PROFILE_NAME_ACTIONS):
                 lines.append(
-                    f"complete -c hermes -f "
+                    f"complete -c eir -f "
                     f"-n '__fish_seen_subcommand_from {action}; "
                     f"and __fish_seen_subcommand_from profile' "
-                    f"-a '(__hermes_profiles)' -d 'Profile name'")
+                    f"-a '(__eir_profiles)' -d 'Profile name'")
     lines.append("")
     return "\n".join(lines)

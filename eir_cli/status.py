@@ -1,4 +1,4 @@
-"""Status command for hermes CLI."""
+"""Status command for eir CLI."""
 
 import json
 import os
@@ -8,20 +8,20 @@ import importlib.util
 from pathlib import Path
 from types import SimpleNamespace
 
-from hermes_cli._startup_fast import project_root_str
+from eir_cli._startup_fast import project_root_str
 
 PROJECT_ROOT = Path(project_root_str())
 
-from hermes_cli.auth import AuthError, resolve_provider
-from hermes_cli.colors import Colors, color
-from hermes_cli.config import get_env_path, get_env_value, get_hermes_home, load_config
-from hermes_cli.config_defaults import DEFAULT_SANDBOX_IMAGE, DEFAULT_VERCEL_IMAGE
-from hermes_cli.models import provider_label
-from hermes_cli.runtime_provider import resolve_requested_provider
-from hermes_cli.vercel_auth import describe_vercel_auth
-from hermes_cli.status_auth import (  # renderers wired into _SECTIONS below
+from eir_cli.auth import AuthError, resolve_provider
+from eir_cli.colors import Colors, color
+from eir_cli.config import get_env_path, get_env_value, get_eir_home, load_config
+from eir_cli.config_defaults import DEFAULT_SANDBOX_IMAGE, DEFAULT_VERCEL_IMAGE
+from eir_cli.models import provider_label
+from eir_cli.runtime_provider import resolve_requested_provider
+from eir_cli.vercel_auth import describe_vercel_auth
+from eir_cli.status_auth import (  # renderers wired into _SECTIONS below
     _render_api_keys, _render_apikey_providers, _render_auth_providers, _render_nous_gateway)
-from hermes_constants import OPENROUTER_MODELS_URL
+from eir_constants import OPENROUTER_MODELS_URL
 
 
 def check_mark(ok: bool) -> str:
@@ -93,7 +93,7 @@ def _effective_provider_label() -> str:
 
 
 def _estop_status_line():
-    """One-line pause banner for `hermes status`, or None when not paused."""
+    """One-line pause banner for `eir status`, or None when not paused."""
     try:
         from agent.estop import get_state
     except ImportError:
@@ -102,7 +102,7 @@ def _estop_status_line():
     if state is None:
         return None
     reason = state.get("reason")
-    return f"⏸️  PAUSED (global emergency stop{f' — reason: {reason}' if reason else ''}; `hermes resume` to lift)"
+    return f"⏸️  PAUSED (global emergency stop{f' — reason: {reason}' if reason else ''}; `eir resume` to lift)"
 
 
 # --- Data tables driving the per-section renderers -------------------------
@@ -128,7 +128,7 @@ def _banner(lines, *styles) -> None:
 
 def _render_header(ctx):
     _banner(("┌─────────────────────────────────────────────────────────┐",
-             "│                 ☤ Hermes Agent Status                  │",
+             "│                 ☤ Eir Agent Status                  │",
              "└─────────────────────────────────────────────────────────┘"), Colors.CYAN)
     paused = _estop_status_line()
     if paused:
@@ -170,7 +170,7 @@ def _render_terminal(ctx):
         _kv("Image:", os.getenv('TERMINAL_VERCEL_RUNTIME') or terminal_cfg.get('vercel_runtime')
             or os.getenv('TERMINAL_VERCEL_IMAGE') or terminal_cfg.get('vercel_image') or DEFAULT_VERCEL_IMAGE)
         _kv_flag("SDK:", importlib.util.find_spec("vercel") is not None, "installed",
-                 "missing (run hermes setup terminal and select Vercel Sandbox, then restart Hermes)")
+                 "missing (run eir setup terminal and select Vercel Sandbox, then restart Eir)")
         _kv("Auth:", f"{check_mark(auth_status.ok)} {auth_status.label}")
         for line in auth_status.detail_lines:
             _kv("Auth detail:", line)
@@ -178,9 +178,9 @@ def _render_terminal(ctx):
         _kv("Processes:", "live processes do not survive cleanup, snapshots, or sandbox recreation")
     else:
         # Plugin-registered terminal backends: show availability via the provider's doctor rows
-        # (fail-soft — never break `hermes status`).
+        # (fail-soft — never break `eir status`).
         try:
-            from hermes_cli.plugins import discover_plugins
+            from eir_cli.plugins import discover_plugins
             discover_plugins()
             from agent.terminal_env_registry import get_provider
             provider = get_provider(terminal_env)
@@ -198,7 +198,7 @@ def _render_platforms(ctx):
     try:
         from gateway.config import load_gateway_config
         from gateway.platform_registry import platform_registry
-        from hermes_cli.plugins import discover_plugins
+        from eir_cli.plugins import discover_plugins
         discover_plugins()  # labels come from the plugin entries
         cfg = load_gateway_config()
     except Exception:
@@ -215,14 +215,14 @@ def _render_platforms(ctx):
 def _render_gateway(ctx):
     _section("Gateway Service")
     try:
-        from hermes_cli.gateway import (
+        from eir_cli.gateway import (
             get_gateway_runtime_snapshot, _format_gateway_pids, named_profile_served_by_running_multiplexer)
-        from hermes_cli.gateway_multiplex_served import multiplexer_served_secondaries
+        from eir_cli.gateway_multiplex_served import multiplexer_served_secondaries
         snapshot = get_gateway_runtime_snapshot()
         # A satellite profile has no gateway.pid of its own; the default multiplexer is its live process.
         if not snapshot.running and named_profile_served_by_running_multiplexer():
             _kv_flag("Status:", True, "running (via the default-profile multiplexer)", "stopped")
-            _kv("Manage with:", "hermes gateway status   # from the default profile")
+            _kv("Manage with:", "eir gateway status   # from the default profile")
             return
         _kv_flag("Status:", snapshot.running, "running", "stopped")
         _kv("Manager:", snapshot.manager)
@@ -230,7 +230,7 @@ def _render_gateway(ctx):
             _kv("PID(s):", _format_gateway_pids(snapshot.gateway_pids))
         if snapshot.running and (served := multiplexer_served_secondaries()):
             _kv("Serves:", ", ".join(served))
-            from hermes_cli.gateway_multiplex_served import served_profile_ingress_urls
+            from eir_cli.gateway_multiplex_served import served_profile_ingress_urls
             for name, per_platform in sorted(served_profile_ingress_urls().items()):
                 for platform, url in sorted(per_platform.items()):
                     _kv(f"  {name}/{platform}:", url)
@@ -252,7 +252,7 @@ def _load_json(path: Path, encoding: str = "utf-8"):
 
 def _cron_summary() -> str:
     """``N active, M total`` jobs line, shared by the full and short status renderers."""
-    jobs_file = get_hermes_home() / "cron" / "jobs.json"
+    jobs_file = get_eir_home() / "cron" / "jobs.json"
     if not jobs_file.exists():
         return "0"
     try:
@@ -274,8 +274,8 @@ def _render_sessions(ctx):
     # Gateway session count: state.db is the source of truth; fall back to sessions.json for
     # pre-migration installs.
     try:
-        from hermes_state import SessionDB
-        db = SessionDB(db_path=get_hermes_home() / "state.db", read_only=True)
+        from eir_state import SessionDB
+        db = SessionDB(db_path=get_eir_home() / "state.db", read_only=True)
         try:
             gateway_rows = db.list_gateway_sessions(active_only=True) or []
         finally:
@@ -287,9 +287,9 @@ def _render_sessions(ctx):
         _kv("Active:", f"{len(gateway_rows)} session(s)")
         freshest = max((float(r.get("last_active") or 0) for r in gateway_rows), default=0.0)
         if freshest > 0:
-            from hermes_cli.timefmt import relative_time
+            from eir_cli.timefmt import relative_time
             print(f"  Last activity:{relative_time(freshest):>13}")
-    elif not (sessions_file := get_hermes_home() / "sessions" / "sessions.json").exists():
+    elif not (sessions_file := get_eir_home() / "sessions" / "sessions.json").exists():
         _kv("Active:", 0)
     else:
         try:
@@ -304,7 +304,7 @@ def _render_sessions(ctx):
     # holding the slots — without this the only way to find out is reading
     # runtime/active_sessions.json by hand.
     try:
-        from hermes_cli.active_sessions import (
+        from eir_cli.active_sessions import (
             active_session_registry_snapshot, format_age, resolve_max_concurrent_sessions)
         cap = resolve_max_concurrent_sessions(ctx.config)
     except Exception:
@@ -345,7 +345,7 @@ def _render_deep(ctx):
 
 
 def _render_footer(ctx):
-    _banner(("─" * 60, "  Run 'hermes doctor' for detailed diagnostics", "  Run 'hermes setup' to configure"),
+    _banner(("─" * 60, "  Run 'eir doctor' for detailed diagnostics", "  Run 'eir setup' to configure"),
             Colors.DIM)
     print()
 
@@ -363,8 +363,8 @@ def _connected_platform_labels() -> list:
 
 def _authenticated_provider_names() -> list:
     """The providers the /model picker offers: cached catalogs only, no endpoint probes."""
-    from hermes_cli.inventory import load_picker_context
-    from hermes_cli.model_switch import list_authenticated_providers
+    from eir_cli.inventory import load_picker_context
+    from eir_cli.model_switch import list_authenticated_providers
     pick = load_picker_context()
     return [row["name"] for row in list_authenticated_providers(
         user_providers=pick.user_providers, custom_providers=pick.custom_providers,
@@ -373,7 +373,7 @@ def _authenticated_provider_names() -> list:
 
 
 def _gateway_state() -> tuple:
-    from hermes_cli.gateway import get_gateway_runtime_snapshot, named_profile_served_by_running_multiplexer
+    from eir_cli.gateway import get_gateway_runtime_snapshot, named_profile_served_by_running_multiplexer
     if get_gateway_runtime_snapshot().running:
         return True, "running"
     if named_profile_served_by_running_multiplexer():  # satellite profile: no gateway.pid of its own
@@ -391,7 +391,7 @@ def _summary_row(label: str, probe, empty: str) -> None:
 
 
 def _render_summary(ctx):
-    """Default ``hermes status``: one line per component; ``--full`` prints every section."""
+    """Default ``eir status``: one line per component; ``--full`` prints every section."""
     _render_header(ctx)
     print()
     _load_ctx_config(ctx)
@@ -405,11 +405,11 @@ def _render_summary(ctx):
         _kv("Gateway:", "unknown")
     _summary_row("Platforms:", _connected_platform_labels, "none configured")
     _kv("Jobs:", _cron_summary())
-    _banner(("  Run 'hermes status --full' for every section",), Colors.DIM)
+    _banner(("  Run 'eir status --full' for every section",), Colors.DIM)
     print()
 
 
-# Print order of `hermes status`; each renderer takes the shared _StatusContext.
+# Print order of `eir status`; each renderer takes the shared _StatusContext.
 _SECTIONS = (
     _render_header, _render_environment, _render_api_keys, _render_auth_providers, _render_nous_gateway,
     _render_apikey_providers, _render_terminal, _render_platforms, _render_gateway, _render_cron,

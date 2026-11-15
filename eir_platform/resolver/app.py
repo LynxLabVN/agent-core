@@ -20,9 +20,9 @@ from dataclasses import dataclass
 from typing import Any, Callable, Iterator, Literal
 from urllib.parse import urlsplit
 
-from hermes_platform.resolver import known_dirs
-from hermes_platform.resolver.base import Effort, Inspection, Probe
-from hermes_platform.resolver.core import (
+from eir_platform.resolver import known_dirs
+from eir_platform.resolver.base import Effort, Inspection, Probe
+from eir_platform.resolver.core import (
     Candidate,
     CheckState,
     Kind,
@@ -441,7 +441,7 @@ def _mcp_initialize(session: _Session, endpoint: str, deadline_s: float) -> Obse
     body = json.dumps({
         "jsonrpc": "2.0", "id": 1, "method": "initialize",
         "params": {"protocolVersion": "2025-06-18", "capabilities": {},
-                   "clientInfo": {"name": "hermes", "version": "probe"}},
+                   "clientInfo": {"name": "eir", "version": "probe"}},
     }).encode()
     headers = {"Content-Type": "application/json", "Accept": "application/json, text/event-stream"}
     if session.token:

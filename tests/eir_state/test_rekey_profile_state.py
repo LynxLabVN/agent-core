@@ -1,4 +1,4 @@
-"""Regression tests for profile-name-keyed state migration on `hermes profile rename`.
+"""Regression tests for profile-name-keyed state migration on `eir profile rename`.
 
 When a profile is renamed, the directory move carries the row data, but the profile name is also
 baked into session keys (``agent:<name>:*``), ``sessions.profile_name``, ``gateway_heartbeats.profile``,
@@ -11,8 +11,8 @@ import time
 
 import pytest
 
-from hermes_state import SessionDB
-from hermes_state_local import API_BINDING_PREFIX, POLICY_PREFIX
+from eir_state import SessionDB
+from eir_state_local import API_BINDING_PREFIX, POLICY_PREFIX
 
 
 def _session_receipt(name, sid, platform, **extra):
@@ -125,7 +125,7 @@ class TestRekeyProfileState:
             backend_id="be1", pid=123, started_at=time.time(),
             profile="oldname", host="h")
         # delivery_obligations is created lazily by the delivery ledger against the same state.db.
-        monkeypatch.setenv("HERMES_HOME", str(db.db_path.parent))
+        monkeypatch.setenv("EIR_HOME", str(db.db_path.parent))
         from gateway import delivery_ledger
         monkeypatch.setattr(delivery_ledger, "_db_path", lambda: db.db_path)
         with delivery_ledger._connect() as conn:
@@ -269,8 +269,8 @@ class TestRekeyProfileState:
     def test_rekeys_local_policy_receipts(self, db):
         """The renamed profile's local-chat receipts move to the new name (route, entry key, origin);
         the minting home, the id and the lineage stay, and no legacy marker is written."""
-        from hermes_state_local import local_receipt
-        from hermes_state_local_migration import LEGACY_PREFIX
+        from eir_state_local import local_receipt
+        from eir_state_local_migration import LEGACY_PREFIX
 
         moved = _session_receipt("oldname", "local-a", "local", lineage=["local-a", "local-a-tip"])
         bystander = _session_receipt("oldname2", "local-b", "local")

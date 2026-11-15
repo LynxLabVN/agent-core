@@ -2,7 +2,7 @@
 
 A plugin registers a session-less job over its own state. Every host that ticks the curator also
 polls the registered idle tasks of the active profile's plugin manager (:func:`run_idle_jobs`):
-gateway housekeeping (once per served profile), CLI/TUI startup maintenance and ``hermes serve``'s
+gateway housekeeping (once per served profile), CLI/TUI startup maintenance and ``eir serve``'s
 maintenance ticker. A task runs when the host has been idle ``min_idle_hours``, the task is not
 paused, ``interval_hours`` have passed since its last run (the first observation seeds
 ``last_run_at`` and defers one interval, like the curator, unless ``first_run="immediate"``) and no
@@ -15,7 +15,7 @@ and recorded, never raised. A host that stops (gateway housekeeping) polls under
 
 State is per (profile, plugin, task): ``<plugin data dir>/idle-tasks/<name>.json`` with
 ``last_run_at``, ``run_count``, ``paused``, ``last_summary``, ``last_status``, ``last_error``.
-``hermes plugins idle-tasks`` lists it and pauses/resumes a task.
+``eir plugins idle-tasks`` lists it and pauses/resumes a task.
 
 No capability gates this surface: it calls nothing privileged itself; model calls go through
 ``ctx.llm`` and its existing gates.
@@ -35,7 +35,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable, Iterator, Optional
 
-logger = logging.getLogger("hermes_cli.plugins")
+logger = logging.getLogger("eir_cli.plugins")
 
 MIN_INTERVAL_HOURS = 1.0
 _FIRST_RUN = ("defer", "immediate")
@@ -202,9 +202,9 @@ def set_paused(path: Path, paused: bool) -> dict[str, Any]:
 
 def iter_state_files(plugin_id: Optional[str] = None) -> Iterator[tuple[Path, dict[str, Any]]]:
     """Every idle task state of the active profile (optionally one plugin's), sorted."""
-    from hermes_constants import get_hermes_home
+    from eir_constants import get_eir_home
 
-    for path in sorted((get_hermes_home() / "plugin-data").glob(f"*/{_STATE_DIR}/*.json")):
+    for path in sorted((get_eir_home() / "plugin-data").glob(f"*/{_STATE_DIR}/*.json")):
         state = load_state(path)
         if plugin_id is None or state.get("plugin") == plugin_id:
             yield path, state
@@ -318,13 +318,13 @@ def run_plugin_idle_tasks(
     """Poll the active profile's registered idle tasks and return at once; ``{"<plugin>:<task>":
     worker}`` for the runs it started, each on its own thread. A manager polled outside its own
     profile runs nothing; a host that stops passes its ``fence``. Never raises."""
-    from hermes_constants import hermes_home_key
-    from hermes_cli.plugins import get_plugin_manager
+    from eir_constants import eir_home_key
+    from eir_cli.plugins import get_plugin_manager
 
     started: dict[str, threading.Thread] = {}
     try:
         manager = manager if manager is not None else get_plugin_manager()
-        if manager.scope_key != hermes_home_key():
+        if manager.scope_key != eir_home_key():
             return started
         now = now or datetime.now(UTC)
         for key, spec in list(registered_idle_tasks(manager).items()):
@@ -347,12 +347,12 @@ def run_idle_jobs(
 
 
 def cmd_idle_tasks(plugin: Optional[str] = None, *, pause: Optional[str] = None, resume: Optional[str] = None) -> None:
-    """``hermes plugins idle-tasks [plugin] [--pause TASK | --resume TASK]``: list the active
+    """``eir plugins idle-tasks [plugin] [--pause TASK | --resume TASK]``: list the active
     profile's idle task states, or pause/resume one task (the plugin name is required then)."""
     target = pause or resume
     if target is not None:
         if not plugin:
-            raise SystemExit("hermes plugins idle-tasks: name the plugin to pause or resume a task")
+            raise SystemExit("eir plugins idle-tasks: name the plugin to pause or resume a task")
         hit = next((path for path, state in iter_state_files(plugin) if state["task"] == target), None)
         if hit is None:
             raise SystemExit(f"No idle task {target!r} of plugin {plugin!r} has run or been seeded in this profile")
@@ -378,7 +378,7 @@ class PluginIdleTaskCtxMixin:
         self, name: str, fn: Callable[[IdleTaskRun], Optional[str]], *, interval_hours: float,
         min_idle_hours: float = 2.0, first_run: str = "defer",
     ):
-        """Run ``fn`` in the background when Hermes is idle, at most once per ``interval_hours``
+        """Run ``fn`` in the background when Eir is idle, at most once per ``interval_hours``
         (floored to 1) and only after ``min_idle_hours`` without activity. ``fn`` runs on its own
         thread and the host does not wait for it, so keep a run short and safe to repeat; it
         receives an :class:`IdleTaskRun` (``name``, ``idle_for_seconds``, ``last_run_at``,

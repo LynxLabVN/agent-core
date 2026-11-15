@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fail when a user ``config.yaml`` is read by anything but the config backend.
 
-Every read of ``<hermes home>/config.yaml`` must go through ``hermes_cli.config_backend``
+Every read of ``<eir home>/config.yaml`` must go through ``eir_cli.config_backend``
 (``get_config_backend()`` / the path helpers there) so a non-file backend (design §4.1, D10) sees
 every reader. A direct ``open`` / ``read_text`` / ``yaml.safe_load`` / ``fast_safe_load`` /
 ``load_yaml_file_readonly`` / ``stat`` of a config path silently keeps reading the local file —
@@ -39,14 +39,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.append(str(ROOT))
-from hermes_agent.compat.paths import current_path, original_path
+from eir_agent.compat.paths import current_path, original_path
 DEFAULT_TREES = (
-    "hermes_cli", "agent", "gateway", "tui_gateway", "cron", "plugins", "tools", "acp_adapter", "pm",
-    "cli.py", "utils.py", "hermes_constants.py", "hermes_logging.py", "hermes_time.py", "run_agent.py",
+    "eir_cli", "agent", "gateway", "tui_gateway", "cron", "plugins", "tools", "acp_adapter", "pm",
+    "cli.py", "utils.py", "eir_constants.py", "eir_logging.py", "eir_time.py", "run_agent.py",
     "model_tools.py", "batch_runner.py")
 # The backend module itself, and the on-disk primitives it wraps.
-ALLOWED_FILES = {ROOT / current_path("hermes_cli/config_backend.py"), ROOT / current_path("utils.py")}
-# Modules whose ``config_path`` / ``path`` names are their OWN config file, never a hermes
+ALLOWED_FILES = {ROOT / current_path("eir_cli/config_backend.py"), ROOT / current_path("utils.py")}
+# Modules whose ``config_path`` / ``path`` names are their OWN config file, never a eir
 # config.yaml (the name heuristic would flag every line of them).
 FOREIGN_CONFIG_FILES = {
     "plugins/memory/openviking": "OpenViking's own ovcli config",
@@ -174,7 +174,7 @@ class _Scanner:
             return
         if SUPPRESS in line:
             why = f"{why}; the escape needs a reason (`{SUPPRESS} — <why>`)"
-        self.problems.append(f"{self.rel}:{node.lineno}: {why} — go through hermes_cli.config_backend")
+        self.problems.append(f"{self.rel}:{node.lineno}: {why} — go through eir_cli.config_backend")
 
     def check_call(self, node: ast.Call, names: set[str]) -> None:
         name = _func_name(node.func)
@@ -249,7 +249,7 @@ def main(argv: list[str]) -> int:
             continue
         problems.extend(scan_file(f))
     if problems:
-        print("config.yaml must only be read through hermes_cli.config_backend:", file=sys.stderr)
+        print("config.yaml must only be read through eir_cli.config_backend:", file=sys.stderr)
         for p in problems:
             print(f"  {p}", file=sys.stderr)
         return 1

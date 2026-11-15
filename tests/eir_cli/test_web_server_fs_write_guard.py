@@ -9,9 +9,9 @@ import os
 
 import pytest
 
-from hermes_cli import web_server
-from hermes_cli.ssh_workspace_fs import SshWorkspaceFs
-from hermes_cli.web_routers import files as file_routes
+from eir_cli import web_server
+from eir_cli.ssh_workspace_fs import SshWorkspaceFs
+from eir_cli.web_routers import files as file_routes
 
 pytest.importorskip("starlette.testclient")
 from starlette.testclient import TestClient
@@ -82,7 +82,7 @@ def test_write_text_stays_inside_a_locked_files_root(client, tmp_path, monkeypat
     managed.mkdir()
     outside = tmp_path / "elsewhere"
     outside.mkdir()
-    monkeypatch.setenv("HERMES_DASHBOARD_FILES_ROOT", str(managed))
+    monkeypatch.setenv("EIR_DASHBOARD_FILES_ROOT", str(managed))
 
     refused = _save(client, outside / "run.sh", "#!/bin/sh\n")
     saved = _save(client, managed / "notes.md", "kept")
@@ -147,12 +147,12 @@ def test_write_text_still_saves_an_ordinary_file(client, tmp_path):
 def test_write_text_judges_a_named_profile_save_by_that_profiles_protected_state(client, tmp_path, monkeypatch):
     """``?profile=work`` saves under work's scope: its ``state.db`` and ``sessions/`` are protected
     exactly as the launch profile's are, not just ``<root>/state.db``."""
-    root = tmp_path / ".hermes"
+    root = tmp_path / ".eir"
     work = root / "profiles" / "work"
     (work / "sessions").mkdir(parents=True)
     (work / "config.yaml").write_text("{}", encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(root))
-    monkeypatch.delenv("HERMES_DASHBOARD_FILES_ROOT", raising=False)
+    monkeypatch.setenv("EIR_HOME", str(root))
+    monkeypatch.delenv("EIR_DASHBOARD_FILES_ROOT", raising=False)
     state_db = work / "state.db"
     state_db.write_text("original")
     transcript = work / "sessions" / "s1.jsonl"

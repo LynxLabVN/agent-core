@@ -26,7 +26,7 @@ Config: `delegation.*` in `config.yaml`.
 ### Cron (scheduled jobs)
 
 Durable scheduler — `cron/jobs.py` + `cron/scheduler.py`. Drive it via
-the `cronjob` tool, the `hermes cron` CLI (`list`, `add`, `edit`,
+the `cronjob` tool, the `eir cron` CLI (`list`, `add`, `edit`,
 `pause`, `resume`, `run`, `remove`), or the `/cron` slash command.
 
 - **Schedules:** duration (`"30m"`, `"2h"`), "every" phrase
@@ -50,7 +50,7 @@ Background maintenance for agent-created skills. Tracks usage, marks
 idle skills stale, archives stale ones, keeps a pre-run tar.gz backup
 so nothing is lost.
 
-- **CLI:** `hermes curator <verb>` — `status`, `usage`, `run`, `pause`,
+- **CLI:** `eir curator <verb>` — `status`, `usage`, `run`, `pause`,
   `resume`, `pin`, `unpin`, `archive`, `restore`, `list-archived`, `prune`,
   `backup`, `rollback`.
 - **Slash:** `/curator <subcommand>` mirrors the CLI.
@@ -61,9 +61,9 @@ so nothing is lost.
 - **Cost:** the deterministic inactivity/prune sweep runs for free. The
   aux-model "consolidate overlapping skills into umbrellas" pass is
   **off by default** — opt in with `curator.consolidate: true` or
-  `hermes curator run --consolidate`. Routine background curation costs
+  `eir curator run --consolidate`. Routine background curation costs
   zero tokens.
-- **Telemetry:** sidecar at `~/.hermes/skills/.usage.json` holds
+- **Telemetry:** sidecar at `~/.eir/skills/.usage.json` holds
   per-skill `use_count`, `view_count`, `patch_count`,
   `last_activity_at`, `state`, `pinned`.
 
@@ -74,8 +74,8 @@ User docs: https://hermes-agent.nousresearch.com/docs/user-guide/features/curato
 ### Kanban (multi-agent work queue)
 
 Durable SQLite board for multi-profile / multi-worker collaboration.
-Users drive it via `hermes kanban <verb>`; dispatcher-spawned workers
-see a focused `kanban_*` toolset gated by `HERMES_KANBAN_TASK`, and
+Users drive it via `eir kanban <verb>`; dispatcher-spawned workers
+see a focused `kanban_*` toolset gated by `EIR_KANBAN_TASK`, and
 orchestrator profiles can opt into the broader `kanban` toolset. Normal
 sessions still have zero `kanban_*` schema footprint unless configured.
 
@@ -95,7 +95,7 @@ sessions still have zero `kanban_*` schema footprint unless configured.
   (default 2; configurable via `kanban.failure_limit` or per-task
   `max_retries`).
 - **Isolation:** board is the hard boundary (workers get
-  `HERMES_KANBAN_BOARD` pinned in env); tenant is a soft namespace
+  `EIR_KANBAN_BOARD` pinned in env); tenant is a soft namespace
   within a board for workspace-path + memory-key isolation.
 
 Project-linked tasks (worktree + branch by default under a Project's primary folder, when it has one):

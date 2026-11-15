@@ -1,4 +1,4 @@
-"""Guard: every text-mode subprocess call in hermes_cli pins utf-8 decoding (#55658).
+"""Guard: every text-mode subprocess call in eir_cli pins utf-8 decoding (#55658).
 
 On Windows, ``text=True`` without ``encoding`` decodes child output with the ANSI
 code page (e.g. 'gbk'), and non-ASCII bytes raise UnicodeDecodeError inside
@@ -12,9 +12,9 @@ from pathlib import Path
 
 import pytest
 
-from hermes_agent.compat.paths import current_path
+from eir_agent.compat.paths import current_path
 
-HERMES_CLI = Path(__file__).resolve().parents[2] / current_path("hermes_cli")
+EIR_CLI = Path(__file__).resolve().parents[2] / current_path("eir_cli")
 
 
 def _iter_call_text_nodes(tree: ast.AST) -> list[ast.Call]:
@@ -23,8 +23,8 @@ def _iter_call_text_nodes(tree: ast.AST) -> list[ast.Call]:
 
 @pytest.mark.parametrize(
     "path",
-    sorted(p for p in HERMES_CLI.rglob("*.py") if "__pycache__" not in p.parts and "test" not in p.name),
-    ids=lambda p: str(p.relative_to(HERMES_CLI)),
+    sorted(p for p in EIR_CLI.rglob("*.py") if "__pycache__" not in p.parts and "test" not in p.name),
+    ids=lambda p: str(p.relative_to(EIR_CLI)),
 )
 def test_text_mode_subprocess_calls_pin_utf8(path: Path) -> None:
     tree = ast.parse(path.read_text(encoding="utf-8"))
@@ -37,7 +37,7 @@ def test_text_mode_subprocess_calls_pin_utf8(path: Path) -> None:
                 and kw.value.value is True
             ):
                 assert "encoding" in names, (
-                    f"{path.relative_to(HERMES_CLI)}:{kw.lineno}: subprocess text=True "
+                    f"{path.relative_to(EIR_CLI)}:{kw.lineno}: subprocess text=True "
                     "without encoding= — on Windows this decodes with the ANSI code page "
                     "and can raise UnicodeDecodeError on non-ASCII child output (#55658)"
                 )

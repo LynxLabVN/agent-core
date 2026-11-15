@@ -21,9 +21,9 @@ from fastapi import APIRouter, Body, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from starlette.concurrency import run_in_threadpool
 
-from hermes_cli import gateway_connections as store
-from hermes_cli import gateway_connections_oauth as oauth
-from hermes_cli import gateway_connections_ssh as ssh
+from eir_cli import gateway_connections as store
+from eir_cli import gateway_connections_oauth as oauth
+from eir_cli import gateway_connections_ssh as ssh
 
 router = APIRouter()
 
@@ -118,7 +118,7 @@ async def oauth_callback(code: str = "", state: str = "", error: str = "", error
             store.ConnectionStoreBusy) as exc:
         page = _PAGE.format(title="Sign-in failed", body=html.escape(str(exc)))
         return HTMLResponse(page, status_code=400, headers=_NO_STORE)
-    page = _PAGE.format(title="&#10003; Signed in", body="You can close this tab and return to Hermes.")
+    page = _PAGE.format(title="&#10003; Signed in", body="You can close this tab and return to Eir.")
     return HTMLResponse(page, headers=_NO_STORE)
 
 

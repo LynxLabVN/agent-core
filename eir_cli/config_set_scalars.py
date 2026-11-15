@@ -1,4 +1,4 @@
-"""Scalar coercion for ``hermes config set`` string arguments (bool/None/int/float words)."""
+"""Scalar coercion for ``eir config set`` string arguments (bool/None/int/float words)."""
 
 from decimal import Decimal, InvalidOperation
 from typing import Optional
@@ -34,7 +34,7 @@ _SCALAR_WORDS = {
 
 def _quoted_bool(stripped: str) -> Optional[bool]:
     """The bool a quoted boolean word spells (``'"true"'`` -> True), else None. Shell-quoted
-    YAML scalars (``hermes config set gateway.strict '"true"'``) arrive with the quotes as literal
+    YAML scalars (``eir config set gateway.strict '"true"'``) arrive with the quotes as literal
     characters; stored verbatim on a bool-schema key, readers saw an unknown string and fell back
     to the knob's default (#143009: strict media delivery silently stayed off)."""
     if len(stripped) < 2 or stripped[0] != stripped[-1] or stripped[0] not in ("'", '"'):

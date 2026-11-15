@@ -5,9 +5,9 @@ from contextlib import asynccontextmanager
 
 import pytest
 
-from hermes_cli.gateway_client import GatewayClientError, GatewayRPCError
-from hermes_cli.gateway_connection import GatewayConnection
-from hermes_cli.gateway_session_store import GatewaySessionStore
+from eir_cli.gateway_client import GatewayClientError, GatewayRPCError
+from eir_cli.gateway_connection import GatewayConnection
+from eir_cli.gateway_session_store import GatewaySessionStore
 
 
 def _snapshot(sid):
@@ -36,10 +36,10 @@ class DrainingThenReady:
 
 @pytest.fixture
 def owner(monkeypatch):
-    import hermes_cli.gateway_owner_restart as restart
+    import eir_cli.gateway_owner_restart as restart
     monkeypatch.setattr(restart, "restart_wait_budget", lambda: 30.0)
     monkeypatch.setattr("agent.retry_utils.jittered_backoff", lambda *a, **k: 0.01)
-    monkeypatch.delenv("HERMES_SESSION_SOURCE", raising=False)
+    monkeypatch.delenv("EIR_SESSION_SOURCE", raising=False)
     client = DrainingThenReady(refusals=2)
 
     @asynccontextmanager
@@ -60,27 +60,27 @@ def _host(store):
 def test_new_session_waits_for_the_restarted_owner_and_says_so_once(owner, capsys):
     """A draining owner's refusal is not the user's error: one plain line, then the session opens
     on the successor, and the reason code is never printed."""
-    from hermes_cli.cli_init_mixin import CLIInitMixin
+    from eir_cli.cli_init_mixin import CLIInitMixin
     store, client = owner
     sid = CLIInitMixin._new_session_id(_host(store), None)
     assert sid == "local-after-restart" and client.creates == 3
     err = capsys.readouterr().err
-    assert err.count("Hermes is restarting") == 1
+    assert err.count("Eir is restarting") == 1
     assert "runtime_draining" not in err
 
 
 def test_a_final_refusal_is_still_raised_at_once(owner, capsys):
-    from hermes_cli.cli_init_mixin import CLIInitMixin
+    from eir_cli.cli_init_mixin import CLIInitMixin
     store, client = owner
     client.reason = "invalid_params"
     with pytest.raises(GatewayRPCError, match="invalid_params"):
         CLIInitMixin._new_session_id(_host(store), None)
-    assert client.creates == 1 and "Hermes is restarting" not in capsys.readouterr().err
+    assert client.creates == 1 and "Eir is restarting" not in capsys.readouterr().err
 
 
 def test_the_wait_is_bounded_and_ctrl_c_stops_it():
     import threading
-    from hermes_cli.gateway_owner_restart import SuccessorWaitStopped, wait_for_successor
+    from eir_cli.gateway_owner_restart import SuccessorWaitStopped, wait_for_successor
 
     def refuse(_remaining):
         raise GatewayRPCError("runtime_retired")

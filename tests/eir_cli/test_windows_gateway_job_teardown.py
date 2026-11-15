@@ -8,7 +8,7 @@ Two fixes under test:
    (a) route the respawned gateway's stray stdout/stderr to
        ``logs/gateway-stdio.log`` (it was ``DEVNULL`` — a gateway killed by
        parent Job Object teardown left ZERO trace anywhere), and
-   (b) stamp ``_HERMES_GATEWAY_BREAKAWAY`` =1/0 on the respawn env exactly
+   (b) stamp ``_EIR_GATEWAY_BREAKAWAY`` =1/0 on the respawn env exactly
        like the canonical ``gateway_windows._spawn_detached``, so the
        lifecycle/exit-diag records show whether the gateway escaped the
        parent's Job Object.
@@ -20,7 +20,7 @@ Two fixes under test:
    updater's Job Object teardown.
 """
 
-from hermes_cli import gateway
+from eir_cli import gateway
 
 # ---------------------------------------------------------------------------
 # 1. Watcher template contract
@@ -41,7 +41,7 @@ def _captured_watcher_source(monkeypatch) -> str:
 
     monkeypatch.setattr(gateway.subprocess, "Popen", fake_popen)
     assert gateway._spawn_gateway_restart_watcher(
-        999999, ["python", "-m", "hermes_cli.main", "gateway", "run"]
+        999999, ["python", "-m", "eir_cli.main", "gateway", "run"]
     )
     argv = captured["argv"]
     assert argv[1] == "-c"

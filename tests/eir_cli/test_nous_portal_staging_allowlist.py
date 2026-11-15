@@ -4,7 +4,7 @@ _ALLOWED_NOUS_INFERENCE_HOSTS treatment.
 
 Real incident (2026-07): a hosted agent provisioned by nous-account-service
 on the `staging` Vercel environment is stamped with
-``HERMES_PORTAL_BASE_URL=https://portal.staging-nousresearch.com`` in its
+``EIR_PORTAL_BASE_URL=https://portal.staging-nousresearch.com`` in its
 container env (the documented dev/staging override), while its bootstrap
 ``auth.json`` ALSO persists ``portal_base_url`` to the same staging host.
 
@@ -31,7 +31,7 @@ from __future__ import annotations
 import json
 import logging
 
-from hermes_cli.auth import (
+from eir_cli.auth import (
     DEFAULT_NOUS_PORTAL_URL,
 )
 
@@ -53,7 +53,7 @@ class TestResolveAccessTokenEnvOverrideWins:
                             "portal_base_url": stored_portal_url,
                             "access_token": "expired-access",
                             "refresh_token": "staging-refresh",
-                            "client_id": "hermes-cli-vps",
+                            "client_id": "eir-cli-vps",
                             "expires_at": "2000-01-01T00:00:00+00:00",
                         }
                     },
@@ -63,7 +63,7 @@ class TestResolveAccessTokenEnvOverrideWins:
         return auth_file
 
     def _run_and_capture(self, monkeypatch, auth):
-        from hermes_cli import auth_nous
+        from eir_cli import auth_nous
         seen_portal_urls = []
 
         # The resolve memo is module-level state; clear it so each test's
@@ -83,7 +83,7 @@ class TestResolveAccessTokenEnvOverrideWins:
         monkeypatch.setattr(auth_nous, "_refresh_access_token", _fake_refresh)
 
         caplog_records = []
-        logger = logging.getLogger("hermes_cli.auth")
+        logger = logging.getLogger("eir_cli.auth")
         handler = logging.Handler()
         handler.emit = lambda record: caplog_records.append(record.getMessage())
         logger.addHandler(handler)
@@ -97,14 +97,14 @@ class TestResolveAccessTokenEnvOverrideWins:
         self, monkeypatch, tmp_path
     ):
         """The real incident: state ALSO has the staging host stored (from
-        a prior HERMES_AUTH_JSON_BOOTSTRAP seed), and the env var is set to
+        a prior EIR_AUTH_JSON_BOOTSTRAP seed), and the env var is set to
         the same staging host. Both must resolve to staging, and the
         allowlist-rejection warning must never fire."""
-        from hermes_cli import auth
+        from eir_cli import auth
 
         staging_portal = "https://portal.staging-nousresearch.com"
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-        monkeypatch.setenv("HERMES_PORTAL_BASE_URL", staging_portal)
+        monkeypatch.setenv("EIR_HOME", str(tmp_path))
+        monkeypatch.setenv("EIR_PORTAL_BASE_URL", staging_portal)
         self._write_auth_file(tmp_path, stored_portal_url=staging_portal)
 
         seen_portal_urls, records = self._run_and_capture(monkeypatch, auth)
@@ -121,10 +121,10 @@ class TestResolveAccessTokenEnvOverrideWins:
     ):
         """Baseline: no override, no staging state — prod is used and the
         allowlist never even logs a warning (nothing was rejected)."""
-        from hermes_cli import auth
+        from eir_cli import auth
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-        monkeypatch.delenv("HERMES_PORTAL_BASE_URL", raising=False)
+        monkeypatch.setenv("EIR_HOME", str(tmp_path))
+        monkeypatch.delenv("EIR_PORTAL_BASE_URL", raising=False)
         monkeypatch.delenv("NOUS_PORTAL_BASE_URL", raising=False)
         self._write_auth_file(tmp_path, stored_portal_url=DEFAULT_NOUS_PORTAL_URL)
 

@@ -8,7 +8,7 @@ accepts; the request and the picker's "sends X" hint both clamp onto them.
 import pytest
 
 from agent.reasoning_effort import EFFORT_LADDER, effort_display_label
-from hermes_cli.local_runtime import catalog, growth
+from eir_cli.local_runtime import catalog, growth
 
 MANAGED = "http://127.0.0.1:18434/v1"
 
@@ -77,7 +77,7 @@ def test_the_picker_hint_names_the_level_actually_sent(managed_endpoint):
     assert effort_display_label("none", "llamacpp", model_id) == "none"
 
 
-def test_catalog_effort_levels_are_levels_hermes_can_send():
+def test_catalog_effort_levels_are_levels_eir_can_send():
     sendable = set(EFFORT_LADDER) - {"none", "ultra"}
     for entry in catalog.CATALOG:
         assert set(entry.reasoning_efforts) <= sendable, entry.id

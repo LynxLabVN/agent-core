@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from hermes_cli import plugins_cmd
+from eir_cli import plugins_cmd
 
 
 def _args(**kwargs):
@@ -65,18 +65,18 @@ def test_discover_all_plugins_includes_entrypoint_plugins(monkeypatch, tmp_path)
 
     dist = SimpleNamespace(
         version="0.1.0",
-        metadata={"Summary": "Karpathy-style LLM Wikis for Hermes"},
+        metadata={"Summary": "Karpathy-style LLM Wikis for Eir"},
     )
     entry_point = SimpleNamespace(
         name="wiki",
-        value="adapters.hermes.cli_plugin",
-        group="hermes_agent.plugins",
+        value="adapters.eir.cli_plugin",
+        group="eir_agent.plugins",
         dist=dist,
     )
 
     monkeypatch.setattr(plugins_cmd, "_plugins_dir", lambda: user_dir)
     monkeypatch.setattr(
-        "hermes_cli.plugins.get_bundled_plugins_dir",
+        "eir_cli.plugins.get_bundled_plugins_dir",
         lambda: bundled_dir,
     )
     monkeypatch.setattr(
@@ -91,9 +91,9 @@ def test_discover_all_plugins_includes_entrypoint_plugins(monkeypatch, tmp_path)
         (
             "wiki",
             "0.1.0",
-            "Karpathy-style LLM Wikis for Hermes",
+            "Karpathy-style LLM Wikis for Eir",
             "entrypoint",
-            "adapters.hermes.cli_plugin",
+            "adapters.eir.cli_plugin",
             "wiki",
         )
     ]
@@ -109,17 +109,17 @@ def test_declared_capabilities_for_entrypoint_uses_distribution_metadata(
     plugin_ep = SimpleNamespace(
         name="thread-namer",
         value="thread_namer.plugin:register",
-        group="hermes_agent.plugins",
+        group="eir_agent.plugins",
         dist=SimpleNamespace(version="1.0", metadata={"Summary": ""}),
     )
     capability_ep = SimpleNamespace(
         name="thread-namer.gateway.platform_actions",
         value="thread_namer.plugin:register",
-        group="hermes_agent.plugin_capabilities",
+        group="eir_agent.plugin_capabilities",
     )
     monkeypatch.setattr(plugins_cmd, "_plugins_dir", lambda: user_dir)
     monkeypatch.setattr(
-        "hermes_cli.plugins.get_bundled_plugins_dir", lambda: bundled_dir
+        "eir_cli.plugins.get_bundled_plugins_dir", lambda: bundled_dir
     )
     monkeypatch.setattr(
         importlib.metadata,
@@ -140,7 +140,7 @@ def test_entrypoint_spec_does_not_abort_plugin_status(monkeypatch):
     real_stat = Path.stat
 
     def stat(self, *args, **kwargs):
-        if str(self).startswith("mnemosyne_hermes:register"):
+        if str(self).startswith("mnemosyne_eir:register"):
             err = OSError(22, "The filename, directory name, or volume label syntax is incorrect")
             err.winerror = 123
             raise err
@@ -149,8 +149,8 @@ def test_entrypoint_spec_does_not_abort_plugin_status(monkeypatch):
     monkeypatch.setattr(Path, "stat", stat)
 
     assert plugins_cmd._plugin_status(
-        "mnemosyne_hermes", set(), set(), key="mnemosyne_hermes",
-        source="entrypoint", dir_path="mnemosyne_hermes:register",
+        "mnemosyne_eir", set(), set(), key="mnemosyne_eir",
+        source="entrypoint", dir_path="mnemosyne_eir:register",
     ) == "not enabled"
 
 
@@ -160,7 +160,7 @@ def test_unreadable_plugin_dir_is_skipped_by_every_manifest_scan(monkeypatch, tm
     """One plugin directory the process cannot stat() into (Windows WinError 5, POSIX mode 000)
     must be warned about and skipped — not abort discovery for every other plugin (#111804).
     Covers the loader scan (``scan_directory``) and the list/hub scan (``_scan_level``)."""
-    from hermes_cli.plugins_discovery import scan_directory
+    from eir_cli.plugins_discovery import scan_directory
 
     user_dir = tmp_path / "plugins"
     bundled_dir = tmp_path / "bundled"
@@ -170,7 +170,7 @@ def test_unreadable_plugin_dir_is_skipped_by_every_manifest_scan(monkeypatch, tm
         (user_dir / name / "plugin.yaml").write_text(f"name: {name}\nversion: 1.0.0\n", encoding="utf-8")
     (user_dir / "denied").chmod(0)
     monkeypatch.setattr(plugins_cmd, "_plugins_dir", lambda: user_dir)
-    monkeypatch.setattr("hermes_cli.plugins.get_bundled_plugins_dir", lambda: bundled_dir)
+    monkeypatch.setattr("eir_cli.plugins.get_bundled_plugins_dir", lambda: bundled_dir)
     monkeypatch.setattr(importlib.metadata, "entry_points", list)
 
     try:

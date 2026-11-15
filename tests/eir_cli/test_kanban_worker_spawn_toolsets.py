@@ -27,7 +27,7 @@ def _make_task(kb, *, assignee: str):
 
 def test_default_spawn_pins_assignee_profile_cli_toolsets(monkeypatch, tmp_path):
     """The transport client reaches the assigned profile with its exact run claim."""
-    root = tmp_path / ".hermes"
+    root = tmp_path / ".eir"
     profile = root / "profiles" / "elias"
     profile.mkdir(parents=True)
     profile.joinpath("config.yaml").write_text(
@@ -44,19 +44,19 @@ platform_toolsets:
     - terminal
     - web
 toolsets:
-  - hermes-cli
+  - eir-cli
 agent:
   disabled_toolsets: []
 """.lstrip(),
         encoding="utf-8",
     )
     root.joinpath("config.yaml").write_text("toolsets:\n  - kanban\n", encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(root))
+    monkeypatch.setenv("EIR_HOME", str(root))
 
-    from hermes_cli import kanban_db as kb
-    from hermes_cli import kanban_db_dispatch as kbd
+    from eir_cli import kanban_db as kb
+    from eir_cli import kanban_db_dispatch as kbd
 
-    monkeypatch.setattr(kbd, "_resolve_hermes_argv", lambda: ["hermes"])
+    monkeypatch.setattr(kbd, "_resolve_eir_argv", lambda: ["eir"])
 
     captured = {}
 
@@ -76,24 +76,24 @@ agent:
     pid = kbd._default_spawn(_make_task(kb, assignee="elias"), str(workspace))
 
     assert pid == 4242
-    assert captured["env"]["HERMES_HOME"] == str(profile)
-    assert captured["env"]["HERMES_KANBAN_TASK"] == "t_spawn_tools"
-    assert captured["cmd"][-2:] == ["-m", "hermes_cli.kanban_worker_client"]
-    assert captured["env"]["HERMES_KANBAN_RUN_ID"] == "7"
-    assert captured["env"]["HERMES_KANBAN_CLAIM_LOCK"] == "lock"
+    assert captured["env"]["EIR_HOME"] == str(profile)
+    assert captured["env"]["EIR_KANBAN_TASK"] == "t_spawn_tools"
+    assert captured["cmd"][-2:] == ["-m", "eir_cli.kanban_worker_client"]
+    assert captured["env"]["EIR_KANBAN_RUN_ID"] == "7"
+    assert captured["env"]["EIR_KANBAN_CLAIM_LOCK"] == "lock"
 
 
 def test_default_spawn_does_not_pass_mutable_launch_overrides(monkeypatch, tmp_path):
     """Owner policy reads overrides from the claimed card, not executable argv."""
-    root = tmp_path / ".hermes"
+    root = tmp_path / ".eir"
     (root / "profiles" / "elias").mkdir(parents=True)
     root.joinpath("config.yaml").write_text("{}\n", encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(root))
+    monkeypatch.setenv("EIR_HOME", str(root))
 
-    from hermes_cli import kanban_db as kb
-    from hermes_cli import kanban_db_dispatch as kbd
+    from eir_cli import kanban_db as kb
+    from eir_cli import kanban_db_dispatch as kbd
 
-    monkeypatch.setattr(kbd, "_resolve_hermes_argv", lambda: ["hermes"])
+    monkeypatch.setattr(kbd, "_resolve_eir_argv", lambda: ["eir"])
     captured = {}
 
     class FakeProc:
@@ -112,7 +112,7 @@ def test_default_spawn_does_not_pass_mutable_launch_overrides(monkeypatch, tmp_p
     kbd._default_spawn(task, str(workspace))
 
     # Mutable model strings are not launch authority; the owner reads the claimed card.
-    assert captured["cmd"][-2:] == ["-m", "hermes_cli.kanban_worker_client"]
+    assert captured["cmd"][-2:] == ["-m", "eir_cli.kanban_worker_client"]
     assert task.model_override not in captured["cmd"]
 
 @pytest.mark.parametrize("multiplex", [True, False])
@@ -126,12 +126,12 @@ def test_default_spawn_hands_the_assignee_owner_only_its_own_values(monkeypatch,
     target_home=<assignee>, inherit_credentials=True)`` (``gateway_runtime_start``), so that is the
     environment this asserts on.
     """
-    root = tmp_path / ".hermes"
+    root = tmp_path / ".eir"
     profile = root / "profiles" / "elias"
     profile.mkdir(parents=True)
     profile.joinpath("config.yaml").write_text("{}\n", encoding="utf-8")
     profile.joinpath(".env").write_text("MY_PASSTHROUGH_VAR=elias-value\n", encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(root))
+    monkeypatch.setenv("EIR_HOME", str(root))
     monkeypatch.setenv("MY_PASSTHROUGH_VAR", "dispatcher-value")
     # Injected into the dispatcher only (systemd, op run): one on its passthrough list, one not.
     root.joinpath("config.yaml").write_text(
@@ -143,17 +143,17 @@ def test_default_spawn_hands_the_assignee_owner_only_its_own_values(monkeypatch,
     root.joinpath(".env").write_text("HTTPS_PROXY=http://user:pw@dispatcher-proxy:3128\n", encoding="utf-8")
     monkeypatch.setenv("HTTPS_PROXY", "http://user:pw@dispatcher-proxy:3128")
     # Host policy the cold-started gateway must share with the rest of the host.
-    host = {"HERMES_GATEWAY_LOCK_DIR": str(tmp_path / "locks"), "XDG_STATE_HOME": str(tmp_path / "state"),
-            "HERMES_DISABLE_LAZY_INSTALLS": "1", "HTTP_PROXY": "http://host-proxy:3128",
+    host = {"EIR_GATEWAY_LOCK_DIR": str(tmp_path / "locks"), "XDG_STATE_HOME": str(tmp_path / "state"),
+            "EIR_DISABLE_LAZY_INSTALLS": "1", "HTTP_PROXY": "http://host-proxy:3128",
             "SSH_AUTH_SOCK": str(tmp_path / "ssh-agent.sock")}
     for name, value in host.items():
         monkeypatch.setenv(name, value)
 
     from agent.secret_scope import set_multiplex_active
-    from hermes_cli import kanban_db as kb
-    from hermes_cli import kanban_db_dispatch as kbd
+    from eir_cli import kanban_db as kb
+    from eir_cli import kanban_db_dispatch as kbd
 
-    monkeypatch.setattr(kbd, "_resolve_hermes_argv", lambda: ["hermes"])
+    monkeypatch.setattr(kbd, "_resolve_eir_argv", lambda: ["eir"])
 
     captured = {}
 
@@ -179,7 +179,7 @@ def test_default_spawn_hands_the_assignee_owner_only_its_own_values(monkeypatch,
     from tools.environments.local import served_profile_child_env
     owner_env = served_profile_child_env(base=captured["env"], target_home=str(profile), inherit_credentials=True)
     assert owner_env.get("MY_PASSTHROUGH_VAR") == "elias-value"
-    assert owner_env["HERMES_HOME"] == str(profile)
+    assert owner_env["EIR_HOME"] == str(profile)
     # A value only the dispatcher has never reaches the assignee: an overlay cannot remove it.
     for name in ("DISPATCHER_ONLY_TOKEN", "SERVICE_INJECTED_SETTING", "XDG_SERVICE_TOKEN", "HTTPS_PROXY"):
         assert name not in captured["env"] and name not in owner_env, name
@@ -195,18 +195,18 @@ def test_worker_toolsets_come_from_the_assignee_profile_not_the_parent_config(tm
     from contextlib import closing
     from types import SimpleNamespace
 
-    from hermes_cli import kanban_db as kb
-    from hermes_cli.kanban_db_connect import connect
+    from eir_cli import kanban_db as kb
+    from eir_cli.kanban_db_connect import connect
     from gateway.session_contract import SessionActor
     from gateway.session_kanban import build_kanban_policy
 
     profile = tmp_path / "profiles" / "elias"
     profile.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_KANBAN_HOME", str(tmp_path))
-    monkeypatch.setenv("HERMES_HOME", str(profile))
+    monkeypatch.setenv("EIR_KANBAN_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(profile))
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
-    monkeypatch.delenv("HERMES_KANBAN_DB", raising=False)
-    monkeypatch.setattr("hermes_cli.profiles.resolve_profile_env", lambda name: str(profile))
+    monkeypatch.delenv("EIR_KANBAN_DB", raising=False)
+    monkeypatch.setattr("eir_cli.profiles.resolve_profile_env", lambda name: str(profile))
     workspace = tmp_path / "workspace"
     workspace.mkdir()
     kb.create_board("owned")  # explicit creation; connect() never creates a board (#43243)
@@ -220,7 +220,7 @@ def test_worker_toolsets_come_from_the_assignee_profile_not_the_parent_config(tm
     params = dict(board="owned", task_id=task.id, run_id=task.current_run_id, claim_lock=task.claim_lock)
 
     assignee_config = {"model": {"default": "m", "provider": "custom"},
-                       "platform_toolsets": {"cli": ["terminal", "web"]}, "toolsets": ["hermes-cli"]}
+                       "platform_toolsets": {"cli": ["terminal", "web"]}, "toolsets": ["eir-cli"]}
     policy, _ = build_kanban_policy(connection, params, assignee_config)
     assert {"terminal", "web", "kanban"} <= set(policy.toolsets)
 

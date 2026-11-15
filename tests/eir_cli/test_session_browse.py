@@ -1,4 +1,4 @@
-"""Tests for the interactive session browser (`hermes sessions browse`).
+"""Tests for the interactive session browser (`eir sessions browse`).
 
 Covers:
 - _session_browse_picker logic (curses mocked, fallback tested)
@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 
-from hermes_cli.sessions_cmd_browse import _session_browse_picker
+from eir_cli.sessions_cmd_browse import _session_browse_picker
 
 
 # ─── Sample session data ──────────────────────────────────────────────────────

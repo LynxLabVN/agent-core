@@ -1,4 +1,4 @@
-import type { PluginTranslate } from '@hermes/plugin-sdk'
+import type { PluginTranslate } from '@eir/plugin-sdk'
 
 // Resolve leaves when read: a module-level translator keeps its identity
 // across language changes, including while an async caller holds this binding.

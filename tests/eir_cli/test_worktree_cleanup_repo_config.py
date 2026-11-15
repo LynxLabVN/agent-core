@@ -35,7 +35,7 @@ def session_worktree(tmp_path):
     _git(repo, "commit", "-q", "-m", "init")
     _git(repo, "update-ref", "refs/remotes/origin/main", "HEAD")
     worktree = repo / ".worktrees" / "session"
-    _git(repo, "worktree", "add", "-q", "-b", "hermes/session", str(worktree), "HEAD")
+    _git(repo, "worktree", "add", "-q", "-b", "eir/session", str(worktree), "HEAD")
     markers = tmp_path / "markers"
     markers.mkdir()
     hooks = tmp_path / "hooks"
@@ -54,7 +54,7 @@ def _cleanup(monkeypatch, repo: Path, worktree: Path) -> str:
     printed: list[str] = []
     monkeypatch.setattr(cli, "release_lsp_clients", lambda path: None)
     monkeypatch.setattr(cli, "_cprint", printed.append)
-    cli._cleanup_worktree({"path": str(worktree), "branch": "hermes/session", "repo_root": str(repo)})
+    cli._cleanup_worktree({"path": str(worktree), "branch": "eir/session", "repo_root": str(repo)})
     return "".join(printed)
 
 
@@ -67,7 +67,7 @@ def test_cleanup_deletes_the_session_branch_without_running_repository_hooks(
 
     assert sorted(p.name for p in markers.iterdir()) == []
     assert not worktree.exists()
-    assert _git(repo, "branch", "--list", "hermes/session").strip() == ""
+    assert _git(repo, "branch", "--list", "eir/session").strip() == ""
     assert "cleaned up" in out
 
 

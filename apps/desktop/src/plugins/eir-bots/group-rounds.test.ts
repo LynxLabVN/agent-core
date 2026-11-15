@@ -15,7 +15,7 @@ import type { Attachment, GroupChat, GroupMember, GroupMessage } from './types'
 
 const { host } = vi.hoisted(() => ({ host: {} as Record<string, unknown> }))
 
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@eir/plugin-sdk', async () => {
   const { pluginSdkMock } = await import('./group-test-utils')
 
   return pluginSdkMock(host)
@@ -102,7 +102,7 @@ describe('routing', () => {
     expect(parsed.mentioned.size).toBe(1)
   })
 
-  it('resolves @hermes to the default member', async () => {
+  it('resolves @eir to the default member', async () => {
     const { rounds } = await loadRoom()
 
     const members: GroupMember[] = [
@@ -110,7 +110,7 @@ describe('routing', () => {
       { name: 'builder', title: '' }
     ]
 
-    const parsed = rounds.parseGroupChatMentions('@hermes take a look', members)
+    const parsed = rounds.parseGroupChatMentions('@eir take a look', members)
 
     expect(parsed.mentioned.has('default')).toBe(true)
     expect(parsed.mentioned.size).toBe(1)
@@ -253,7 +253,7 @@ describe('routing', () => {
     const { formatGroupChatLine } = await import('./group-round-prompt')
     const local: GroupMember = { connectionId: 'central', connectionLabel: 'Central', name: 'default', title: '' }
 
-    room.rounds.sendToGroupChat('Core', [local], '@hermes status?')
+    room.rounds.sendToGroupChat('Core', [local], '@eir status?')
     await settle(room, 'Core')
 
     const reply = log(room, 'Core').find(entry => entry.from.kind === 'member')
@@ -278,11 +278,11 @@ describe('routing', () => {
     const room = await loadRoom({ turn: ({ n }) => `Reply ${n} from this device.` })
     const local: GroupMember = { connectionId: 'local', connectionLabel: 'This device', name: 'default', title: '' }
 
-    room.rounds.sendToGroupChat('Core', [local], '@hermes status?')
+    room.rounds.sendToGroupChat('Core', [local], '@eir status?')
     await settle(room, 'Core')
 
     expect(room.gateway.calls).toHaveLength(1)
-    expect(log(room, 'Core').map(entry => entry.text)).toEqual(['@hermes status?', 'Reply 1 from this device.'])
+    expect(log(room, 'Core').map(entry => entry.text)).toEqual(['@eir status?', 'Reply 1 from this device.'])
   })
 
   // Two Desktops label the same gateway differently ("Central" here, "Studio"
@@ -299,7 +299,7 @@ describe('routing', () => {
       title: ''
     }
 
-    room.rounds.sendToGroupChat('Core', [local], '@hermes status?')
+    room.rounds.sendToGroupChat('Core', [local], '@eir status?')
     await settle(room, 'Core')
 
     const reply = log(room, 'Core').find(entry => entry.from.kind === 'member') as GroupMessage
@@ -857,7 +857,7 @@ describe('threads', () => {
         () =>
           !room.gateway.calls.some(call => call.prompt.includes(text)) ||
           Boolean(room.chat.$groupChats.get().Rooms?.running) ||
-          !JSON.stringify(room.gateway.uiMeta['hermes-bots-groups'] || {}).includes(text)
+          !JSON.stringify(room.gateway.uiMeta['eir-bots-groups'] || {}).includes(text)
       )
     }
 
@@ -868,7 +868,7 @@ describe('threads', () => {
     const firstEntry = log(room, 'Rooms').find(entry => entry.from.kind === 'user' && entry.text === 'first topic')
 
     expect(firstEntry?.thread).toBe(first)
-    expect(JSON.stringify(room.gateway.uiMeta['hermes-bots-groups'] || {})).toContain('first topic')
+    expect(JSON.stringify(room.gateway.uiMeta['eir-bots-groups'] || {})).toContain('first topic')
 
     const second = room.rounds.sendToGroupChat('Rooms', member, 'second topic')!
 
@@ -880,7 +880,7 @@ describe('threads', () => {
     expect(second).toBeTruthy()
     expect(first).not.toBe(second)
     expect(secondEntry?.thread).toBe(second)
-    expect(JSON.stringify(room.gateway.uiMeta['hermes-bots-groups'] || {})).toContain('second topic')
+    expect(JSON.stringify(room.gateway.uiMeta['eir-bots-groups'] || {})).toContain('second topic')
   })
 
   it('continues an explicit thread and scopes the member delta to it', async () => {
@@ -964,7 +964,7 @@ describe('threads', () => {
 })
 
 describe('turn prompt', () => {
-  it('addresses the default profile as @hermes', async () => {
+  it('addresses the default profile as @eir', async () => {
     const { rounds } = await loadRoom()
     const { buildGroupChatTurnPrompt } = await import('./group-round-prompt')
 
@@ -980,7 +980,7 @@ describe('turn prompt', () => {
       viewer: { name: 'default', title: '' }
     })
 
-    expect(own).toMatch(/You are @hermes,/)
+    expect(own).toMatch(/You are @eir,/)
     expect(own).not.toMatch(/@default\b/)
 
     const peer = buildGroupChatTurnPrompt({
@@ -990,11 +990,11 @@ describe('turn prompt', () => {
       viewer: { name: 'builder', title: '' }
     })
 
-    expect(peer).toMatch(/group chat with @hermes/)
+    expect(peer).toMatch(/group chat with @eir/)
   })
 
   // #89720: a renamed primary is @bobby to the roster, autocomplete and the
-  // mention resolver; introducing it to itself as @hermes made it treat
+  // mention resolver; introducing it to itself as @eir made it treat
   // `@bobby …` as someone else's message and pass.
   it('introduces a renamed primary by the same @tag the room resolves', async () => {
     const { rounds } = await loadRoom()

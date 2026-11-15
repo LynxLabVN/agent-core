@@ -14,24 +14,24 @@ import pytest
 
 @pytest.fixture
 def profile_home(tmp_path, monkeypatch):
-    """A NAMED-profile HERMES_HOME under <root>/profiles/<name>."""
-    root = tmp_path / ".hermes"
+    """A NAMED-profile EIR_HOME under <root>/profiles/<name>."""
+    root = tmp_path / ".eir"
     profile = root / "profiles" / "coder"
     profile.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(profile))
-    # hermes_constants memoizes root resolution per (native, env) pair;
+    monkeypatch.setenv("EIR_HOME", str(profile))
+    # eir_constants memoizes root resolution per (native, env) pair;
     # reload to make the new env authoritative for this test.
-    import hermes_constants
+    import eir_constants
 
-    importlib.reload(hermes_constants)
+    importlib.reload(eir_constants)
     yield root, profile
-    importlib.reload(hermes_constants)
+    importlib.reload(eir_constants)
 
 
 def test_models_and_runtimes_resolve_to_the_shared_root(profile_home):
     root, _profile = profile_home
-    from hermes_cli.local_runtime import binaries
-    from hermes_cli.local_runtime import bootstrap
+    from eir_cli.local_runtime import binaries
+    from eir_cli.local_runtime import bootstrap
 
     models = bootstrap.models_dir()
     runtimes = binaries.runtimes_root()
@@ -49,9 +49,9 @@ def test_all_runtime_state_follows_runtimes_root(profile_home):
     under runtimes_root() — one resolver, so profile-scoping bugs cannot
     come back one file at a time."""
     root, _profile = profile_home
-    from hermes_cli.local_runtime.growth import window_overrides_path
-    from hermes_cli.local_runtime.presets import read_preset_decisions
-    from hermes_cli.local_runtime import binaries
+    from eir_cli.local_runtime.growth import window_overrides_path
+    from eir_cli.local_runtime.presets import read_preset_decisions
+    from eir_cli.local_runtime import binaries
 
     shared = root / "runtimes" / "llamacpp"
     assert window_overrides_path() == shared / "window_overrides.json"
@@ -64,19 +64,19 @@ def test_all_runtime_state_follows_runtimes_root(profile_home):
 
 
 def test_default_profile_paths_unchanged(tmp_path, monkeypatch):
-    """HERMES_HOME at the root itself (default profile) resolves exactly
+    """EIR_HOME at the root itself (default profile) resolves exactly
     as before the scoping change — no migration for existing installs."""
-    root = tmp_path / ".hermes"
+    root = tmp_path / ".eir"
     root.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(root))
-    import hermes_constants
+    monkeypatch.setenv("EIR_HOME", str(root))
+    import eir_constants
 
-    importlib.reload(hermes_constants)
+    importlib.reload(eir_constants)
     try:
-        from hermes_cli.local_runtime import binaries
-        from hermes_cli.local_runtime import bootstrap
+        from eir_cli.local_runtime import binaries
+        from eir_cli.local_runtime import bootstrap
 
         assert bootstrap.models_dir() == root / "models"
         assert binaries.runtimes_root() == root / "runtimes" / "llamacpp"
     finally:
-        importlib.reload(hermes_constants)
+        importlib.reload(eir_constants)

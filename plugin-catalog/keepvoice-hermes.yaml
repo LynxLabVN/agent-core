@@ -1,5 +1,5 @@
 name: keepvoice-hermes
-title: KeepVoice for Hermes
+title: KeepVoice for Eir
 repo: https://github.com/yablokolabs/keepvoice-hermes
 sha: f75d546aeb42d84c3a2c5cfc95e2e013bf724c47
 version: "0.1.0"
@@ -8,12 +8,12 @@ maintainer: yablokolabs
 tier: community
 category: voice
 docs_url: https://github.com/yablokolabs/keepvoice-hermes
-requires_hermes: ">=0.23.0"
+requires_eir: ">=0.23.0"
 readme: true
 platforms: []
 known_issues:
   - "The signed artifact link is withheld on public surfaces (CLI, TUI, Desktop, ACP); open the review page in KeepVoice instead."
-  - "Live use needs a KeepVoice agent token for the active Hermes profile and an upload the creator is authorized to process."
+  - "Live use needs a KeepVoice agent token for the active Eir profile and an upload the creator is authorized to process."
 capabilities:
   provides_tools:
     - keepvoice_submit

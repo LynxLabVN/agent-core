@@ -3,11 +3,11 @@
 name: hermes-adaptive-effort
 repo: https://github.com/atostivint/hermes-adaptive-effort
 sha: cdbe220a64eb694914451abcd426630ca45d51d2
-description: "Choose a separate scorer to set the reasoning effort of each Hermes request. Disclosure — off by default; when a mode is enabled (or on an explicit `/hae probe`), sends the latest user message (or the parent-written subagent goal), truncated to 4000 characters, plus any configured guidance to the scorer you select (TypeSafe Jev at api.typesafe.ai by default, or OpenAI Decisions, OpenRouter, Cloudflare Workers AI, Nace at console.nace.ai, a local Ollama endpoint that needs no key, or a custom URL) using that service's key, or with no key at all for Ollama and for an unauthenticated custom endpoint; by default an enabled mode also sends up to 4 earlier user/assistant text messages (1200 characters each, up to 6 when configured; never on subagents or `/hae probe`) and a separate yes/no continuation question to the same scorer on each turn (set `dialogue_context_messages` or `continuation_downgrade_votes` to 0 to stop this), and an opt-in setting can also send the target model identity. The prompt stays on this machine only when the Ollama endpoint is local: this plugin cannot vouch for a remote address an operator types. In Hermes Desktop it also sets the focused chat's session reasoning selector through the gateway `config.set` API after each applied change, and it keeps a prompt-free effort-change history (64 changes × 64 conversations), per-conversation mode overrides (at most 256 conversations) and per-route cache verdicts built from provider token counters (at most 128 routes) in its plugin data directory."
+description: "Choose a separate scorer to set the reasoning effort of each Eir request. Disclosure — off by default; when a mode is enabled (or on an explicit `/hae probe`), sends the latest user message (or the parent-written subagent goal), truncated to 4000 characters, plus any configured guidance to the scorer you select (TypeSafe Jev at api.typesafe.ai by default, or OpenAI Decisions, OpenRouter, Cloudflare Workers AI, Nace at console.nace.ai, a local Ollama endpoint that needs no key, or a custom URL) using that service's key, or with no key at all for Ollama and for an unauthenticated custom endpoint; by default an enabled mode also sends up to 4 earlier user/assistant text messages (1200 characters each, up to 6 when configured; never on subagents or `/hae probe`) and a separate yes/no continuation question to the same scorer on each turn (set `dialogue_context_messages` or `continuation_downgrade_votes` to 0 to stop this), and an opt-in setting can also send the target model identity. The prompt stays on this machine only when the Ollama endpoint is local: this plugin cannot vouch for a remote address an operator types. In Eir Desktop it also sets the focused chat's session reasoning selector through the gateway `config.set` API after each applied change, and it keeps a prompt-free effort-change history (64 changes × 64 conversations), per-conversation mode overrides (at most 256 conversations) and per-route cache verdicts built from provider token counters (at most 128 routes) in its plugin data directory."
 maintainer: atostivint
 tier: community
 category: models
-requires_hermes: ">=0.21.6"
+requires_eir: ">=0.21.6"
 docs_url: https://github.com/atostivint/hermes-adaptive-effort/blob/cdbe220a64eb694914451abcd426630ca45d51d2/docs/README.md
 version: "0.5.0"
 image: https://raw.githubusercontent.com/atostivint/hermes-adaptive-effort/cdbe220a64eb694914451abcd426630ca45d51d2/assets/illustrations/plugin-card-2x1@2x.png
@@ -18,7 +18,7 @@ screenshots:
   - https://raw.githubusercontent.com/atostivint/hermes-adaptive-effort/cdbe220a64eb694914451abcd426630ca45d51d2/docs/images/desktop-settings.png
   - https://raw.githubusercontent.com/atostivint/hermes-adaptive-effort/cdbe220a64eb694914451abcd426630ca45d51d2/docs/images/routing-mode-popover.png
 platforms: []
-title: Hermes Adaptive Effort
+title: Eir Adaptive Effort
 known_issues:
   - "Live per-level effort intensity is only partially validated: the named levels were measured as accepted (one HTTP 200 per level), not as producing distinct reasoning intensity, and cache, cost and quality are unmeasured."
   - "The Ollama scorer has no live call in this release, so `logprobs` support on a given Ollama build is unverified, and the prompt stays on this machine only when `ollama_endpoint` is local."

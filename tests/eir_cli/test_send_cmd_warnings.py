@@ -1,9 +1,9 @@
-"""``hermes send`` without ``--json`` prints the result's warnings, so a failed media upload shows
+"""``eir send`` without ``--json`` prints the result's warnings, so a failed media upload shows
 its cause ("Timed out ...") instead of only the generic "No deliverable" error (#133164)."""
 
 import json
 
-from hermes_cli.send_cmd import _emit_result
+from eir_cli.send_cmd import _emit_result
 
 
 def test_plain_output_prints_warnings_before_the_error(capsys):

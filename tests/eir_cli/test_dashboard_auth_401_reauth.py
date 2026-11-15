@@ -12,7 +12,7 @@ Verifies the contract documented in Phase 6 v2 of the plan:
   - Invalid/expired cookies are cleared on 401 so the browser doesn't
     keep replaying them.
   - ``set_session_cookies(refresh_token="")`` does NOT emit the
-    ``hermes_session_rt`` cookie (contract V1: no RT to persist).
+    ``eir_session_rt`` cookie (contract V1: no RT to persist).
   - ``/auth/callback?next=…`` honours the same-origin landing path.
 """
 
@@ -31,17 +31,17 @@ from fastapi import FastAPI
 from fastapi.responses import Response
 from fastapi.testclient import TestClient
 
-from hermes_cli import web_server
-from hermes_cli.dashboard_auth import clear_providers, register_provider
-from hermes_cli.dashboard_auth.base import ProviderError, RefreshExpiredError
-from hermes_cli.dashboard_auth.cookies import (
+from eir_cli import web_server
+from eir_cli.dashboard_auth import clear_providers, register_provider
+from eir_cli.dashboard_auth.base import ProviderError, RefreshExpiredError
+from eir_cli.dashboard_auth.cookies import (
     SESSION_AT_COOKIE,
     SESSION_PROVIDER_COOKIE,
     SESSION_RT_COOKIE,
     clear_session_cookies,
     set_session_cookies,
 )
-from tests.hermes_cli.conftest_dashboard_auth import StubAuthProvider
+from tests.eir_cli.conftest_dashboard_auth import StubAuthProvider
 
 
 # ---------------------------------------------------------------------------
@@ -157,7 +157,7 @@ class TestApi401Envelope:
         /api/analytics/models?days=30`` from ModelsPage round-tripped
         through the OAuth dance and landed the user on the raw JSON
         endpoint instead of the dashboard. The gate now drops API paths
-        from ``next=`` entirely; the SPA's own ``hermes.lastLocation``
+        from ``next=`` entirely; the SPA's own ``eir.lastLocation``
         fallback in ``web/src/lib/api.ts`` covers the deep-link case.
         """
         r = gated_app.get("/api/sessions?page=2")
@@ -176,8 +176,8 @@ class TestTransparentRefreshOnAccessTokenEviction:
 
     This is the common-path expiry bug, not an edge case. The access-token
     cookie is set with ``Max-Age = access_token_expires_in`` (~15 min), so
-    the browser deletes ``hermes_session_at`` the instant the token lapses,
-    while ``hermes_session_rt`` lives for 30 days. From that moment the
+    the browser deletes ``eir_session_at`` the instant the token lapses,
+    while ``eir_session_rt`` lives for 30 days. From that moment the
     browser sends ONLY the refresh-token cookie. The original gate bailed at
     ``if not at: return _unauth_response(...)`` — bouncing the user to
     /login on every single expiry despite holding a perfectly good refresh
@@ -197,7 +197,7 @@ class TestTransparentRefreshOnAccessTokenEviction:
         signature + exp), then send ONLY that RT cookie.
         """
         import time as _t
-        from tests.hermes_cli.conftest_dashboard_auth import _sign
+        from tests.eir_cli.conftest_dashboard_auth import _sign
 
         clear_providers()
         provider = StubAuthProvider(default_ttl=900)
@@ -225,7 +225,7 @@ class TestTransparentRefreshOnAccessTokenEviction:
 
         # Browsing is read-only; initialize the real store as its owner would.
         from contextlib import closing
-        from hermes_state import SessionDB
+        from eir_state import SessionDB
 
         with closing(SessionDB()) as db:
             db.create_session("refresh-owner-session", source="cli")
@@ -263,7 +263,7 @@ class TestTransparentRefreshOnAccessTokenEviction:
         gated_app.cookies.clear()
         # A syntactically-real but expired RT (signed with exp<=now).
         import time as _t
-        from tests.hermes_cli.conftest_dashboard_auth import _sign
+        from tests.eir_cli.conftest_dashboard_auth import _sign
         dead_rt = _sign({"sub": "u", "kind": "refresh", "exp": int(_t.time()) - 1})
         gated_app.cookies.set(f"__Host-{SESSION_RT_COOKIE}", dead_rt)
         r = gated_app.get("/api/sessions")
@@ -303,7 +303,7 @@ class TestAutoSsoRedirect:
     has no session for the user.
     """
 
-    from hermes_cli.dashboard_auth.cookies import SSO_ATTEMPT_COOKIE
+    from eir_cli.dashboard_auth.cookies import SSO_ATTEMPT_COOKIE
 
     def test_unauth_html_load_auto_redirects_to_oauth(self, gated_app):
         """Common case: clicked a dashboard link, no local session cookie.
@@ -361,12 +361,12 @@ class TestAutoSsoRedirect:
         reverse proxy that mounts the dashboard at a sub-path."""
         r = gated_app.get(
             "/login",
-            headers={"X-Forwarded-Prefix": "/hermes"},
+            headers={"X-Forwarded-Prefix": "/eir"},
         )
         assert r.status_code == 200
         html = r.text
-        assert 'href="/hermes/auth/login?provider=' in html
-        assert 'data-prefix="/hermes"' in html
+        assert 'href="/eir/auth/login?provider=' in html
+        assert 'data-prefix="/eir"' in html
 
     def test_login_page_bare_urls_without_proxy_header(self, gated_app):
         """Without X-Forwarded-Prefix the login page must use
@@ -399,7 +399,7 @@ class TestNextSameOriginValidation:
         assert "//evil" not in location
 
     def test_safe_next_validator_accepts_same_origin(self):
-        from hermes_cli.dashboard_auth.middleware import _safe_next_target
+        from eir_cli.dashboard_auth.middleware import _safe_next_target
 
         class FakeRequest:
             def __init__(self, path, query=""):
@@ -413,7 +413,7 @@ class TestNextSameOriginValidation:
         )
 
     def test_safe_next_validator_rejects_protocol_relative(self):
-        from hermes_cli.dashboard_auth.middleware import _safe_next_target
+        from eir_cli.dashboard_auth.middleware import _safe_next_target
 
         class FakeRequest:
             def __init__(self, path):
@@ -423,7 +423,7 @@ class TestNextSameOriginValidation:
         assert _safe_next_target(FakeRequest("//evil.com")) == ""
 
     def test_safe_next_validator_rejects_login_loop(self):
-        from hermes_cli.dashboard_auth.middleware import _safe_next_target
+        from eir_cli.dashboard_auth.middleware import _safe_next_target
 
         class FakeRequest:
             def __init__(self, path):
@@ -441,7 +441,7 @@ class TestNextSameOriginValidation:
         OAuth shows raw JSON instead of the dashboard. This is the bug
         fix that closes the analytics-page redirect mishap.
         """
-        from hermes_cli.dashboard_auth.middleware import _safe_next_target
+        from eir_cli.dashboard_auth.middleware import _safe_next_target
 
         class FakeRequest:
             def __init__(self, path, query=""):
@@ -465,7 +465,7 @@ class TestNextSameOriginValidation:
     def test_safe_next_validator_does_not_reject_api_prefix_lookalikes(self):
         """Negative guard: ``/api-docs`` or ``/apis`` aren't ``/api/*``
         and must remain valid landing targets."""
-        from hermes_cli.dashboard_auth.middleware import _safe_next_target
+        from eir_cli.dashboard_auth.middleware import _safe_next_target
 
         class FakeRequest:
             def __init__(self, path):
@@ -483,7 +483,7 @@ class TestNextSameOriginValidation:
         """When ``X-Forwarded-Prefix`` is set, the ``next`` target must
         include the prefix so the post-login redirect lands within the
         reverse-proxy sub-path."""
-        from hermes_cli.dashboard_auth.middleware import _safe_next_target
+        from eir_cli.dashboard_auth.middleware import _safe_next_target
 
         class FakeRequest:
             def __init__(self, path, query="", prefix=""):
@@ -499,12 +499,12 @@ class TestNextSameOriginValidation:
 
         # With prefix: path is prefixed
         assert (
-            _safe_next_target(FakeRequest("/sessions", prefix="/hermes"))
-            == "%2Fhermes%2Fsessions"
+            _safe_next_target(FakeRequest("/sessions", prefix="/eir"))
+            == "%2Feir%2Fsessions"
         )
         assert (
-            _safe_next_target(FakeRequest("/sessions", "page=2", prefix="/hermes"))
-            == "%2Fhermes%2Fsessions%3Fpage%3D2"
+            _safe_next_target(FakeRequest("/sessions", "page=2", prefix="/eir"))
+            == "%2Feir%2Fsessions%3Fpage%3D2"
         )
 
         # With multi-level prefix like /profile/nati
@@ -515,21 +515,21 @@ class TestNextSameOriginValidation:
 
         # Auth rejection paths still work with prefix
         assert (
-            _safe_next_target(FakeRequest("/login", prefix="/hermes"))
+            _safe_next_target(FakeRequest("/login", prefix="/eir"))
             == ""
         )
         assert (
-            _safe_next_target(FakeRequest("/auth/login", prefix="/hermes"))
+            _safe_next_target(FakeRequest("/auth/login", prefix="/eir"))
             == ""
         )
         assert (
-            _safe_next_target(FakeRequest("/api/auth/me", prefix="/hermes"))
+            _safe_next_target(FakeRequest("/api/auth/me", prefix="/eir"))
             == ""
         )
 
         # API paths rejected even with prefix
         assert (
-            _safe_next_target(FakeRequest("/api/analytics/models", prefix="/hermes"))
+            _safe_next_target(FakeRequest("/api/analytics/models", prefix="/eir"))
             == ""
         )
 
@@ -685,7 +685,7 @@ class TestValidatePostLoginTarget:
     """
 
     def test_accepts_same_origin_paths(self):
-        from hermes_cli.dashboard_auth.routes import _validate_post_login_target
+        from eir_cli.dashboard_auth.routes import _validate_post_login_target
         assert _validate_post_login_target("/sessions") == "/sessions"
         # URL-encoded form (as the cookie carries it) round-trips through
         # the validator's unquote step.
@@ -699,7 +699,7 @@ class TestValidatePostLoginTarget:
         """Bug fix: any ``/api/*`` target is dropped at the callback
         boundary. Pin both the exact match and the trailing-slash forms
         plus a few realistic SPA-API endpoints."""
-        from hermes_cli.dashboard_auth.routes import _validate_post_login_target
+        from eir_cli.dashboard_auth.routes import _validate_post_login_target
         assert _validate_post_login_target("/api") == ""
         assert _validate_post_login_target("/api/analytics/models") == ""
         assert _validate_post_login_target("/api/analytics/models?days=30") == ""
@@ -732,7 +732,7 @@ class TestRenderLoginHtmlNext:
         clear_providers()
 
     def test_no_next_emits_plain_button(self):
-        from hermes_cli.dashboard_auth.login_page import render_login_html
+        from eir_cli.dashboard_auth.login_page import render_login_html
         html_out = render_login_html()
         assert 'href="/auth/login?provider=stub"' in html_out
         assert "next=" not in html_out
@@ -742,7 +742,7 @@ class TestRenderLoginHtmlNext:
         """Defence in depth: even though the caller validates next_path,
         we still HTML-escape the rendered value so a regression in the
         caller can't trivially produce an HTML-injection sink."""
-        from hermes_cli.dashboard_auth.login_page import render_login_html
+        from eir_cli.dashboard_auth.login_page import render_login_html
         # `"` in a path is already URL-encoded by quote() to %22, so it
         # never reaches the HTML escaper as a raw quote. This test pins
         # both layers: quote() does its job AND escape() does its.
@@ -751,20 +751,20 @@ class TestRenderLoginHtmlNext:
         assert "%22injected" in html_out
 
     def test_prefix_prepended_to_provider_button_href(self):
-        from hermes_cli.dashboard_auth.login_page import render_login_html
-        html_out = render_login_html(prefix="/hermes")
-        assert 'href="/hermes/auth/login?provider=stub"' in html_out
+        from eir_cli.dashboard_auth.login_page import render_login_html
+        html_out = render_login_html(prefix="/eir")
+        assert 'href="/eir/auth/login?provider=stub"' in html_out
 
     def test_prefix_with_next_threaded(self):
-        from hermes_cli.dashboard_auth.login_page import render_login_html
-        html_out = render_login_html(next_path="/sessions", prefix="/hermes")
-        assert 'href="/hermes/auth/login?provider=stub' in html_out
+        from eir_cli.dashboard_auth.login_page import render_login_html
+        html_out = render_login_html(next_path="/sessions", prefix="/eir")
+        assert 'href="/eir/auth/login?provider=stub' in html_out
         assert "next=" in html_out
 
     def test_empty_prefix_produces_bare_root_urls(self):
         """Explicitly passing prefix='' (the default) must NOT inject a
         ``data-prefix`` attribute or alter the hrefs."""
-        from hermes_cli.dashboard_auth.login_page import render_login_html
+        from eir_cli.dashboard_auth.login_page import render_login_html
         html_out = render_login_html(prefix="")
         assert 'href="/auth/login?provider=stub"' in html_out
         assert "data-prefix" not in html_out
@@ -772,12 +772,12 @@ class TestRenderLoginHtmlNext:
     def test_prefix_injected_as_data_attribute(self):
         """The <main> element must carry data-prefix so the password-login
         JS can read it."""
-        from hermes_cli.dashboard_auth.login_page import render_login_html
-        html_out = render_login_html(prefix="/hermes")
-        assert 'data-prefix="/hermes"' in html_out
+        from eir_cli.dashboard_auth.login_page import render_login_html
+        html_out = render_login_html(prefix="/eir")
+        assert 'data-prefix="/eir"' in html_out
 
     def test_prefix_does_not_appear_without_explicit_prefix(self):
-        from hermes_cli.dashboard_auth.login_page import render_login_html
+        from eir_cli.dashboard_auth.login_page import render_login_html
         html_out = render_login_html()
         assert "<main>" in html_out
         assert "data-prefix" not in html_out
@@ -802,7 +802,7 @@ class TestAuthLoginPkceCookieNext:
         )
         assert r.status_code == 302
         cookies = r.headers.get_list("set-cookie")
-        pkce = next(c for c in cookies if "hermes_session_pkce" in c)
+        pkce = next(c for c in cookies if "eir_session_pkce" in c)
         assert "next=" not in pkce
 
 
@@ -816,5 +816,5 @@ class TestAuthLoginPkceCookieNext:
             follow_redirects=False,
         )
         cookies = r.headers.get_list("set-cookie")
-        pkce = next(c for c in cookies if "hermes_session_pkce" in c)
+        pkce = next(c for c in cookies if "eir_session_pkce" in c)
         assert "next=" not in pkce

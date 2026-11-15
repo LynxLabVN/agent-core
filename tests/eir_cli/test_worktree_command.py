@@ -17,7 +17,7 @@ import pytest
 from agent.i18n import t
 
 import cli as cli_mod
-from hermes_cli.cli_commands_mixin import CLICommandsMixin
+from eir_cli.cli_commands_mixin import CLICommandsMixin
 
 requires_git = pytest.mark.skipif(
     shutil.which("git") is None, reason="git required"
@@ -97,7 +97,7 @@ def test_new_named_creates_and_retargets(repo):
     assert os.environ["TERMINAL_CWD"] == str(wt)
     assert os.path.realpath(os.getcwd()) == os.path.realpath(str(wt))
     assert cli_mod._active_worktree is not None
-    assert cli_mod._active_worktree["branch"] == "hermes/fix-login"
+    assert cli_mod._active_worktree["branch"] == "eir/fix-login"
     # Same file contents as the base commit.
     assert (wt / "a.txt").read_text() == "hello\n"
 
@@ -112,11 +112,11 @@ def test_new_named_collision_refused(repo):
     assert cli_mod._active_worktree == first
 
 @requires_git
-def test_new_unnamed_uses_random_hermes_prefix(repo):
+def test_new_unnamed_uses_random_eir_prefix(repo):
     out = _run(_Stub(), "/worktree new")
     assert t("cli.commands.worktree.ready", path=cli_mod._active_worktree["path"]) in out
     name = os.path.basename(cli_mod._active_worktree["path"])
-    assert name.startswith("hermes-")
+    assert name.startswith("eir-")
 
 @requires_git
 def test_new_sanitizes_name(repo):
@@ -127,10 +127,10 @@ def test_new_sanitizes_name(repo):
 
 def _gateway_stub(rpc=None):
     """A CLI attached to a (scripted) gateway session: the tools run there, not in this process."""
-    from hermes_cli.gateway_connection import GatewayConnection
-    from hermes_cli.gateway_session_store import GatewaySessionStore
-    from tests.hermes_cli.test_gateway_agent import connect_with
-    from tests.hermes_cli.test_gateway_session_store import FakeClient
+    from eir_cli.gateway_connection import GatewayConnection
+    from eir_cli.gateway_session_store import GatewaySessionStore
+    from tests.eir_cli.test_gateway_agent import connect_with
+    from tests.eir_cli.test_gateway_session_store import FakeClient
     client = FakeClient(known=("local-s",))
     if rpc is not None:
         client.rpc = rpc.__get__(client)
@@ -161,8 +161,8 @@ def test_new_moves_the_gateway_sessions_workspace_into_the_tree(repo):
 def test_new_refused_by_the_gateway_never_claims_the_tools_moved(repo):
     """A refused move (e.g. ``session_busy`` mid-turn) leaves the session where it was: say so, and
     keep this process (and a later /new's cwd) in the original checkout too."""
-    from hermes_cli.gateway_client import GatewayRPCError
-    from tests.hermes_cli.test_gateway_session_store import snapshot
+    from eir_cli.gateway_client import GatewayRPCError
+    from tests.eir_cli.test_gateway_session_store import snapshot
 
     async def refuse(self, method, *, _timeout=None, **params):
         self.calls.append((method, params))
@@ -207,7 +207,7 @@ def test_a_moved_session_gets_its_clean_tree_back_on_resume(repo):
     """The move freezes the tree as the session's cwd and quit removes a clean tree, so a resume had
     every turn refused ``workspace_unavailable``. The tree is recorded as a ``--tui -w`` one is, so the
     resume recreates it at the same path (N8)."""
-    from hermes_cli.tui_worktree_resume import recreate_tui_worktree
+    from eir_cli.tui_worktree_resume import recreate_tui_worktree
     stub, _client, conn = _gateway_stub()
     try:
         _run(stub, "/worktree new kept")

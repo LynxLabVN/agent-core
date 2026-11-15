@@ -5,7 +5,7 @@
  * them instead of the bot-list error, with no Refresh button.
  */
 
-import type * as HermesSdk from '@hermes/plugin-sdk'
+import type * as EirSdk from '@eir/plugin-sdk'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, render, screen } from '@testing-library/react'
 import { atom } from 'nanostores'
@@ -15,8 +15,8 @@ import { translateBotsIn } from './i18n-test-helper'
 
 const { request, requestProfile } = vi.hoisted(() => ({ request: vi.fn(), requestProfile: vi.fn() }))
 
-vi.mock('@hermes/plugin-sdk', async importOriginal => {
-  const sdk = await importOriginal<typeof HermesSdk>()
+vi.mock('@eir/plugin-sdk', async importOriginal => {
+  const sdk = await importOriginal<typeof EirSdk>()
 
   return {
     ...sdk,

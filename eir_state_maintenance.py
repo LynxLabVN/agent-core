@@ -7,14 +7,14 @@ import time
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-from hermes_state_common import (
+from eir_state_common import (
     AUTO_VACUUM_MIN_FREELIST_RATIO, _id_chunks, _non_continuation_child_sql, _placeholders, _sql_session_last_active,
     escape_like as _escape_like, emit_session_deleted,
 )
-from hermes_startup_watchdog import report_startup_progress
+from eir_startup_watchdog import report_startup_progress
 
-# caplog tests pin the "hermes_state" logger name.
-logger = logging.getLogger("hermes_state")
+# caplog tests pin the "eir_state" logger name.
+logger = logging.getLogger("eir_state")
 
 _LAST_ACTIVE_SQL = _sql_session_last_active("s")
 _TOKENS_SQL = "(COALESCE(s.input_tokens, 0) + COALESCE(s.output_tokens, 0))"
@@ -26,7 +26,7 @@ def _like(value: str) -> str:
 
 
 def _cwd_prefix_filter(value: str) -> tuple[list[str], list]:
-    from hermes_state_sessions import _cwd_prefix_clause
+    from eir_state_sessions import _cwd_prefix_clause
     clause, params = _cwd_prefix_clause(value)
     return [clause], list(params)
 
@@ -124,7 +124,7 @@ class SessionMaintenanceMixin:
                       SELECT 1 FROM messages WHERE messages.session_id = sessions.id
                   )
             """, (cutoff,)).fetchall()]
-            from hermes_state_mutation_retirement import retire_prunable
+            from eir_state_mutation_retirement import retire_prunable
             ids = retire_prunable(conn, ids)
             for chunk in _id_chunks(ids):
                 conn.execute(f"DELETE FROM sessions WHERE id IN ({_placeholders(chunk)})", chunk)
@@ -133,7 +133,7 @@ class SessionMaintenanceMixin:
             return ids
         removed_ids = self._execute_write(_do) or []
         emit_session_deleted(self, removed_ids, reason="ghost_prune", sessions_dir=sessions_dir)
-        from hermes_state_media import collect_retired_media
+        from eir_state_media import collect_retired_media
         collect_retired_media(self)
         for sid in removed_ids if sessions_dir else ():
             self._remove_session_files(sessions_dir, sid)
@@ -147,8 +147,8 @@ class SessionMaintenanceMixin:
     def _write_guards_reject(self, conn, sid: str, **kwargs) -> bool:
         """True when a live turn lease / compression lock protects ``sid``; expired or
         dead-holder guards are reclaimed and fenced as a side effect."""
-        from hermes_state import SessionCompressionInProgressError
-        from hermes_state_errors import SessionTurnLeaseLostError
+        from eir_state import SessionCompressionInProgressError
+        from eir_state_errors import SessionTurnLeaseLostError
         try:
             self._check_transcript_write_guards(
                 conn, sid, compression_lock_holder=None, turn_lease_holder=None,
@@ -389,7 +389,7 @@ class SessionMaintenanceMixin:
             session_ids = {row["id"] for row in cursor.fetchall()}
             if exclude_active_write_guards:
                 session_ids -= self._guarded_ids(conn, session_ids)
-            from hermes_state_mutation_retirement import prune_retired_tombstones, retire_prunable
+            from eir_state_mutation_retirement import prune_retired_tombstones, retire_prunable
             session_ids = retire_prunable(conn, sorted(session_ids))
             prune_retired_tombstones(conn)  # every prune pass also reclaims expired deletion tombstones
             if not session_ids:
@@ -406,7 +406,7 @@ class SessionMaintenanceMixin:
         count = self._execute_write(_do)
         if count:
             emit_session_deleted(self, removed_ids, reason="prune", sessions_dir=sessions_dir)
-        from hermes_state_media import collect_retired_media
+        from eir_state_media import collect_retired_media
         collect_retired_media(self)
         for sid in removed_ids:
             self._remove_session_files(sessions_dir, sid)
@@ -469,7 +469,7 @@ class SessionMaintenanceMixin:
             self._raise_if_db_replaced()
             if self._conn is None:
                 self._reopen_after_close_locked(context="write")
-            # PASSIVE, not TRUNCATE: a manual `hermes sessions vacuum` runs in a transient CLI
+            # PASSIVE, not TRUNCATE: a manual `eir sessions vacuum` runs in a transient CLI
             # process; a TRUNCATE reset here would race a live gateway writer.
             self._try_checkpoint("PASSIVE", "WAL checkpoint (PASSIVE) before VACUUM failed: %s")
             self._conn.execute("VACUUM")
@@ -503,7 +503,7 @@ class SessionMaintenanceMixin:
         ``request_dump_*``) for pruned sessions are removed as part of the same sweep (issue #3015).
         Messaging and UI sources are never touched here. See #54189.
         """
-        from hermes_state_repair import _release_auto_maintenance_lock, _try_acquire_auto_maintenance_lock
+        from eir_state_repair import _release_auto_maintenance_lock, _try_acquire_auto_maintenance_lock
         result: dict[str, Any] = {"skipped": False, "pruned": 0, "closed": 0, "vacuumed": False}
         if retention_days is None or retention_days < 0:
             # A negative retention would build a future cutoff and match every ended
@@ -545,14 +545,14 @@ class SessionMaintenanceMixin:
             vacuum_due = since_vacuum is None or since_vacuum >= min_vacuum_interval_days * 86400
             if vacuum and pruned > 0 and vacuum_due:
                 result["freelist_ratio"] = ratio = self._freelist_ratio()
-                # Same admission `hermes sessions optimize` runs: VACUUM plus the TRUNCATE checkpoint
+                # Same admission `eir sessions optimize` runs: VACUUM plus the TRUNCATE checkpoint
                 # retire the WAL generation a sibling writer (gateway, Desktop, dashboard, cron) still
                 # holds, and that is exactly the state every agent then refuses turns in (#110054).
                 # The foreign scan skips our own pid, so it is paired with the in-process arm: under
                 # one multiplexed process another live SessionDB generation for this same path is
                 # just as much a holder as another process would be.
                 # Automatic maintenance only ever SKIPS — a turn is never refused over housekeeping.
-                from hermes_state_holders import (
+                from eir_state_holders import (
                     foreign_state_db_holders, in_process_state_db_holders)
                 holders = (foreign_state_db_holders(self.db_path)
                            + in_process_state_db_holders(self.db_path, exclude=self))

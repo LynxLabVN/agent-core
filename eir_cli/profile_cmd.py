@@ -1,6 +1,6 @@
-"""``hermes profile`` command — one handler per action, dispatched by ``PROFILE_ACTIONS``.
+"""``eir profile`` command — one handler per action, dispatched by ``PROFILE_ACTIONS``.
 
-Imports from ``hermes_cli.profiles`` stay lazy (inside each handler) so tests can monkeypatch
+Imports from ``eir_cli.profiles`` stay lazy (inside each handler) so tests can monkeypatch
 the module attributes.
 """
 
@@ -39,15 +39,15 @@ def _env_file_has_key(env_path: Path, key: str) -> bool:
 
 def _render_distribution_plan(plan) -> None:
     """Print a human-readable summary of a pending distribution install."""
-    from hermes_cli.profile_distribution import MANIFEST_FILENAME
+    from eir_cli.profile_distribution import MANIFEST_FILENAME
     mf = plan.manifest
     print(f"\nDistribution: {mf.name} v{mf.version}")
     if mf.description:
         print(f"  {mf.description}")
     if mf.author:
         print(f"  Author:   {mf.author}")
-    if mf.hermes_requires:
-        print(f"  Requires: Hermes {mf.hermes_requires}")
+    if mf.eir_requires:
+        print(f"  Requires: Eir {mf.eir_requires}")
     print(f"  Source:   {plan.provenance}")
     print(f"  Target:   {plan.target_dir}")
     if plan.existing:
@@ -85,11 +85,11 @@ def _render_distribution_plan(plan) -> None:
 
 
 def _profile_status(args):
-    """Bare ``hermes profile`` — show current profile status."""
-    from hermes_constants import display_hermes_home
-    from hermes_cli.profiles import format_profile_label, get_active_profile_name, list_profiles
+    """Bare ``eir profile`` — show current profile status."""
+    from eir_constants import display_eir_home
+    from eir_cli.profiles import format_profile_label, get_active_profile_name, list_profiles
     profile_name = get_active_profile_name()
-    dhh = display_hermes_home()
+    dhh = display_eir_home()
     current = next((p for p in list_profiles() if _is_active(p, profile_name)), None)
     label = format_profile_label(profile_name, current.display_name if current else "")
     print(f"\nActive profile: {label}")
@@ -101,12 +101,12 @@ def _profile_status(args):
         print(f"Gateway:        {'running' if p.gateway_running else 'stopped'}")
         print(f"Skills:         {p.skill_count} installed")
         if p.alias_path:
-            print(f"Alias:          {p.alias_name or p.name} → hermes -p {p.name}")
+            print(f"Alias:          {p.alias_name or p.name} → eir -p {p.name}")
     print()
 
 
 def _profile_list(args):
-    from hermes_cli.profiles import format_profile_label, get_active_profile_name, list_profiles
+    from eir_cli.profiles import format_profile_label, get_active_profile_name, list_profiles
     profiles = list_profiles()
     active = get_active_profile_name()
     if not profiles:
@@ -131,7 +131,7 @@ def _shared_credential_warnings(profiles) -> list:
     """One warning per named profile whose bot credential is byte-identical to the default's
     (typically an old ``--clone`` that copied .env): the collision that parks a multiplexed
     adapter or makes two standalone gateways fight over one bot."""
-    from hermes_cli.profile_channels import shared_channel_credentials, shared_credential_warning
+    from eir_cli.profile_channels import shared_channel_credentials, shared_credential_warning
     default = next((p for p in profiles if p.is_default), None)
     if default is None:
         return []
@@ -149,17 +149,17 @@ def _shared_credential_warnings(profiles) -> list:
 
 
 def _profile_use(args):
-    from hermes_cli.profiles import set_active_profile
+    from eir_cli.profiles import set_active_profile
     name = args.profile_name
     try:
         set_active_profile(name)
-        print("Switched to: default (~/.hermes)" if name == "default" else f"Switched to: {name}")
+        print("Switched to: default (~/.eir)" if name == "default" else f"Switched to: {name}")
     except (ValueError, FileNotFoundError) as e:
         _die(f"Error: {e}")
 
 
 def _print_channel_clone_notice(name: str, made, clone_channels: bool, clone_flag: str) -> None:
-    from hermes_cli.profile_channels import format_stripped_notice, shared_credential_warning
+    from eir_cli.profile_channels import format_stripped_notice, shared_credential_warning
     if not clone_channels:
         for line in format_stripped_notice(name, made.channels_left_behind, clone_flag):
             print(line)
@@ -193,9 +193,9 @@ def _refuse_create_args(args, clone_from: Optional[str], cloned: bool) -> None:
 
 
 def _profile_create(args):
-    from hermes_cli.profile_provision import CREATE_REFUSALS, ProfileCreateReceipt, ProfileCreateRequest, provision_profile
-    from hermes_cli.profile_provision_gateway import GatewayCreateError, create_through_gateway
-    from hermes_cli.profiles import _get_wrapper_dir, _is_wrapper_dir_in_path
+    from eir_cli.profile_provision import CREATE_REFUSALS, ProfileCreateReceipt, ProfileCreateRequest, provision_profile
+    from eir_cli.profile_provision_gateway import GatewayCreateError, create_through_gateway
+    from eir_cli.profiles import _get_wrapper_dir, _is_wrapper_dir_in_path
     name = args.profile_name
     clone = getattr(args, "clone", False)
     clone_all = getattr(args, "clone_all", False)
@@ -214,7 +214,7 @@ def _profile_create(args):
         mirror_credentials=not getattr(args, "no_credentials", False),
         share_auth=not getattr(args, "isolated_auth", False))
     try:
-        # A gateway serving this terminal makes the profile (one HERMES_TUI_GATEWAY_URL names always
+        # A gateway serving this terminal makes the profile (one EIR_TUI_GATEWAY_URL names always
         # does); with none it is made here. Either way the receipt below is read where it was made.
         made = create_through_gateway(request) or ProfileCreateReceipt.of(request, provision_profile(request))
     except (*CREATE_REFUSALS, GatewayCreateError) as e:
@@ -231,7 +231,7 @@ def _profile_create(args):
             if made.memory_provider:
                 print(f"Cloned memory provider config ({made.memory_provider}) too.")
         if sync_imports:
-            print(f"Import sources carried over — `hermes -p {name} import-agent --sync` "
+            print(f"Import sources carried over — `eir -p {name} import-agent --sync` "
                   "keeps pulling the same Claude Code / Codex trees.")
         _print_channel_clone_notice(name, made, clone_channels, "--clone-all" if clone_all else "--clone")
     else:
@@ -245,8 +245,8 @@ def _profile_create(args):
     if not no_alias:
         if made.alias_collision:
             print(f"\n⚠ Cannot create alias '{name}' — {made.alias_collision}")
-            print(f"  Choose a custom alias:  hermes profile alias {name} --name <custom>")
-            print(f"  Or access via flag:     hermes -p {name} chat")
+            print(f"  Choose a custom alias:  eir profile alias {name} --name <custom>")
+            print(f"  Or access via flag:     eir -p {name} chat")
         elif made.alias_path:
             print(f"Wrapper created: {made.alias_path}")
             if not _is_wrapper_dir_in_path():
@@ -264,7 +264,7 @@ def _profile_create(args):
         print("  (served now by the running multiplexed gateway — add its bot token and it connects)")
     elif made.served_now is False:
         # The multiplexer did not pick the profile up (older gateway or the signal failed): a restart serves it.
-        print("  hermes gateway restart    Serve this profile from the running multiplexed gateway")
+        print("  eir gateway restart    Serve this profile from the running multiplexed gateway")
     else:
         print(f"  {name} gateway start      Start the messaging gateway")
     if cloned or made.mirrored.get("env"):
@@ -278,7 +278,7 @@ def _profile_create(args):
 
 
 def _profile_delete(args):
-    from hermes_cli.profiles import delete_profile
+    from eir_cli.profiles import delete_profile
     try:
         delete_profile(args.profile_name, yes=getattr(args, "yes", False))
     except (ValueError, FileNotFoundError, RuntimeError) as e:
@@ -286,17 +286,17 @@ def _profile_delete(args):
 
 
 def _describe_target_dir(name: str) -> Path:
-    """Profile dir for ``describe``: ``default`` maps to the CURRENT home (get_hermes_home),
+    """Profile dir for ``describe``: ``default`` maps to the CURRENT home (get_eir_home),
     everything else to its named directory."""
-    from hermes_cli import profiles as _profiles_mod
+    from eir_cli import profiles as _profiles_mod
     if _profiles_mod.normalize_profile_name(name) == "default":
-        from hermes_constants import get_hermes_home as _hh
+        from eir_constants import get_eir_home as _hh
         return Path(_hh())
     return _profiles_mod.get_profile_dir(name)
 
 
 def _profile_describe(args):
-    from hermes_cli import profiles as _profiles_mod
+    from eir_cli import profiles as _profiles_mod
     all_flag = bool(getattr(args, "all_missing", False))
     auto_flag = bool(getattr(args, "auto", False))
     overwrite_flag = bool(getattr(args, "overwrite", False))
@@ -338,7 +338,7 @@ def _profile_describe(args):
         sys.exit(0)
 
     # --auto path: invoke the LLM describer.
-    from hermes_cli import profile_describer as _pd
+    from eir_cli import profile_describer as _pd
     if all_flag:
         targets = _pd.list_describable_profiles(missing_only=True)
         if not targets:
@@ -358,7 +358,7 @@ def _profile_describe(args):
 
 def _profile_show(args):
     name = args.profile_name
-    from hermes_cli.profiles import (
+    from eir_cli.profiles import (
         get_profile_dir, profile_exists, _read_config_model, _check_gateway_running,
         _served_by_running_multiplexer, _count_skills, _read_distribution_meta, _wrapper_path,
         find_alias_for_profile, format_profile_label, read_profile_meta,
@@ -383,14 +383,14 @@ def _profile_show(args):
         print(f"Distribution: {dist_name}@{dist_version or '?'}")
         if dist_source:
             print(f"Installed from: {dist_source}")
-        print(f"  (run `hermes profile info {name}` for full manifest)")
+        print(f"  (run `eir profile info {name}` for full manifest)")
     if alias_name:
-        print(f"Alias:   {alias_name} → hermes -p {name}  ({_wrapper_path(alias_name)})")
+        print(f"Alias:   {alias_name} → eir -p {name}  ({_wrapper_path(alias_name)})")
     print()
 
 
 def _profile_alias(args):
-    from hermes_cli.profiles import (
+    from eir_cli.profiles import (
         _get_wrapper_dir, _is_wrapper_dir_in_path, check_alias_collision, create_wrapper_script,
         profile_exists, remove_wrapper_script, validate_alias_name,
     )
@@ -409,7 +409,7 @@ def _profile_alias(args):
         if remove_wrapper_script(alias_name):
             print(f"✓ Removed alias '{alias_name}'")
         elif not exists:
-            _die(f"Error: No alias '{alias_name}' and no profile '{name}'. `hermes doctor` lists orphan aliases.")
+            _die(f"Error: No alias '{alias_name}' and no profile '{name}'. `eir doctor` lists orphan aliases.")
         else:
             print(f"No alias '{alias_name}' found to remove.")
         return
@@ -426,7 +426,7 @@ def _profile_alias(args):
 
 
 def _profile_rename(args):
-    from hermes_cli.profiles import normalize_profile_name, rename_profile
+    from eir_cli.profiles import normalize_profile_name, rename_profile
     try:
         new_dir = rename_profile(args.old_name, args.new_name)
         if normalize_profile_name(args.old_name) != "default":
@@ -440,14 +440,14 @@ def _profile_migrate_identity(args):
     """Retry the identity migration of a rename that already completed. Exits non-zero when a
     live gateway would not migrate (it still owns the routing index in memory), or when a
     database rejected the rewrite (collision, lock, partial failure)."""
-    from hermes_cli.profile_identity import migrate_profile_identity
+    from eir_cli.profile_identity import migrate_profile_identity
     try:
         migrated = migrate_profile_identity(args.old_name, args.new_name)
     except (ValueError, FileNotFoundError) as e:
         _die(f"Error: {e}")
     if not migrated:
         _die(f"Error: session identity was not migrated. Restart or stop the gateway, then run:\n"
-             f"    hermes profile migrate-identity {args.old_name} {args.new_name}", err=True)
+             f"    eir profile migrate-identity {args.old_name} {args.new_name}", err=True)
     print(f"✓ Session/routing identity migrated: {args.old_name} → {args.new_name}")
 
 
@@ -455,19 +455,19 @@ def _profile_purge_identity(args):
     """Retry the identity purge of a delete that already completed. Exits non-zero when a live
     gateway would not purge (it still owns the routing index in memory), or when a database rejected
     the delete (lock, partial failure)."""
-    from hermes_cli.profile_identity import purge_profile_identity
+    from eir_cli.profile_identity import purge_profile_identity
     try:
         purged = purge_profile_identity(args.profile_name)
     except ValueError as e:
         _die(f"Error: {e}")
     if not purged:
         _die(f"Error: session identity was not purged. Restart or stop the gateway, then run:\n"
-             f"    hermes profile purge-identity {args.profile_name}", err=True)
+             f"    eir profile purge-identity {args.profile_name}", err=True)
     print(f"✓ Session/routing identity purged: {args.profile_name}")
 
 
 def _profile_export(args):
-    from hermes_cli.profiles import export_profile, get_profile_export_path
+    from eir_cli.profiles import export_profile, get_profile_export_path
     name = args.profile_name
     try:
         output = args.output or str(get_profile_export_path(name))
@@ -478,7 +478,7 @@ def _profile_export(args):
 
 
 def _profile_import(args):
-    from hermes_cli.profiles import check_alias_collision, create_wrapper_script, import_profile
+    from eir_cli.profiles import check_alias_collision, create_wrapper_script, import_profile
     try:
         profile_dir = import_profile(args.archive, name=getattr(args, "import_name", None))
         name = profile_dir.name
@@ -494,11 +494,11 @@ def _profile_import(args):
 
 def _profile_install(args):
     import tempfile
-    from hermes_cli.profile_distribution import DistributionError, install_distribution, plan_install
+    from eir_cli.profile_distribution import DistributionError, install_distribution, plan_install
     try:
         # Preview: stage into a scratch dir, show the manifest, then do the real install.
         # The double-stage avoids any side-effects if the user declines.
-        with tempfile.TemporaryDirectory(prefix="hermes_dist_preview_") as tmp:
+        with tempfile.TemporaryDirectory(prefix="eir_dist_preview_") as tmp:
             plan = plan_install(args.source, Path(tmp), override_name=getattr(args, "install_name", None))
             _render_distribution_plan(plan)
             if not getattr(args, "yes", False) and not _confirm("\nProceed with install? [y/N] "):
@@ -518,23 +518,23 @@ def _profile_install(args):
         if plan.has_cron:
             print(
                 "  Cron jobs were included but are NOT scheduled automatically.\n"
-                f"  Review them with:  hermes -p {plan.manifest.name} cron list"
+                f"  Review them with:  eir -p {plan.manifest.name} cron list"
             )
-        print(f"\n  Use with:      hermes -p {plan.manifest.name} chat")
+        print(f"\n  Use with:      eir -p {plan.manifest.name} chat")
     except (DistributionError, ValueError) as e:
         _die(f"Error: {e}")
 
 
 def _profile_update(args):
-    from hermes_cli.profile_distribution import DistributionError, read_manifest, update_distribution
-    from hermes_cli.profiles import get_profile_dir, normalize_profile_name
+    from eir_cli.profile_distribution import DistributionError, read_manifest, update_distribution
+    from eir_cli.profiles import get_profile_dir, normalize_profile_name
     try:
         canon = normalize_profile_name(args.profile_name)
         current = read_manifest(get_profile_dir(canon))
         if current is None:
             _die(
                 f"Error: Profile '{canon}' is not a distribution (no distribution.yaml). "
-                "Only profiles installed via `hermes profile install` can be updated."
+                "Only profiles installed via `eir profile install` can be updated."
             )
         force_config = getattr(args, "force_config", False)
         if not getattr(args, "yes", False):
@@ -551,7 +551,7 @@ def _profile_update(args):
         plan = update_distribution(canon, force_config=force_config)
         print(f"\n✓ Updated '{plan.manifest.name}' → v{plan.manifest.version}")
         if plan.has_cron:
-            print(f"  Cron files were refreshed.  Review with:  hermes -p {plan.manifest.name} cron list")
+            print(f"  Cron files were refreshed.  Review with:  eir -p {plan.manifest.name} cron list")
     except (DistributionError, ValueError) as e:
         _die(f"Error: {e}")
 
@@ -560,14 +560,14 @@ _INFO_FIELDS = (
     ("description", "Description:  "),
     ("author", "Author:       "),
     ("license", "License:      "),
-    ("hermes_requires", "Requires:     Hermes "),
+    ("eir_requires", "Requires:     Eir "),
     ("source", "Source:       "),
     ("installed_at", "Installed:    "),
 )
 
 
 def _profile_info(args):
-    from hermes_cli.profile_distribution import describe_distribution, DistributionError
+    from eir_cli.profile_distribution import describe_distribution, DistributionError
     try:
         data = describe_distribution(args.profile_name)
     except (DistributionError, ValueError) as e:
@@ -594,7 +594,7 @@ def _profile_info(args):
     print()
 
 
-# Order mirrors the original if/elif chain; None = bare ``hermes profile``.
+# Order mirrors the original if/elif chain; None = bare ``eir profile``.
 PROFILE_ACTIONS = {
     None: _profile_status,
     'list': _profile_list,

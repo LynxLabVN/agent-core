@@ -1,4 +1,4 @@
-import { compactNumber } from '@hermes/shared'
+import { compactNumber } from '@eir/shared'
 import { Fragment } from 'react'
 
 import { Codicon } from '@/components/ui/codicon'

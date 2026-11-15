@@ -1,5 +1,5 @@
 /**
- * Hermes Cloud owns updates for its agents: it replaces the agent's image, so
+ * Eir Cloud owns updates for its agents: it replaces the agent's image, so
  * no in-app updater may be offered there. Two shapes reach a Cloud agent:
  *
  * - the Webapp served BY a Cloud agent (the tab's own origin is the agent):
@@ -8,28 +8,28 @@
  *   the Desktop app on this machine still updates itself.
  */
 
-import { isHermesCloudUrl } from '@hermes/shared'
+import { isEirCloudUrl } from '@eir/shared'
 import { computed } from 'nanostores'
 
-import type { HermesConnection } from '@/global'
-import { servedByHermesCloud } from '@/lib/hermes-cloud-host'
+import type { EirConnection } from '@/global'
+import { servedByEirCloud } from '@/lib/eir-cloud-host'
 import type { UpdateTarget } from '@/lib/update-copy'
 import { $connection } from '@/store/session'
 
-function connectedToHermesCloud(connection: HermesConnection | null): boolean {
-  return connection?.mode === 'remote' && (connection.remoteKind === 'cloud' || isHermesCloudUrl(connection.baseUrl))
+function connectedToEirCloud(connection: EirConnection | null): boolean {
+  return connection?.mode === 'remote' && (connection.remoteKind === 'cloud' || isEirCloudUrl(connection.baseUrl))
 }
 
-/** Whether Hermes Cloud owns updates for `target` under `connection`. */
-export function cloudOwnsUpdates(target: UpdateTarget, connection: HermesConnection | null = $connection.get()): boolean {
-  return servedByHermesCloud() || (target === 'backend' && connectedToHermesCloud(connection))
+/** Whether Eir Cloud owns updates for `target` under `connection`. */
+export function cloudOwnsUpdates(target: UpdateTarget, connection: EirConnection | null = $connection.get()): boolean {
+  return servedByEirCloud() || (target === 'backend' && connectedToEirCloud(connection))
 }
 
 /**
- * The target a generic "Update Hermes" command acts on: the connected backend
- * in remote mode, unless Hermes Cloud owns it — then this machine's own app.
+ * The target a generic "Update Eir" command acts on: the connected backend
+ * in remote mode, unless Eir Cloud owns it — then this machine's own app.
  */
-export function updateTargetFor(connection: HermesConnection | null): UpdateTarget {
+export function updateTargetFor(connection: EirConnection | null): UpdateTarget {
   return connection?.mode === 'remote' && !cloudOwnsUpdates('backend', connection) ? 'backend' : 'client'
 }
 

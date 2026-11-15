@@ -2,12 +2,12 @@ name: hermes-detox
 repo: https://github.com/kellycryptos/hermes-detox
 sha: 6efe12bea00546d0e200c67c7afec5e1ac056ce7
 version: "0.1.0"
-title: "Hermes Detox"
+title: "Eir Detox"
 description: "Tool output firewall. Saves redacted tool output locally (unencrypted; redaction is pattern-based and can miss secrets; no network), gives the model a compact report, and retrieves exact lines on demand."
 maintainer: kellycryptos
 tier: community
 category: tools
-requires_hermes: ">=0.22.3"
+requires_eir: ">=0.22.3"
 docs_url: https://github.com/kellycryptos/hermes-detox#readme
 readme: true
 platforms: []

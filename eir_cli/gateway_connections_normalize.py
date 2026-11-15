@@ -17,11 +17,11 @@ LOCAL_CONNECTION_ID = "local"
 REGISTRY_QUARANTINE_CAP = 20
 LABEL_MAX = 64
 KINDS = ("local", "remote", "cloud", "ssh")
-_RESERVED_REMOTE_PROFILES = {"hermes", "test", "tmp", "root", "sudo"}
+_RESERVED_REMOTE_PROFILES = {"eir", "test", "tmp", "root", "sudo"}
 _HEADER_NAME_RE = re.compile(r"^[!#$%&'*+.^_`|~0-9A-Za-z-]+$")
 _FORBIDDEN_HEADERS = {
     "authorization", "connection", "content-length", "content-type", "cookie", "host", "origin",
-    "referer", "te", "trailer", "transfer-encoding", "upgrade", "x-hermes-session-token",
+    "referer", "te", "trailer", "transfer-encoding", "upgrade", "x-eir-session-token",
 }
 _PROFILE_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 
@@ -225,7 +225,7 @@ def normalize_ssh_config(entry: Any) -> Optional[dict]:
     port = explicit if explicit is not None else parsed_port
     if isinstance(port, int) and 0 < port <= 65535 and port != 22:
         out["port"] = port
-    for field in ("keyPath", "remoteHermesPath"):
+    for field in ("keyPath", "remoteEirPath"):
         value = js_str(entry.get(field)).strip()
         if value:
             out[field] = value
@@ -384,7 +384,7 @@ def _check_label(label: str, input_id: Any, registry: dict) -> None:
 
 def _ssh_input(data: dict, cid: str, registry: dict) -> dict:
     ssh = normalize_ssh_config({"mode": "ssh", **{k: data.get(k) for k in (
-        "host", "user", "port", "keyPath", "remoteHermesPath", "remoteProfile")}})
+        "host", "user", "port", "keyPath", "remoteEirPath", "remoteProfile")}})
     if not ssh:
         raise ConnectionStoreError("SSH connections need a host.")
     fields = _ssh_fields(ssh)
@@ -451,7 +451,7 @@ def merge_connection_input(data: dict, existing: Optional[dict]) -> dict:
         inherit(field)
     if data.get("kind") == "cloud" and ("url" not in data or _same_url(data["url"], existing.get("url"))):
         inherit("name")
-    for field in ("host", "keyPath", "remoteHermesPath", "remoteProfile", "headers"):
+    for field in ("host", "keyPath", "remoteEirPath", "remoteProfile", "headers"):
         inherit(field)
     if "host" not in data or not js_string(data["host"]).strip():
         inherit("user")
@@ -466,7 +466,7 @@ def _same_url(a: Any, b: Any) -> bool:
 def connection_dial_fields_changed(before: dict, after: dict) -> bool:
     if before.get("kind") != after.get("kind"):
         return True
-    for field in ("url", "authMode", "org", "host", "user", "port", "keyPath", "remoteHermesPath", "remoteProfile"):
+    for field in ("url", "authMode", "org", "host", "user", "port", "keyPath", "remoteEirPath", "remoteProfile"):
         if before.get(field) != after.get(field):
             return True
     return before.get("token") != after.get("token") or before.get("headers") != after.get("headers")

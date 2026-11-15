@@ -1,4 +1,4 @@
-"""``hermes auth upgrade``: the plain device-code sign-in, then the free tier's apps move over.
+"""``eir auth upgrade``: the plain device-code sign-in, then the free tier's apps move over.
 
 Driven through a fake portal covering the device-code endpoints plus the free tier's claim
 endpoint, so the wire contract (device code, token grant persisted over the guest singleton, one
@@ -16,8 +16,8 @@ from urllib.parse import parse_qs
 import httpx
 import pytest
 
-from hermes_cli import anon_auth
-from hermes_cli.auth import _auth_file_path, _load_auth_store
+from eir_cli import anon_auth
+from eir_cli.auth import _auth_file_path, _load_auth_store
 
 WELCOME = "https://welcome-api.nousresearch.com/v1"
 INFERENCE = "https://inference-api.nousresearch.com/v1"
@@ -90,7 +90,7 @@ class FakePortal:
             if self.on_token is not None:
                 self.on_token()
             return httpx.Response(200, json={
-                "access_token": _jwt(sub="nas_user:9", client_id="hermes-cli", account_tier="free", email=EMAIL),
+                "access_token": _jwt(sub="nas_user:9", client_id="eir-cli", account_tier="free", email=EMAIL),
                 "refresh_token": REFRESH_TOKEN, "token_type": "Bearer", "expires_in": 900,
                 "scope": "inference:invoke", "inference_base_url": self.token_inference_url})
         return httpx.Response(500, json={"error": f"unexpected {path}"})
@@ -99,12 +99,12 @@ class FakePortal:
 @pytest.fixture
 def portal(monkeypatch, tmp_path):
     fake = FakePortal()
-    monkeypatch.setenv("HERMES_PORTAL_BASE_URL", PORTAL)
-    monkeypatch.setenv("HERMES_ANON_API_SECRET", "test-secret")
-    monkeypatch.setenv("HERMES_SHARED_AUTH_DIR", str(tmp_path / "shared-store"))
+    monkeypatch.setenv("EIR_PORTAL_BASE_URL", PORTAL)
+    monkeypatch.setenv("EIR_ANON_API_SECRET", "test-secret")
+    monkeypatch.setenv("EIR_SHARED_AUTH_DIR", str(tmp_path / "shared-store"))
     for var in ("OPENROUTER_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "NOUS_API_KEY"):
         monkeypatch.delenv(var, raising=False)
-    from hermes_cli import auth_nous
+    from eir_cli import auth_nous
 
     def _client(timeout_seconds, verify):
         return httpx.Client(transport=httpx.MockTransport(fake.handler), base_url=PORTAL)
@@ -170,9 +170,9 @@ class TestUpgrade:
         assert shared.get("refresh_token") == REFRESH_TOKEN
         assert "anon_token" not in shared
 
-    def test_hermes_model_signs_a_connector_free_tier_in_instead_of_refusing(self, portal, monkeypatch, capsys):
-        from hermes_cli import model_setup_flows
-        from tests.hermes_cli.anon_portal import as_local_desktop_backend
+    def test_eir_model_signs_a_connector_free_tier_in_instead_of_refusing(self, portal, monkeypatch, capsys):
+        from eir_cli import model_setup_flows
+        from tests.eir_cli.anon_portal import as_local_desktop_backend
         as_local_desktop_backend(monkeypatch)
         assert anon_auth.guest_without_free_tier(anon_auth.ensure_portal_identity(explicit=True))
         logins = []
@@ -185,12 +185,12 @@ class TestUpgrade:
 
     def test_the_terminal_device_login_prints_what_moved(self, portal, monkeypatch, capsys):
         import argparse
-        from hermes_cli import auth_nous
-        from hermes_cli.auth import PROVIDER_REGISTRY
+        from eir_cli import auth_nous
+        from eir_cli.auth import PROVIDER_REGISTRY
         anon_auth.ensure_portal_identity(explicit=True)
-        account = {"access_token": _jwt(sub="nas_user:9", client_id="hermes-cli", account_tier="free", email=EMAIL),
+        account = {"access_token": _jwt(sub="nas_user:9", client_id="eir-cli", account_tier="free", email=EMAIL),
                    "refresh_token": REFRESH_TOKEN, "portal_base_url": PORTAL, "inference_base_url": INFERENCE,
-                   "client_id": "hermes-cli", "expires_in": 900}
+                   "client_id": "eir-cli", "expires_in": 900}
         monkeypatch.setattr(auth_nous, "_offer_shared_nous_import", lambda timeout: None)
         monkeypatch.setattr(auth_nous, "_nous_device_code_login", lambda **kw: dict(account))
         monkeypatch.setattr(auth_nous, "_pick_nous_model_after_login", lambda *a: None)
@@ -208,8 +208,8 @@ FREE_PICK = "upstage/solar-pro4:free"
 def free_account(monkeypatch):
     """The signed-in account is a $0 (free-plan) account: the Portal's tier read and its recommended
     free list are the only network egress the default pick has, stubbed at their seams."""
-    from hermes_cli import models as m
-    from hermes_cli import models_pricing as mp
+    from eir_cli import models as m
+    from eir_cli import models_pricing as mp
     monkeypatch.setattr(m, "check_nous_free_tier", lambda **kw: True)
     monkeypatch.setattr(m, "fetch_nous_recommended_models", lambda *a, **kw: {
         "freeRecommendedModels": [{"modelName": FREE_PICK}]})
@@ -218,14 +218,14 @@ def free_account(monkeypatch):
 
 
 def _write_model_config(model_cfg: dict) -> None:
-    from hermes_cli.config import load_config, save_config
+    from eir_cli.config import load_config, save_config
     config = load_config()
     config["model"] = model_cfg
     save_config(config)
 
 
 def _model_config() -> dict:
-    from hermes_cli.config import load_config_readonly
+    from eir_cli.config import load_config_readonly
     return dict(load_config_readonly().get("model") or {})
 
 
@@ -252,7 +252,7 @@ class TestSignInCompletionSettlesTheModel:
 
     def test_no_eligible_recommendation_leaves_no_default_rather_than_a_model_the_account_may_not_use(
             self, portal, free_account, monkeypatch, capsys):
-        from hermes_cli import models as m
+        from eir_cli import models as m
         anon_auth.ensure_portal_identity(explicit=True)
         _write_model_config({"provider": "nous", "default": anon_auth.GUEST_MODEL, "base_url": WELCOME})
         def _portal_down():
@@ -264,4 +264,4 @@ class TestSignInCompletionSettlesTheModel:
         assert model_cfg["base_url"] == INFERENCE.rstrip("/")
         out = capsys.readouterr().out
         assert "Default model is now" not in out
-        assert "run `hermes model` to pick one" in out
+        assert "run `eir model` to pick one" in out

@@ -9,11 +9,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 import gateway.status as _gw_status
-import hermes_cli.web_server_gateway as _web_server_gateway
+import eir_cli.web_server_gateway as _web_server_gateway
 import plugins.dashboard_auth.basic as basic_plugin
-from hermes_cli import web_server
-from hermes_cli.dashboard_auth import clear_providers, register_provider
-from hermes_cli.dashboard_auth.routes import _reset_password_rate_limit
+from eir_cli import web_server
+from eir_cli.dashboard_auth import clear_providers, register_provider
+from eir_cli.dashboard_auth.routes import _reset_password_rate_limit
 
 LAN = "http://192.168.50.220:9130"
 SECRET = "hunter2-bot-token"
@@ -37,7 +37,7 @@ def password_hash():
 
 @pytest.fixture
 def gated(password_hash, monkeypatch):
-    monkeypatch.delenv("HERMES_DASHBOARD_PUBLIC_URL", raising=False)
+    monkeypatch.delenv("EIR_DASHBOARD_PUBLIC_URL", raising=False)
     for key, value in (("bound_host", "0.0.0.0"), ("bound_port", 9130), ("auth_required", True),
                        ("trusted_public_hosts", frozenset())):
         monkeypatch.setattr(web_server.app.state, key, value, raising=False)
@@ -117,7 +117,7 @@ def test_loopback_dashboard_gates_detail_on_the_session_token(gated, monkeypatch
 
 def test_unlisted_platform_state_reads_as_unknown():
     # A live gateway's entries reach the projection whatever their state; only the enum passes.
-    from hermes_cli.web_routers.status_public import redact_status_for_unverified
+    from eir_cli.web_routers.status_public import redact_status_for_unverified
     status = {"gateway_platforms": {"telegram": {"state": f"fatal: {SECRET}"}}}
     redact_status_for_unverified(status)
     assert status["gateway_platforms"] == {"telegram": {"state": "unknown"}}

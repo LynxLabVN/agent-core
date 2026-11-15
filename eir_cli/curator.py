@@ -1,4 +1,4 @@
-"""CLI subcommand: `hermes curator <subcommand>`."""
+"""CLI subcommand: `eir curator <subcommand>`."""
 
 from __future__ import annotations
 
@@ -70,7 +70,7 @@ def _print_unmanaged_summary() -> None:
     print(f"\nunmanaged (no provenance marker): {len(unmanaged)} total")
     print(f"  pre-dates marker    {legacy}")
     print(f"  foreground-created  {foreground}")
-    print("  never auto-staled or archived — `hermes curator adopt <name>` hands one over")
+    print("  never auto-staled or archived — `eir curator adopt <name>` hands one over")
 
 
 def _print_curator_config(curator) -> None:
@@ -107,7 +107,7 @@ def _cmd_status(args) -> int:
     _print_curator_config(curator)
     if locked := skill_usage.locked_skill_names():
         print(f"\nlocked ({len(locked)}): {', '.join(locked)}  "
-              f"(the agent cannot change these; `hermes curator unlock <skill>` lifts it)")
+              f"(the agent cannot change these; `eir curator unlock <skill>` lifts it)")
     rows = skill_usage.curated_report()
     if not rows:
         print("\nno curator-managed skills")
@@ -178,14 +178,14 @@ def _cmd_run(args) -> int:
             f"archived={auto.get('archived', 0)} "
             f"reactivated={auto.get('reactivated', 0)}")
     if not synchronous:
-        print("llm pass running in background — check `hermes curator status` later")
+        print("llm pass running in background — check `eir curator status` later")
     if dry:
         print(
             "dry-run: no changes applied. Read the report with "
-            "`hermes curator status` and run `hermes curator run` (no flag) to apply."
+            "`eir curator status` and run `eir curator run` (no flag) to apply."
             if synchronous else
             "dry-run: no changes applied. When the report lands, read it with "
-            "`hermes curator status` and run `hermes curator run` (no flag) to apply.")
+            "`eir curator status` and run `eir curator run` (no flag) to apply.")
     return 0
 
 
@@ -204,12 +204,12 @@ _PIN_MESSAGES = {
     True: (
         "cannot pin (only agent-created skills participate in curation)",
         "could not pin '{skill}' — the skill is not curation-eligible (protected built-in or "
-        "external), or skills/.usage.json is damaged or not writable. `hermes curator list-unmanaged` "
+        "external), or skills/.usage.json is damaged or not writable. `eir curator list-unmanaged` "
         "shows which skills the curator tracks.",
         # Unmanaged skills are never auto-transitioned, so the pin is recorded but only
         # becomes protective once the skill is adopted — say so and point at `adopt`.
         "pinned '{skill}' (recorded; this skill is unmanaged — auto-transitions never consider "
-        "it. Run `hermes curator adopt {skill}` to put it under curator management)",
+        "it. Run `eir curator adopt {skill}` to put it under curator management)",
         "pinned '{skill}' (will bypass auto-transitions)"),
     False: (
         "there's nothing to unpin (curator only tracks agent-created skills)",
@@ -242,7 +242,7 @@ def _cmd_unpin(args) -> int: return _set_pin(args, False)
 
 
 def _set_lock(args, locked: bool) -> int:
-    """``hermes curator lock|unlock``: a user declaration stored beside ``pinned`` in the active
+    """``eir curator lock|unlock``: a user declaration stored beside ``pinned`` in the active
     profile's skills/.usage.json, enforced by tools/skill_lock on every agent write path. Any skill
     can be locked, but the name must resolve in this profile, so a typo never forges a record."""
     from tools import skill_usage
@@ -251,7 +251,7 @@ def _set_lock(args, locked: bool) -> int:
     existing = _find_skill(args.skill)
     if existing is None:
         print(f"curator: no skill named '{args.skill}' in the active profile — nothing to {verb}. "
-              f"`hermes skills list` shows the names.")
+              f"`eir skills list` shows the names.")
         return 1
     key = existing["path"].name  # directory name: the key the skill_manage guard resolves to
     if not skill_usage.set_locked(key, locked):
@@ -262,7 +262,7 @@ def _set_lock(args, locked: bool) -> int:
         print(f"curator: locked '{key}'. The agent can no longer change it: skill_manage, write_file, "
               f"patch and terminal refuse, in normal turns and the background passes alike, and the "
               f"curator won't archive it. It stays readable and auto-loadable, and you can still edit it "
-              f"yourself. Unlock with `hermes curator unlock {key}`.")
+              f"yourself. Unlock with `eir curator unlock {key}`.")
     else:
         print(f"curator: unlocked '{key}'. The agent may edit it again.")
     return 0
@@ -285,8 +285,8 @@ def _cmd_list_unmanaged(args) -> int:
         print(
             f"  {r['name']:44s} activity={r.get('activity_count', 0):4d}  "
             f"last_activity={_fmt_ts(r.get('last_activity_at')):14s}  ({why})")
-    print("\nadopt one with `hermes curator adopt <name>`, "
-          "or all with `hermes curator adopt --all-unmanaged`")
+    print("\nadopt one with `eir curator adopt <name>`, "
+          "or all with `eir curator adopt --all-unmanaged`")
     return 0
 
 
@@ -352,7 +352,7 @@ def _cmd_archive(args) -> int:
     if skill_usage.get_record(args.skill).get("pinned"):
         print(
             f"curator: '{args.skill}' is pinned — unpin first with "
-            f"`hermes curator unpin {args.skill}`")
+            f"`eir curator unpin {args.skill}`")
         return 1
     return _as_user(skill_usage.archive_skill, args.skill)
 
@@ -415,7 +415,7 @@ def _cmd_backup(args) -> int:
     if snap is None:
         print("curator: snapshot failed — check logs (backup disabled or IO error)")
         return 1
-    print(f"curator: snapshot created at ~/.hermes/skills/.curator_backups/{snap.name}")
+    print(f"curator: snapshot created at ~/.eir/skills/.curator_backups/{snap.name}")
     return 0
 
 
@@ -446,8 +446,8 @@ def _cmd_ledger(args) -> int:
             f"{r.get('actor', '?'):<8} {r.get('action', '?'):<12} "
             f"{r.get('skill', '?')}{extra}")
     print(
-        "\nRoll back a single mutation with `hermes curator rollback <id>`; "
-        "whole-tree snapshots remain available via `hermes curator rollback --list`.")
+        "\nRoll back a single mutation with `eir curator rollback <id>`; "
+        "whole-tree snapshots remain available via `eir curator rollback --list`.")
     return 0
 
 
@@ -457,7 +457,7 @@ def _cmd_purge(args) -> int:
     entry, so even a purge is auditable and blob-recoverable."""
     import shutil
     import time
-    from hermes_cli.config import cfg_get, load_config
+    from eir_cli.config import cfg_get, load_config
     from tools import skill_ledger, skill_usage
     ttl_days = getattr(args, "days", None)
     if ttl_days is None:
@@ -528,7 +528,7 @@ def _rollback_ledger_entry(args, entry_id: str) -> int:
     if entry is None:
         print(
             f"curator: no ledger entry '{entry_id}'. "
-            "See `hermes curator ledger` for entry ids, or use "
+            "See `eir curator ledger` for entry ids, or use "
             "`--id <snapshot>` for whole-tree snapshot rollback.")
         return 1
     print(f"Rollback target: ledger entry {entry_id}")
@@ -559,7 +559,7 @@ def _cmd_rollback(args) -> int:
         if not curator_backup.list_backups():
             print(
                 "curator: no snapshots exist yet. Take one with "
-                "`hermes curator backup` or wait for the next curator run.")
+                "`eir curator backup` or wait for the next curator run.")
         else:
             print(
                 f"curator: no snapshot matching "
@@ -582,7 +582,7 @@ def _cmd_rollback(args) -> int:
             else:
                 print(f"  cron jobs:   not in snapshot ({cron.get('reason', 'not captured')})")
     print(
-        "\nThis will replace the current ~/.hermes/skills/ tree (a safety "
+        "\nThis will replace the current ~/.eir/skills/ tree (a safety "
         "snapshot of the current state is taken first so this is undoable). "
         "Cron jobs that still exist will have their skills/skill fields "
         "restored from the snapshot; all other cron fields are left alone.")
@@ -710,19 +710,19 @@ _SUBCOMMANDS = (
              help="Show what would be archived without doing it")),
     (
         "backup",
-        "Take a manual tar.gz snapshot of ~/.hermes/skills/ "
+        "Take a manual tar.gz snapshot of ~/.eir/skills/ "
         "(curator also does this automatically before every real run)",
         _cmd_backup,
         _arg("--reason", default=None,
              help="Free-text label stored in manifest.json (default: 'manual')")),
     (
         "rollback",
-        "Restore ~/.hermes/skills/ from a curator snapshot, or a single "
-        "mutation by ledger entry id (see `hermes curator ledger`)",
+        "Restore ~/.eir/skills/ from a curator snapshot, or a single "
+        "mutation by ledger entry id (see `eir curator ledger`)",
         _cmd_rollback,
         _arg("entry_id", nargs="?", default=None,
              help="Ledger entry id for single-mutation rollback (from "
-                  "`hermes curator ledger`). Omit for whole-tree snapshot rollback."),
+                  "`eir curator ledger`). Omit for whole-tree snapshot rollback."),
         _arg("--list", **_STORE_TRUE, help="List available snapshots and exit without restoring"),
         _arg("--id", dest="backup_id", default=None,
              help="Snapshot id to restore (see `--list`); default: newest"),
@@ -758,8 +758,8 @@ def register_cli(parent: argparse.ArgumentParser) -> None:
 
 
 def cli_main(argv=None) -> int:
-    """Standalone entry (also usable by hermes_cli.main fallthrough)."""
-    parser = argparse.ArgumentParser(prog="hermes curator")
+    """Standalone entry (also usable by eir_cli.main fallthrough)."""
+    parser = argparse.ArgumentParser(prog="eir curator")
     register_cli(parser)
     args = parser.parse_args(argv)
     return int(args.func(args) or 0)

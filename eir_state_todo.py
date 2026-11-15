@@ -1,5 +1,5 @@
 """The newest Todo result a resume restores: an indexed, bounded search of the resume display scope.
-Split out of ``hermes_state_messages`` and bound onto SessionDB through ``SessionMessagesMixin``; built
+Split out of ``eir_state_messages`` and bound onto SessionDB through ``SessionMessagesMixin``; built
 on its _resume_lineage_ids/_read_ctx primitives."""
 
 from __future__ import annotations
@@ -91,7 +91,7 @@ class SessionTodoResultMixin:
 
     def _todo_copies(self, row, identity: Any = None) -> list[Any]:
         """The copy identities ``_dedupe_display_generations(drop_removed=True)`` gives a Todo result row."""
-        from hermes_state_identity import _uid_list
+        from eir_state_identity import _uid_list
         hashed = identity or self._display_identity(self._display_dedupe_key(row))
         return [hashed, *(("uid", uid) for uid in (row["message_uid"], *_uid_list(row["absorbed_message_uids"])) if uid)]
 

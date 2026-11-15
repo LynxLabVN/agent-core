@@ -1,4 +1,4 @@
-"""Runtime-backed validation behind ``hermes plugins doctor``: every manifest/import/registration
+"""Runtime-backed validation behind ``eir plugins doctor``: every manifest/import/registration
 check routes through the real runtime contracts instead of a parallel scanner."""
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from types import SimpleNamespace
 from typing import Any, Literal
 from unittest.mock import patch
 
-from hermes_constants import get_hermes_home
+from eir_constants import get_eir_home
 
 
 class _DoctorLoadError(RuntimeError):
@@ -61,13 +61,13 @@ def _doctor_runtime(plugin_path: Path):
     """Load one plugin through the real runtime and restore global state afterwards.
 
     Private Doctor machinery, not a plugin test framework. Registration code runs under a temporary
-    HERMES_HOME with outbound socket connects blocked.
+    EIR_HOME with outbound socket connects blocked.
     """
     stack = ExitStack()
     try:
         # The temp dir enters the stack FIRST so any failure below (ENOSPC / KeyboardInterrupt in
-        # copytree) removes it instead of stranding a hermes-plugin-doctor-* directory.
-        home = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix="hermes-plugin-doctor-")))
+        # copytree) removes it instead of stranding a eir-plugin-doctor-* directory.
+        home = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix="eir-plugin-doctor-")))
         bundled = home / "bundled-plugins"
         plugins_root = home / "plugins"
         bundled.mkdir(parents=True)
@@ -87,9 +87,9 @@ def _doctor_runtime(plugin_path: Path):
             staged = staging_root / members[0].name
             _stage_copy(members[0], staged)
         stack.enter_context(patch.dict(os.environ, {
-            "HERMES_HOME": str(home),
-            "HERMES_BUNDLED_PLUGINS": str(bundled),
-            "HERMES_ENABLE_PROJECT_PLUGINS": "0",
+            "EIR_HOME": str(home),
+            "EIR_BUNDLED_PLUGINS": str(bundled),
+            "EIR_ENABLE_PROJECT_PLUGINS": "0",
         }, clear=False))
         stack.enter_context(patch.object(socket, "create_connection", _deny_network))
         stack.enter_context(patch.object(socket.socket, "connect", _deny_network))
@@ -98,7 +98,7 @@ def _doctor_runtime(plugin_path: Path):
         stack.close()
         raise
 
-    from hermes_cli.plugins import PluginManager
+    from eir_cli.plugins import PluginManager
     from tools.registry import registry
     entries_before = {entry.name: entry for entry in registry._snapshot_entries()}
     policy_before = dict(registry._plugin_override_policy)
@@ -107,7 +107,7 @@ def _doctor_runtime(plugin_path: Path):
     try:
         manifests = manager._scan_directory(plugins_root, source="user")
         if not manifests:
-            raise _DoctorLoadError(f"Hermes discovery found no valid plugin manifest under {staging_root}")
+            raise _DoctorLoadError(f"Eir discovery found no valid plugin manifest under {staging_root}")
         if len(manifests) != 1:
             raise _DoctorLoadError(
                 f"Expected one plugin manifest, discovered {len(manifests)} under {staging_root}")
@@ -130,7 +130,7 @@ def _doctor_runtime(plugin_path: Path):
             registered_hooks=tuple(loaded.hooks_registered), registered_providers=())
     finally:
         # Dispose the plugin's own registrations FIRST, while the temporary
-        # HERMES_HOME still exists. This runs the host-owned ctx.on_unload(...)
+        # EIR_HOME still exists. This runs the host-owned ctx.on_unload(...)
         # callbacks — e.g. closing a SQLite handle a context-engine plugin
         # opened under that home. Without it the DB stays open and stack.close()
         # below (TemporaryDirectory removal) fails with WinError 32 on Windows
@@ -165,7 +165,7 @@ def _doctor_runtime(plugin_path: Path):
 
 
 def _is_plugin_module(name: str) -> bool:
-    return name == "hermes_plugins" or name.startswith("hermes_plugins.")
+    return name == "eir_plugins" or name.startswith("eir_plugins.")
 
 
 @contextmanager
@@ -256,7 +256,7 @@ _STAGING_SKIPPED_DIRS = (".git", "__pycache__", ".pytest_cache")
 
 def _candidate_dirs(path: Path) -> list[Path]:
     """Subdirectories of *path* that could be plugins: not skipped by discovery or the staging copy."""
-    from hermes_cli.plugins_discovery import is_skipped_plugin_dir
+    from eir_cli.plugins_discovery import is_skipped_plugin_dir
 
     try:
         return sorted(
@@ -273,7 +273,7 @@ def _category_plugins(path: Path) -> list[Path]:
     """The plugin subdirectories of a manifest-less *path* when it is a category, else ``[]``.
 
     A category is a directory whose candidate subdirectories (:func:`_candidate_dirs`) all hold
-    a manifest. A plugin checkout next to other directories (``$HOME`` beside ``.hermes``, a repo
+    a manifest. A plugin checkout next to other directories (``$HOME`` beside ``.eir``, a repo
     root beside ``tests/``) is not a category."""
     children = _candidate_dirs(path)
     return children if children and all(_has_manifest(child) for child in children) else []
@@ -305,14 +305,14 @@ def resolve_plugin_path(target: str | os.PathLike[str] | None = None) -> Path:
 
     candidates: list[Path] = []
     if _is_plugin_id(raw):
-        candidates.append(get_hermes_home() / "plugins" / raw)
+        candidates.append(get_eir_home() / "plugins" / raw)
         try:
-            from hermes_cli.plugins import get_bundled_plugins_dir
+            from eir_cli.plugins import get_bundled_plugins_dir
             bundled = get_bundled_plugins_dir()
             candidates += [bundled / raw, bundled / "platforms" / raw, bundled / "model-providers" / raw]
         except Exception:
             pass
-        candidates.append(Path.cwd() / ".hermes" / "plugins" / raw)
+        candidates.append(Path.cwd() / ".eir" / "plugins" / raw)
     for candidate in candidates:
         if _holds_plugin(candidate):
             return candidate.resolve()
@@ -341,11 +341,11 @@ def _check_manifest_v2(report: DoctorReport, manifest: Any) -> None:
     """Manifest v2 checks: versions, deps, pip declarations, config schema."""
     import importlib.metadata
     import re as _re
-    from hermes_cli.plugins import SUPPORTED_MANIFEST_VERSION
+    from eir_cli.plugins import SUPPORTED_MANIFEST_VERSION
     mv = getattr(manifest, "manifest_version", 1)
     if mv > SUPPORTED_MANIFEST_VERSION:
         report.warning(
-            f"manifest_version {mv} is newer than this Hermes supports "
+            f"manifest_version {mv} is newer than this Eir supports "
             f"({SUPPORTED_MANIFEST_VERSION}); unknown fields are ignored")
 
     api_version = getattr(manifest, "api_version", None)
@@ -385,12 +385,12 @@ def _check_manifest_v2(report: DoctorReport, manifest: Any) -> None:
     if missing:
         report.warning(
             "declared python_dependencies not installed: " + ", ".join(missing)
-            + " — install and enable the plugin with hermes plugins. "
-            "For an enabled plugin, run hermes pm repair, then restart Hermes.")
+            + " — install and enable the plugin with eir plugins. "
+            "For an enabled plugin, run eir pm repair, then restart Eir.")
 
     schema = getattr(manifest, "config_schema", {}) or {}
     if schema:
-        from hermes_cli.plugins import _CONFIG_SCHEMA_TYPES
+        from eir_cli.plugins import _CONFIG_SCHEMA_TYPES
         for skey, spec in schema.items():
             stype = spec.get("type") if isinstance(spec, dict) else None
             if stype is not None and str(stype).lower() not in _CONFIG_SCHEMA_TYPES:
@@ -402,20 +402,20 @@ def _check_desktop_half_copy(report: DoctorReport, path: Path) -> None:
 
     Electron copies a unified package's desktop half to ``<root>/desktop-plugins/<name>/`` and loads
     THAT copy, so editing the package in place changes nothing on screen until the copy is refreshed.
-    The copy carries a ``.hermes-package.json`` marker whose ``source`` names the folder it came from.
+    The copy carries a ``.eir-package.json`` marker whose ``source`` names the folder it came from.
     """
-    from hermes_cli.desktop_plugin_halves import desktop_source
+    from eir_cli.desktop_plugin_halves import desktop_source
 
     source_dir = desktop_source(path)
     if source_dir is None:
         return
     source = source_dir / "plugin.js"
     shown = source.relative_to(path).as_posix()
-    from hermes_constants import get_default_hermes_root
+    from eir_constants import get_default_eir_root
 
-    app_root = get_default_hermes_root() / "desktop-plugins"
+    app_root = get_default_eir_root() / "desktop-plugins"
     try:
-        copies = sorted(app_root.glob("*/.hermes-package.json"))
+        copies = sorted(app_root.glob("*/.eir-package.json"))
     except OSError:
         return
     for marker_file in copies:
@@ -436,7 +436,7 @@ def _check_desktop_half_copy(report: DoctorReport, path: Path) -> None:
 
 
 def doctor_plugin(target: str | os.PathLike[str] | None = None) -> DoctorReport:
-    """Validate one plugin through Hermes' real scanner and registration path."""
+    """Validate one plugin through Eir' real scanner and registration path."""
     try:
         path = resolve_plugin_path(target)
     except FileNotFoundError as exc:
@@ -452,7 +452,7 @@ def doctor_plugin(target: str | os.PathLike[str] | None = None) -> DoctorReport:
             report.registered_hooks = host.registered_hooks
             report.registered_providers = host.registered_providers
 
-            from hermes_cli.plugins import VALID_HOOKS
+            from eir_cli.plugins import VALID_HOOKS
 
             declared_hooks = host.manifest.provides_hooks
             declared_tools = host.manifest.provides_tools
@@ -495,7 +495,7 @@ def doctor_plugin(target: str | os.PathLike[str] | None = None) -> DoctorReport:
         report.error(str(exc))
     except Exception as exc:
         report.error(f"unexpected validation failure: {type(exc).__name__}: {exc}")
-    # Outside the runtime sandbox: it swaps HERMES_HOME for a temp dir, and the copy lives in the real one.
+    # Outside the runtime sandbox: it swaps EIR_HOME for a temp dir, and the copy lives in the real one.
     _check_desktop_half_copy(report, path)
     return report
 

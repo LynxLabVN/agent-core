@@ -18,23 +18,23 @@ def prepare(request: dict) -> tuple[Path, dict[str, str]]:
     sys.path.insert(0, str(root))
     # The old shim's UI has been frozen since the pull; from here the new
     # tree can publish stages (and pop the panel the old shim couldn't).
-    from hermes_cli.update_stage import ensure_panel, publish_stage
+    from eir_cli.update_stage import ensure_panel, publish_stage
 
     ensure_panel(root)
     # An older updater hands off here instead of update_completion._prepare.
-    from hermes_cli.gitlock import convert_treeless_checkout_first
+    from eir_cli.gitlock import convert_treeless_checkout_first
     convert_treeless_checkout_first(root)
     publish_stage("Updating Python dependencies (PM)")
     from pm import receipt
     from pm.client import ensure_tools_for_sync, sync_venv, venv_is_current
     from pm.environments import activation_environment, install_state_dir
-    from hermes_cli._launchers import resolve_store_python
-    from hermes_cli.venv_sync import (
+    from eir_cli._launchers import resolve_store_python
+    from eir_cli.venv_sync import (
         arm_completion, collect_superseded_generations, publish_launchers, refuse_foreign_owned_venv)
 
     # The historical updater already moved the tree: owe the tail and the fleet restart before the
     # first slow step, exactly like a current updater's commit point, so a kill from here on leaves
-    # both for the next launch / `hermes update` instead of nothing.
+    # both for the next launch / `eir update` instead of nothing.
     refuse_foreign_owned_venv(root)
     arm_completion(root)
     _arm_fleet_obligation(root)
@@ -72,19 +72,19 @@ def _arm_fleet_obligation(root: Path) -> None:
     # modules here (``update_cmd_fleet``'s writer imports ``update_cmd`` -> config -> ruamel, which a
     # release older than ruamel does not have). Same arm and per-home fallback as the commit point's;
     # its False (a debt other profiles cannot see) is already said out loud, and the tree has moved.
-    from hermes_cli.update_host_obligation import PROFILE_MARKER_NAME, arm_host_obligation
-    from hermes_constants import get_hermes_home
+    from eir_cli.update_host_obligation import PROFILE_MARKER_NAME, arm_host_obligation
+    from eir_constants import get_eir_home
 
     # A git-less archive root has no SHA: an SHA-less record still owes the restart; its readers hold
     # the fleet to the checkout instead of a named pull.
-    arm_host_obligation(get_hermes_home() / PROFILE_MARKER_NAME, expected_sha=_head_sha(root))
+    arm_host_obligation(get_eir_home() / PROFILE_MARKER_NAME, expected_sha=_head_sha(root))
 
 
 def _head_sha(root: Path) -> str:
     """HEAD of ``root``, or ``''``. Git may be off PATH (only PM's store copy) or broken here, so a
     failed ``rev-parse`` falls back to reading the ref files git itself would read."""
-    from hermes_cli._early_recovery import _git_dir, _git_executable
-    from hermes_cli.update_lock import _git_common_dir
+    from eir_cli._early_recovery import _git_dir, _git_executable
+    from eir_cli.update_lock import _git_common_dir
 
     try:
         head = subprocess.run([_git_executable(), "-C", str(root), "rev-parse", "HEAD"], capture_output=True,
@@ -113,16 +113,16 @@ def _head_sha(root: Path) -> str:
 def _publish_gateway_exit_code(code: int) -> None:
     """Temp + rename with the stdlib only (the takeover runs before app imports are safe): the
     gateway watcher polls ``.update_exit_code`` and reads an empty file as exit 1."""
-    from hermes_constants import get_hermes_home
+    from eir_constants import get_eir_home
 
-    marker = get_hermes_home() / ".update_exit_code"
+    marker = get_eir_home() / ".update_exit_code"
     temporary = marker.with_name(marker.name + ".tmp")
     temporary.write_text(f"{code}\n", encoding="utf-8")
     os.replace(temporary, marker)
 
 
 def _record_failure(request: dict, result: Path, code: int, detail: str) -> None:
-    from hermes_cli import update_receipt
+    from eir_cli import update_receipt
 
     update_receipt.record_step("historical_takeover", False, detail)
     saved = update_receipt.finalize_pending_update_receipt(code, detail)
@@ -135,27 +135,27 @@ def main() -> int:
     context, result = map(Path, sys.argv[1:3])
     request = json.loads(context.read_text(encoding="utf-8-sig"))
     sys.path.insert(0, request["root"])
-    from hermes_agent.compat import install
+    from eir_agent.compat import install
 
     install()
     if "stopped_serves" in request:
         # Historical atexit cleanup may run after the update's result is fixed.
         # It must reuse that installation, never start a second update/repair.
-        from hermes_cli._launchers import resolve_store_python
+        from eir_cli._launchers import resolve_store_python
         from pm.environments import activation_environment
 
         root = Path(request["root"])
         python = resolve_store_python(root)
         if python is None:
-            print("Cannot resume stopped backends: no selected Hermes interpreter", file=sys.stderr)
+            print("Cannot resume stopped backends: no selected Eir interpreter", file=sys.stderr)
             return 1
         return subprocess.run(
-            [str(python), "-I", "-B", "-X", "utf8", str(root / "hermes_cli/update_serve_resume.py"),
+            [str(python), "-I", "-B", "-X", "utf8", str(root / "eir_cli/update_serve_resume.py"),
              str(context), str(result)], cwd=root, env=activation_environment(root),
              check=False,
         ).returncode
-    from hermes_cli import update_receipt
-    from hermes_cli.update_lock import UpdateLock, describe_holder
+    from eir_cli import update_receipt
+    from eir_cli.update_lock import UpdateLock, describe_holder
 
     # The takeover syncs dependencies and its update_finish child builds the checkout: hold
     # (or join, inherited from the old updater) the checkout lock, not just the marker (R2).
@@ -187,9 +187,9 @@ def main() -> int:
 def _run_finish_child(request: dict, context: Path, result: Path, python: Path, env: dict) -> int:
     # This file is new too. Direct execution bypasses normal launch-time
     # update liveness checks while the waiting parent still holds its lock.
-    command = [str(python), "-I", "-B", "-X", "utf8", str(Path(request["root"]) / "hermes_cli/update_finish.py"),
+    command = [str(python), "-I", "-B", "-X", "utf8", str(Path(request["root"]) / "eir_cli/update_finish.py"),
                str(context), str(result)]
-    from hermes_cli.update_custody import popen_post_commit
+    from eir_cli.update_custody import popen_post_commit
 
     # update_finish builds the checkout: POSIX lock fd; Windows bound to the job (or leased).
     with popen_post_commit(command, label="update finish child", cwd=request["root"], env=env) as child:
@@ -210,11 +210,11 @@ def _record_owed_finish(request: dict, result: Path, detail: str) -> None:
     from contextlib import suppress
 
     print(f"  ⚠ The update is installed, but its finishing steps did not run: {detail}. "
-          "The next `hermes` launch finishes them.", file=sys.stderr, flush=True)
+          "The next `eir` launch finishes them.", file=sys.stderr, flush=True)
     saved = None
     # Receipt/exit-code writes are best effort: a committed update exits 0 whatever they hit.
     with suppress(Exception):  # health: allow BLE001 -- post-commit boundary: a receipt error never fails the update
-        from hermes_cli import update_receipt
+        from eir_cli import update_receipt
 
         update_receipt.record_step("historical_takeover", False, f"owed: {detail}")
         saved = update_receipt.finalize_pending_update_receipt(0, f"committed; finishing steps owed: {detail}")

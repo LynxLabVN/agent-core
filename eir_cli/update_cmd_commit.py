@@ -1,13 +1,13 @@
-"""The single commit point of a source ``hermes update``: everything the tree move needs armed first.
+"""The single commit point of a source ``eir update``: everything the tree move needs armed first.
 
 Before git (or the ZIP swap) writes the first file of the new code, three things are durable:
 
-* the interrupted-pull marker (``.git/hermes-update-pull``) naming the commit git moves to, for EVERY
+* the interrupted-pull marker (``.git/eir-update-pull``) naming the commit git moves to, for EVERY
   tree move (branch switch, upstream fork pull, the pull itself) so a launch after any exit that left
   a torn tree puts the old one back (``_early_recovery.restore_interrupted_pull``);
 * the source-completion tail (``venv_sync.arm_completion``) and the host fleet-restart obligation,
   so a kill after the move but before the completion child starts still leaves the tail owed to the
-  next launch (``venv_sync.prepare_launch``) and the restart owed to the next ``hermes update``.
+  next launch (``venv_sync.prepare_launch``) and the restart owed to the next ``eir update``.
 
 Failures before the move are no-ops: ``disarm_commit_obligations`` puts both obligations back the way
 this run found them once the tree is verified at its pre-update commit again.
@@ -23,7 +23,7 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Optional
 
-from hermes_cli._early_recovery import (
+from eir_cli._early_recovery import (
     RECOVERY_CLOSURE,
     RECOVERY_CLOSURE_INIT,
     RECOVERY_CLOSURE_MANIFEST,
@@ -36,10 +36,10 @@ from hermes_cli._early_recovery import (
     restore_interrupted_pull,
     write_durable_text,
 )
-from hermes_cli.update_cmd_common import _record_stop
-from hermes_cli.update_custody import run_git
+from eir_cli.update_cmd_common import _record_stop
+from eir_cli.update_custody import run_git
 
-logger = logging.getLogger("hermes_cli.update_cmd")
+logger = logging.getLogger("eir_cli.update_cmd")
 # What this run found before it armed anything: {path: bytes or None}. None = nothing armed yet.
 _armed_snapshot: Optional[dict[Path, Optional[bytes]]] = None
 # What this run's latest arm left at each path: disarm hands back only records still exactly these.
@@ -52,15 +52,15 @@ _owner: str = ""
 
 
 def _owns_live_checkout(root: Path) -> bool:
-    from hermes_cli.update_cmd import _m
+    from eir_cli.update_cmd import _m
 
     return _m()._pytest_owns_live_checkout(root)
 
 
 def _obligation_paths(root: Path) -> list[Path]:
-    from hermes_cli.update_cmd_fleet import _fleet_restart_pending_marker_path
-    from hermes_cli.update_host_obligation import host_obligation_path
-    from hermes_cli.venv_sync import completion_pending_path
+    from eir_cli.update_cmd_fleet import _fleet_restart_pending_marker_path
+    from eir_cli.update_host_obligation import host_obligation_path
+    from eir_cli.venv_sync import completion_pending_path
 
     return [completion_pending_path(root), _fleet_restart_pending_marker_path(), host_obligation_path()]
 
@@ -91,15 +91,15 @@ POST_MOVE_MODULES = (
     "gateway.session_context",
     "gateway.shutdown_forensics",
     "gateway.status",
-    "hermes_cli.config_backups",
-    "hermes_cli.gateway",
-    "hermes_cli.gateway_runtime_start",
-    "hermes_cli.gateway_windows",
-    "hermes_cli.github_api",
-    "hermes_cli.plugins_session_env",
-    "hermes_cli.source_check",
-    "hermes_cli.update_cmd_fleet_unit_budget",
-    "hermes_cli.update_serve_obligations",
+    "eir_cli.config_backups",
+    "eir_cli.gateway",
+    "eir_cli.gateway_runtime_start",
+    "eir_cli.gateway_windows",
+    "eir_cli.github_api",
+    "eir_cli.plugins_session_env",
+    "eir_cli.source_check",
+    "eir_cli.update_cmd_fleet_unit_budget",
+    "eir_cli.update_serve_obligations",
     "pm.lock",
     "tools.environments.local",
 )
@@ -132,8 +132,8 @@ def arm_commit_obligations(root: Path, expected_sha: str) -> None:
     global _armed_snapshot, _owner
     import uuid
 
-    from hermes_cli.update_cmd_fleet import _write_fleet_restart_pending_marker
-    from hermes_cli.venv_sync import arm_completion
+    from eir_cli.update_cmd_fleet import _write_fleet_restart_pending_marker
+    from eir_cli.venv_sync import arm_completion
 
     if _armed_snapshot is None:  # a re-arm runs after a move: too late to load anything
         load_post_move_modules()
@@ -169,7 +169,7 @@ def disarm_commit_obligations() -> None:
             if root is not None:
                 _owe_for(root, head)
             return
-    from hermes_cli.update_host_obligation import host_obligation_path, release_host_obligation, replace_bytes
+    from eir_cli.update_host_obligation import host_obligation_path, release_host_obligation, replace_bytes
 
     snapshot, _armed_snapshot = _armed_snapshot, None
     armed = dict(_armed_bytes)
@@ -209,7 +209,7 @@ def _owe_for(root: Path, sha: str) -> None:
     except OSError as exc:
         logger.warning("Could not re-arm the update obligations for %s: %s", sha[:10], exc)
         print(f"  ⚠ Could not record the restart this update still owes for {sha[:10]} ({exc}); "
-              "run `hermes gateway restart` once the update is done.", file=sys.stderr)
+              "run `eir gateway restart` once the update is done.", file=sys.stderr)
 
 
 def debt_sha_for_move(pre: str, target: str) -> str:
@@ -233,7 +233,7 @@ def arm_commit_point(git_cmd, root: Path, expected_sha: str, **move) -> str | No
     (``disarm_commit_obligations``), and the caller must stop before git writes a file.
     Linux/macOS gateways are paused first: this is every route's first checkout move.
     """
-    from hermes_cli.update_cmd_posix_pause import pause_at_commit_point
+    from eir_cli.update_cmd_posix_pause import pause_at_commit_point
     if refused := pause_at_commit_point():
         return refused
     try:
@@ -318,7 +318,7 @@ def publish_recovery_closure(git_cmd, root: Path, pre: str) -> Path:
                 handle.write(data)
                 handle.flush()
                 os.fsync(handle.fileno())
-        for directory in (staging / "hermes_cli", staging):
+        for directory in (staging / "eir_cli", staging):
             _fsync_dir(directory)
         shutil.rmtree(dest, ignore_errors=True)
         os.replace(staging, dest)
@@ -348,7 +348,7 @@ def _absolute_git(git_cmd) -> str:
 
     A Windows install's git is often PM's store copy, on PATH only inside the updater
     (``expose_pm_git``); the repair cannot look it up through ``pm`` when the killed move tore a
-    module ``pm`` imports (``hermes_constants``)."""
+    module ``pm`` imports (``eir_constants``)."""
     import shutil
 
     head = (list(git_cmd) or ["git"])[0] if not isinstance(git_cmd, str) else git_cmd
@@ -437,14 +437,14 @@ def _requires_python_spec(pyproject: bytes | str | None) -> str | None:
     return spec if isinstance(spec, str) else None
 
 
-MISSING_STARTUP_FILE = "the tree lists this startup file in [tool.hermes] update-startup-files but it is missing or could not be read"
-INVALID_STARTUP_FILES = "pyproject.toml must be valid TOML whose [tool.hermes] update-startup-files is a list of file paths"
+MISSING_STARTUP_FILE = "the tree lists this startup file in [tool.eir] update-startup-files but it is missing or could not be read"
+INVALID_STARTUP_FILES = "pyproject.toml must be valid TOML whose [tool.eir] update-startup-files is a list of file paths"
 
 
 def startup_files(pyproject: bytes | str | None, undeclared) -> tuple[tuple[str, ...], bool] | None:
     """``(files, required)``: the startup files to compile in a tree, and whether each must exist.
 
-    A tree that declares ``[tool.hermes] update-startup-files`` is judged by its own list, so a move
+    A tree that declares ``[tool.eir] update-startup-files`` is judged by its own list, so a move
     that relocates a startup file edits that list and an update to it is judged by the new paths. A
     declared file the tree lacks refuses the update. A tree that declares none (a release before the
     declaration) is judged by ``undeclared`` with absent files skipped, so a rollback to it still works.
@@ -454,7 +454,7 @@ def startup_files(pyproject: bytes | str | None, undeclared) -> tuple[tuple[str,
     tables = _pyproject_tables(pyproject)
     if tables is None:
         return None
-    declared = _table(tables, "tool", "hermes")
+    declared = _table(tables, "tool", "eir")
     if "update-startup-files" not in declared:
         return tuple(undeclared), False
     listed = declared["update-startup-files"]
@@ -494,7 +494,7 @@ _COMPILE_ALL = (
 
 def _run_python(argv: list[str], *, stdin: str = "", timeout: float = 60) -> str | None:
     """Stdout of a read-only interpreter child (it never writes the checkout), None when it failed."""
-    from hermes_cli._subprocess_compat import windows_hide_flags
+    from eir_cli._subprocess_compat import windows_hide_flags
 
     try:
         done = subprocess.run(argv, input=stdin, capture_output=True, text=True, encoding="utf-8",
@@ -506,9 +506,9 @@ def _run_python(argv: list[str], *, stdin: str = "", timeout: float = 60) -> str
 
 def _admitted_python(spec: str) -> str | None:
     """An installed ``python3.N`` the target's ``requires-python`` admits (newest first), or None
-    when this machine has none. No uv tier: Hermes never resolves the user's uv
+    when this machine has none. No uv tier: Eir never resolves the user's uv
     (tests/test_managed_runtime_resolution.py), and a missing interpreter only means this one judges."""
-    from hermes_platform.resolver import locate_command
+    from eir_platform.resolver import locate_command
 
     candidates = [res.command[0] for minor in range(40, sys.version_info[1], -1)
                   if (res := locate_command(f"python3.{minor}")).command][:3]
@@ -565,7 +565,7 @@ def startup_syntax_error(sources: dict[str, bytes | None], pyproject: bytes | No
         return None
     return broken[0], (f"{broken[1]}\nJudged by Python {platform.python_version()}: the target requires Python "
                        f"{spec} and no installed interpreter satisfies it. Install one (`uv python install "
-                       f"'{spec}'`) and re-run `hermes update` so the release is judged by its own Python.")
+                       f"'{spec}'`) and re-run `eir update` so the release is judged by its own Python.")
 
 
 def read_target_files(git_cmd, root: Path, target_ref: str, relpaths) -> dict[str, bytes | None]:
@@ -642,7 +642,7 @@ def head_and_branch(git_cmd, root: Path) -> tuple[str, str]:
 def checkout_untouched(git_cmd, root: Path, start: tuple[str, str] | None) -> bool:
     """True when the checkout is exactly where this run found it: same HEAD, same branch, no
     autostash taken, no tree move armed. Only then may a failed git update fall back to ZIP."""
-    from hermes_cli.update_cmd_stash import _unrestored_autostash_notice
+    from eir_cli.update_cmd_stash import _unrestored_autostash_notice
 
     if start is None or not start[0]:
         return False
@@ -652,7 +652,7 @@ def checkout_untouched(git_cmd, root: Path, start: tuple[str, str] | None) -> bo
 
 
 def begin_update_attempt() -> None:
-    """A new ``hermes update`` attempt owns nothing yet: no snapshot, no stake, no run start.
+    """A new ``eir update`` attempt owns nothing yet: no snapshot, no stake, no run start.
 
     The state above is per attempt, not per process: a second update in one interpreter (a
     long-lived caller) that inherited the first one's snapshot and owner would hand back the
@@ -688,7 +688,7 @@ def preflight_refusal(git_cmd, root: Path, target_ref: str, critical_files) -> s
     root = Path(root)
     if not _owns_live_checkout(root):
         try:
-            from hermes_cli.venv_sync import refuse_foreign_owned_venv
+            from eir_cli.venv_sync import refuse_foreign_owned_venv
 
             refuse_foreign_owned_venv(root)
         except ImportError:

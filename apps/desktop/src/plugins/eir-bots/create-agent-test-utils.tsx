@@ -3,7 +3,7 @@
  *
  * `vi.mock` must stay in each test file, so this module only supplies the
  * pieces: the hoisted mock bag, the SDK factory, and the render helpers. It
- * never imports `@hermes/plugin-sdk` itself, so the SDK factory can load it.
+ * never imports `@eir/plugin-sdk` itself, so the SDK factory can load it.
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -38,7 +38,7 @@ export function createMocks() {
 
 export type CreateAgentMocks = ReturnType<typeof createMocks>
 
-/** The `@hermes/plugin-sdk` mock: the real module with the host doors stubbed. */
+/** The `@eir/plugin-sdk` mock: the real module with the host doors stubbed. */
 export function sdkMock(original: Record<string, any>, mocks: CreateAgentMocks, translate: () => unknown) {
   const CapabilitiesViewStub = (props: CapabilitiesViewProps) => {
     mocks.skillsView.push(props)

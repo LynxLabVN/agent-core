@@ -1,4 +1,4 @@
-"""Prompt-size diagnostic: ``hermes prompt-size``.
+"""Prompt-size diagnostic: ``eir prompt-size``.
 
 Builds a real inspection agent (so the numbers match what ships on the wire) but never makes a
 network call: dummy credentials force ``AIAgent.__init__`` down the direct-construction path, then
@@ -51,8 +51,8 @@ def _build_inspection_agent(platform: str) -> Any:
     the gateway does so the breakdown matches a real session.
     """
     from run_agent import AIAgent
-    from hermes_cli.config import load_config
-    from hermes_cli.tools_config import _get_platform_tools
+    from eir_cli.config import load_config
+    from eir_cli.tools_config import _get_platform_tools
     from agent.skill_utils import parse_config_string_list
 
     cfg = load_config()
@@ -231,7 +231,7 @@ def render_breakdown(data: dict[str, Any]) -> str:
 
 
 def cmd_prompt_size(args: Any) -> None:
-    """Entry point for ``hermes prompt-size``."""
+    """Entry point for ``eir prompt-size``."""
     try:
         data = compute_prompt_breakdown(getattr(args, "platform", "cli") or "cli")
     except Exception as e:

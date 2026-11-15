@@ -99,7 +99,7 @@ class BillingUpgradeCapExceeded(BillingTransient):
 
 def resolve_portal_base_url(state: Optional[dict[str, Any]] = None) -> str:
     """Resolve the portal base URL with login-time precedence: env, stored state, default."""
-    from hermes_cli.auth_nous import _nous_portal_env_override
+    from eir_cli.auth_nous import _nous_portal_env_override
 
     env = _nous_portal_env_override()
     for candidate in (env, state.get("portal_base_url") if state else None):
@@ -123,7 +123,7 @@ def _absolutize_portal_url(portal_url: Optional[str]) -> Optional[str]:
 # cross-process file locks + reads two files per call, wasteful for the 2s charge poll loop
 # (~150 calls per purchase). The resolver only returns tokens with >=120s of life (its refresh
 # skew), so a 30s cache can never hand back an about-to-expire token; a 401 still surfaces.
-# Keyed by hermes_home_key() so a multiplex profile never bills through a sibling's token.
+# Keyed by eir_home_key() so a multiplex profile never bills through a sibling's token.
 _TOKEN_CACHE_TTL_SECONDS = 30.0
 _token_cache: dict[str, tuple[float, str, str]] = {}  # home key -> (cached_at, token, base)
 
@@ -139,7 +139,7 @@ def invalidate_cached_token() -> None:
 
 def _billing_not_logged_in(exc: Optional[BaseException] = None) -> BillingAuthError:
     """Build the canonical 'not logged in' BillingAuthError (single source)."""
-    err = BillingAuthError("Not logged into Nous Portal — run `hermes portal` to log in.", status=401, error="invalid_token")
+    err = BillingAuthError("Not logged into Nous Portal — run `eir portal` to log in.", status=401, error="invalid_token")
     if exc is not None:
         err.__cause__ = exc
     return err
@@ -147,23 +147,23 @@ def _billing_not_logged_in(exc: Optional[BaseException] = None) -> BillingAuthEr
 
 def _resolve_token_and_base(*, use_cache: bool = True) -> tuple[str, str]:
     """``(access_token, portal_base_url)``, cached for ``_TOKEN_CACHE_TTL_SECONDS`` unless ``use_cache=False``."""
-    from hermes_constants import hermes_home_key
+    from eir_constants import eir_home_key
 
-    cache_key = hermes_home_key()
+    cache_key = eir_home_key()
     cached = _token_cache.get(cache_key) if use_cache else None
     if cached is not None:
         cached_at, token, base = cached
         if (time.time() - cached_at) < _TOKEN_CACHE_TTL_SECONDS:
             return token, base
     try:
-        from hermes_cli.auth import get_provider_auth_state
+        from eir_cli.auth import get_provider_auth_state
 
         state = get_provider_auth_state("nous") or {}
     except Exception:
         state = {}
     base = resolve_portal_base_url(state)
     try:
-        from hermes_cli.auth import AuthError, resolve_nous_access_token
+        from eir_cli.auth import AuthError, resolve_nous_access_token
     except ImportError:
         # auth module unavailable — fall back to the raw stored token.
         token = state.get("access_token")

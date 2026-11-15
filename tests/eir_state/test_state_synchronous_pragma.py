@@ -14,9 +14,9 @@ import sqlite3
 
 import pytest
 
-import hermes_state_wal
-from hermes_state import apply_database_pragmas
-from hermes_state_wal import resolve_synchronous_level
+import eir_state_wal
+from eir_state import apply_database_pragmas
+from eir_state_wal import resolve_synchronous_level
 
 
 def _wal_conn(tmp_path):
@@ -32,10 +32,10 @@ def _level(conn):
 def _config(monkeypatch, database_section):
     """Point apply_database_pragmas at an in-memory config.
 
-    It imports `hermes_cli.config` lazily inside the function body, so the
+    It imports `eir_cli.config` lazily inside the function body, so the
     patch has to land on that module rather than on a name in this one.
     """
-    import hermes_cli.config as config_mod
+    import eir_cli.config as config_mod
 
     cfg = {"database": database_section}
     monkeypatch.setattr(config_mod, "load_config_readonly", lambda *a, **k: cfg)
@@ -179,7 +179,7 @@ class TestMacOSFloor:
         _config(monkeypatch, {"synchronous": "NORMAL"})
         conn = _wal_conn(tmp_path)
         try:
-            hermes_state_wal._enforce_macos_synchronous_full(conn)
+            eir_state_wal._enforce_macos_synchronous_full(conn)
             assert _level(conn) == 2
             with caplog.at_level("WARNING"):
                 apply_database_pragmas(conn, db_label="state.db")

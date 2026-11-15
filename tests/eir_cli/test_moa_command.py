@@ -1,10 +1,10 @@
 import queue
 from unittest.mock import patch
 
-from cli import HermesCLI
+from cli import EirCLI
 
 def _make_cli():
-    cli = HermesCLI.__new__(HermesCLI)
+    cli = EirCLI.__new__(EirCLI)
     cli.config = {
         "moa": {
             "default_preset": "default",

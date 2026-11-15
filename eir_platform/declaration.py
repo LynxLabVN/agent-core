@@ -7,7 +7,7 @@ import threading
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Mapping, Optional
 
-from hermes_platform.resolver.app import LOCATION_KINDS, AppDef, AppLocation
+from eir_platform.resolver.app import LOCATION_KINDS, AppDef, AppLocation
 
 __all__ = [
     "KEY_NAME_RE",
@@ -52,7 +52,7 @@ class RequiresSpec:
 
 @dataclass(frozen=True)
 class Declaration:
-    """A parsed declaration; satisfies ``hermes_platform.resolver.availability._HasRequirements``."""
+    """A parsed declaration; satisfies ``eir_platform.resolver.availability._HasRequirements``."""
 
     name: str
     app: Optional[AppSpec]

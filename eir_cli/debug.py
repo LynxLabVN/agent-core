@@ -1,4 +1,4 @@
-"""``hermes debug`` debug tools for Hermes Agent."""
+"""``eir debug`` debug tools for Eir Agent."""
 
 import contextlib
 import datetime
@@ -15,24 +15,24 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Optional
 
-from hermes_constants import get_hermes_home
-from hermes_cli.debug_redaction import redact_debug_support_text
+from eir_constants import get_eir_home
+from eir_cli.debug_redaction import redact_debug_support_text
 from utils import atomic_json_write
 
 logger = logging.getLogger(__name__)
 
 # Prepended to upload-bound content when redaction is enabled so paste reviewers know.
 _REDACTION_BANNER = (
-    "[hermes debug share: log content redacted at upload time. "
+    "[eir debug share: log content redacted at upload time. "
     "run with --no-redact to disable]\n")
 _PASTE_RS_URL = "https://paste.rs/"  # primary; dpaste.com is the fallback
 _DPASTE_COM_URL = "https://dpaste.com/api/"
-_USER_AGENT = "hermes-agent/debug-share"
+_USER_AGENT = "eir-agent/debug-share"
 _MAX_LOG_BYTES = 512_000  # per log file for upload (paste.rs caps at ~1 MB)
 _AUTO_DELETE_SECONDS = 21600  # 6 hours
 
 # Pending-deletion tracking: the gateway cron ticker calls ``_sweep_expired_pastes`` hourly and
-# ``hermes debug`` sweeps on entry (CLI-only users). Replaced a fork-and-sleep subprocess that
+# ``eir debug`` sweeps on entry (CLI-only users). Replaced a fork-and-sleep subprocess that
 # leaked ~20 MB per share.
 
 
@@ -40,7 +40,7 @@ _PENDING_LOCK_HOLDER = threading.local()
 
 
 def _pending_file() -> Path:
-    return get_hermes_home() / "pastes" / "pending.json"
+    return get_eir_home() / "pastes" / "pending.json"
 
 
 def _load_pending() -> list[dict]:
@@ -57,13 +57,13 @@ def _save_pending(entries: list[dict]) -> None:
     try:
         atomic_json_write(_pending_file(), entries)
     except OSError:
-        pass  # non-fatal — worst case the user runs ``hermes debug delete`` manually
+        pass  # non-fatal — worst case the user runs ``eir debug delete`` manually
 
 
 @contextlib.contextmanager
 def _pending_lock():
     """Cross-process lock for pending.json read-modify-write (gateway sweep vs CLI/gateway share)."""
-    from hermes_cli.auth import _file_lock
+    from eir_cli.auth import _file_lock
     path = _pending_file()
     with _file_lock(path.with_name(path.name + ".lock"), _PENDING_LOCK_HOLDER, 10.0,
                     f"Timed out waiting for the pending paste list lock ({path})"):
@@ -122,18 +122,18 @@ def _best_effort_sweep_expired_pastes() -> None:
 _PRIVACY_NOTICE = """\
 ⚠️  This uploads a debug SUMMARY to a PUBLIC paste service (anyone with the
     link can read it). The summary is built from an allowlist and contains:
-  • Hermes, Python and OS versions, and the install kind
+  • Eir, Python and OS versions, and the install kind
   • Names of connected platforms and configured built-in toolsets
   • Which config.yaml keys are set (key names only, never values)
   • Counts of warnings/errors by logger, exception class and HTTP status
 
 It contains NO log lines, message text, user names/IDs, paths or config
 values. Full (secret-redacted) logs are never sent to the public paste: use
-`hermes debug share --nous` to send them to private Nous storage instead.
+`eir debug share --nous` to send them to private Nous storage instead.
 
 Pastes auto-delete after 6 hours. If paste.rs is unreachable the upload
 falls back to dpaste.com, which keeps it for the --expire window
-(default: 1 day) and CANNOT be deleted with `hermes debug delete`.
+(default: 1 day) and CANNOT be deleted with `eir debug delete`.
 
 Use --local to view everything on this machine without uploading.
 """
@@ -142,7 +142,7 @@ _GATEWAY_PRIVACY_NOTICE = (
     "⚠️ **Privacy notice:** This uploads an allowlisted debug summary (versions, platform and "
     "toolset names, config key names, error counts) to a public paste service. It contains no "
     "log lines or message text; full logs go only to private storage via "
-    "`hermes debug share --nous` from the CLI.\n"
+    "`eir debug share --nous` from the CLI.\n"
     "Pastes auto-delete after 6 hours (dpaste.com fallback pastes: kept for "
     "1 day, cannot be deleted).")
 
@@ -211,7 +211,7 @@ def _upload_paste_rs(content: str) -> str:
 
 
 def _upload_dpaste_com(content: str, expiry_days: int = 1) -> str:
-    boundary = "----HermesDebugBoundary9f3c"
+    boundary = "----EirDebugBoundary9f3c"
     fields = (("content", content), ("syntax", "text"), ("expiry_days", str(expiry_days)))
     body = ("".join(f'--{boundary}\r\nContent-Disposition: form-data; name="{n}"\r\n\r\n{v}\r\n'
                     for n, v in fields) + f"--{boundary}--\r\n").encode("utf-8")
@@ -247,7 +247,7 @@ class LogSnapshot:
 
 def _primary_log_path(log_name: str) -> Optional[Path]:
     """Where *log_name* would live if present. Doesn't check existence."""
-    from hermes_cli.logs import log_file_path
+    from eir_cli.logs import log_file_path
     return log_file_path(log_name)  # update/handoff: the ROOT home's, whatever profile is active
 
 
@@ -255,7 +255,7 @@ def _primary_log_path(log_name: str) -> Optional[Path]:
 # share`; a bare "(file not found)" would read as "the app logged nothing" and misdirect triage.
 _CLIENT_SIDE_LOGS = {
     "desktop": (
-        "written by Hermes Desktop on the machine running the app, not by this "
+        "written by Eir Desktop on the machine running the app, not by this "
         "backend. If the desktop connects to a remote/docker/SSH backend, collect "
         "it on that client machine")}
 
@@ -377,10 +377,10 @@ def _capture_default_log_snapshots(
 
 
 def _capture_dump(redact: bool = True) -> str:
-    """Run ``hermes dump`` and return its stdout, force-redacted unless *redact* is False: the dump
+    """Run ``eir dump`` and return its stdout, force-redacted unless *redact* is False: the dump
     is upload-bound and quotes config values (e.g. ``fallback_providers``), so URL credentials are
     redacted too, as in the uploaded logs."""
-    from hermes_cli.dump import run_dump
+    from eir_cli.dump import run_dump
     capture = io.StringIO()
     with contextlib.redirect_stdout(capture), contextlib.suppress(SystemExit):
         run_dump(SimpleNamespace(show_keys=False))
@@ -393,7 +393,7 @@ def collect_debug_report(
     log_snapshots: Optional[dict[str, LogSnapshot]] = None) -> str:
     """Build the summary debug report (system dump + log tails) as upload-ready text.
 
-    ``dump_text`` is pre-captured dump output; when empty, ``hermes dump`` is run internally.
+    ``dump_text`` is pre-captured dump output; when empty, ``eir dump`` is run internally.
     """
     buf = io.StringIO()
     buf.write(dump_text or _capture_dump())
@@ -411,7 +411,7 @@ def collect_debug_report(
                 buf.write(f"session {sess}: {st['heal_events']} heal events, "
                           f"{st['messages_healed']} messages healed, escalated={st['escalated']}\n")
     buf.write("\n")
-    from hermes_cli.logs import LOG_FILES
+    from eir_cli.logs import LOG_FILES
     for name in _REPORT_LOGS:
         snap = log_snapshots.get(name)
         if snap is None:
@@ -423,7 +423,7 @@ def collect_debug_report(
 
 
 # Nous-S3 envelope format id; the discord-support viewer keys off it.
-_NOUS_BUNDLE_FORMAT = "hermes-debug-share/1"
+_NOUS_BUNDLE_FORMAT = "eir-debug-share/1"
 
 
 def collect_share_bundle(log_lines: int = 200, redact: bool = True) -> dict[str, str]:
@@ -438,7 +438,7 @@ def collect_share_bundle(log_lines: int = 200, redact: bool = True) -> dict[str,
                                   log_snapshots=log_snapshots)
     banner = _REDACTION_BANNER if redact else ""
     bundle: dict[str, str] = {"report": banner + report}
-    from hermes_cli.logs import LOG_FILES
+    from eir_cli.logs import LOG_FILES
     for name in _FULL_LOGS:
         if full := log_snapshots[name].full_text:
             filename = LOG_FILES.get(name, f"{name}.log")
@@ -470,12 +470,12 @@ def build_debug_share(
         *, log_lines: int = 200, expiry: int = 1, redact: bool = True) -> DebugShareResult:
     """Upload the allowlisted public summary and return its URL.
 
-    Shared by ``hermes debug share`` and the dashboard ``POST /api/ops/debug-share``. The public
+    Shared by ``eir debug share`` and the dashboard ``POST /api/ops/debug-share``. The public
     paste never carries log text (#46006), so ``redact`` has nothing to act on here and the result
     always reports ``redacted=True``; full logs go only through ``--nous``. Blocking network I/O —
     callers inside an event loop must run it in a worker thread.
     """
-    from hermes_cli.debug_summary import collect_public_summary
+    from eir_cli.debug_summary import collect_public_summary
     del redact  # the summary is allowlisted; there is no free text to redact or leave raw
     _best_effort_sweep_expired_pastes()
     report = collect_public_summary(log_lines=log_lines)
@@ -545,7 +545,7 @@ def run_debug_share(args):
         result = build_debug_share(log_lines=log_lines, expiry=expiry, redact=redact)
     except RuntimeError as exc:
         print(f"\nUpload failed: {redact_debug_support_text(exc)}", file=sys.stderr)
-        print("\nRun `hermes debug share --local` to print the report instead.\n")
+        print("\nRun `eir debug share --local` to print the report instead.\n")
         sys.exit(1)
     label_width = max(len(k) for k in result.urls)
     print("\nDebug summary uploaded:")
@@ -559,24 +559,24 @@ def run_debug_share(args):
               f"{result.auto_delete_seconds // 3600} hours.")
         print(f"⚠️  {len(dpaste_urls)} of {len(result.urls)} upload(s) fell back to "
               f"dpaste.com: those pastes stay public for {expiry} day(s) and CANNOT be "
-              "deleted with `hermes debug delete`.\n"
-              "\nShare these links with the Hermes team for support.")
+              "deleted with `eir debug delete`.\n"
+              "\nShare these links with the Eir team for support.")
         print(_FULL_LOGS_HINT)
     else:
         print(f"\n⏱  Pastes will auto-delete in {result.auto_delete_seconds // 3600} hours.\n"
-              "To delete now:  hermes debug delete <url>\n"
-              "\nShare these links with the Hermes team for support.")
+              "To delete now:  eir debug delete <url>\n"
+              "\nShare these links with the Eir team for support.")
         print(_FULL_LOGS_HINT)
 
 
-_FULL_LOGS_HINT = ("If support needs the full logs, run `hermes debug share --nous` "
+_FULL_LOGS_HINT = ("If support needs the full logs, run `eir debug share --nous` "
                    "(private Nous storage, not a public paste).")
 
 
 _NOUS_PRIVACY_NOTICE = """\
 ⚠️  --nous: This uploads your debug bundle to Nous-INTERNAL storage (AWS S3),
     NOT a public paste service. The following is included:
-  • System info (OS, Python/Hermes version, provider, which API keys are
+  • System info (OS, Python/Eir version, provider, which API keys are
     configured — NOT the actual keys)
   • Full agent.log, gateway.log, and desktop.log (up to 512 KB each — likely
     contains conversation content, tool outputs, and file paths), plus
@@ -613,8 +613,8 @@ def run_debug_slash(cmd_original: str = "") -> None:
 
 
 def _run_debug_share_nous(args, *, log_lines: int, redact: bool) -> None:
-    """``hermes debug share --nous``: gzip the same bundle into the Nous envelope → Nous-S3."""
-    from hermes_cli.diagnostics_upload import share_to_nous
+    """``eir debug share --nous``: gzip the same bundle into the Nous envelope → Nous-S3."""
+    from eir_cli.diagnostics_upload import share_to_nous
     print(_NOUS_PRIVACY_NOTICE)
     if not _confirm_upload(args):
         return
@@ -624,7 +624,7 @@ def _run_debug_share_nous(args, *, log_lines: int, redact: bool) -> None:
     _best_effort_sweep_expired_pastes()
     bundle = collect_share_bundle(log_lines=log_lines, redact=redact)
     if redact:
-        logger.info("hermes debug share --nous: applied force-mode redaction before upload")
+        logger.info("eir debug share --nous: applied force-mode redaction before upload")
     print("Uploading to Nous diagnostics storage...")
     try:
         res = share_to_nous(build_nous_bundle(bundle, redact=redact))
@@ -634,8 +634,8 @@ def _run_debug_share_nous(args, *, log_lines: int, redact: bool) -> None:
         error = redact_debug_support_text(exc)
         cause = edge_block(exc) or "The Nous diagnostics service may be unavailable or not yet provisioned"
         print(f"\nNous upload failed: {error}\n\n{cause}.\n"
-              "Run `hermes debug share --local` to print the report instead, "
-              "or `hermes debug share` to upload to a public paste service.\n", file=sys.stderr)
+              "Run `eir debug share --local` to print the report instead, "
+              "or `eir debug share` to upload to a public paste service.\n", file=sys.stderr)
         sys.exit(1)
     view_url = res.get("viewUrl") or res.get("view_url")
     expires_at = res.get("expiresAt") or res.get("expires_at")
@@ -656,8 +656,8 @@ def run_debug_delete(args):
     """Delete one or more paste URLs uploaded by /debug."""
     urls = getattr(args, "urls", [])
     if not urls:
-        print("Usage: hermes debug delete <url> [<url> ...]\n"
-              "  Deletes paste.rs pastes uploaded by 'hermes debug share'.")
+        print("Usage: eir debug delete <url> [<url> ...]\n"
+              "  Deletes paste.rs pastes uploaded by 'eir debug share'.")
         return
     for url in urls:
         try:
@@ -687,7 +687,7 @@ def run_debug(args):
 
 
 _DEBUG_USAGE = """\
-Usage: hermes debug <command>
+Usage: eir debug <command>
 
 Commands:
   share    Upload an allowlisted debug summary to a public paste (full logs: --nous)

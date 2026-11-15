@@ -1,7 +1,7 @@
 """Session heartbeats — recurring re-entry prompts for the current session.
 
 Session-scoped and in-process (CLI or gateway must be running); durable cross-process scheduling stays
-``hermes cron``. Invariants (mirrors goals.py): injection is a plain user message — no system-prompt
+``eir cron``. Invariants (mirrors goals.py): injection is a plain user message — no system-prompt
 mutation or toolset swap, so prompt caching stays intact — and a real user message always wins:
 heartbeats only fire into an idle session with an empty input queue."""
 
@@ -91,9 +91,9 @@ class HeartbeatState:
 
 
 def _get_session_db() -> Optional[Any]:
-    """Persistence goes through the goals module's per-HERMES_HOME cached SessionDB (one shared connection)."""
+    """Persistence goes through the goals module's per-EIR_HOME cached SessionDB (one shared connection)."""
     try:
-        from hermes_cli.goals import _get_session_db as _goals_db
+        from eir_cli.goals import _get_session_db as _goals_db
         return _goals_db()
     except Exception as exc:  # pragma: no cover
         logger.debug("HeartbeatManager: SessionDB bootstrap failed (%s)", exc)
@@ -139,7 +139,7 @@ def save_heartbeat(session_id: str, state: HeartbeatState) -> None:
         return
     db = _get_session_db()
     if db is None:
-        from hermes_cli.goals import _warn_dropped_write
+        from eir_cli.goals import _warn_dropped_write
         _warn_dropped_write("HeartbeatManager", "heartbeat", session_id)
         return
     try:

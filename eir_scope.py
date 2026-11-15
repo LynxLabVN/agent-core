@@ -1,8 +1,8 @@
 """The runtime scope: which tenant, agent and actor the current activity serves.
 
-Import-safe, stdlib-only, like ``hermes_constants``. Binding and deriving profile state from a
+Import-safe, stdlib-only, like ``eir_constants``. Binding and deriving profile state from a
 scope lives in ``agent/runtime_scope.py``; this module holds only the values and the context-local
-slot, so ``hermes_constants``, ``agent.secret_scope`` and ``tools.terminal_scope`` can ask "is a
+slot, so ``eir_constants``, ``agent.secret_scope`` and ``tools.terminal_scope`` can ask "is a
 scope bound, and for which agent?" without importing anything heavier.
 
 Every activity a gateway runs for a profile binds a :class:`Scope`: a turn, cache eviction, a
@@ -14,8 +14,8 @@ whether the activity may administer the agent. On a local install the tenant is
 :data:`LOCAL_TENANT`, the agent is the profile home path, the actor and owner are
 :data:`LOCAL_OWNER`, and it may administer.
 
-The scope and the profile state readers use (the ``HERMES_HOME`` override behind
-``get_hermes_home()``, the secret mapping behind ``get_secret()``, the terminal policy) are ONE
+The scope and the profile state readers use (the ``EIR_HOME`` override behind
+``get_eir_home()``, the secret mapping behind ``get_secret()``, the terminal policy) are ONE
 immutable :class:`ScopeState` in one context variable, so they cannot drift apart. A bind is one
 change to that value; a reset removes its change and replays the later ones, dropping any made
 inside a scope the result no longer has (:func:`pop_state`). An out-of-order, repeated or stale
@@ -104,7 +104,7 @@ class Scope:
     ``owner`` and ``can_administer`` are keyword-only. A local scope may omit them: the owner is
     the local person (the actor when it is a person, else :data:`LOCAL_OWNER`) and it may
     administer. A hosted scope must name both, as its identity verifier read them from a signed
-    claim; who administers is decided there (in Hermes Cloud: a personal agent's owner, and the
+    claim; who administers is decided there (in Eir Cloud: a personal agent's owner, and the
     org's owners and admins for an agent owned by the org or a group), never here."""
 
     tenant: str
@@ -193,7 +193,7 @@ class BoundSecrets(NamedTuple):
 class ScopeState:
     """Everything the current activity's profile state is read from, as one value.
 
-    ``home`` is the ``HERMES_HOME`` override (``None``: the process home). ``secrets`` is the
+    ``home`` is the ``EIR_HOME`` override (``None``: the process home). ``secrets`` is the
     secret scope (``None``: unscoped, ``os.environ`` semantics). ``terminal`` is the terminal
     policy mapping or refusal (``None``: process env)."""
 
@@ -226,7 +226,7 @@ class _Node(NamedTuple):
     parent: _Node | None
 
 
-_STATE: ContextVar[_Node | None] = ContextVar("hermes_scope_state", default=None)
+_STATE: ContextVar[_Node | None] = ContextVar("eir_scope_state", default=None)
 
 
 def current_state() -> ScopeState:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from hermes_cli.plugins import (
+from eir_cli.plugins import (
     PluginContext,
     PluginManager,
     PluginManifest,
@@ -20,7 +20,7 @@ def patched_manager(monkeypatch):
 
     Restored automatically after the test by monkeypatch.
     """
-    from hermes_cli import plugins as plugins_mod
+    from eir_cli import plugins as plugins_mod
 
     fresh = PluginManager()
     fresh._discovered = True
@@ -38,7 +38,7 @@ def patched_manager(monkeypatch):
 
 
 def test_all_aux_tasks_includes_plugin_registered(patched_manager):
-    from hermes_cli.main_provider_setup import _AUX_TASKS, _all_aux_tasks
+    from eir_cli.main_provider_setup import _AUX_TASKS, _all_aux_tasks
 
     manifest = PluginManifest(name="hindsight")
     ctx = PluginContext(manifest, patched_manager)
@@ -69,12 +69,12 @@ def test_all_aux_tasks_includes_plugin_registered(patched_manager):
 def test_reset_aux_to_auto_resets_plugin_tasks(tmp_path, monkeypatch, patched_manager):
     """Plugin task with non-auto config gets reset alongside built-ins."""
     from pathlib import Path
-    from hermes_cli.config import load_config, save_config
-    from hermes_cli.main_provider_setup import _reset_aux_to_auto
+    from eir_cli.config import load_config, save_config
+    from eir_cli.main_provider_setup import _reset_aux_to_auto
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path / ".eir"))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    (tmp_path / ".hermes").mkdir(exist_ok=True)
+    (tmp_path / ".eir").mkdir(exist_ok=True)
 
     manifest = PluginManifest(name="plug")
     ctx = PluginContext(manifest, patched_manager)
@@ -103,12 +103,12 @@ def test_reset_aux_to_auto_resets_plugin_tasks(tmp_path, monkeypatch, patched_ma
 
 @pytest.fixture
 def aux_home(tmp_path, monkeypatch):
-    """Empty HERMES_HOME so DEFAULT_CONFIG is the only source of built-in aux values."""
+    """Empty EIR_HOME so DEFAULT_CONFIG is the only source of built-in aux values."""
     from pathlib import Path
 
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     return home
 
@@ -119,7 +119,7 @@ def _register(patched_manager, key, *, plugin="plug", **kwargs):
 
 
 def _set_aux(**blocks):
-    from hermes_cli.config import load_config, save_config
+    from eir_cli.config import load_config, save_config
 
     cfg = load_config()
     cfg.setdefault("auxiliary", {}).update(blocks)
@@ -128,7 +128,7 @@ def _set_aux(**blocks):
 
 def _grant_task_override(patched_manager, key):
     """``plugins.entries.<owner of key>.llm.allow_task_override: true``."""
-    from hermes_cli.config import load_config, save_config
+    from eir_cli.config import load_config, save_config
 
     cfg = load_config()
     owner = patched_manager._aux_tasks[key]["plugin"]
@@ -205,10 +205,10 @@ def test_a_plugin_chain_ending_in_a_core_block_needs_the_grant_at_every_link(aux
 def test_core_blocks_off_the_inheritance_allowlist_are_refused(aux_home, patched_manager, caplog, bad):
     import logging
 
-    from hermes_cli.config_defaults import DEFAULT_CONFIG
+    from eir_cli.config_defaults import DEFAULT_CONFIG
 
     assert isinstance(DEFAULT_CONFIG["auxiliary"].get(bad), dict)  # a real core block, just not a base
-    with caplog.at_level(logging.WARNING, logger="hermes_cli.plugins"):
+    with caplog.at_level(logging.WARNING, logger="eir_cli.plugins"):
         _register(patched_manager, "plug_aux", inherit_from=bad)
     assert "ignoring inherit_from" in caplog.text
     assert patched_manager._aux_tasks["plug_aux"]["inherit_from"] is None
@@ -220,7 +220,7 @@ def test_bad_inherit_from_warns_and_registers_without_inheritance(aux_home, patc
 
     from agent.auxiliary_client import _get_auxiliary_task_config as resolve
 
-    with caplog.at_level(logging.WARNING, logger="hermes_cli.plugins"):
+    with caplog.at_level(logging.WARNING, logger="eir_cli.plugins"):
         _register(patched_manager, "plug_aux", inherit_from=bad)
     assert "ignoring inherit_from" in caplog.text
     assert patched_manager._aux_tasks["plug_aux"]["inherit_from"] is None

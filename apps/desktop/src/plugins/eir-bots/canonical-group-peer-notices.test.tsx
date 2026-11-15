@@ -2,7 +2,7 @@ import { cleanup, render, renderHook, screen } from '@testing-library/react'
 import type { ComponentProps, ReactNode } from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
 
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@eir/plugin-sdk', async () => {
   const { en } = await import('@/i18n/en')
   const { relativeTime } = await import('@/lib/time')
 
@@ -23,7 +23,7 @@ import { CANONICAL_GROUP_LOCALES } from './canonical-group-locales'
 afterEach(cleanup)
 
 const binding = { connectionId: 'local', profile: 'default', roomId: 'room' }
-const members = [{ member_id: 'peer', profile: 'default', handle: 'peer', display_name: 'Hermes · Homelab' }]
+const members = [{ member_id: 'peer', profile: 'default', handle: 'peer', display_name: 'Eir · Homelab' }]
 
 it('says what a deferred turn means instead of printing its reason code', () => {
   const events = [{ seq: 1, kind: 'turn.deferred', payload: { member_id: 'peer', reason: 'member_unavailable' } }]

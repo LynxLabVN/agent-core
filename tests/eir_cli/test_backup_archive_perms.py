@@ -5,8 +5,8 @@ import zipfile
 
 import pytest
 
-from hermes_cli.backup import create_pre_update_backup
-from hermes_cli.backup_atomic import _atomic_output_path
+from eir_cli.backup import create_pre_update_backup
+from eir_cli.backup_atomic import _atomic_output_path
 
 
 @pytest.fixture
@@ -51,20 +51,20 @@ def test_partial_refuses_planted_symlink(tmp_path, umask_022, monkeypatch):
 
 @pytest.mark.platforms("posix")
 def test_pre_update_backup_owner_only_and_tightens_backups_dir(tmp_path, umask_022):
-    hermes_home = tmp_path / ".hermes"
-    hermes_home.mkdir()
-    (hermes_home / "config.yaml").write_text("model:\n  provider: openrouter\n")
-    (hermes_home / "auth.json").write_text('{"token": "sk-test"}\n')
+    eir_home = tmp_path / ".eir"
+    eir_home.mkdir()
+    (eir_home / "config.yaml").write_text("model:\n  provider: openrouter\n")
+    (eir_home / "auth.json").write_text('{"token": "sk-test"}\n')
 
-    out = create_pre_update_backup(hermes_home=hermes_home)
-    backup_dir = hermes_home / "backups"
+    out = create_pre_update_backup(eir_home=eir_home)
+    backup_dir = eir_home / "backups"
     assert out is not None
     assert stat.S_IMODE(backup_dir.stat().st_mode) == 0o700
     assert stat.S_IMODE(out.stat().st_mode) == 0o600
 
     backup_dir.chmod(0o755)
     out.unlink()
-    out2 = create_pre_update_backup(hermes_home=hermes_home)
+    out2 = create_pre_update_backup(eir_home=eir_home)
     assert out2 is not None
     assert stat.S_IMODE(backup_dir.stat().st_mode) == 0o700
     assert stat.S_IMODE(out2.stat().st_mode) == 0o600

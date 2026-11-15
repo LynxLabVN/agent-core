@@ -7,7 +7,7 @@
  * drives the two doors, startBotRelay / stopBotRelay.
  */
 
-import { host, LruCache } from '@hermes/plugin-sdk'
+import { host, LruCache } from '@eir/plugin-sdk'
 
 import { botHandle, clearBotAttention, noteBotAttention } from './data'
 import { RELAY_DELIVER_TIMEOUT_MS } from './relay-budget'
@@ -16,7 +16,7 @@ import type { ProfileRoute, RosterRow } from './types'
 
 // ── cross-connection bot relay ────────────────────────────────────────────
 // Connections ARE the peer set: every gateway this Desktop holds a socket
-// to (local, remote URL, SSH, Hermes Cloud, docker) must be able to find
+// to (local, remote URL, SSH, Eir Cloud, docker) must be able to find
 // every other connection's agents and message them via message_agent. The
 // Desktop is the relay — it owns every socket. Two loops:
 //  - roster loop: pushes each gateway the union roster of agents on the
@@ -334,8 +334,8 @@ async function relayAgentsOn(
     )
 
     const profiles = Array.isArray(res?.profiles) ? res.profiles : []
-    // This connection's default is @hermes only while it has no real 'hermes' profile.
-    const hermesTaken = profiles.some(profile => profile?.name === 'hermes')
+    // This connection's default is @eir only while it has no real 'eir' profile.
+    const eirTaken = profiles.some(profile => profile?.name === 'eir')
     const label = labels.get(connection.id) || connection.id
 
     const rows = profiles
@@ -343,11 +343,11 @@ async function relayAgentsOn(
         profile: String(profile?.name || ''),
         handle: botHandle(
           profile?.name,
-          hermesTaken && profile?.name === 'default' ? { ...profile, hermesHandleTaken: true } : profile
+          eirTaken && profile?.name === 'default' ? { ...profile, eirHandleTaken: true } : profile
         ),
         connection_id: connection.id,
         connection_label: label,
-        title: String(profile?.ui_meta?.['hermes-bots']?.title || profile?.display_name || ''),
+        title: String(profile?.ui_meta?.['eir-bots']?.title || profile?.display_name || ''),
         description: String(profile?.description || '')
       }))
       .filter(row => row.profile)

@@ -18,7 +18,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from hermes_cli.profile_cmd import _render_distribution_plan
+from eir_cli.profile_cmd import _render_distribution_plan
 
 
 def _make_plan(target_dir, env_requires):
@@ -27,7 +27,7 @@ def _make_plan(target_dir, env_requires):
         version="1.0.0",
         description="",
         author="",
-        hermes_requires="",
+        eir_requires="",
         env_requires=env_requires,
     )
     return SimpleNamespace(

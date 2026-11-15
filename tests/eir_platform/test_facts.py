@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from hermes_platform.host import facts
+from eir_platform.host import facts
 
 @pytest.mark.parametrize(
     ("raw", "expected"),

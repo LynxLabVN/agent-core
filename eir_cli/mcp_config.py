@@ -1,4 +1,4 @@
-"""MCP Server Management CLI — ``hermes mcp`` subcommand."""
+"""MCP Server Management CLI — ``eir mcp`` subcommand."""
 
 import asyncio
 import contextlib
@@ -8,17 +8,17 @@ import re
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
-from hermes_cli.config import (
+from eir_cli.config import (
     cfg_get,
     load_config,
     save_config,
     get_env_value,
     save_env_value,
-    get_hermes_home,
+    get_eir_home,
 )
-from hermes_cli.colors import Colors, color
-from hermes_constants import display_hermes_home
-from hermes_cli.mcp_security import validate_mcp_server_entry
+from eir_cli.colors import Colors, color
+from eir_constants import display_eir_home
+from eir_cli.mcp_security import validate_mcp_server_entry
 from tools.mcp_tool_config import _ENV_VAR_PATTERN
 from tools.mcp_tool_common import _env_ref_name, mcp_server_enabled
 
@@ -394,7 +394,7 @@ def _resolve_mcp_server_config(config: dict) -> dict:
     Mirrors ``_load_mcp_config()`` in ``tools/mcp_tool.py``; without it the discovery probe sent
     literal placeholders in header templates and auth-requiring servers returned 401.
 
-    Mirrors ``_load_mcp_config()`` in ``tools/mcp_tool.py``: load ``~/.hermes/.env`` into ``os.environ`` and
+    Mirrors ``_load_mcp_config()`` in ``tools/mcp_tool.py``: load ``~/.eir/.env`` into ``os.environ`` and
     recursively interpolate any ``${VAR}`` placeholders. The CLI builds header templates like
     ``Authorization: Bearer ${MCP_X_API_KEY}`` but the probe path never resolved them, so the discovery
     probe sent the literal placeholder and auth-requiring servers (e.g. n8n) returned 401 — while runtime
@@ -405,8 +405,8 @@ def _resolve_mcp_server_config(config: dict) -> dict:
 
     if current_secret_scope() is None:
         try:
-            from hermes_cli.env_loader import load_hermes_dotenv
-            load_hermes_dotenv()
+            from eir_cli.env_loader import load_eir_dotenv
+            load_eir_dotenv()
         except Exception:  # pragma: no cover — defensive
             pass
     return _interpolate_env_vars(config)
@@ -440,7 +440,7 @@ def _probe_single_server(
     # Deep transport code (tools/mcp_tool_transport.py::_negotiate_session) reads its OWN
     # session.initialize() bound straight off config["connect_timeout"], independent of the
     # `connect_timeout` param above. Callers that extend the param to give a user time to finish
-    # an OAuth browser flow (e.g. `hermes mcp login`'s 315s) left that inner bound at the
+    # an OAuth browser flow (e.g. `eir mcp login`'s 315s) left that inner bound at the
     # (unrelated) 60s default, so the still-pending OAuth callback wait got cancelled mid-flow —
     # surfacing as a retry that re-opens a second authorization against the same callback port.
     config["connect_timeout"] = connect_timeout
@@ -528,8 +528,8 @@ def _probe_single_server(
 def _oauth_tokens_present(name: str) -> bool:
     """True if an OAuth token file exists for ``name`` (a clean probe alone is not proof of auth)."""
     try:
-        from tools.mcp_oauth import HermesTokenStorage
-        return HermesTokenStorage(name).has_cached_tokens()
+        from tools.mcp_oauth import EirTokenStorage
+        return EirTokenStorage(name).has_cached_tokens()
     except Exception as exc:  # pragma: no cover — defensive
         logger.debug("Could not check OAuth tokens for '%s': %s", name, exc)
         return True  # permissive: don't block a real success
@@ -575,11 +575,11 @@ def _configure_http_auth(
             _success(f"{env_key}: already configured")
             server_config["headers"] = _bearer_auth_headers(name)
         else:
-            from hermes_cli.cli_output import prompt
+            from eir_cli.cli_output import prompt
             api_key = prompt("API key / Bearer token", default="", password=True)
             if api_key:
                 server_config["headers"] = _save_bearer_auth_token(name, api_key)
-                _success(f"Saved to {display_hermes_home()}/.env as {env_key}")
+                _success(f"Saved to {display_eir_home()}/.env as {env_key}")
     return True
 
 
@@ -603,7 +603,7 @@ def _choose_tools(name: str, tools: list[tuple[str, str]], server_config: dict[s
         return None
     if choice not in {"s", "select"}:
         return len(tools)
-    from hermes_cli.curses_ui import curses_checklist
+    from eir_cli.curses_ui import curses_checklist
 
     labels = [f"{t[0]}  —  {t[1]}" for t in tools]
     chosen = curses_checklist(f"Select tools for '{name}'", labels, set(range(len(tools))))
@@ -616,10 +616,10 @@ def _choose_tools(name: str, tools: list[tuple[str, str]], server_config: dict[s
 
 
 def _add_probe_timeout(server_config: dict) -> Optional[float]:
-    """Connect bound for the probe ``hermes mcp add`` runs; None keeps the server's connect_timeout.
+    """Connect bound for the probe ``eir mcp add`` runs; None keeps the server's connect_timeout.
 
     An OAuth server's first connect IS the browser sign-in: the probe waits on the callback while the user
-    reads and approves the consent page. It gets the ``hermes mcp login`` window (login_connect_timeout:
+    reads and approves the consent page. It gets the ``eir mcp login`` window (login_connect_timeout:
     oauth.timeout + exchange headroom), not the 30 s connect_timeout default, which closed the loopback
     listener under people still on the consent page — the provider's redirect then hit
     ERR_CONNECTION_REFUSED, the code was lost, and "Save config anyway?" defaulted to No (#49759).
@@ -635,7 +635,7 @@ def cmd_mcp_add(args):
     """Add a new MCP server with discovery-first tool selection."""
     name = args.name
     url = getattr(args, "url", None)
-    # --command uses dest="mcp_command" (see hermes_cli/main.py for why the dest is renamed).
+    # --command uses dest="mcp_command" (see eir_cli/main.py for why the dest is renamed).
     command = getattr(args, "mcp_command", None)
     cmd_args = getattr(args, "args", None) or []
     if cmd_args and cmd_args[0] == "--":
@@ -659,9 +659,9 @@ def cmd_mcp_add(args):
     if not url and not command:
         _error("Must specify --url <endpoint>, --command <cmd>, or --preset <name>")
         _info("Examples:")
-        _info('  hermes mcp add ink --url "https://mcp.ml.ink/mcp"')
-        _info('  hermes mcp add github --command npx --args @modelcontextprotocol/server-github')
-        _info('  hermes mcp add myserver --preset mypreset')
+        _info('  eir mcp add ink --url "https://mcp.ml.ink/mcp"')
+        _info('  eir mcp add github --command npx --args @modelcontextprotocol/server-github')
+        _info('  eir mcp add myserver --preset mypreset')
         return
 
     # Overwriting an existing server is a re-add, not an install; cancels are not recorded either.
@@ -675,7 +675,7 @@ def cmd_mcp_add(args):
     def _record(saved: bool, failure_class: str = "config_rejected") -> None:
         # A save only fails on a suspicious configuration (_save_mcp_server returns False).
         if fresh:
-            from hermes_cli.mcp_catalog import record_mcp_install
+            from eir_cli.mcp_catalog import record_mcp_install
 
             record_mcp_install("url" if url else "local", None, "success" if saved else "failed",
                                failure_class=None if saved else failure_class)
@@ -710,7 +710,7 @@ def cmd_mcp_add(args):
             saved = _save_mcp_server(name, server_config)
             if saved:
                 _success(f"Saved '{name}' to config (disabled)")
-                _info("Fix the issue, then: hermes mcp test " + name)
+                _info("Fix the issue, then: eir mcp test " + name)
         _record(saved, probe_failure_class(exc))
         return
 
@@ -732,7 +732,7 @@ def cmd_mcp_add(args):
     if saved:
         print()
         _success(
-            f"Saved '{name}' to {display_hermes_home()}/config.yaml ({tool_count}/{len(tools)} tools enabled)"
+            f"Saved '{name}' to {display_eir_home()}/config.yaml ({tool_count}/{len(tools)} tools enabled)"
         )
         _info("Start a new session to use these tools, or run /reload-mcp to load them into open sessions.")
 
@@ -748,7 +748,7 @@ def cmd_mcp_remove(args):
     _remove_mcp_server(name)
     _success(f"Removed '{name}' from config")
     # Route OAuth cleanup through MCPOAuthManager so any provider cached in this process (e.g. from
-    # an earlier `hermes mcp test`) is evicted too.
+    # an earlier `eir mcp test`) is evicted too.
     try:
         from tools.mcp_oauth_manager import get_manager
         get_manager().remove(name)
@@ -765,8 +765,8 @@ def cmd_mcp_list(args=None):
         _info("No MCP servers configured.")
         print()
         _info("Add one with:")
-        _info('  hermes mcp add <name> --url <endpoint>')
-        _info('  hermes mcp add <name> --command <cmd> --args <args...>')
+        _info('  eir mcp add <name> --url <endpoint>')
+        _info('  eir mcp add <name> --command <cmd> --args <args...>')
         print()
         return
 
@@ -801,7 +801,7 @@ def cmd_mcp_list(args=None):
         status = color("✓ enabled", Colors.GREEN) if enabled else color("✗ disabled", Colors.DIM)
         if not enabled and mcp_server_enabled({k: v for k, v in cfg.items() if k != "disabled"}):
             escaped = str(name).replace(".", "\\.")
-            status += color(f" (legacy `disabled` key; `hermes config set mcp_servers.{escaped}.enabled true` "
+            status += color(f" (legacy `disabled` key; `eir config set mcp_servers.{escaped}.enabled true` "
                             "clears it)", Colors.DIM)
         print(f"  {name:<16} {transport:<30} {tools_str:<12} {status}")
     print()
@@ -818,7 +818,7 @@ def probe_failure_class(exc: BaseException) -> str:
     """Extension-install class for a failed MCP probe, from the exception TYPE (the same tests
     :func:`_probe_failure_next_step` uses), never its message. Never raises: an exception whose own
     attribute hooks raise reads ``connect_failed`` instead of replacing the user's error."""
-    from hermes_cli.observability.shared_metrics_fields import tagged_failure_class
+    from eir_cli.observability.shared_metrics_fields import tagged_failure_class
 
     if tagged := tagged_failure_class(exc):
         return tagged
@@ -844,13 +844,13 @@ def _probe_failure_next_step(name: str, exc: BaseException) -> str:
     from tools.mcp_tool_node_abi import NodeAbiMismatchError
     root = _unwrap_exception_group(exc)
     if _is_auth_error(root) or getattr(getattr(root, "response", None), "status_code", None) in (401, 403):
-        return f"The server rejected the sign-in. Run: hermes mcp login {name}"
+        return f"The server rejected the sign-in. Run: eir mcp login {name}"
     if isinstance(root, NodeAbiMismatchError):
-        return f"After rebuilding it under Hermes's Node as above, run: hermes mcp test {name}"
+        return f"After rebuilding it under Eir's Node as above, run: eir mcp test {name}"
     if "missing executable" in _format_connect_error(exc):
-        return (f"Install that command, or set mcp_servers.{name}.command in {display_hermes_home()}/config.yaml "
+        return (f"Install that command, or set mcp_servers.{name}.command in {display_eir_home()}/config.yaml "
                 "to its full path.")
-    return f"Check the server is running and the URL/command in its config, then run: hermes mcp test {name}"
+    return f"Check the server is running and the URL/command in its config, then run: eir mcp test {name}"
 
 
 def cmd_mcp_test(args):
@@ -913,7 +913,7 @@ def _reauth_oauth_server(name: str, server_config: dict, *, flow: str | None = N
         return False
     if server_config.get("auth") != "oauth":
         _error(f"Server '{name}' is not configured for OAuth (auth={server_config.get('auth')})")
-        _info("Use `hermes mcp remove` + `hermes mcp add` to reconfigure auth.")
+        _info("Use `eir mcp remove` + `eir mcp add` to reconfigure auth.")
         return False
 
     oauth_cfg = server_config.get("oauth") or {}
@@ -928,9 +928,9 @@ def _reauth_oauth_server(name: str, server_config: dict, *, flow: str | None = N
             # metadata stays. A fresh discovery still overwrites it, but when the metadata document
             # cannot be re-fetched (WAF-fronted split-host servers) it is the only thing that keeps
             # the announced authorize URL off the SDK's `{mcp-origin}/authorize` guess (#115329).
-            from tools.mcp_oauth import HermesTokenStorage
+            from tools.mcp_oauth import EirTokenStorage
             get_manager().evict(name)
-            HermesTokenStorage(name).remove(keep_metadata=True)
+            EirTokenStorage(name).remove(keep_metadata=True)
     except Exception as exc:
         _warning(f"Could not clear existing OAuth state: {exc}")
 
@@ -940,7 +940,7 @@ def _reauth_oauth_server(name: str, server_config: dict, *, flow: str | None = N
     # The probe triggers the OAuth flow (browser redirect + callback capture). Its bound must outlast
     # the oauth.timeout callback window (plus headroom for the token exchange), or a user who raised
     # oauth.timeout still gets cut off at the old fixed floor — matching the GUI re-auth path in
-    # web_server_mcp.py and tui_gateway/mcp_oauth_sessions.py. force_interactive_oauth: `hermes mcp
+    # web_server_mcp.py and tui_gateway/mcp_oauth_sessions.py. force_interactive_oauth: `eir mcp
     # login` is explicitly user-initiated even when stdin isn't a TTY (desktop / agent-spawned
     # terminals), where _is_interactive() alone would refuse to open a browser.
     try:
@@ -973,7 +973,7 @@ def _reauth_oauth_server(name: str, server_config: dict, *, flow: str | None = N
             ):
                 print(color(f"    {line}", Colors.DIM))
             print()
-            _info("Then re-run `hermes mcp login " + name + "`.")
+            _info("Then re-run `eir mcp login " + name + "`.")
             return False
         if tools:
             _success(f"Authenticated — {len(tools)} tool(s) available")
@@ -1025,7 +1025,7 @@ def cmd_mcp_reauth(args):
         return
     if not name:
         _error("Specify a server name, or use --all to re-auth every OAuth server.")
-        _info("Usage: hermes mcp reauth <name>   |   hermes mcp reauth --all")
+        _info("Usage: eir mcp reauth <name>   |   eir mcp reauth --all")
         return
     cfg = _lookup_server(name, servers)
     if cfg is not None:
@@ -1069,7 +1069,7 @@ def cmd_mcp_configure(args):
     """Reconfigure which tools are enabled for an existing MCP server."""
     import sys as _sys
     if not _sys.stdin.isatty():
-        print("Error: 'hermes mcp configure' requires an interactive terminal.", file=_sys.stderr)
+        print("Error: 'eir mcp configure' requires an interactive terminal.", file=_sys.stderr)
         _sys.exit(1)
     name = args.name
     cfg = _lookup_server(name, _get_mcp_servers(), "Available")
@@ -1108,7 +1108,7 @@ def cmd_mcp_configure(args):
     _info(f"Currently {len(pre_selected)}/{total} tools enabled for '{name}'.")
     print()
 
-    from hermes_cli.curses_ui import curses_checklist
+    from eir_cli.curses_ui import curses_checklist
 
     labels = [f"{t[0]}  —  {t[1]}" for t in all_tools]
     chosen = curses_checklist(f"Select tools for '{name}'", labels, pre_selected)
@@ -1142,27 +1142,27 @@ def cmd_mcp_configure(args):
 
 
 _MCP_USAGE = (
-    "hermes mcp                                    Open the catalog picker (default)",
-    "hermes mcp catalog                            List Nous-approved MCPs",
-    "hermes mcp install <name>                     Install a catalog MCP",
-    "hermes mcp add <name> --url <endpoint>        Add a custom MCP server",
-    "hermes mcp add <name> --command <cmd>         Add a stdio server",
-    "hermes mcp add <name> --preset <preset>       Add from a known preset",
-    "hermes mcp remove <name>                      Remove a server",
-    "hermes mcp list                               List configured servers",
-    "hermes mcp test <name>                        Test connection",
-    "hermes mcp configure <name>                   Toggle tools",
-    "hermes mcp login <name>                       Re-authenticate OAuth",
-    "hermes mcp reauth <name> | --all              Re-auth one or all OAuth servers",
+    "eir mcp                                    Open the catalog picker (default)",
+    "eir mcp catalog                            List Nous-approved MCPs",
+    "eir mcp install <name>                     Install a catalog MCP",
+    "eir mcp add <name> --url <endpoint>        Add a custom MCP server",
+    "eir mcp add <name> --command <cmd>         Add a stdio server",
+    "eir mcp add <name> --preset <preset>       Add from a known preset",
+    "eir mcp remove <name>                      Remove a server",
+    "eir mcp list                               List configured servers",
+    "eir mcp test <name>                        Test connection",
+    "eir mcp configure <name>                   Toggle tools",
+    "eir mcp login <name>                       Re-authenticate OAuth",
+    "eir mcp reauth <name> | --all              Re-auth one or all OAuth servers",
 )
 
 
 def mcp_command(args):
-    """Main dispatcher for ``hermes mcp`` subcommands."""
+    """Main dispatcher for ``eir mcp`` subcommands."""
     action = getattr(args, "mcp_action", None)
     if action in ("picker", "catalog", "install"):
         # Catalog subcommands live in mcp_picker / mcp_catalog; import lazily to keep this module cheap.
-        from hermes_cli import mcp_picker
+        from eir_cli import mcp_picker
 
         if action == "picker":
             mcp_picker.run_picker()
@@ -1182,8 +1182,8 @@ def mcp_command(args):
     if handler:
         # A handler's int return is the process exit code (``main()`` exits non-zero on it).
         return handler(args)
-    # No subcommand — drop the user into the catalog picker (same UX as `hermes plugin`).
-    from hermes_cli.mcp_picker import run_picker
+    # No subcommand — drop the user into the catalog picker (same UX as `eir plugin`).
+    from eir_cli.mcp_picker import run_picker
     run_picker()
     print(color("  Commands:", Colors.CYAN))
     for line in _MCP_USAGE:

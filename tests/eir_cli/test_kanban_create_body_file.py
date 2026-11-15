@@ -14,27 +14,27 @@ from pathlib import Path
 
 import pytest
 
-from hermes_cli import kanban as kc
-from hermes_cli import kanban_db as kb
-from hermes_cli import kanban_db_connect as kbc
+from eir_cli import kanban as kc
+from eir_cli import kanban_db as kb
+from eir_cli import kanban_db_connect as kbc
 
 BODY = "line one\nline two\n--json\n--body should survive verbatim\n"
 
 
 @pytest.fixture
 def kanban_home(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
+    monkeypatch.setenv("EIR_KANBAN_HOME", str(home))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     kb.init_db()
     return home
 
 
 def _create(argv, monkeypatch=None, stdin=None):
-    """Drive the real ``hermes kanban create`` parser into ``_cmd_create``."""
-    root = argparse.ArgumentParser(prog="hermes")
+    """Drive the real ``eir kanban create`` parser into ``_cmd_create``."""
+    root = argparse.ArgumentParser(prog="eir")
     kc.build_parser(root.add_subparsers())
     args = root.parse_args(["kanban", "create", *argv])
     if stdin is not None:

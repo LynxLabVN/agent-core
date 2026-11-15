@@ -1,6 +1,6 @@
-"""Allowlisted public summary for ``hermes debug share`` (#46006).
+"""Allowlisted public summary for ``eir debug share`` (#46006).
 
-The public paste carries only values Hermes itself produces: versions, install kind, platform and
+The public paste carries only values Eir itself produces: versions, install kind, platform and
 toolset names, the KEY shape of config.yaml, and counts of warnings/errors by logger, exception
 class and HTTP status. Log lines and message text never take this path: subtractive redaction
 cannot recognise IPs, room IDs, display names or message bodies, so the public report is built
@@ -22,7 +22,7 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# ``hermes_logging._LOG_FORMAT``: ``<date> <time> LEVEL[ [session]] logger: message``.
+# ``eir_logging._LOG_FORMAT``: ``<date> <time> LEVEL[ [session]] logger: message``.
 _LOG_LINE_RE = re.compile(
     r"^\d{4}-\d{2}-\d{2}[ T][\d:,.]+\s+(?P<level>WARNING|ERROR|CRITICAL)"
     r"(?: \[[^\]]*\])?\s+(?P<logger>[A-Za-z_][\w.]{0,80}):")
@@ -39,15 +39,15 @@ _MAX_SHAPE_DEPTH = 2
 # loggers rooted in a known package are named, the rest are counted as "(other)". Below the root,
 # only segments that exist as modules on disk are kept (see _module_path).
 _KNOWN_LOGGER_ROOTS = frozenset({
-    "acp_adapter", "agent", "cli", "cron", "gateway", "hermes", "hermes_cli", "hermes_constants",
-    "hermes_logging", "hermes_platform", "hermes_state", "model_tools", "pm", "plugins",
+    "acp_adapter", "agent", "cli", "cron", "gateway", "eir", "eir_cli", "eir_constants",
+    "eir_logging", "eir_platform", "eir_state", "model_tools", "pm", "plugins",
     "providers", "run_agent", "toolsets", "tools", "tui_gateway", "asyncio", "httpx", "httpcore",
     "openai", "anthropic", "urllib3", "websockets", "aiohttp", "uvicorn", "fastapi", "mcp"})
 
 PUBLIC_SUMMARY_BANNER = (
-    "[hermes debug share: PUBLIC SUMMARY. Allowlisted fields only (versions, config key "
+    "[eir debug share: PUBLIC SUMMARY. Allowlisted fields only (versions, config key "
     "shape, error counts); no log lines or message text. Full redacted logs go only to "
-    "private storage: hermes debug share --nous]\n")
+    "private storage: eir debug share --nous]\n")
 
 
 def _guarded(fn, default: Any = "unknown") -> Any:
@@ -59,13 +59,13 @@ def _guarded(fn, default: Any = "unknown") -> Any:
         return default
 
 
-def _hermes_version() -> str:
-    from hermes_cli.version_info import get_version_info
+def _eir_version() -> str:
+    from eir_cli.version_info import get_version_info
     return get_version_info().derived_version
 
 
 def _install_kind() -> str:
-    from hermes_cli.config import detect_install_method
+    from eir_cli.config import detect_install_method
     return detect_install_method()
 
 
@@ -215,8 +215,8 @@ def _log_counts(text: str) -> tuple[Counter, Counter, Counter, int]:
 
 
 def _log_section(log_lines: int) -> list[str]:
-    from hermes_cli.debug import _REPORT_LOGS, _capture_log_snapshot
-    from hermes_cli.logs import LOG_FILES
+    from eir_cli.debug import _REPORT_LOGS, _capture_log_snapshot
+    from eir_cli.logs import LOG_FILES
     out = ["", "logs (counts from the recent tail; no line text):"]
     by_logger: Counter = Counter()
     exceptions: Counter = Counter()
@@ -249,13 +249,13 @@ def _log_section(log_lines: int) -> list[str]:
 
 def collect_public_summary(*, log_lines: int = 200) -> str:
     """The text uploaded to the PUBLIC paste: allowlisted fields only, never log or message text."""
-    from hermes_cli.config import read_raw_config
-    from hermes_cli.config_defaults import DEFAULT_CONFIG
+    from eir_cli.config import read_raw_config
+    from eir_cli.config_defaults import DEFAULT_CONFIG
     raw_config = _guarded(read_raw_config, {})
     raw_config = raw_config if isinstance(raw_config, dict) else {}
     lines = [
-        "--- hermes debug summary ---",
-        f"hermes:        {_guarded(_hermes_version)}",
+        "--- eir debug summary ---",
+        f"eir:        {_guarded(_eir_version)}",
         f"python:        {sys.version.split()[0]}",
         f"os:            {platform.system()} {platform.release()} {platform.machine()}",
         f"install_kind:  {_guarded(_install_kind)}",

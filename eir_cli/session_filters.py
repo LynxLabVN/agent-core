@@ -1,4 +1,4 @@
-"""Shared time/filter parsing for `hermes sessions prune` / `archive`."""
+"""Shared time/filter parsing for `eir sessions prune` / `archive`."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import time
 from datetime import datetime, timezone, UTC
 from typing import Any, Dict, Optional
 
-from hermes_cli.timefmt import coerce_epoch
+from eir_cli.timefmt import coerce_epoch
 
 _DURATION_RE = re.compile(
     r"^(\d+(?:\.\d+)?)\s*"

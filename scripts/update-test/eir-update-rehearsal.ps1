@@ -1,13 +1,13 @@
 <#
 .SYNOPSIS
-  hermes-update-rehearsal.ps1 -- for an EXISTING Hermes install (Windows).
+  eir-update-rehearsal.ps1 -- for an EXISTING Eir install (Windows).
 
 .DESCRIPTION
   Two steps:
 
-    pre   take a `hermes backup` of your data, snapshot the disk that holds
-          HERMES_HOME and the desktop app's Electron userData (Volume Shadow Copy),
-          then point the install's update source at a fork so `hermes update`
+    pre   take a `eir backup` of your data, snapshot the disk that holds
+          EIR_HOME and the desktop app's Electron userData (Volume Shadow Copy),
+          then point the install's update source at a fork so `eir update`
           pulls that fork's main. Prints what to do next.
     post  put both trees back exactly as they were at the snapshot.
 
@@ -16,10 +16,10 @@
 
   The snapshot is copy-on-write, so pre copies nothing and takes seconds. post
   mirrors the snapshot back over both trees: only files the update changed are
-  copied, and files it added are deleted. HERMES_HOME\cache is left as it is.
+  copied, and files it added are deleted. EIR_HOME\cache is left as it is.
 
   If Windows drops the snapshot (it can when the disk's shadow storage fills),
-  your files are untouched but post cannot roll back; the `hermes backup` zip
+  your files are untouched but post cannot roll back; the `eir backup` zip
   still holds your config, keys, sessions, memories and skills. To make that
   unlikely, pre raises the shadow-storage cap to 128 GB (a ceiling, not a
   reservation) and post puts the original cap back.
@@ -34,18 +34,18 @@
   rehearsal fork).
 
 .PARAMETER BackupRoot
-  Where the backup lives (default: $HOME\hermes-update-rehearsal).
+  Where the backup lives (default: $HOME\eir-update-rehearsal).
 
 .PARAMETER Yes
   post: skip the confirmation.
 
 .EXAMPLE
-  ./hermes-update-rehearsal.ps1 pre -Source <git-url>
-  # ... run `hermes update`, use Hermes, test ...
-  ./hermes-update-rehearsal.ps1 post
+  ./eir-update-rehearsal.ps1 pre -Source <git-url>
+  # ... run `eir update`, use Eir, test ...
+  ./eir-update-rehearsal.ps1 post
 
 .NOTES
-  `pre` and `hermes update` need network access to -Source, and a usable git on PATH.
+  `pre` and `eir update` need network access to -Source, and a usable git on PATH.
 #>
 [CmdletBinding()]
 param(
@@ -62,7 +62,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 2.0
 
 $OfficialHttps = 'https://github.com/NousResearch/hermes-agent.git'
-$OfficialSsh = 'git@github.com:NousResearch/hermes-agent.git'
+$OfficialSsh = 'git@github.com:NousResearch/eir-agent.git'
 # Diff-area cap pre sets while the snapshot is alive (post restores the original).
 $ShadowStorageMax = [UInt64]128GB
 
@@ -86,20 +86,20 @@ function Assert-Elevated {
 # paths
 # ---------------------------------------------------------------------------
 function Get-ResolvedPaths {
-  $suffix = if ($env:HERMES_DATA_DIR_SUFFIX) { $env:HERMES_DATA_DIR_SUFFIX } else { '' }
+  $suffix = if ($env:EIR_DATA_DIR_SUFFIX) { $env:EIR_DATA_DIR_SUFFIX } else { '' }
   $userProfile = $env:USERPROFILE
-  if ($env:HERMES_HOME) {
-    $home_ = $env:HERMES_HOME
+  if ($env:EIR_HOME) {
+    $home_ = $env:EIR_HOME
     try { $home_ = (Resolve-Path -LiteralPath $home_ -ErrorAction Stop).Path }
     catch { $home_ = [IO.Path]::GetFullPath($home_) }
   }
   else {
     $base = if ($env:LOCALAPPDATA) { $env:LOCALAPPDATA } else { Join-Path $userProfile 'AppData\Local' }
-    $home_ = "$(Join-Path $base 'hermes')$suffix"
+    $home_ = "$(Join-Path $base 'eir')$suffix"
   }
-  $install = Join-Path $home_ 'hermes-agent'
-  if ($env:HERMES_DESKTOP_USER_DATA_DIR) {
-    $ud = $env:HERMES_DESKTOP_USER_DATA_DIR
+  $install = Join-Path $home_ 'eir-agent'
+  if ($env:EIR_DESKTOP_USER_DATA_DIR) {
+    $ud = $env:EIR_DESKTOP_USER_DATA_DIR
     try { $ud = (Resolve-Path -LiteralPath $ud -ErrorAction Stop).Path }
     catch { $ud = [IO.Path]::GetFullPath($ud) }
     $userData = $ud
@@ -107,7 +107,7 @@ function Get-ResolvedPaths {
   }
   else {
     $appData = if ($env:APPDATA) { $env:APPDATA } else { Join-Path $userProfile 'AppData\Roaming' }
-    $userData = Join-Path $appData "Hermes$suffix"
+    $userData = Join-Path $appData "Eir$suffix"
     $userDataSource = 'default'
   }
   return [pscustomobject]@{
@@ -127,13 +127,13 @@ function Load-Snapshot {
   $snap = Get-LatestSnapshot
   if (-not $snap) { Fail "no backup found under $BackupRoot -- run 'pre' first" }
   $script:Snap = $snap
-  $recordedPath = Join-Path $snap 'hermes-home.txt'
-  if (-not (Test-Path -LiteralPath $recordedPath)) { Fail "$snap is not a rehearsal backup (no hermes-home.txt)" }
+  $recordedPath = Join-Path $snap 'eir-home.txt'
+  if (-not (Test-Path -LiteralPath $recordedPath)) { Fail "$snap is not a rehearsal backup (no eir-home.txt)" }
   if (-not (Test-Path -LiteralPath (Join-Path $snap 'shadows.txt'))) { Fail "$snap has no disk snapshot (made by an older version of this script)" }
   $P = Get-ResolvedPaths
   $recorded = ((Get-Content -LiteralPath $recordedPath -Raw) -replace "`r", '').Trim()
   if ($recorded -ne $P.Home) {
-    Fail "that backup belongs to HERMES_HOME=$recorded, not $($P.Home); pass -BackupRoot to pick the right one"
+    Fail "that backup belongs to EIR_HOME=$recorded, not $($P.Home); pass -BackupRoot to pick the right one"
   }
 }
 
@@ -280,12 +280,12 @@ function Invoke-Mirror {
 # pre
 # ---------------------------------------------------------------------------
 
-function Resolve-HermesExe {
+function Resolve-EirExe {
   param($P)
   foreach ($c in @(
-      (Join-Path $P.Install 'venv\Scripts\hermes.exe'),
-      (Join-Path $P.Home 'bin\hermes.exe'),
-      (Join-Path $P.Home 'bin\hermes.cmd'))) {
+      (Join-Path $P.Install 'venv\Scripts\eir.exe'),
+      (Join-Path $P.Home 'bin\eir.exe'),
+      (Join-Path $P.Home 'bin\eir.cmd'))) {
     if (Test-Path -LiteralPath $c) { return $c }
   }
   return $null
@@ -294,15 +294,15 @@ function Resolve-HermesExe {
 function Invoke-Pre {
   $P = Get-ResolvedPaths
   Step 'your install'
-  Say "HERMES_HOME   $($P.Home)"
+  Say "EIR_HOME   $($P.Home)"
   Say "install       $($P.Install)"
   Say "desktop data  $($P.UserData) ($($P.UserDataOrigin))"
   Say "backup to     $BackupRoot"
-  if (-not (Test-Path -LiteralPath $P.Home)) { Fail "no HERMES_HOME at $($P.Home)" }
+  if (-not (Test-Path -LiteralPath $P.Home)) { Fail "no EIR_HOME at $($P.Home)" }
   if (-not (Test-Path -LiteralPath (Join-Path $P.Install '.git'))) { Fail "no git checkout at $($P.Install) -- this tool covers source installs" }
   Assert-Elevated
-  $hermesExe = Resolve-HermesExe $P
-  if (-not $hermesExe) { Fail "no hermes executable found under $($P.Install)\venv\Scripts or $($P.Home)\bin" }
+  $eirExe = Resolve-EirExe $P
+  if (-not $eirExe) { Fail "no eir executable found under $($P.Install)\venv\Scripts or $($P.Home)\bin" }
 
   $volumes = @(Get-VolumeRoot $P.Home)
   $userDataExists = Test-Path -LiteralPath $P.UserData
@@ -310,13 +310,13 @@ function Invoke-Pre {
   $volumes = @($volumes | Select-Object -Unique)
 
   Step 'before we start (nothing here is pass/fail, just read it)'
-  $procs = @(Get-Process -Name 'Hermes', 'hermes' -ErrorAction SilentlyContinue)
+  $procs = @(Get-Process -Name 'Eir', 'eir' -ErrorAction SilentlyContinue)
   if ($procs.Count) {
-    Warn 'Hermes looks like it is running -- close the desktop app and the gateway'
-    Warn "before you run 'hermes update', or the dependency sync may fail:"
+    Warn 'Eir looks like it is running -- close the desktop app and the gateway'
+    Warn "before you run 'eir update', or the dependency sync may fail:"
     $procs | ForEach-Object { Write-Host "    $($_.ProcessName) (pid $($_.Id))" }
   }
-  else { Ok 'no Hermes processes running' }
+  else { Ok 'no Eir processes running' }
   $n = @(Invoke-GitCmd @('config', '--global', '--get-regexp', '^url\.')).Count + @(Invoke-GitCmd @('-C', $P.Install, 'config', '--local', '--get-regexp', '^url\.')).Count
   if ($n -eq 0) { Ok 'global git config has no URL rewrites' }
   else { Warn "$n existing url.* insteadOf entr(y/ies) in your git config; we add more and remove only ours" }
@@ -332,28 +332,28 @@ function Invoke-Pre {
   if (Test-Path -LiteralPath $script:Snap) { Fail "backup dir already exists: $($script:Snap)" }
   New-Item -ItemType Directory -Force -Path $script:Snap | Out-Null
 
-  Step 'backing up your data (hermes backup)'
+  Step 'backing up your data (eir backup)'
   # Insurance for the case where Windows drops the snapshot: config, keys,
   # sessions, memories, skills, with SQLite copied consistently. Code, venvs and
   # models are left out -- those are what a reinstall brings back.
-  $zip = Join-Path $script:Snap 'hermes-backup.zip'
+  $zip = Join-Path $script:Snap 'eir-backup.zip'
   $started = Get-Date
-  $prevHome = $env:HERMES_HOME
-  $env:HERMES_HOME = $P.Home
+  $prevHome = $env:EIR_HOME
+  $env:EIR_HOME = $P.Home
   $prev = $ErrorActionPreference
   $ErrorActionPreference = 'Continue'
-  try { $out = & $hermesExe backup -o $zip 2>&1; $code = $LASTEXITCODE }
-  finally { $ErrorActionPreference = $prev; $env:HERMES_HOME = $prevHome }
+  try { $out = & $eirExe backup -o $zip 2>&1; $code = $LASTEXITCODE }
+  finally { $ErrorActionPreference = $prev; $env:EIR_HOME = $prevHome }
   $elapsed = [int]((Get-Date) - $started).TotalSeconds
   if ($code -eq 1 -and (Test-Path -LiteralPath $zip)) {
     $out | ForEach-Object { Write-Host "    $_" }
-    Warn "hermes backup finished INCOMPLETE (${elapsed}s): the files listed above are not in $zip"
+    Warn "eir backup finished INCOMPLETE (${elapsed}s): the files listed above are not in $zip"
   }
   elseif ($code -ne 0 -or -not (Test-Path -LiteralPath $zip)) {
     $out | ForEach-Object { Write-Host "    $_" }
-    Fail "hermes backup failed (exit $code) -- nothing else was done"
+    Fail "eir backup failed (exit $code) -- nothing else was done"
   }
-  else { Ok "hermes-backup.zip ($([math]::Round((Get-Item $zip).Length / 1MB, 1)) MB, ${elapsed}s)" }
+  else { Ok "eir-backup.zip ($([math]::Round((Get-Item $zip).Length / 1MB, 1)) MB, ${elapsed}s)" }
 
   # --- snapshot: the rollback point. Everything after this is undone by post.
   Step 'snapshotting the disk'
@@ -388,11 +388,11 @@ function Invoke-Pre {
 
   # Plain text, not JSON: post compares this string byte-for-byte to decide
   # whether the backup belongs to the home it is about to restore.
-  Set-Content -LiteralPath (Join-Path $script:Snap 'hermes-home.txt') -Encoding utf8 -Value @($P.Home)
+  Set-Content -LiteralPath (Join-Path $script:Snap 'eir-home.txt') -Encoding utf8 -Value @($P.Home)
   $manifest = [ordered]@{
     schema              = 4
     created             = (Get-Date).ToUniversalTime().ToString('o')
-    hermes_home         = $P.Home
+    eir_home         = $P.Home
     install_dir         = $P.Install
     userdata_dir        = $P.UserData
     userdata_dir_source = $P.UserDataOrigin
@@ -403,7 +403,7 @@ function Invoke-Pre {
 
   Step "pointing your install at $Source"
   # insteadOf is a TRANSPORT rewrite. Your checkout's origin keeps the official
-  # URL, which matters: `hermes update` resolves its channel from the archive and
+  # URL, which matters: `eir update` resolves its channel from the archive and
   # validates it against `git config --get remote.origin.url`. Repointing origin
   # at a fork would make the update fail before any git work.
   # Straight at the fork: the updater follows main, so the fork's main is what
@@ -434,7 +434,7 @@ function Invoke-Pre {
 function Invoke-Status {
   $P = Get-ResolvedPaths
   Step 'your install'
-  Say "HERMES_HOME   $($P.Home)"
+  Say "EIR_HOME   $($P.Home)"
   Say "install       $($P.Install)"
   Say "desktop data  $($P.UserData) ($($P.UserDataOrigin))"
   Say "backup root   $BackupRoot"
@@ -464,7 +464,7 @@ function Invoke-Status {
       Say "snapshot room $($f[0]) was $(Format-Bytes ([UInt64]$f[1])) before pre (post puts it back; without post: vssadmin resize shadowstorage /for=$d /on=$d /maxsize=$($f[1]))"
     }
   }
-  Say "data backup   $(if (Test-Path -LiteralPath (Join-Path $snap 'hermes-backup.zip')) { 'hermes-backup.zip' } else { 'none' })"
+  Say "data backup   $(if (Test-Path -LiteralPath (Join-Path $snap 'eir-backup.zip')) { 'eir-backup.zip' } else { 'none' })"
   Say "marker        $(if (Test-Path -LiteralPath (Join-Path $P.Home '.skip_upstream_prompt')) { 'present' } else { 'absent' })"
   $n = @(Invoke-GitCmd @('config', '--global', '--get-regexp', '^url\.')).Count + @(Invoke-GitCmd @('-C', $P.Install, 'config', '--local', '--get-regexp', '^url\.')).Count
   Say "git rewrites  $n insteadOf entr(y/ies)"
@@ -494,16 +494,16 @@ function Invoke-Post {
   # Check EVERY snapshot before touching anything: half a rollback is worse than none.
   $gone = @($shadows | Where-Object { -not (Test-ShadowAlive $_) })
   if ($gone.Count) {
-    $zip = Join-Path $script:Snap 'hermes-backup.zip'
+    $zip = Join-Path $script:Snap 'eir-backup.zip'
     $gone | ForEach-Object { Warn "the snapshot of $($_.Volume) is gone (Windows deletes snapshots when the disk's shadow storage fills)" }
     Say ''
     Say 'Nothing was changed. An exact rollback is no longer possible, but your data is'
     Say "backed up in $zip. To put your config, keys, sessions, memories and"
     Say 'skills back, either:'
-    Say "  hermes import `"$zip`""
-    Say 'or, if hermes itself no longer starts, extract the zip over your home:'
+    Say "  eir import `"$zip`""
+    Say 'or, if eir itself no longer starts, extract the zip over your home:'
     Say "  tar -xf `"$zip`" -C `"$($P.Home)`""
-    Say 'then reinstall Hermes to get the program back.'
+    Say 'then reinstall Eir to get the program back.'
     Restore-ShadowStorage
     Fail 'the disk snapshot is gone'
   }
@@ -514,16 +514,16 @@ function Invoke-Post {
   Say "  to how they were at $($script:Snap)"
   Confirm-Action "Put everything back from $($script:Snap)?"
 
-  Step 'stopping Hermes'
-  foreach ($name in @('Hermes', 'hermes')) {
+  Step 'stopping Eir'
+  foreach ($name in @('Eir', 'eir')) {
     Get-Process -Name $name -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
   }
-  Ok 'asked Hermes to stop (if anything was running)'
+  Ok 'asked Eir to stop (if anything was running)'
 
   $mounts = @{}
   try {
     foreach ($s in $shadows) { $mounts[$s.Volume] = Mount-Shadow $s }
-    $trees = @([pscustomobject]@{ Label = 'HERMES_HOME'; Live = $P.Home; IsHome = $true })
+    $trees = @([pscustomobject]@{ Label = 'EIR_HOME'; Live = $P.Home; IsHome = $true })
     $trees += [pscustomobject]@{ Label = "the desktop app's data"; Live = $P.UserData; IsHome = $false }
     foreach ($t in $trees) {
       Step "restoring $($t.Label)"
@@ -554,15 +554,15 @@ function Invoke-Post {
   Restore-ShadowStorage
 
   Step 'done'
-  Say "Your HERMES_HOME and the desktop app's data are back exactly as they were."
-  Say "Open the desktop app once and run 'hermes doctor' to confirm."
+  Say "Your EIR_HOME and the desktop app's data are back exactly as they were."
+  Say "Open the desktop app once and run 'eir doctor' to confirm."
   Say "Nothing was judged or changed by this script; the backup at $($script:Snap)"
   Say 'is yours to keep or delete.'
 }
 
 # ---------------------------------------------------------------------------
 
-if (-not $BackupRoot) { $BackupRoot = Join-Path $env:USERPROFILE 'hermes-update-rehearsal' }
+if (-not $BackupRoot) { $BackupRoot = Join-Path $env:USERPROFILE 'eir-update-rehearsal' }
 
 switch ($Command) {
   'pre' { Invoke-Pre }
@@ -575,7 +575,7 @@ switch ($Command) {
       Get-Help $PSCommandPath -Detailed | Out-String | Write-Host
     }
     else {
-      Write-Host 'hermes-update-rehearsal.ps1 -- run against an EXISTING Hermes install.'
+      Write-Host 'eir-update-rehearsal.ps1 -- run against an EXISTING Eir install.'
       Write-Host ''
       Write-Host '  pre     back up your data, snapshot the disk, point the update source at a fork'
       Write-Host '  post    restore both trees exactly as they were at the snapshot'

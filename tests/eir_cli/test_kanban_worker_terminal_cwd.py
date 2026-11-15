@@ -2,7 +2,7 @@
 
 Regression coverage for #34619 and #41312 (same root cause): ``_default_spawn``
 launched the worker subprocess with ``cwd=workspace`` and set
-``HERMES_KANBAN_WORKSPACE``, but did NOT set ``TERMINAL_CWD``. Because
+``EIR_KANBAN_WORKSPACE``, but did NOT set ``TERMINAL_CWD``. Because
 ``TERMINAL_CWD`` takes precedence over the process cwd in both
 ``tools/file_tools.py::_resolve_base_dir`` (relative ``write_file`` paths) and
 ``agent_init``'s context-file loader (``AGENTS.md`` discovery), workers inherited
@@ -38,9 +38,9 @@ def _make_task(kb, *, assignee: str = "w"):
 
 
 def _capture_spawn_env(kb, monkeypatch, workspace: str) -> dict:
-    from hermes_cli import kanban_db_dispatch as kbd
+    from eir_cli import kanban_db_dispatch as kbd
 
-    monkeypatch.setattr(kbd, "_resolve_hermes_argv", lambda: ["hermes"])
+    monkeypatch.setattr(kbd, "_resolve_eir_argv", lambda: ["eir"])
 
     captured: dict = {}
 
@@ -60,13 +60,13 @@ def _capture_spawn_env(kb, monkeypatch, workspace: str) -> dict:
 
 def test_terminal_cwd_pinned_to_workspace(monkeypatch, tmp_path):
     """A real, absolute workspace dir is pinned as TERMINAL_CWD."""
-    root = tmp_path / ".hermes"
+    root = tmp_path / ".eir"
     (root / "profiles" / "w").mkdir(parents=True)
     (root / "profiles" / "w" / "config.yaml").write_text("toolsets:\n  - kanban\n", encoding="utf-8")
     root.joinpath("config.yaml").write_text("toolsets:\n  - kanban\n", encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(root))
+    monkeypatch.setenv("EIR_HOME", str(root))
 
-    from hermes_cli import kanban_db as kb
+    from eir_cli import kanban_db as kb
 
     workspace = tmp_path / "ws"
     workspace.mkdir()
@@ -76,6 +76,6 @@ def test_terminal_cwd_pinned_to_workspace(monkeypatch, tmp_path):
     assert captured["env"]["TERMINAL_CWD"] == str(workspace)
     # The subprocess cwd and TERMINAL_CWD must agree — both anchor the workspace.
     assert captured["cwd"] == str(workspace)
-    assert captured["env"]["HERMES_KANBAN_WORKSPACE"] == str(workspace)
+    assert captured["env"]["EIR_KANBAN_WORKSPACE"] == str(workspace)
 
 

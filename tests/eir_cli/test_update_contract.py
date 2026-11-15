@@ -14,8 +14,8 @@ from pathlib import Path
 
 import pytest
 
-from hermes_cli.image_provenance import read_image_provenance
-from hermes_cli.update_contract import (
+from eir_cli.image_provenance import read_image_provenance
+from eir_cli.update_contract import (
     UpdateRefusal,
     evaluate_update_admission,
     record_refusal_receipt,
@@ -28,7 +28,7 @@ def _valid_marker(tmp_path: Path) -> Path:
         "schema": 1,
         "deployment_kind": "image",
         "manager": "docker",
-        "image": "nousresearch/hermes-agent",
+        "image": "nousresearch/eir-agent",
         "version": "1.0.0",
         "revision": "a" * 40,
     }))
@@ -90,11 +90,11 @@ def test_reader_rejects_symlink_marker(tmp_path):
 def test_admission_marker_refuses_even_on_git_checkout(tmp_path, monkeypatch):
     """The bind-mounted-checkout case: heuristics say git, marker says image
     — the marker wins."""
-    import hermes_cli.image_provenance as ip
+    import eir_cli.image_provenance as ip
 
     monkeypatch.setattr(ip, "IMAGE_PROVENANCE_PATH", _valid_marker(tmp_path))
     monkeypatch.setattr(
-        "hermes_cli.config.detect_install_method", lambda *a, **k: "git"
+        "eir_cli.config.detect_install_method", lambda *a, **k: "git"
     )
     refusal = evaluate_update_admission(tmp_path)
     assert refusal is not None
@@ -103,7 +103,7 @@ def test_admission_marker_refuses_even_on_git_checkout(tmp_path, monkeypatch):
 
 
 def test_admission_invalid_marker_fails_closed(tmp_path, monkeypatch):
-    import hermes_cli.image_provenance as ip
+    import eir_cli.image_provenance as ip
 
     bad = tmp_path / "image-provenance.json"
     bad.write_text("corrupted {{{")
@@ -115,34 +115,34 @@ def test_admission_invalid_marker_fails_closed(tmp_path, monkeypatch):
 
 
 def test_admission_no_marker_falls_back_to_heuristics(tmp_path, monkeypatch):
-    import hermes_cli.image_provenance as ip
+    import eir_cli.image_provenance as ip
 
     monkeypatch.setattr(ip, "IMAGE_PROVENANCE_PATH", tmp_path / "absent.json")
     monkeypatch.setattr(
-        "hermes_cli.config.detect_install_method", lambda *a, **k: "docker"
+        "eir_cli.config.detect_install_method", lambda *a, **k: "docker"
     )
     refusal = evaluate_update_admission(tmp_path)
     assert refusal is not None and refusal.code == "docker"
 
 
 def test_admission_git_checkout_no_marker_is_admitted(tmp_path, monkeypatch):
-    import hermes_cli.image_provenance as ip
+    import eir_cli.image_provenance as ip
 
     monkeypatch.setattr(ip, "IMAGE_PROVENANCE_PATH", tmp_path / "absent.json")
     monkeypatch.setattr(
-        "hermes_cli.config.detect_install_method", lambda *a, **k: "git"
+        "eir_cli.config.detect_install_method", lambda *a, **k: "git"
     )
     assert evaluate_update_admission(tmp_path) is None
 
 
 def test_admission_nix_refuses(tmp_path, monkeypatch):
-    import hermes_cli.image_provenance as ip
+    import eir_cli.image_provenance as ip
 
     monkeypatch.setattr(ip, "IMAGE_PROVENANCE_PATH", tmp_path / "absent.json")
     def _detect(*a, **k):
         return "nix"
 
-    monkeypatch.setattr("hermes_cli.config.detect_install_method", _detect)
+    monkeypatch.setattr("eir_cli.config.detect_install_method", _detect)
     refusal = evaluate_update_admission(tmp_path)
     assert refusal is not None and refusal.code == "nix"
 
@@ -153,8 +153,8 @@ def test_admission_nix_refuses(tmp_path, monkeypatch):
 
 
 def test_refusal_receipt_written_as_refused(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-    import hermes_cli.update_receipt as ur
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
+    import eir_cli.update_receipt as ur
 
     monkeypatch.setattr(ur, "_receipt_dir", lambda: tmp_path / "receipts")
 
@@ -162,7 +162,7 @@ def test_refusal_receipt_written_as_refused(tmp_path, monkeypatch):
         UpdateRefusal(
             code="image-marker",
             message="msg",
-            update_command="docker pull nousresearch/hermes-agent:latest",
+            update_command="docker pull nousresearch/eir-agent:latest",
         )
     )
     receipts = list((tmp_path / "receipts").glob("*.json"))
@@ -194,8 +194,8 @@ def _sealed_tree(tmp_path: Path, distribution: str) -> Path:
 def test_admission_source_checkout_on_termux_host_refuses_with_apt_hint(tmp_path, monkeypatch):
     """A git checkout is normally admitted, but not on a Termux host: the
     lock has no Android wheels, so a source sync would build sdists on the
-    phone. The refusal must point at the APT package, never `hermes update`."""
-    import hermes_cli.image_provenance as ip
+    phone. The refusal must point at the APT package, never `eir update`."""
+    import eir_cli.image_provenance as ip
 
     monkeypatch.setattr(ip, "IMAGE_PROVENANCE_PATH", tmp_path / "absent.json")
     (tmp_path / ".git").mkdir()
@@ -203,9 +203,9 @@ def test_admission_source_checkout_on_termux_host_refuses_with_apt_hint(tmp_path
     monkeypatch.setenv("PREFIX", "/data/data/com.termux/files/usr")
     refusal = evaluate_update_admission(tmp_path)
     assert refusal is not None and refusal.code == "apt-termux"
-    assert "pkg install hermes-agent" in refusal.message
-    assert refusal.update_command == "pkg install hermes-agent"
-    assert "hermes update" not in refusal.update_command
+    assert "pkg install eir-agent" in refusal.message
+    assert refusal.update_command == "pkg install eir-agent"
+    assert "eir update" not in refusal.update_command
     monkeypatch.setenv("PREFIX", "/usr")
     assert evaluate_update_admission(tmp_path) is None, "the same checkout off Termux stays updatable"
 
@@ -213,19 +213,19 @@ def test_admission_source_checkout_on_termux_host_refuses_with_apt_hint(tmp_path
 def test_admission_apt_termux_refuses_with_pkg_upgrade(tmp_path, monkeypatch):
     """A sealed apt-termux tree (no .git) is refused by the steward gate:
     the package manager owns the code tree, so remediation is pkg upgrade
-    — never `hermes update`."""
-    import hermes_cli.image_provenance as ip
+    — never `eir update`."""
+    import eir_cli.image_provenance as ip
 
     monkeypatch.setattr(ip, "IMAGE_PROVENANCE_PATH", tmp_path / "absent.json")
     monkeypatch.setattr(
-        "hermes_cli.config.detect_install_method", lambda *a, **k: "git"
+        "eir_cli.config.detect_install_method", lambda *a, **k: "git"
     )
     root = _sealed_tree(tmp_path, "apt-termux")
     refusal = evaluate_update_admission(root)
     assert refusal is not None
     assert refusal.code == "apt-termux"
-    assert "pkg upgrade hermes-agent" in refusal.message
-    assert "pkg upgrade hermes-agent" in refusal.update_command
+    assert "pkg upgrade eir-agent" in refusal.message
+    assert "pkg upgrade eir-agent" in refusal.update_command
 
 
 def test_admission_apt_termux_command_comes_from_steward_table(tmp_path, monkeypatch):
@@ -233,21 +233,21 @@ def test_admission_apt_termux_command_comes_from_steward_table(tmp_path, monkeyp
     ``_UPDATE_COMMAND_BY_METHOD`` table (the same one every install method
     reads) — not hardcoded inline in the steward refusal — so there is ONE
     source of truth for the update command."""
-    import hermes_cli.config as config_mod
-    import hermes_cli.image_provenance as ip
+    import eir_cli.config as config_mod
+    import eir_cli.image_provenance as ip
 
     monkeypatch.setattr(ip, "IMAGE_PROVENANCE_PATH", tmp_path / "absent.json")
     monkeypatch.setattr(
-        "hermes_cli.config.detect_install_method", lambda *a, **k: "git"
+        "eir_cli.config.detect_install_method", lambda *a, **k: "git"
     )
     # Prove the table is the source: a table edit flows into the refusal.
     monkeypatch.setitem(
         config_mod._UPDATE_COMMAND_BY_METHOD,
         "apt",
-        "pkg upgrade hermes-agent --from-table",
+        "pkg upgrade eir-agent --from-table",
     )
     root = _sealed_tree(tmp_path, "apt-termux")
     refusal = evaluate_update_admission(root)
     assert refusal is not None
     assert refusal.code == "apt-termux"
-    assert refusal.update_command == "pkg upgrade hermes-agent --from-table"
+    assert refusal.update_command == "pkg upgrade eir-agent --from-table"

@@ -9,10 +9,10 @@ def install() -> None:
 
     Stdlib only and idempotent. A finder already installed (the strict one in tests) is kept.
     """
-    if any(type(finder).__name__ == "Finder" and type(finder).__module__.startswith("hermes_agent.compat")
+    if any(type(finder).__name__ == "Finder" and type(finder).__module__.startswith("eir_agent.compat")
            for finder in sys.meta_path):
         return
-    from hermes_agent.compat.finder import Finder
-    from hermes_agent.compat.moves import MOVES
+    from eir_agent.compat.finder import Finder
+    from eir_agent.compat.moves import MOVES
 
     sys.meta_path.insert(0, Finder(MOVES))

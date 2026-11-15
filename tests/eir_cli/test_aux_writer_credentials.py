@@ -1,7 +1,7 @@
 """Every writer that re-points an ``auxiliary.<task>`` block drops the old route's credentials (#141832).
 
 The aux resolver (``_resolve_task_provider_model``) hands a block's ``api_key``/``key_env`` to
-whatever provider/base_url the block names, so a key left behind by any writer (``hermes model``
+whatever provider/base_url the block names, so a key left behind by any writer (``eir model``
 reset, the setup-wizard vision picker, the dashboard assignment) is sent to the next endpoint.
 Each test drives the real writer and asserts what the resolver would send.
 """
@@ -12,18 +12,18 @@ from unittest.mock import patch
 
 import pytest
 
-import hermes_yaml as yaml
+import eir_yaml as yaml
 
 OLD_SECRET = "old-endpoint-secret"
 
 
 @pytest.fixture
 def home(tmp_path, monkeypatch):
-    hermes_home = tmp_path / ".hermes"
-    hermes_home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    eir_home = tmp_path / ".eir"
+    eir_home.mkdir()
+    monkeypatch.setenv("EIR_HOME", str(eir_home))
     monkeypatch.setenv("OLD_ENDPOINT_KEY", OLD_SECRET)
-    return hermes_home
+    return eir_home
 
 
 def _seed(home, vision: dict) -> None:
@@ -39,19 +39,19 @@ OPENROUTER_ROUTE = {"provider": "openrouter", "model": "m", "key_env": "OLD_ENDP
 
 
 def _wizard_auto():
-    import hermes_cli.tools_config as tc
+    import eir_cli.tools_config as tc
     with patch.object(tc, "_prompt_choice", return_value=0):
         tc._configure_vision_backend()
 
 
-def _hermes_model_reset():
-    from hermes_cli.main_provider_setup import _reset_aux_to_auto
+def _eir_model_reset():
+    from eir_cli.main_provider_setup import _reset_aux_to_auto
     _reset_aux_to_auto()
 
 
-@pytest.mark.parametrize("reset_to_auto", [_wizard_auto, _hermes_model_reset], ids=["wizard_auto", "hermes_model_reset"])
+@pytest.mark.parametrize("reset_to_auto", [_wizard_auto, _eir_model_reset], ids=["wizard_auto", "eir_model_reset"])
 def test_auto_reset_then_provider_set_sends_no_old_key(home, reset_to_auto):
-    from hermes_cli.config import set_config_value
+    from eir_cli.config import set_config_value
     # No api_mode: nothing route-shaped is left for the set-time guard to pop after the reset.
     _seed(home, {"provider": "openrouter", "model": "m", "key_env": "OLD_ENDPOINT_KEY"})
 
@@ -63,8 +63,8 @@ def test_auto_reset_then_provider_set_sends_no_old_key(home, reset_to_auto):
 
 
 def test_wizard_vision_picker_switch_drops_old_credentials(home):
-    from hermes_cli import inventory
-    import hermes_cli.tools_config as tc
+    from eir_cli import inventory
+    import eir_cli.tools_config as tc
     _seed(home, OPENROUTER_ROUTE)
     rows = [{"slug": "anthropic", "name": "Anthropic", "models": ["claude-x"]}]
     choices = iter([1, 0, 0])  # "Pick a provider and model" → Anthropic → claude-x
@@ -82,8 +82,8 @@ def test_wizard_vision_picker_switch_drops_old_credentials(home):
      "api_mode": "codex_responses"},
 ], ids=["openrouter_key_env", "custom_inline_key"])
 def test_dashboard_new_base_url_sends_no_old_key(home, seed):
-    from hermes_cli.config import load_config
-    from hermes_cli.web_server_config import _apply_aux_assignment_sync
+    from eir_cli.config import load_config
+    from eir_cli.web_server_config import _apply_aux_assignment_sync
     _seed(home, seed)
 
     _apply_aux_assignment_sync(load_config(), "custom", "m", "vision", "https://b.example/v1", "")
@@ -95,8 +95,8 @@ def test_dashboard_new_base_url_sends_no_old_key(home, seed):
 
 def test_dashboard_equivalent_https_url_keeps_its_key(home):
     """A different spelling of the same HTTPS URL must not lose endpoint credentials."""
-    from hermes_cli.config import load_config
-    from hermes_cli.web_server_config import _apply_aux_assignment_sync
+    from eir_cli.config import load_config
+    from eir_cli.web_server_config import _apply_aux_assignment_sync
     _seed(home, {"provider": "custom", "model": "m",
                  "base_url": "https://a.example/v1", "api_key": "a-key"})
 
@@ -109,9 +109,9 @@ def test_dashboard_equivalent_https_url_keeps_its_key(home):
 
 def test_dashboard_bare_custom_on_same_url_keeps_its_key(home):
     """Picking bare custom keeps the slot's URL (the keeps-old-URL branch), so the key configured
-    for that URL stays with it, as `hermes config set ….provider custom` keeps it."""
-    from hermes_cli.config import load_config
-    from hermes_cli.web_server_config import _apply_aux_assignment_sync
+    for that URL stays with it, as `eir config set ….provider custom` keeps it."""
+    from eir_cli.config import load_config
+    from eir_cli.web_server_config import _apply_aux_assignment_sync
     _seed(home, {"provider": "openrouter", "model": "m", "base_url": "https://openrouter.ai/api/v1", "api_key": "a-key"})
 
     _apply_aux_assignment_sync(load_config(), "custom", "m2", "vision", "", "")
@@ -121,8 +121,8 @@ def test_dashboard_bare_custom_on_same_url_keeps_its_key(home):
 
 def test_dashboard_same_provider_model_change_keeps_its_key(home):
     """A model-only change (no base_url sent) keeps the slot's URL, so it is not a route change."""
-    from hermes_cli.config import load_config
-    from hermes_cli.web_server_config import _apply_aux_assignment_sync
+    from eir_cli.config import load_config
+    from eir_cli.web_server_config import _apply_aux_assignment_sync
     _seed(home, {"provider": "openrouter", "model": "m", "base_url": "https://openrouter.ai/api/v1", "api_key": "a-key"})
 
     _apply_aux_assignment_sync(load_config(), "openrouter", "m2", "vision", "", "")
@@ -131,8 +131,8 @@ def test_dashboard_same_provider_model_change_keeps_its_key(home):
 
 
 def test_dashboard_same_route_keeps_its_key(home):
-    from hermes_cli.config import load_config
-    from hermes_cli.web_server_config import _apply_aux_assignment_sync
+    from eir_cli.config import load_config
+    from eir_cli.web_server_config import _apply_aux_assignment_sync
     _seed(home, {"provider": "custom", "model": "m", "base_url": "https://a.example/v1", "api_key": "a-key"})
 
     _apply_aux_assignment_sync(load_config(), "custom", "m2", "vision", "https://a.example/v1", "")
@@ -146,8 +146,8 @@ def test_dashboard_same_route_keeps_its_key(home):
      "api_mode": "codex_responses"},
 ], ids=["openrouter_key_env", "custom_inline_key"])
 def test_wizard_custom_endpoint_sends_no_old_key(home, seed):
-    import hermes_cli.tools_config as tc
-    import hermes_cli.tools_config_providers as tcp
+    import eir_cli.tools_config as tc
+    import eir_cli.tools_config_providers as tcp
     _seed(home, seed)
     answers = iter(["https://b.example/v1", "new-key", "m"])
     with patch.object(tc, "_prompt_choice", return_value=2), \
@@ -161,8 +161,8 @@ def test_wizard_custom_endpoint_sends_no_old_key(home, seed):
                                            ("https://a.example:8443/v1", False)],
                          ids=["same_origin_path", "http_downgrade", "other_port"])
 def test_aux_picker_custom_url_binds_key_env_to_origin(home, new_url, kept):
-    """``hermes model``'s custom aux endpoint keeps a key only across a path change on one origin (#130410)."""
-    from hermes_cli.main_provider_setup import _save_aux_choice
+    """``eir model``'s custom aux endpoint keeps a key only across a path change on one origin (#130410)."""
+    from eir_cli.main_provider_setup import _save_aux_choice
     _seed(home, {"provider": "custom", "model": "m", "base_url": "https://a.example/v1", "key_env": "OLD_ENDPOINT_KEY"})
 
     _save_aux_choice("vision", provider="custom", model="m", base_url=new_url, api_key="")
@@ -172,7 +172,7 @@ def test_aux_picker_custom_url_binds_key_env_to_origin(home, new_url, kept):
 
 def _put_config(config: dict) -> None:
     import asyncio
-    from hermes_cli.web_routers.config_env import ConfigUpdate, update_config
+    from eir_cli.web_routers.config_env import ConfigUpdate, update_config
     asyncio.run(update_config(ConfigUpdate(config=config)))
 
 
@@ -191,7 +191,7 @@ def test_dashboard_config_form_provider_change_sends_no_old_key(home, seed):
 
 
 def test_dashboard_config_form_main_model_provider_change_drops_old_route(home):
-    from hermes_cli.config import read_raw_config
+    from eir_cli.config import read_raw_config
     (home / "config.yaml").write_text(yaml.safe_dump({"model": {
         "provider": "custom", "default": "m", "base_url": "https://a.example/v1", "key_env": "OLD_ENDPOINT_KEY"}}))
 
@@ -232,7 +232,7 @@ def test_dashboard_config_form_round_trip_drops_referenced_key(home):
     """The settings form PUTs back what GET returned, and GET expands a ``${VAR}`` key (aux keys
     are stored as ``${AUXILIARY_<TASK>_API_KEY}``): the re-sent expansion is the old route's key."""
     import asyncio
-    from hermes_cli.web_routers.config_env import get_config
+    from eir_cli.web_routers.config_env import get_config
     (home / ".env").write_text(f"AUXILIARY_VISION_API_KEY={OLD_SECRET}\n")
     _seed(home, {"provider": "custom", "model": "m", "base_url": "https://a.example/v1",
                  "api_key": "${AUXILIARY_VISION_API_KEY}"})
@@ -246,7 +246,7 @@ def test_dashboard_config_form_round_trip_drops_referenced_key(home):
 
 def test_dashboard_config_form_round_trip_keeps_typed_key(home):
     import asyncio
-    from hermes_cli.web_routers.config_env import get_config
+    from eir_cli.web_routers.config_env import get_config
     (home / ".env").write_text(f"AUXILIARY_VISION_API_KEY={OLD_SECRET}\n")
     _seed(home, {"provider": "custom", "model": "m", "base_url": "https://a.example/v1",
                  "api_key": "${AUXILIARY_VISION_API_KEY}"})
@@ -260,11 +260,11 @@ def test_dashboard_config_form_round_trip_keeps_typed_key(home):
 
 def _delegation_form_change(home, change: dict) -> None:
     import asyncio
-    from hermes_cli.web_routers.config_env import get_config
-    (home / ".env").write_text(f"HERMES_DELEGATION_API_KEY={OLD_SECRET}\n")
+    from eir_cli.web_routers.config_env import get_config
+    (home / ".env").write_text(f"EIR_DELEGATION_API_KEY={OLD_SECRET}\n")
     (home / "config.yaml").write_text(yaml.safe_dump({"delegation": {
         "provider": "custom", "model": "m", "base_url": "https://a.example/v1",
-        "api_key": "${HERMES_DELEGATION_API_KEY}"}}))
+        "api_key": "${EIR_DELEGATION_API_KEY}"}}))
     form = asyncio.run(get_config())
     form["delegation"].update(change)
     _put_config(form)
@@ -272,7 +272,7 @@ def _delegation_form_change(home, change: dict) -> None:
 
 def test_dashboard_config_form_delegation_provider_change_drops_old_key(home):
     """``delegation`` sits in the same form; its resolver posts ``api_key`` to ``base_url``."""
-    from hermes_cli.config import read_raw_config
+    from eir_cli.config import read_raw_config
     _delegation_form_change(home, {"provider": "anthropic"})
 
     assert not read_raw_config()["delegation"].get("api_key")
@@ -281,10 +281,10 @@ def test_dashboard_config_form_delegation_provider_change_drops_old_key(home):
 def test_dashboard_config_form_delegation_url_change_never_runs_on_parent_key(home):
     """A keyless ``delegation.base_url`` inherits the parent's key: a URL change must not leave one."""
     from types import SimpleNamespace
-    from hermes_cli.env_loader import load_hermes_dotenv
+    from eir_cli.env_loader import load_eir_dotenv
     from tools.delegate_tool_config import _load_config, _resolve_child_runtime, _resolve_delegation_credentials
     _delegation_form_change(home, {"base_url": "https://b.example/v1"})
-    load_hermes_dotenv(hermes_home=home)
+    load_eir_dotenv(eir_home=home)
     parent = SimpleNamespace(model="p", provider="anthropic", base_url="https://api.anthropic.com",
                              api_key="parent-key", api_mode="anthropic_messages", acp_command=None, acp_args=[])
     creds = _resolve_delegation_credentials(_load_config(), parent)
@@ -301,9 +301,9 @@ def test_dashboard_config_form_delegation_url_change_never_runs_on_parent_key(ho
                                            ("https://a.example:8443/v1", False), ("https://b.example/v1", False)],
                          ids=["same_origin_path", "http_downgrade", "other_port", "other_host"])
 def test_dashboard_config_form_url_edit_binds_key_to_origin(home, new_url, kept):
-    """The settings form follows the origin rule the aux assignment and the ``hermes model`` picker use."""
+    """The settings form follows the origin rule the aux assignment and the ``eir model`` picker use."""
     import asyncio
-    from hermes_cli.web_routers.config_env import get_config
+    from eir_cli.web_routers.config_env import get_config
     _seed(home, {"provider": "custom", "model": "m", "base_url": "https://a.example/v1", "api_key": OLD_SECRET})
     form = asyncio.run(get_config())
     form["auxiliary"]["vision"]["base_url"] = new_url
@@ -316,7 +316,7 @@ def test_dashboard_config_form_url_edit_binds_key_to_origin(home, new_url, kept)
 def test_dashboard_config_form_same_origin_provider_switch_drops_key(home):
     """The origin exception is bare custom's: a switch to a named provider on one origin still drops the key."""
     import asyncio
-    from hermes_cli.web_routers.config_env import get_config
+    from eir_cli.web_routers.config_env import get_config
     _seed(home, {"provider": "custom", "model": "m", "base_url": "https://a.example/v1", "api_key": OLD_SECRET})
     form = asyncio.run(get_config())
     form["auxiliary"]["vision"].update(provider="openrouter", base_url="https://a.example/v2")

@@ -1,6 +1,6 @@
 """Managed scope — IT-pushed, user-immutable config & env layer.
 
-DISTINCT from ``hermes_cli.config.is_managed()`` / ``HERMES_MANAGED`` (a coarse package-manager
+DISTINCT from ``eir_cli.config.is_managed()`` / ``EIR_MANAGED`` (a coarse package-manager
 write-lock that blocks all mutation); this layer injects specific immutable values. The two are
 independent and may coexist. v1 enforcement is filesystem permissions only (see
 ``docs/design/managed-scope.md`` §7); ``get_managed_dir()`` is the single seam for adding
@@ -18,8 +18,8 @@ from typing import Dict, Optional
 
 # Stale-module bridge: this module binds ``utils`` names at import time, so a fresh
 # import in a post-pull updater process (pre-handoff purge keeps root modules cached) dies
-# unless the stale ``utils`` is dropped first. See hermes_cli.stale_modules.
-from hermes_cli.stale_modules import drop_stale_root_modules
+# unless the stale ``utils`` is dropped first. See eir_cli.stale_modules.
+from eir_cli.stale_modules import drop_stale_root_modules
 
 drop_stale_root_modules()
 
@@ -28,7 +28,7 @@ from utils import fast_safe_load, file_cache_version, file_signature  # file_sig
 logger = logging.getLogger(__name__)
 
 # POSIX default. Other-platform locations belong ONLY inside get_managed_dir().
-_DEFAULT_MANAGED_DIR = Path("/etc/hermes")
+_DEFAULT_MANAGED_DIR = Path("/etc/eir")
 
 _CACHE_LOCK = threading.Lock()
 # path_key -> (*file_cache_version, parsed)
@@ -37,19 +37,19 @@ _ENV_CACHE: dict[str, tuple] = {}
 
 
 def _under_pytest() -> bool:
-    """True inside the test suite: ignore the system ``/etc/hermes`` so a real managed scope on a
-    dev/CI box can't leak policy into the suite. An explicit ``HERMES_MANAGED_DIR`` still wins."""
+    """True inside the test suite: ignore the system ``/etc/eir`` so a real managed scope on a
+    dev/CI box can't leak policy into the suite. An explicit ``EIR_MANAGED_DIR`` still wins."""
     return "PYTEST_CURRENT_TEST" in os.environ
 
 
 def get_managed_dir() -> Optional[Path]:
     """Resolve the managed-scope directory, or None when no scope is present.
 
-    Priority: ``$HERMES_MANAGED_DIR`` (IT-only bootstrap override; never persisted to any .env;
-    honored only when non-empty AND the directory exists), then ``/etc/hermes`` when it exists.
+    Priority: ``$EIR_MANAGED_DIR`` (IT-only bootstrap override; never persisted to any .env;
+    honored only when non-empty AND the directory exists), then ``/etc/eir`` when it exists.
     A missing directory resolves to None — the common case, so it must be cheap + side-effect-free.
     """
-    override = os.environ.get("HERMES_MANAGED_DIR", "").strip()
+    override = os.environ.get("EIR_MANAGED_DIR", "").strip()
     if override:
         p = Path(override)
     elif _under_pytest():
@@ -115,7 +115,7 @@ def load_managed_config(*, strict: bool = False) -> dict:
     """Parsed managed config.yaml, or {} when absent/malformed (fail-open). Always {} under a config
     backend that takes config and locks from elsewhere (remote mode, D18; boot warns about the file).
     *strict* raises on an unreadable or malformed file instead of returning {}."""
-    from hermes_cli.config_backend import get_config_backend
+    from eir_cli.config_backend import get_config_backend
 
     if not get_config_backend().honors_managed_config():
         return {}
@@ -149,7 +149,7 @@ def apply_managed_overlay(config: dict) -> dict:
         if not managed:
             return config
         # Imported lazily to avoid an import cycle (config imports managed_scope).
-        from hermes_cli.config import _deep_merge, _expand_env_vars, _normalize_root_model_keys
+        from eir_cli.config import _deep_merge, _expand_env_vars, _normalize_root_model_keys
         managed_expanded = _normalize_root_model_keys(_expand_env_vars(managed))
         # _normalize_root_model_keys only promotes the string when root provider/base_url
         # keys exist to migrate; handle the bare case here (matches cli.py) so _deep_merge

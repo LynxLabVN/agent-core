@@ -1,5 +1,5 @@
-import type * as HermesSdk from '@hermes/plugin-sdk'
-import { host } from '@hermes/plugin-sdk'
+import type * as EirSdk from '@eir/plugin-sdk'
+import { host } from '@eir/plugin-sdk'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { WritableAtom } from 'nanostores'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -30,8 +30,8 @@ import type { RosterRow } from './types'
 // the dialog says what is missing, and no Desktop-driven room is ever made.
 
 const { request, notify, openWorkspace } = vi.hoisted(() => ({ request: vi.fn(), notify: vi.fn(), openWorkspace: vi.fn() }))
-vi.mock('@hermes/plugin-sdk', async importOriginal => {
-  const sdk = await importOriginal<typeof HermesSdk>()
+vi.mock('@eir/plugin-sdk', async importOriginal => {
+  const sdk = await importOriginal<typeof EirSdk>()
   const { en } = await import('@/i18n/en')
 
   return {

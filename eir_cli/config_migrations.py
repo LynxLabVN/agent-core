@@ -2,7 +2,7 @@
 
 Each step is ``_migrate_to_N(results, quiet)`` (a large topical step lives in a
 ``config_migrations_<topic>.py`` sibling, registered here); the version gate and strict ascending
-order live in :func:`run_migrations`. Every write goes through ``hermes_cli.config._persist_migration`` so a
+order live in :func:`run_migrations`. Every write goes through ``eir_cli.config._persist_migration`` so a
 step may only persist values that differ from the schema default (plus removals/renames).
 """
 
@@ -16,7 +16,7 @@ import re
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 from urllib.parse import urlparse
 
-from hermes_cli.config_migrations_browser import migrate_to_52
+from eir_cli.config_migrations_browser import migrate_to_52
 
 logger = logging.getLogger(__name__)
 
@@ -42,19 +42,19 @@ def _local_files_allowed() -> bool:
 
 def support_floor_message() -> str:
     """Human-facing explanation shown when a config is below the floor."""
-    from hermes_constants import display_hermes_home
+    from eir_constants import display_eir_home
 
     return (
         f"This config predates version {SUPPORT_FLOOR_VERSION} (~2 years old) "
         "and can no longer be auto-migrated. Back up "
-        f"{display_hermes_home()}/config.yaml and run `hermes setup` to "
+        f"{display_eir_home()}/config.yaml and run `eir setup` to "
         f"regenerate, or manually set _config_version: {SUPPORT_FLOOR_VERSION} "
         "after reviewing the changelog.")
 
 
 def _cfg():
-    """Return the live ``hermes_cli.config`` module (lazy, cycle-free, monkeypatch-friendly)."""
-    from hermes_cli import config
+    """Return the live ``eir_cli.config`` module (lazy, cycle-free, monkeypatch-friendly)."""
+    from eir_cli import config
 
     return config
 
@@ -320,11 +320,11 @@ def _migrate_to_17(results: dict[str, Any], quiet: bool) -> None:
 
 
 def _installed_user_plugins(disabled: set) -> list[str]:
-    """Names of plugins under ``$HERMES_HOME/plugins/`` with a manifest, minus *disabled*."""
+    """Names of plugins under ``$EIR_HOME/plugins/`` with a manifest, minus *disabled*."""
     _c = _cfg()
     found: list[str] = []
     try:
-        user_plugins_dir = _c.get_hermes_home() / "plugins"
+        user_plugins_dir = _c.get_eir_home() / "plugins"
         if user_plugins_dir.is_dir():
             for child in sorted(user_plugins_dir.iterdir()):
                 if not child.is_dir():
@@ -363,7 +363,7 @@ def _migrate_to_21(results: dict[str, Any], quiet: bool) -> None:
         f"{len(grandfathered)} existing plugin(s) into plugins.enabled"
         if grandfathered else
         "  ✓ Plugins now opt-in: no existing plugins to grandfather. "
-        "Use `hermes plugins enable <name>` to activate.")
+        "Use `eir plugins enable <name>` to activate.")
     _commit(
         config, results, quiet,
         f"plugins.enabled (opt-in allow-list, {len(grandfathered)} grandfathered)", message)
@@ -371,14 +371,14 @@ def _migrate_to_21(results: dict[str, Any], quiet: bool) -> None:
 
 def _migrate_to_23(results: dict[str, Any], quiet: bool) -> None:
     # 22 → 23: seed curator defaults + create logs/curator/. Older configs never wrote the curator
-    # section; deep-merge made it work but users could not see/edit it and `hermes curator status`
+    # section; deep-merge made it work but users could not see/edit it and `eir curator status`
     # had no stable logs dir. Only keys the user hasn't set are written.
     _c = _cfg()
     DEFAULT_CONFIG = _c.DEFAULT_CONFIG
 
     if _local_files_allowed():
         try:
-            curator_dir = _c.get_hermes_home() / "logs" / "curator"
+            curator_dir = _c.get_eir_home() / "logs" / "curator"
             curator_dir.mkdir(parents=True, exist_ok=True)
         except Exception as e:
             results["warnings"].append(f"Could not create {curator_dir}: {e}")
@@ -413,7 +413,7 @@ def _migrate_to_23(results: dict[str, Any], quiet: bool) -> None:
             if not quiet:
                 print(
                     f"  ✓ {'Curator' if label == 'curator' else label} settings now available "
-                    f"({', '.join(added)}) — edit via `hermes config set`")
+                    f"({', '.join(added)}) — edit via `eir config set`")
 
 
 def _migrate_to_29(results: dict[str, Any], quiet: bool) -> None:
@@ -478,7 +478,7 @@ def _migrate_to_34(results: dict[str, Any], quiet: bool) -> None:
     # once display.personality became authoritative, stale names resurrected personalities users
     # had turned off. Reset display.personality → "" and scrub agent.system_prompt ONLY when it
     # verbatim-equals a known personality's rendered text; any other text is user-owned.
-    from hermes_cli.personality import (
+    from eir_cli.personality import (
         available_personalities, normalize_personality_name, prompt_text, render_personality_prompt)
 
     config = read_raw_config()
@@ -528,7 +528,7 @@ def _migrate_to_34(results: dict[str, Any], quiet: bool) -> None:
 def _migrate_to_38(results: dict[str, Any], quiet: bool) -> None:
     # 37 → 38: the bundled observability/nemo_relay plugin was removed (Relay lifecycle moved
     # into the agent core); drop it from plugins.enabled.
-    from hermes_cli.relay_plugin_cutover import legacy_relay_plugin_keys
+    from eir_cli.relay_plugin_cutover import legacy_relay_plugin_keys
 
     config = read_raw_config()
     plugins = config.get("plugins")
@@ -545,7 +545,7 @@ def _migrate_to_38(results: dict[str, Any], quiet: bool) -> None:
     message = (
         "Removed legacy Relay plugin from plugins.enabled: "
         f"{', '.join(removed)}. Configure a standard user or system Relay plugins.toml, or use "
-        "HERMES_NEMO_RELAY_PLUGINS_TOML for an explicit user-file override.")
+        "EIR_NEMO_RELAY_PLUGINS_TOML for an explicit user-file override.")
     results["warnings"].append(message)
     if not quiet:
         print(f"  ⚠ {message}")
@@ -571,7 +571,7 @@ def _migrate_to_39(results: dict[str, Any], quiet: bool) -> None:
             config, results, quiet,
             "removed retired 'bfl' toolset from saved toolset lists",
             "  ✓ Removed the retired BFL FLUX 3 toolset from saved toolset "
-            "lists — video generation now lives under `hermes tools` → "
+            "lists — video generation now lives under `eir tools` → "
             "Video Generation (Nous Subscription or FAL).")
 
 
@@ -581,11 +581,11 @@ def _migrate_to_41(results: dict[str, Any], quiet: bool) -> None:
     # every other session (~600 tok) and shadowed the live roster in Bot Chat itself.
     if not _local_files_allowed():
         return  # SOUL.md files only, across the whole roster
-    from hermes_constants import get_hermes_home
-    from tools.bot_mode_probe import _PROTOCOL_HEADING, _hermes_root, _roster, strip_legacy_protocol
+    from eir_constants import get_eir_home
+    from tools.bot_mode_probe import _PROTOCOL_HEADING, _eir_root, _roster, strip_legacy_protocol
 
     cleaned: list[str] = []
-    for name, profile_dir in _roster(_hermes_root(get_hermes_home())):
+    for name, profile_dir in _roster(_eir_root(get_eir_home())):
         soul = profile_dir / "SOUL.md"
         try:
             text = soul.read_text(encoding="utf-8-sig") if soul.is_file() else ""
@@ -607,8 +607,8 @@ def _migrate_to_45(results: dict[str, Any], quiet: bool) -> None:
     # already records `connections` (a decline) or `agent.disabled_toolsets` names it (the
     # resolver subtracts that list last, so the append would have no effect).
     from agent.skill_utils import parse_config_string_list
-    from hermes_cli.tools_config import _configurable_keys, _get_plugin_toolset_keys
-    from hermes_cli.toolset_scope import toolset_allowed_for_platform
+    from eir_cli.tools_config import _configurable_keys, _get_plugin_toolset_keys
+    from eir_cli.toolset_scope import toolset_allowed_for_platform
 
     config = read_raw_config()
     saved = config.get("platform_toolsets")
@@ -625,7 +625,7 @@ def _migrate_to_45(results: dict[str, Any], quiet: bool) -> None:
             continue
         if not toolset_allowed_for_platform("connections", platform):
             continue
-        # A composite like [hermes-cli] already inherits every core tool at read time.
+        # A composite like [eir-cli] already inherits every core tool at read time.
         if not any(str(ts) in explicit_keys for ts in toolsets):
             continue
         offered = known.get(platform)
@@ -645,14 +645,14 @@ def _migrate_to_45(results: dict[str, Any], quiet: bool) -> None:
         config, results, quiet,
         f"enabled the connections toolset for {platforms}",
         f"  ✓ Enabled the Connections toolset (Gmail, Linear, Notion, local MCP servers) for {platforms}. "
-        "Uncheck Connections in `hermes tools` to turn it off.")
+        "Uncheck Connections in `eir tools` to turn it off.")
 
 
 def _migrate_to_46(results: dict[str, Any], quiet: bool) -> None:
     # 45 → 46: the profile editor used to switch an MCP server off with `disabled: true`, a key no
     # runtime reader consults, so the server kept running. Carry that choice over to `enabled:
     # false` (the key every reader uses) and drop `disabled`, so the editor and runtime agree.
-    # `disabled: true` wins over an explicit `enabled: true`: `hermes mcp add` writes that, and the
+    # `disabled: true` wins over an explicit `enabled: true`: `eir mcp add` writes that, and the
     # old editor only added `disabled`, so letting `enabled` win would skip nearly every server.
     from tools.mcp_tool_common import _parse_boolish
 
@@ -675,13 +675,13 @@ def _migrate_to_46(results: dict[str, Any], quiet: bool) -> None:
 
 
 def _migrate_to_48(results: dict[str, Any], quiet: bool) -> None:
-    # 47 → 48: the container sandbox default gains a display stack (nousresearch/hermes-sandbox:
+    # 47 → 48: the container sandbox default gains a display stack (nousresearch/eir-sandbox:
     # desktop) so Bot Screen / computer_use / the browser run inside the sandbox. A saved value
     # still equal to the OLD default is the template copied, not a choice: the key is DROPPED so
     # the file follows the default. It is not rewritten to the new image, because a written image
     # is a pin and a pin recreates a persisted Docker container without asking; unpinned, the
     # runtime keeps an existing sandbox and the CLI / Screen pane ask first. A pinned image stays.
-    from hermes_cli.config_defaults import DEFAULT_SANDBOX_IMAGE, LEGACY_SANDBOX_IMAGES
+    from eir_cli.config_defaults import DEFAULT_SANDBOX_IMAGE, LEGACY_SANDBOX_IMAGES
     _rewrite_stale_defaults(results, quiet, section="terminal", rows=[
         (key, old, None, f"terminal.{key} unset (follows the default, {DEFAULT_SANDBOX_IMAGE})",
          f"  ✓ terminal.{key}: was the old default; now follows the default sandbox image ({DEFAULT_SANDBOX_IMAGE})")
@@ -706,7 +706,7 @@ def _migrate_to_49(results: dict[str, Any], quiet: bool) -> None:
     # not a choice, so both are dropped and fresh sandboxes follow terminal.vercel_image. A runtime
     # the user chose (node22, python3.13) stays and keeps overriding the image, as before. Persisted
     # sandboxes are unaffected either way: a snapshot restore never sends a runtime or an image.
-    from hermes_cli.config_defaults import DEFAULT_VERCEL_IMAGE, LEGACY_VERCEL_RUNTIME
+    from eir_cli.config_defaults import DEFAULT_VERCEL_IMAGE, LEGACY_VERCEL_RUNTIME
     _rewrite_stale_default(
         section="terminal", key="vercel_runtime", old=LEGACY_VERCEL_RUNTIME, new=None,
         added=f"terminal.vercel_runtime unset (fresh sandboxes use terminal.vercel_image, {DEFAULT_VERCEL_IMAGE})",
@@ -730,7 +730,7 @@ _migrate_to_44 = functools.partial(_rewrite_stale_defaults, section="curator", r
      "  ✓ curator.stale_after_days 30→14 — unused skills are flagged stale after two weeks."),
     ("archive_after_days", 90, 30, "curator.archive_after_days=30 (was: 90)", (
         "  ✓ curator.archive_after_days 90→30 — skills unused for a month are archived to skills/.archive/ "
-        "(recoverable with `hermes curator restore`). Set it back to 90 to keep the old window.")),
+        "(recoverable with `eir curator restore`). Set it back to 90 to keep the old window.")),
 ))
 
 
@@ -738,7 +738,7 @@ _RETIRED_TIRITH_KEYS = ("tirith_enabled", "tirith_path", "tirith_timeout", "tiri
 
 
 def _migrate_to_50(results: dict[str, Any], quiet: bool) -> None:
-    # 49 → 50: the bundled tirith scanner left Hermes. Nothing reads its keys now, so they are
+    # 49 → 50: the bundled tirith scanner left Eir. Nothing reads its keys now, so they are
     # dropped; nothing replaces them.
     config = read_raw_config()
     security = config.get("security")
@@ -750,7 +750,7 @@ def _migrate_to_50(results: dict[str, Any], quiet: bool) -> None:
     for key in present:
         del security[key]
     _commit(config, results, quiet, "removed security.tirith_* (scanner no longer bundled)",
-            "  ✓ Removed security.tirith_* — the tirith scanner is no longer bundled with Hermes.")
+            "  ✓ Removed security.tirith_* — the tirith scanner is no longer bundled with Eir.")
 
 
 def disable_suspicious_mcp_servers(results: dict[str, Any], quiet: bool) -> None:
@@ -763,7 +763,7 @@ def disable_suspicious_mcp_servers(results: dict[str, Any], quiet: bool) -> None
     if not isinstance(raw_mcp_servers, dict):
         return
     try:
-        from hermes_cli.mcp_security import validate_mcp_server_entry
+        from eir_cli.mcp_security import validate_mcp_server_entry
     except Exception:
         return
     mcp_touched = False
@@ -905,7 +905,7 @@ MIGRATIONS: tuple[tuple[int, Callable[[dict[str, Any], bool], None]], ...] = (
     (49, _migrate_to_49),
     # 49 → 50: security.tirith_* dropped; the bundled scanner is gone (see _migrate_to_50).
     (50, _migrate_to_50),
-    # 50 → 51: cron.bot_chat_delivery_timeout_seconds is gone with the local `hermes chat`
+    # 50 → 51: cron.bot_chat_delivery_timeout_seconds is gone with the local `eir chat`
     # fallback lane it bounded. Bot Chat deliveries are admitted to the running gateway and
     # settle on its durable receipt; there is no cron-side turn left to time out.
     (51, functools.partial(
@@ -934,7 +934,7 @@ MIGRATIONS: tuple[tuple[int, Callable[[dict[str, Any], bool], None]], ...] = (
 #: ``_config_version`` is current-schema content that was never stamped (installers seed it from
 #: cli-config.yaml.example; targeted writers never stamp), so it gets only these: every other step
 #: decides by a value or an absence that, in such a file, is the user's own choice. v13 is left
-#: out: it clears OPENAI_MODEL from .env, a generic name Hermes never reads but the user's tools may.
+#: out: it clears OPENAI_MODEL from .env, a generic name Eir never reads but the user's tools may.
 #: v41 is left out too: it rewrites profile SOUL.md on a heading match, an artifact whose
 #: provenance the config stamp says nothing about.
 LEGACY_KEY_STEPS = frozenset({12, 14, 16, 17, 29, 33, 38, 39, 42, 43, 46, 50, 51, 52})
@@ -985,7 +985,7 @@ def run_migrations(
                     # creation, unattended update) discard ``results``: this log line is the
                     # pass's one warning.
                     warning = (f"config migration to v{target_ver} failed: {exc}. It and the steps after "
-                               "it run again on the next start (`hermes doctor` shows it)")
+                               "it run again on the next start (`eir doctor` shows it)")
                     results.setdefault("warnings", []).append(warning)
                     logger.warning("%s", warning)
                     if not quiet:

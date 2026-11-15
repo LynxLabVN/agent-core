@@ -1,4 +1,4 @@
-"""Migrate Hermes MCP server config and Codex's installed curated plugins into ~/.codex/config.toml.
+"""Migrate Eir MCP server config and Codex's installed curated plugins into ~/.codex/config.toml.
 """
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
-from agent.transports.hermes_tools_mcp_server import HERMES_TOOLS_MCP_SERVER_NAME
+from agent.transports.eir_tools_mcp_server import EIR_TOOLS_MCP_SERVER_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 # Marker comments wrapping the managed section so re-runs can detect what's ours and what's
 # user-edited. Both must appear or strip is a no-op.
 MIGRATION_MARKER = (
-    "# managed by hermes-agent — `hermes codex-runtime migrate` regenerates this section")
-MIGRATION_END_MARKER = "# end hermes-agent managed section"
+    "# managed by eir-agent — `eir codex-runtime migrate` regenerates this section")
+MIGRATION_END_MARKER = "# end eir-agent managed section"
 
 
 @dataclass
@@ -50,7 +50,7 @@ class MigrationReport:
                 note = f" (skipped: {', '.join(skipped)})" if skipped else ""
                 lines.append(f"  - {name}{note}")
         else:
-            lines.append("No MCP servers found in Hermes config.")
+            lines.append("No MCP servers found in Eir config.")
         if self.migrated_plugins:
             lines.append(f"Migrated {len(self.migrated_plugins)} native Codex plugin(s):")
             lines.extend(f"  - {name}" for name in self.migrated_plugins)
@@ -61,21 +61,21 @@ class MigrationReport:
         if self.preserved_user_servers:
             lines.append(
                 f"Kept {len(self.preserved_user_servers)} user-owned MCP server(s) already in "
-                f"config.toml (Hermes projection skipped): {', '.join(self.preserved_user_servers)}")
+                f"config.toml (Eir projection skipped): {', '.join(self.preserved_user_servers)}")
         lines.extend(f"⚠ {err}" for err in self.errors)
         return "\n".join(lines)
 
 
-# Hermes MCP keys codex understands (transport stdio/http, timeouts, general). Any other key is
-# dropped with a warning: ``sampling`` has no codex equivalent; the rest are unknown Hermes keys.
-_KNOWN_HERMES_KEYS = {
+# Eir MCP keys codex understands (transport stdio/http, timeouts, general). Any other key is
+# dropped with a warning: ``sampling`` has no codex equivalent; the rest are unknown Eir keys.
+_KNOWN_EIR_KEYS = {
     "command", "args", "env", "cwd",
     "url", "headers", "transport",
     "timeout", "connect_timeout",
     "enabled", "description"}
 _KEYS_DROPPED_WITH_WARNING = {"sampling"}
 
-# (hermes key, codex key, skip note) — timeouts are emitted as floats or skipped when non-numeric.
+# (eir key, codex key, skip note) — timeouts are emitted as floats or skipped when non-numeric.
 _TIMEOUT_KEYS = (
     ("timeout", "tool_timeout_sec", "timeout (not numeric)"),
     ("connect_timeout", "startup_timeout_sec", "connect_timeout (not numeric)"))
@@ -86,55 +86,55 @@ def _str_map(d: dict) -> dict[str, str]:
     return {str(k): str(v) for k, v in d.items()}
 
 
-def _translate_one_server(name: str, hermes_cfg: dict) -> tuple[Optional[dict], list[str]]:
-    """Translate one Hermes MCP server config to codex's inline-table dict.
+def _translate_one_server(name: str, eir_cfg: dict) -> tuple[Optional[dict], list[str]]:
+    """Translate one Eir MCP server config to codex's inline-table dict.
 
     Returns ``(codex_entry, skipped_keys)``; ``codex_entry`` is None when the config is unusable.
-    stdio (``command``) wins over ``url`` when both are set. Hermes' ``transport: sse`` hint is
+    stdio (``command``) wins over ``url`` when both are set. Eir' ``transport: sse`` hint is
     informational only — codex auto-negotiates. ``enabled`` is emitted only when explicitly false
     (codex defaults to true).
     """
-    if not isinstance(hermes_cfg, dict):
+    if not isinstance(eir_cfg, dict):
         return None, []
     skipped: list[str] = []
     out: dict[str, Any] = {}
-    if hermes_cfg.get("command"):
-        if hermes_cfg.get("url"):
+    if eir_cfg.get("command"):
+        if eir_cfg.get("url"):
             skipped.append("url (both command and url set; preferring stdio)")
-        out["command"] = str(hermes_cfg["command"])
-        if hermes_cfg.get("args"):
-            out["args"] = [str(a) for a in hermes_cfg["args"]]
-        if hermes_cfg.get("env"):
-            out["env"] = _str_map(hermes_cfg["env"])
-        if hermes_cfg.get("cwd"):
-            out["cwd"] = str(hermes_cfg["cwd"])
-    elif hermes_cfg.get("url"):
-        out["url"] = str(hermes_cfg["url"])
-        if hermes_cfg.get("headers"):
-            out["http_headers"] = _str_map(hermes_cfg["headers"])
-        if hermes_cfg.get("transport") == "sse":
+        out["command"] = str(eir_cfg["command"])
+        if eir_cfg.get("args"):
+            out["args"] = [str(a) for a in eir_cfg["args"]]
+        if eir_cfg.get("env"):
+            out["env"] = _str_map(eir_cfg["env"])
+        if eir_cfg.get("cwd"):
+            out["cwd"] = str(eir_cfg["cwd"])
+    elif eir_cfg.get("url"):
+        out["url"] = str(eir_cfg["url"])
+        if eir_cfg.get("headers"):
+            out["http_headers"] = _str_map(eir_cfg["headers"])
+        if eir_cfg.get("transport") == "sse":
             skipped.append("transport=sse (codex auto-negotiates)")
     else:
         return None, ["no command or url field"]
-    for hermes_key, codex_key, note in _TIMEOUT_KEYS:
-        if hermes_key in hermes_cfg:
+    for eir_key, codex_key, note in _TIMEOUT_KEYS:
+        if eir_key in eir_cfg:
             try:
-                out[codex_key] = float(hermes_cfg[hermes_key])
+                out[codex_key] = float(eir_cfg[eir_key])
             except (TypeError, ValueError):
                 skipped.append(note)
-    if hermes_cfg.get("enabled") is False:
+    if eir_cfg.get("enabled") is False:
         out["enabled"] = False
-    for key in hermes_cfg:
+    for key in eir_cfg:
         if key in _KEYS_DROPPED_WITH_WARNING:
             skipped.append(f"{key} (no codex equivalent)")
-        elif key not in _KNOWN_HERMES_KEYS:
-            skipped.append(f"{key} (unknown Hermes key)")
+        elif key not in _KNOWN_EIR_KEYS:
+            skipped.append(f"{key} (unknown Eir key)")
     return out, skipped
 
 
 # TOML basic-string escapes. Order matters: backslash first so the others aren't re-escaped.
 # Control chars must be \-escaped — a literal one is invalid TOML that codex refuses to load;
-# env-var passthrough (HERMES_HOME, PYTHONPATH) could carry one in pathological cases.
+# env-var passthrough (EIR_HOME, PYTHONPATH) could carry one in pathological cases.
 _TOML_ESCAPES = (
     ("\\", "\\\\"), ('"', '\\"'), ("\b", "\\b"), ("\t", "\\t"),
     ("\n", "\\n"), ("\f", "\\f"), ("\r", "\\r"))
@@ -182,7 +182,7 @@ def render_codex_toml_section(
     """
     out = [MIGRATION_MARKER]
     if not servers and not plugins and not default_permission_profile:
-        out += ["# (no MCP servers, plugins, or permissions configured by Hermes)", MIGRATION_END_MARKER]
+        out += ["# (no MCP servers, plugins, or permissions configured by Eir)", MIGRATION_END_MARKER]
         return "\n".join(out) + "\n"
     if default_permission_profile:
         profile = default_permission_profile
@@ -247,7 +247,7 @@ def _unmanaged_mcp_server_names(toml_text: str) -> set[str]:
 
     Unlike ``[plugins.*]`` — where ``plugin/list`` is the source of truth and we own the
     namespace — ``mcp_servers`` is shared: the docs promise that anything outside the managed
-    block is the user's. A Hermes server whose name is already declared by the user is therefore
+    block is the user's. A Eir server whose name is already declared by the user is therefore
     NOT re-emitted (the user's table wins and is preserved verbatim); emitting both would be a
     duplicate table header, which is invalid TOML that codex refuses to load (issue #79023).
     """
@@ -329,7 +329,7 @@ def _query_codex_plugins(
         return [], f"transport unavailable: {exc}"
     try:
         with CodexAppServerClient(codex_bin=codex_bin, codex_home=str(codex_home) if codex_home else None) as client:
-            client.initialize(client_name="hermes-migration")
+            client.initialize(client_name="eir-migration")
             resp = client.request("plugin/list", {}, timeout=timeout)
     except Exception as exc:
         return [], f"plugin/list query failed: {exc}"
@@ -370,45 +370,45 @@ _TEST_TEMPDIR_NEEDLES = ("pytest-of-", "/pytest-", "/tmp/pytest", "/private/var/
 def _looks_like_test_tempdir(path: str) -> bool:
     """Heuristic: does ``path`` look like a pytest/transient tempdir?
 
-    Such dirs are reaped between sessions; a HERMES_HOME pointing there burned into
+    Such dirs are reaped between sessions; a EIR_HOME pointing there burned into
     ``~/.codex/config.toml`` makes every codex-routed call fail silently once GC'd. Err on
     refusing: a false positive is far less harmful than silently bricking codex's tool surface.
     """
     return bool(path) and any(needle in path.lower() for needle in _TEST_TEMPDIR_NEEDLES)
 
 
-def _build_hermes_tools_mcp_entry() -> dict:
-    """Codex stdio entry launching Hermes' own tool surface as an MCP server (web/vision/
+def _build_eir_tools_mcp_entry() -> dict:
+    """Codex stdio entry launching Eir' own tool surface as an MCP server (web/vision/
     image/skills/kanban call-backs).
 
-    HERMES_HOME passes through only IF SET, read from os.environ (not get_hermes_home()): when
-    unset the codex subprocess must inherit its launcher's runtime HERMES_HOME (systemd, gateway,
+    EIR_HOME passes through only IF SET, read from os.environ (not get_eir_home()): when
+    unset the codex subprocess must inherit its launcher's runtime EIR_HOME (systemd, gateway,
     kanban), not a migrate-time default burned into config.toml that pins the wrong profile. The
-    pytest-tempdir guard keeps a sibling test's monkeypatched HERMES_HOME out of the user's real
-    config. PYTHONPATH passes through so a worktree-launched hermes finds the branch's modules.
+    pytest-tempdir guard keeps a sibling test's monkeypatched EIR_HOME out of the user's real
+    config. PYTHONPATH passes through so a worktree-launched eir finds the branch's modules.
     """
     import sys
     env: dict[str, str] = {}
-    # HERMES_HOME passes through IF SET so the MCP subprocess sees the same config / auth / sessions DB as
-    # the parent CLI. Read from os.environ (not get_hermes_home()) on purpose: when the env var is unset we
-    # want codex's subprocess to inherit whatever HERMES_HOME its launcher sets at runtime (systemd unit,
+    # EIR_HOME passes through IF SET so the MCP subprocess sees the same config / auth / sessions DB as
+    # the parent CLI. Read from os.environ (not get_eir_home()) on purpose: when the env var is unset we
+    # want codex's subprocess to inherit whatever EIR_HOME its launcher sets at runtime (systemd unit,
     # gateway, kanban dispatcher, custom shell), rather than burning the migrate-time resolved default into
-    # config.toml — that would override the launcher's HERMES_HOME and pin the subprocess to the wrong
+    # config.toml — that would override the launcher's EIR_HOME and pin the subprocess to the wrong
     # profile. The pytest-tempdir guard below catches the issue #26250 Bug C scenario: a sibling test's
-    # monkeypatch.setenv("HERMES_HOME", tmp_path) would otherwise leak a transient pytest tempdir into the
+    # monkeypatch.setenv("EIR_HOME", tmp_path) would otherwise leak a transient pytest tempdir into the
     # user's real ~/.codex/config.toml and silently brick codex once the tempdir is GC'd.
-    hermes_home = os.environ.get("HERMES_HOME") or ""
-    if hermes_home and not _looks_like_test_tempdir(hermes_home):
-        env["HERMES_HOME"] = hermes_home
+    eir_home = os.environ.get("EIR_HOME") or ""
+    if eir_home and not _looks_like_test_tempdir(eir_home):
+        env["EIR_HOME"] = eir_home
     if os.environ.get("PYTHONPATH"):
         env["PYTHONPATH"] = os.environ["PYTHONPATH"]
     # Quiet mode + redaction defaults so the MCP wire stays clean.
-    env["HERMES_QUIET"] = "1"
-    env["HERMES_REDACT_SECRETS"] = env.get("HERMES_REDACT_SECRETS", "true")
+    env["EIR_QUIET"] = "1"
+    env["EIR_REDACT_SECRETS"] = env.get("EIR_REDACT_SECRETS", "true")
     return {
         "command": sys.executable,
-        # -P: codex starts this in the user's workspace, which must not shadow Hermes' own packages.
-        "args": ["-P", "-m", "agent.transports.hermes_tools_mcp_server"],
+        # -P: codex starts this in the user's workspace, which must not shadow Eir' own packages.
+        "args": ["-P", "-m", "agent.transports.eir_tools_mcp_server"],
         "env": env,
         # Generous timeouts — image_generate or delegate_task can take a while.
         "startup_timeout_sec": 30.0,
@@ -422,16 +422,16 @@ def _write_atomic(target: Path, text: str) -> None:
 
 
 def migrate(
-    hermes_config: dict, *, codex_home: Optional[Path] = None, dry_run: bool = False,
+    eir_config: dict, *, codex_home: Optional[Path] = None, dry_run: bool = False,
     discover_plugins: bool = True, default_permission_profile: Optional[str] = ":workspace",
-    expose_hermes_tools: bool = True) -> MigrationReport:
-    """Translate Hermes mcp_servers config + Codex curated plugins into ~/.codex/config.toml.
+    expose_eir_tools: bool = True) -> MigrationReport:
+    """Translate Eir mcp_servers config + Codex curated plugins into ~/.codex/config.toml.
 
     ``discover_plugins`` spawns the live codex CLI (set False in tests); discovery is best-effort
     and never blocks the migration. ``default_permission_profile`` (default ":workspace"; built-ins
     carry a leading ":", user profiles do not; None leaves codex's read-only default) avoids an
-    approval prompt on every write. ``expose_hermes_tools`` registers Hermes' own tool surface
-    (agent/transports/hermes_tools_mcp_server.py, launched on demand by codex over stdio) as an MCP
+    approval prompt on every write. ``expose_eir_tools`` registers Eir' own tool surface
+    (agent/transports/eir_tools_mcp_server.py, launched on demand by codex over stdio) as an MCP
     server so the codex subprocess can call back for tools it lacks.
     """
     report = MigrationReport(dry_run=dry_run)
@@ -439,12 +439,12 @@ def migrate(
         os.getenv("CODEX_HOME", "").strip() or str(Path.home() / ".codex")).expanduser()
     target = codex_home / "config.toml"
     report.target_path = target
-    hermes_servers = (hermes_config or {}).get("mcp_servers") or {}
-    if not isinstance(hermes_servers, dict):
-        report.errors.append("mcp_servers in Hermes config is not a dict; cannot migrate.")
+    eir_servers = (eir_config or {}).get("mcp_servers") or {}
+    if not isinstance(eir_servers, dict):
+        report.errors.append("mcp_servers in Eir config is not a dict; cannot migrate.")
         return report
     translated: dict[str, dict] = {}
-    for raw_name, cfg in hermes_servers.items():
+    for raw_name, cfg in eir_servers.items():
         name = str(raw_name)
         out, skipped = _translate_one_server(name, cfg or {})
         if out is None:
@@ -458,9 +458,9 @@ def migrate(
     plugins: list[dict] = []
     plugin_query_succeeded = False
     if discover_plugins and not dry_run:
-        from hermes_cli.codex_runtime_switch import get_configured_codex_binary
+        from eir_cli.codex_runtime_switch import get_configured_codex_binary
         plugins, plugin_err = _query_codex_plugins(
-            codex_home=codex_home, codex_bin=get_configured_codex_binary(hermes_config))
+            codex_home=codex_home, codex_bin=get_configured_codex_binary(eir_config))
         if plugin_err:
             report.plugin_query_error = plugin_err
         # An authoritative plugin/list (even an empty one) means we own [plugins.*] for this
@@ -469,10 +469,10 @@ def migrate(
         report.migrated_plugins += [f"{p['name']}@{p['marketplace']}" for p in plugins]
     if default_permission_profile:
         report.wrote_permissions_default = default_permission_profile
-    if expose_hermes_tools:
-        translated[HERMES_TOOLS_MCP_SERVER_NAME] = _build_hermes_tools_mcp_entry()
-        if HERMES_TOOLS_MCP_SERVER_NAME not in report.migrated:
-            report.migrated.append(HERMES_TOOLS_MCP_SERVER_NAME)
+    if expose_eir_tools:
+        translated[EIR_TOOLS_MCP_SERVER_NAME] = _build_eir_tools_mcp_entry()
+        if EIR_TOOLS_MCP_SERVER_NAME not in report.migrated:
+            report.migrated.append(EIR_TOOLS_MCP_SERVER_NAME)
     without_managed = ""
     if target.exists():
         try:
@@ -486,7 +486,7 @@ def migrate(
             except tomllib.TOMLDecodeError:
                 # codex could not load the pre-broken file, so plugin/list failed for that reason.
                 report.plugin_query_error += (
-                    "; existing config.toml was unloadable — re-run `hermes codex-runtime migrate` "
+                    "; existing config.toml was unloadable — re-run `eir codex-runtime migrate` "
                     "to migrate plugins")
         without_managed = _strip_existing_managed_block(existing)
         if plugin_query_succeeded:

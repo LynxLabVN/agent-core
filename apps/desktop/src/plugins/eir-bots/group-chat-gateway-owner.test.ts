@@ -8,7 +8,7 @@ import type { RosterRow } from './types'
 
 const { onEvent, request } = vi.hoisted(() => ({ onEvent: vi.fn(() => () => undefined), request: vi.fn(async () => ({})) }))
 
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@eir/plugin-sdk', async () => {
   const { atom } = await import('nanostores')
 
   const stub: unknown = new Proxy(function stubbed() {}, {
@@ -61,7 +61,7 @@ vi.mock('./data', async () => {
   const { atom: nanoAtom } = await import('nanostores')
 
   return {
-    ROSTER_KEY: ['hermes-bots'],
+    ROSTER_KEY: ['eir-bots'],
     $botMeta: nanoAtom({}),
     $lastRoster: nanoAtom<RosterRow[]>([]),
     botHandle: (name: string) => name,
@@ -174,7 +174,7 @@ it('keeps gateway ownership through a real rename mirror tombstone and storage r
   $groupChats.set({})
   updateGroupChat('Team', room => ({ ...room, roomId: engine.roomId, engine }), { sync: false })
   updateGroupChat('Ordinary', () => desktop, { sync: false })
-  request.mockResolvedValue({ profiles: [{ name: 'default', ui_meta: { 'hermes-bots-groups': mirror } }] })
+  request.mockResolvedValue({ profiles: [{ name: 'default', ui_meta: { 'eir-bots-groups': mirror } }] })
   await pullGroupChatServerState('owner')
   $groupChats.set({})
 

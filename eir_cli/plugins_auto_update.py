@@ -1,8 +1,8 @@
 """Unattended plugin updates shared by every surface: the opt-in ``plugins.auto_apply`` switch, the
 one-click "update all" (Desktop, dashboard, ``/plugins update``), the one-updater-per-plugin lock,
-and the notice ``hermes update`` prints when it moved catalog pins.
+and the notice ``eir update`` prints when it moved catalog pins.
 
-Sibling of :mod:`hermes_cli.plugins_cmd` (the facade is imported late, never at module level).
+Sibling of :mod:`eir_cli.plugins_cmd` (the facade is imported late, never at module level).
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ _lock_holders_guard = threading.Lock()
 
 
 def _pc():
-    from hermes_cli import plugins_cmd
+    from eir_cli import plugins_cmd
     return plugins_cmd
 
 
@@ -35,19 +35,19 @@ def _holder(key: str) -> threading.local:
 @contextmanager
 def plugin_update_lock(target: Path) -> Iterator[None]:
     """Hold the one-updater lock for the plugin at *target*, across threads and processes (the
-    gateway's auto-apply tick, a terminal ``hermes plugins update``, Desktop and the dashboard).
+    gateway's auto-apply tick, a terminal ``eir plugins update``, Desktop and the dashboard).
     A busy lock raises ``PluginOperationError`` after a short wait, so every caller reports it like
     any other refusal (nothing changed); reentrant per thread."""
-    from hermes_cli.auth import _file_lock
-    from hermes_constants import get_hermes_home
+    from eir_cli.auth import _file_lock
+    from eir_constants import get_eir_home
 
-    lock = get_hermes_home() / "cache" / "plugin-update-locks" / f"{target.name}.lock"
+    lock = get_eir_home() / "cache" / "plugin-update-locks" / f"{target.name}.lock"
     stack = ExitStack()
     try:
         stack.enter_context(_file_lock(lock, _holder(str(lock)), _LOCK_WAIT_SECONDS, "plugin update busy"))
     except TimeoutError as exc:
         raise _pc().PluginOperationError(
-            f"Plugin '{target.name}' is already being updated by another Hermes process; "
+            f"Plugin '{target.name}' is already being updated by another Eir process; "
             "nothing was changed. Try again when that update finishes.") from exc
     with stack:
         yield
@@ -55,7 +55,7 @@ def plugin_update_lock(target: Path) -> Iterator[None]:
 
 # ── installs the user held ────────────────────────────────────────────────────────────────────
 
-HELD_WITH_REF = "held with --ref (installed off the catalog pin); `hermes plugins update {name}` moves it"
+HELD_WITH_REF = "held with --ref (installed off the catalog pin); `eir plugins update {name}` moves it"
 
 
 class HeldWithRef(Exception):
@@ -65,7 +65,7 @@ class HeldWithRef(Exception):
 
 def held_with_ref(record: Any) -> bool:
     """A catalog install the user put on a commit of their choosing (``install <name> --ref <sha>``:
-    ``pinned`` with an empty ``catalog.pin``). Only an explicit ``hermes plugins update <name>`` moves
+    ``pinned`` with an empty ``catalog.pin``). Only an explicit ``eir plugins update <name>`` moves
     it: unattended paths would otherwise silently undo a deliberate rollback."""
     block = record.get("catalog") if isinstance(record, dict) else None
     return isinstance(block, dict) and record.get("pinned") is True and not block.get("pin")
@@ -77,7 +77,7 @@ def unattended_gate(name: str, target: Path):
     return the ``surface_gate(manifest, tree)`` a Git update runs on its candidate before publication.
     The gate raises ``RepinConsentRequired`` when the candidate adds tools, hooks, capabilities or
     other surface the installed plugin lacks, the same review a widened catalog pin gets."""
-    from hermes_cli.plugins_cmd_catalog import RepinConsentRequired, plugin_surface, surface_delta
+    from eir_cli.plugins_cmd_catalog import RepinConsentRequired, plugin_surface, surface_delta
     pc = _pc()
     if held_with_ref(pc._read_install_metadata().get(target.name)):
         raise HeldWithRef(HELD_WITH_REF.format(name=name))
@@ -95,7 +95,7 @@ def apply_unattended(name: str) -> None:
     raise (``RepinConsentRequired`` for a widened pin, ``PluginOperationError``) so the tick can tell
     a pending review from a failure; ``cmd_update`` would turn both into an exit. :class:`HeldWithRef`
     when the install was held after the check."""
-    from hermes_cli.plugins_cmd_update import update_one
+    from eir_cli.plugins_cmd_update import update_one
     pc = _pc()
     target = pc._user_installed_plugin_dir(name)
     if target is None:
@@ -103,7 +103,7 @@ def apply_unattended(name: str) -> None:
     if update_one(name, target, pc._console(), interactive=False, unattended=True):
         # The tick runs in the gateway: reload the plugin here, or the gateway keeps serving the old
         # version and a lazily imported file of the new one mixes in (#153300).
-        from hermes_cli.plugins_activation import load_and_go_live
+        from eir_cli.plugins_activation import load_and_go_live
         load_and_go_live(target.name)
 
 
@@ -111,7 +111,7 @@ def apply_unattended(name: str) -> None:
 
 def auto_update_state() -> dict[str, Any]:
     """``{"auto_apply", "check_hours"}`` for the active profile."""
-    from hermes_cli.plugins_cadence import auto_apply_enabled, check_interval_hours
+    from eir_cli.plugins_cadence import auto_apply_enabled, check_interval_hours
     return {"auto_apply": auto_apply_enabled(), "check_hours": check_interval_hours()}
 
 
@@ -119,21 +119,21 @@ def set_auto_update(enabled: bool) -> dict[str, Any]:
     """Write ``plugins.auto_apply`` for the active profile and return the new state. Turning it on also
     clears the check marker, so the gateway's next housekeeping tick checks and applies instead of
     waiting out the rest of the interval."""
-    from hermes_cli.config import get_config_path, is_managed
-    from hermes_cli.config_backend import write_config_key
-    from hermes_constants import get_hermes_home
+    from eir_cli.config import get_config_path, is_managed
+    from eir_cli.config_backend import write_config_key
+    from eir_constants import get_eir_home
 
     if is_managed():
         raise _pc().PluginOperationError(
-            "This Hermes install's configuration is managed by a package manager; set plugins.auto_apply there.")
+            "This Eir install's configuration is managed by a package manager; set plugins.auto_apply there.")
     write_config_key(get_config_path(), "plugins.auto_apply", bool(enabled))
     if enabled:
-        _clear_check_marker(get_hermes_home())
+        _clear_check_marker(get_eir_home())
     return auto_update_state()
 
 
 def _clear_check_marker(home: Path) -> None:
-    from hermes_cli.plugins_cadence import _MARKERS_DIR
+    from eir_cli.plugins_cadence import _MARKERS_DIR
     (home / _MARKERS_DIR / "last-run").unlink(missing_ok=True)
 
 
@@ -144,7 +144,7 @@ def _apply_one(name: str) -> dict[str, str]:
     Git update) or a caution scan of a git update is NOT accepted on the user's behalf: the row comes
     back ``needs_review`` (a catalog re-pin accepts caution: a reviewer read that pin at admission).
     An install held with ``--ref`` after the check comes back ``held``."""
-    from hermes_cli.plugins_cmd_update import dashboard_update_user_plugin
+    from eir_cli.plugins_cmd_update import dashboard_update_user_plugin
     try:
         res = dashboard_update_user_plugin(name, unattended=True)
     except Exception as exc:  # per-plugin batch boundary: one crash must not stop the rest
@@ -161,15 +161,15 @@ def _apply_one(name: str) -> dict[str, str]:
 
 
 def update_all_unattended() -> dict[str, Any]:
-    """Check every installed plugin, then update each one ``hermes plugins update`` would move (same
+    """Check every installed plugin, then update each one ``eir plugins update`` would move (same
     plan: catalog re-pins and tracked Git pulls; pinned, held and pip rows are skipped with why).
 
     Returns ``{"results": [{name, status, detail}], "skipped": [{name, reason}], "current": n}``;
     status is ``updated`` / ``current`` / ``failed`` / ``needs_review`` (nothing changed; the
     plugin's own Update action walks the consent or scan review)."""
-    from hermes_cli.plugins_cadence import record_check_results, snapshot_installs
-    from hermes_cli.plugins_cmd_update_all import plan_update_all
-    from hermes_cli.plugins_updates import run_checks
+    from eir_cli.plugins_cadence import record_check_results, snapshot_installs
+    from eir_cli.plugins_cmd_update_all import plan_update_all
+    from eir_cli.plugins_updates import run_checks
 
     plugins_dir = _pc()._plugins_dir()
     checked = snapshot_installs(plugins_dir)
@@ -195,7 +195,7 @@ def summary_lines(outcome: dict[str, Any]) -> list[str]:
     if not outcome["results"]:
         lines.append("  No plugin updates to apply.")
     if any(r["status"] == "needs_review" for r in outcome["results"]):
-        lines.append("  Review those with `hermes plugins update <name>` in a terminal.")
+        lines.append("  Review those with `eir plugins update <name>` in a terminal.")
     if any(r["status"] == "updated" for r in outcome["results"]):
         lines.append("  Updated plugins were reloaded: MCP servers and skills are live now, Python tools load in new sessions.")
     return lines
@@ -206,9 +206,9 @@ def plugins_slash_action(parts: list[str]) -> list[str]:
     [on|off]`` for the classic CLI, and ``auto-update`` for the TUI's slash worker. The TUI sends
     ``/plugins update`` to ``plugins.manage update_all`` instead: the batch outlives the worker's 45 s."""
     if parts[0] == "update":
-        if len(parts) > 1:  # not `hermes plugins update <name>`: this form updates every plugin
+        if len(parts) > 1:  # not `eir plugins update <name>`: this form updates every plugin
             return ["Usage: /plugins update (updates every plugin that has an update; "
-                    "update one with `hermes plugins update <name>` in a terminal)"]
+                    "update one with `eir plugins update <name>` in a terminal)"]
         return ["Plugin updates:", *summary_lines(update_all_unattended())]
     arg = parts[1].lower() if len(parts) > 1 else ""
     if arg not in ("", "on", "off"):
@@ -222,15 +222,15 @@ def plugins_slash_action(parts: list[str]) -> list[str]:
             "updates load in new sessions)"]
 
 
-# ── after `hermes update` ─────────────────────────────────────────────────────────────────────
+# ── after `eir update` ─────────────────────────────────────────────────────────────────────
 
 def catalog_pins_behind(home: Path) -> list[str]:
     """Catalog installs under *home* whose installed pin is not the in-tree catalog's pin. Offline:
     reads the install records and the catalog shipped with this checkout. An install held with
     ``--ref`` is not behind: the user chose that commit."""
-    from hermes_cli.plugin_catalog import get_catalog_entry
-    from hermes_cli.plugins_cmd_catalog import at_catalog_pin
-    from hermes_cli.plugins_provenance import read_sidecar_rows
+    from eir_cli.plugin_catalog import get_catalog_entry
+    from eir_cli.plugins_cmd_catalog import at_catalog_pin
+    from eir_cli.plugins_provenance import read_sidecar_rows
 
     behind = []
     for name, row in read_sidecar_rows(home / "plugins").items():
@@ -243,7 +243,7 @@ def catalog_pins_behind(home: Path) -> list[str]:
     return sorted(behind)
 
 
-def report_catalog_updates_after_hermes_update(home: Path, sibling_homes: list[tuple[str, Path]]) -> None:
+def report_catalog_updates_after_eir_update(home: Path, sibling_homes: list[tuple[str, Path]]) -> None:
     """An update can move catalog pins; installed plugins stay on their old pin until updated. Name
     them per profile, and clear that profile's check marker so its gateway re-checks on the next tick
     (which applies them when that profile opted into ``plugins.auto_apply``)."""
@@ -253,4 +253,4 @@ def report_catalog_updates_after_hermes_update(home: Path, sibling_homes: list[t
             continue
         _clear_check_marker(profile_home)
         print(f"  → {len(behind)} plugin update(s) from the new catalog in {label}: {', '.join(behind)}")
-        print("    apply: hermes plugins update   (or turn on: hermes plugins auto-update on)")
+        print("    apply: eir plugins update   (or turn on: eir plugins auto-update on)")

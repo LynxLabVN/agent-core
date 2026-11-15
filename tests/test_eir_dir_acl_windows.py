@@ -108,7 +108,7 @@ _REPORTERS_DACL = ["/inheritance:r", "/grant:r", "*S-1-5-18:(OI)(CI)F", "*S-1-5-
 
 def _elevated() -> bool:
     sys.path.insert(0, str(_REPO))
-    from hermes_dir_acl import process_is_elevated
+    from eir_dir_acl import process_is_elevated
     return process_is_elevated()
 
 
@@ -123,7 +123,7 @@ def _child(code: str, *args: str, prelude: str = _FILTERED_TOKEN) -> dict:
 def reporters_parent(tmp_path):
     if not _elevated():
         pytest.skip("needs an elevated token to stand in for the elevated install")
-    parent = tmp_path / "hermes"
+    parent = tmp_path / "eir"
     parent.mkdir()
     subprocess.run(["icacls", str(parent), *_REPORTERS_DACL], check=True, capture_output=True)
     yield parent
@@ -159,7 +159,7 @@ def _require_faithful_probe(reporters_parent: Path, reporters_dir: Path) -> None
 
 
 def test_dir_made_while_elevated_stays_usable_by_the_filtered_token(reporters_parent):
-    from hermes_dir_acl import make_user_dir
+    from eir_dir_acl import make_user_dir
 
     plain = reporters_parent / "plain"
     plain.mkdir()  # inherits the reporters' SYSTEM + Administrators DACL
@@ -173,7 +173,7 @@ def test_dir_made_while_elevated_stays_usable_by_the_filtered_token(reporters_pa
 
 
 def test_elevated_rerun_repairs_a_dir_an_earlier_elevated_run_left(reporters_parent):
-    from hermes_dir_acl import make_user_dir
+    from eir_dir_acl import make_user_dir
 
     left = reporters_parent / "state"
     left.mkdir()
@@ -188,7 +188,7 @@ def test_elevated_rerun_repairs_a_dir_an_earlier_elevated_run_left(reporters_par
 def test_elevated_repair_also_reaches_an_old_lock_already_inside_the_dir(reporters_parent):
     """Review #140490: the pywin32 write does not propagate, so a token lock an earlier elevated run
     left INSIDE the dir kept the reporters' DACL after the dir itself was repaired."""
-    from hermes_dir_acl import make_user_dir
+    from eir_dir_acl import make_user_dir
 
     left = reporters_parent / "gateway-locks"
     left.mkdir()
@@ -213,8 +213,8 @@ def test_elevated_update_step_makes_a_stranded_home_usable(reporters_parent, mon
     """alt-glitch on #140490: the owed ``windows_home_acl`` step had unit tests only. Here the real
     step runs from this elevated runner over a home whose nested dirs and files carry the reporters'
     Administrators-only DACL, with real grants; the filtered token must use every one afterwards.
-    (The full elevated ``hermes update`` run stays a workflow_dispatch / live retest.)"""
-    from hermes_cli import update_windows_acl
+    (The full elevated ``eir update`` run stays a workflow_dispatch / live retest.)"""
+    from eir_cli import update_windows_acl
 
     nested = reporters_parent / "sessions" / "2026"
     nested.mkdir(parents=True)
@@ -222,7 +222,7 @@ def test_elevated_update_step_makes_a_stranded_home_usable(reporters_parent, mon
     old.mkdir()
     (old / "telegram-bot-token-x.lock").write_text("{}")
     _require_faithful_probe(reporters_parent, nested)
-    monkeypatch.setenv("HERMES_HOME", str(reporters_parent))
+    monkeypatch.setenv("EIR_HOME", str(reporters_parent))
     update_windows_acl.repair_windows_home_acl()
     after = _child("""
         print(json.dumps({"nested": usable(sys.argv[1]), "locks": usable(sys.argv[2]),
@@ -250,7 +250,7 @@ def _w2(lock_dir):
     result = _child(r"""
         import logging
         from unittest.mock import MagicMock
-        os.environ["HERMES_GATEWAY_LOCK_DIR"] = sys.argv[1]
+        os.environ["EIR_GATEWAY_LOCK_DIR"] = sys.argv[1]
         records = []
         handler = logging.Handler()
         handler.emit = lambda record: records.append((record.levelname, record.getMessage()))
@@ -285,18 +285,18 @@ def _w2(lock_dir):
     assert len(result["warnings"]) == 1, result
 
 
-# ── P2-5: an elevated grant never follows a junction out of the Hermes home ──────────────────────
+# ── P2-5: an elevated grant never follows a junction out of the Eir home ──────────────────────
 
 
 @pytest.fixture()
 def home_with_junction_out(tmp_path, monkeypatch):
-    """A Hermes home holding a directory junction (what same-user medium-integrity code can plant)
+    """A Eir home holding a directory junction (what same-user medium-integrity code can plant)
     to a directory outside it, standing in for ``C:\\Program Files\\<app>``."""
     if not _elevated():
         pytest.skip("needs an elevated token: only an elevated run grants")
     import _winapi
 
-    home = tmp_path / "hermes"
+    home = tmp_path / "eir"
     (home / "cache").mkdir(parents=True)
     outside = tmp_path / "Program Files" / "App"
     (outside / "bin").mkdir(parents=True)
@@ -304,7 +304,7 @@ def home_with_junction_out(tmp_path, monkeypatch):
     subprocess.run(["icacls", str(outside), *_REPORTERS_DACL], check=True, capture_output=True)
     junction = home / "cache" / "images"
     _winapi.CreateJunction(str(outside), str(junction))
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     yield home, outside, junction
     junction.rmdir()  # removes the junction itself, not the target
     subprocess.run(["icacls", str(outside), "/reset", "/t", "/c", "/q"], check=False, capture_output=True)
@@ -317,18 +317,18 @@ def _dacls(paths):
 
 
 def test_elevated_grants_never_reach_a_junction_target_outside_the_home(home_with_junction_out):
-    import hermes_dir_acl
-    from hermes_cli import update_windows_acl
+    import eir_dir_acl
+    from eir_cli import update_windows_acl
 
     home, outside, junction = home_with_junction_out
-    assert hermes_dir_acl.is_reparse_point(junction)
+    assert eir_dir_acl.is_reparse_point(junction)
     watched = [outside, *sorted(outside.rglob("*"))]
     before = _dacls(watched)
-    hermes_dir_acl._granted.clear()
-    hermes_dir_acl.make_user_dir(junction, parents=True, exist_ok=True)  # the existing-leaf "repair" case
-    hermes_dir_acl.make_user_dir(junction / "thumbs", parents=True, exist_ok=True)  # through the junction
-    assert hermes_dir_acl.grant_user_access(junction) is False
-    granted, skipped, failed = hermes_dir_acl.grant_tree_user_access(home)
+    eir_dir_acl._granted.clear()
+    eir_dir_acl.make_user_dir(junction, parents=True, exist_ok=True)  # the existing-leaf "repair" case
+    eir_dir_acl.make_user_dir(junction / "thumbs", parents=True, exist_ok=True)  # through the junction
+    assert eir_dir_acl.grant_user_access(junction) is False
+    granted, skipped, failed = eir_dir_acl.grant_tree_user_access(home)
     update_windows_acl.repair_windows_home_acl()  # the post-update repair that used icacls /T
     assert junction in skipped and not failed and granted >= 2
     assert _dacls(watched) == before, "an elevated grant followed the junction out of the home"

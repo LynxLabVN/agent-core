@@ -13,18 +13,18 @@ from types import SimpleNamespace
 import httpx
 import pytest
 
-from tests.hermes_cli import test_guest_handoff as _gh
+from tests.eir_cli import test_guest_handoff as _gh
 
 portal = _gh.portal
 
 
 def _refresh_access_token():
-    from hermes_cli import auth
+    from eir_cli import auth
     auth.resolve_nous_access_token(refresh_skew_seconds=10**9)
 
 
 def _refresh_runtime_credentials():
-    from hermes_cli import auth
+    from eir_cli import auth
     auth.resolve_nous_runtime_credentials(force_refresh=True)
 
 
@@ -35,26 +35,26 @@ REFRESHERS = {
 
 
 def _shared_anon_token():
-    from hermes_cli import auth_nous
+    from eir_cli import auth_nous
     return (auth_nous._read_shared_nous_state() or {}).get("anon_token")
 
 
 def _guest_in(monkeypatch, home) -> str:
     """*home* mints a guest into the (empty) shared store."""
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     return _gh._mint_guest()
 
 
 @pytest.mark.parametrize("refresh", sorted(REFRESHERS))
 def test_a_refresh_over_a_guest_in_the_shared_store_records_no_move(portal, monkeypatch, tmp_path, refresh):
-    from hermes_cli import auth_nous
-    mine, sibling = os.environ["HERMES_HOME"], tmp_path / "sibling-profile"
+    from eir_cli import auth_nous
+    mine, sibling = os.environ["EIR_HOME"], tmp_path / "sibling-profile"
     sibling.mkdir()
     _gh._persist(_gh._account())
     auth_nous._clear_shared_nous_state("logout")
     anon = _guest_in(monkeypatch, sibling)
 
-    monkeypatch.setenv("HERMES_HOME", mine)
+    monkeypatch.setenv("EIR_HOME", mine)
     REFRESHERS[refresh]()
 
     assert portal.refreshes == 1
@@ -64,7 +64,7 @@ def test_a_refresh_over_a_guest_in_the_shared_store_records_no_move(portal, monk
 
 @pytest.mark.parametrize("emptied", [False, True], ids=["store-holds-it", "store-emptied-by-a-logout"])
 def test_a_refresh_still_publishes_the_rotated_token_for_profiles_on_the_same_account(portal, emptied):
-    from hermes_cli import auth_nous
+    from eir_cli import auth_nous
     _gh._persist(_gh._account(refresh="rt_1"))
     if emptied:
         auth_nous._clear_shared_nous_state("logout")
@@ -73,11 +73,11 @@ def test_a_refresh_still_publishes_the_rotated_token_for_profiles_on_the_same_ac
 
 
 def test_a_sign_in_over_the_guest_in_the_shared_store_still_hands_it_over(portal, monkeypatch, tmp_path):
-    mine, sibling = os.environ["HERMES_HOME"], tmp_path / "sibling-profile"
+    mine, sibling = os.environ["EIR_HOME"], tmp_path / "sibling-profile"
     sibling.mkdir()
     anon = _guest_in(monkeypatch, sibling)
 
-    monkeypatch.setenv("HERMES_HOME", mine)
+    monkeypatch.setenv("EIR_HOME", mine)
     _gh._persist(_gh._account())
 
     assert [c["body"] for c in portal.claims] == [{"token": anon}]
@@ -86,22 +86,22 @@ def test_a_sign_in_over_the_guest_in_the_shared_store_still_hands_it_over(portal
 
 def test_a_keepalive_refresh_does_not_sign_a_logged_out_profile_back_in(portal, monkeypatch, tmp_path):
     """Two profiles on one account; the first logs out and mints a guest; the second refreshes."""
-    from hermes_cli import anon_auth, auth
-    first, second = os.environ["HERMES_HOME"], tmp_path / "second-profile"
+    from eir_cli import anon_auth, auth
+    first, second = os.environ["EIR_HOME"], tmp_path / "second-profile"
     second.mkdir()
     _gh._persist(_gh._account())
-    monkeypatch.setenv("HERMES_HOME", str(second))
+    monkeypatch.setenv("EIR_HOME", str(second))
     _gh._persist(_gh._account())
 
-    monkeypatch.setenv("HERMES_HOME", first)
+    monkeypatch.setenv("EIR_HOME", first)
     auth.logout_command(SimpleNamespace(provider="nous"))
     anon = _gh._mint_guest()
 
-    monkeypatch.setenv("HERMES_HOME", str(second))
-    from hermes_cli import nous_auth_keepalive
+    monkeypatch.setenv("EIR_HOME", str(second))
+    from eir_cli import nous_auth_keepalive
     assert nous_auth_keepalive.refresh_nous_auth_keepalive_once(min_access_ttl_seconds=10**9)
 
-    monkeypatch.setenv("HERMES_HOME", first)
+    monkeypatch.setenv("EIR_HOME", first)
     state = anon_auth.ensure_portal_identity(explicit=True)
     assert anon_auth.is_guest_state(state) and state["anon_token"] == anon
     assert _gh._records() == {} and portal.claims == []
@@ -110,7 +110,7 @@ def test_a_keepalive_refresh_does_not_sign_a_logged_out_profile_back_in(portal, 
 def test_profiles_sharing_an_account_stay_in_step_while_the_store_holds_a_guest(portal, monkeypatch, tmp_path):
     """Refresh tokens are single use: a profile that refreshes with one a sibling already spent is
     signed out. Siblings on one account learn each rotated token through the shared store."""
-    from hermes_cli import anon_auth, auth
+    from eir_cli import anon_auth, auth
     spent, answer = set(), portal.handler
 
     def single_use_refresh(request):
@@ -122,24 +122,24 @@ def test_profiles_sharing_an_account_stay_in_step_while_the_store_holds_a_guest(
         return answer(request)
 
     portal.handler = single_use_refresh
-    first, second, third = os.environ["HERMES_HOME"], tmp_path / "second-profile", tmp_path / "third-profile"
+    first, second, third = os.environ["EIR_HOME"], tmp_path / "second-profile", tmp_path / "third-profile"
     _gh._persist(_gh._account())
     for home in (second, third):
         home.mkdir()
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("EIR_HOME", str(home))
         assert anon_auth.ensure_portal_identity(explicit=True)["refresh_token"] == "rt_1"   # adopts the account
 
-    monkeypatch.setenv("HERMES_HOME", first)
+    monkeypatch.setenv("EIR_HOME", first)
     auth.logout_command(SimpleNamespace(provider="nous"))
     anon = _gh._mint_guest()
     for home in (second, first, third):   # the guest's own token refresh sits between the two
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("EIR_HOME", str(home))
         _refresh_access_token()
 
     assert auth.get_provider_auth_state("nous")["refresh_token"] == "rt_3"
     assert _shared_anon_token() == anon and _gh._records() == {}
     fourth = tmp_path / "fourth-profile"
     fourth.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(fourth))
+    monkeypatch.setenv("EIR_HOME", str(fourth))
     adopted = anon_auth.ensure_portal_identity(explicit=True)
     assert adopted["anon_token"] == anon and "renewal" not in adopted

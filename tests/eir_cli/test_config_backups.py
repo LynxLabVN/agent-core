@@ -1,21 +1,21 @@
-"""config.yaml backups: one dir, deduped, bounded — never a pile of siblings in HERMES_HOME."""
+"""config.yaml backups: one dir, deduped, bounded — never a pile of siblings in EIR_HOME."""
 import os
 from pathlib import Path
 
 import pytest
 
-from hermes_cli.config_backups import backup_config, list_config_backups
+from eir_cli.config_backups import backup_config, list_config_backups
 
 
 def test_repeat_backups_dedupe_and_rotate(tmp_path: Path, monkeypatch):
     cfg = tmp_path / "config.yaml"
     cfg.write_text("model: a\n")
     stamps = iter(f"2026010100000{i}" for i in range(10))
-    monkeypatch.setattr("hermes_cli.config_backups.time.strftime", lambda _fmt: next(stamps))
+    monkeypatch.setattr("eir_cli.config_backups.time.strftime", lambda _fmt: next(stamps))
 
     first = backup_config(cfg, "pre-setup", keep=2)
     assert first is not None and first.parent == tmp_path / "backups" / "config"
-    # Same bytes again → no new file (the hermes-setup-three-times case).
+    # Same bytes again → no new file (the eir-setup-three-times case).
     assert backup_config(cfg, "pre-setup", keep=2) is None
     for i in range(3):
         cfg.write_text(f"model: {i}\n")
@@ -32,7 +32,7 @@ def test_same_size_edit_within_one_mtime_tick_is_still_backed_up(tmp_path: Path,
     cfg = tmp_path / "config.yaml"
     cfg.write_text("model: a\n")
     stamps = iter(f"2026010100000{i}" for i in range(10))
-    monkeypatch.setattr("hermes_cli.config_backups.time.strftime", lambda _fmt: next(stamps))
+    monkeypatch.setattr("eir_cli.config_backups.time.strftime", lambda _fmt: next(stamps))
 
     assert backup_config(cfg, "pre-setup") is not None
     assert backup_config(cfg, "pre-setup") is None
@@ -65,8 +65,8 @@ def test_legacy_siblings_move_but_user_named_copies_stay(tmp_path: Path):
 def test_backup_of_world_readable_config_is_owner_only(tmp_path: Path, monkeypatch):
     # copy2 preserves the source mode; a config.yaml left 0644 by an editor must not yield a
     # world-readable backup of the user's credentials (#148317).
-    monkeypatch.setattr("hermes_cli.config.is_managed", lambda: False)
-    monkeypatch.setattr("hermes_cli.config._container_or_chmod_skipped", lambda: False)
+    monkeypatch.setattr("eir_cli.config.is_managed", lambda: False)
+    monkeypatch.setattr("eir_cli.config._container_or_chmod_skipped", lambda: False)
     cfg = tmp_path / "config.yaml"
     cfg.write_text("api_key: secret\n")
     os.chmod(cfg, 0o644)
@@ -79,8 +79,8 @@ def test_backup_of_world_readable_config_is_owner_only(tmp_path: Path, monkeypat
 
 @pytest.mark.platforms("posix")
 def test_swept_legacy_backup_becomes_owner_only(tmp_path: Path, monkeypatch):
-    monkeypatch.setattr("hermes_cli.config.is_managed", lambda: False)
-    monkeypatch.setattr("hermes_cli.config._container_or_chmod_skipped", lambda: False)
+    monkeypatch.setattr("eir_cli.config.is_managed", lambda: False)
+    monkeypatch.setattr("eir_cli.config._container_or_chmod_skipped", lambda: False)
     cfg = tmp_path / "config.yaml"
     cfg.write_text("api_key: secret\n")
     legacy = tmp_path / "config.yaml.bak.20260101-000000"
@@ -97,8 +97,8 @@ def test_swept_legacy_backup_becomes_owner_only(tmp_path: Path, monkeypatch):
 def test_backups_written_before_the_fix_lose_world_access(tmp_path: Path, monkeypatch):
     # A reason that never fires again never rotates its old 0644 copy out; any later backup secures it.
     # Group bits stay (shared-group homes), as for config.yaml writes (#59726).
-    monkeypatch.setattr("hermes_constants.get_managed_system", lambda *a, **k: None)
-    monkeypatch.setattr("hermes_constants._container_or_chmod_skipped", lambda: False)
+    monkeypatch.setattr("eir_constants.get_managed_system", lambda *a, **k: None)
+    monkeypatch.setattr("eir_constants._container_or_chmod_skipped", lambda: False)
     cfg = tmp_path / "config.yaml"
     cfg.write_text("api_key: secret\n")
     root = tmp_path / "backups" / "config"
@@ -118,8 +118,8 @@ def test_backups_written_before_the_fix_lose_world_access(tmp_path: Path, monkey
 
 @pytest.mark.platforms("posix")
 def test_backup_pass_never_chmods_through_a_planted_link(tmp_path: Path, monkeypatch):
-    monkeypatch.setattr("hermes_constants.get_managed_system", lambda *a, **k: None)
-    monkeypatch.setattr("hermes_constants._container_or_chmod_skipped", lambda: False)
+    monkeypatch.setattr("eir_constants.get_managed_system", lambda *a, **k: None)
+    monkeypatch.setattr("eir_constants._container_or_chmod_skipped", lambda: False)
     cfg = tmp_path / "config.yaml"
     cfg.write_text("api_key: secret\n")
     outside = tmp_path / "outside.txt"

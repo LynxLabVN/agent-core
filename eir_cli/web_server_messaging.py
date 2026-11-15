@@ -10,12 +10,12 @@ from dataclasses import dataclass
 from fastapi import HTTPException
 from pathlib import Path
 from typing import Any, Optional
-from hermes_cli.config import OPTIONAL_ENV_VARS, write_platform_config_field
-from hermes_cli.setup_hidden_env import is_setup_hidden_env as _is_setup_hidden_env
-from hermes_cli.version_info import hermes_user_agent
+from eir_cli.config import OPTIONAL_ENV_VARS, write_platform_config_field
+from eir_cli.setup_hidden_env import is_setup_hidden_env as _is_setup_hidden_env
+from eir_cli.version_info import eir_user_agent
 
 # Same logger the code used before extraction (record parity).
-_log = logging.getLogger("hermes_cli.web_server")
+_log = logging.getLogger("eir_cli.web_server")
 
 
 # Card metadata for core-only platforms (no plugin, so no PlatformEntry to declare it). Plugin
@@ -25,7 +25,7 @@ _log = logging.getLogger("hermes_cli.web_server")
 _PLATFORM_OVERRIDES: dict[str, dict[str, Any]] = {
     "api_server": {
         "name": "API server",
-        "description": "Expose Hermes as an OpenAI-compatible HTTP API for tools like Open WebUI.",
+        "description": "Expose Eir as an OpenAI-compatible HTTP API for tools like Open WebUI.",
         "docs_url": "https://hermes-agent.nousresearch.com/docs/user-guide/messaging/",
         "env_vars": (
             "API_SERVER_ENABLED", "API_SERVER_KEY", "API_SERVER_PORT", "API_SERVER_HOST",
@@ -47,7 +47,7 @@ _PLATFORM_OVERRIDES: dict[str, dict[str, Any]] = {
     },
     "relay": {
         "name": "Relay (experimental)",
-        "description": "Generic relay adapter fronted by the Hermes Relay connector.",
+        "description": "Generic relay adapter fronted by the Eir Relay connector.",
         "docs_url": "", "required_env": (),
     },
 }
@@ -78,7 +78,7 @@ def _messaging_platform_catalog() -> tuple[dict[str, Any], ...]:
     try:
         # Plugin discovery normally runs as a side effect of importing model_tools, which this
         # server process doesn't do — trigger it explicitly (idempotent).
-        from hermes_cli.plugins import discover_plugins
+        from eir_cli.plugins import discover_plugins
         discover_plugins()
         from gateway.platform_registry import platform_registry
         for plugin_entry in platform_registry.plugin_entries():
@@ -120,7 +120,7 @@ _MESSAGING_KEYS_PAGE_KEYS = frozenset({
 def _platform_env_prefixes(platform_id: str) -> tuple[str, ...]:
     """Env-var prefixes owned by a messaging platform card (shared with the profile-clone
     channel stripper so a card and a clone agree on which keys belong to a platform)."""
-    from hermes_cli.profile_channels import platform_env_prefixes
+    from eir_cli.profile_channels import platform_env_prefixes
     return platform_env_prefixes(platform_id)
 
 
@@ -208,8 +208,8 @@ _whatsapp_onboarding_sessions: dict[str, _WhatsAppOnboardingSession] = {}
 
 
 def _whatsapp_session_path() -> Path:
-    from hermes_constants import get_hermes_dir
-    return get_hermes_dir("platforms/whatsapp/session", "whatsapp/session")
+    from eir_constants import get_eir_dir
+    return get_eir_dir("platforms/whatsapp/session", "whatsapp/session")
 
 
 _WHATSAPP_PAYLOAD_FIELDS = (
@@ -223,7 +223,7 @@ def _whatsapp_onboarding_payload(pairing_id: str, record: _WhatsAppOnboardingSes
 
 
 def _restart_gateway_after_whatsapp_onboarding(profile: Optional[str] = None) -> dict[str, Any]:
-    from hermes_cli.web_server_gateway import _restart_gateway_after
+    from eir_cli.web_server_gateway import _restart_gateway_after
     return _restart_gateway_after(profile, what="WhatsApp onboarding", label="WhatsApp onboarding")
 
 
@@ -267,7 +267,7 @@ def _telegram_onboarding_request_sync(
     method: str, path: str, *, body: dict[str, Any] | None = None, bearer_token: str | None = None
 ) -> dict[str, Any]:
     import httpx
-    headers = {"Accept": "application/json", "User-Agent": hermes_user_agent("HermesDashboard")}
+    headers = {"Accept": "application/json", "User-Agent": eir_user_agent("EirDashboard")}
     request_kwargs: dict[str, Any] = {}
     if body is not None:
         headers["Content-Type"] = "application/json"

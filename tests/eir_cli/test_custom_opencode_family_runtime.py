@@ -17,13 +17,13 @@ import pytest
 
 @pytest.fixture()
 def _bridge_env(monkeypatch, tmp_path):
-    hermes_home = tmp_path / ".hermes"
-    hermes_home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    eir_home = tmp_path / ".eir"
+    eir_home.mkdir()
+    monkeypatch.setenv("EIR_HOME", str(eir_home))
     monkeypatch.setenv("OPENCODE_GO_BRIDGE_API_KEY", "sk-test-bridge")
 
     def write_config(provider_name: str, extra: str = "", default: str = "grok-4.5"):
-        (hermes_home / "config.yaml").write_text(
+        (eir_home / "config.yaml").write_text(
             f"""
 model:
   provider: {provider_name}
@@ -39,7 +39,7 @@ providers:
 
 
 def _resolve(provider, model):
-    from hermes_cli.runtime_provider import resolve_runtime_provider
+    from eir_cli.runtime_provider import resolve_runtime_provider
 
     return resolve_runtime_provider(requested=provider, target_model=model)
 

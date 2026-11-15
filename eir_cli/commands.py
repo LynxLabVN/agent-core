@@ -1,4 +1,4 @@
-"""Slash command registry for the Hermes CLI and gateway.
+"""Slash command registry for the Eir CLI and gateway.
 
 Every consumer -- CLI help, gateway dispatch, Telegram BotCommands, Slack
 subcommand mapping, autocomplete -- derives from ``COMMAND_REGISTRY``. To add a
@@ -15,7 +15,7 @@ from typing import Optional
 
 from utils import is_truthy_value
 from agent.i18n import t
-from hermes_constants import INDICATOR_STYLES
+from eir_constants import INDICATOR_STYLES
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ class CommandDef:
     # "interrupt_then_dispatch" = interrupt first (/stop, /new, /reset; Guard 1, platforms/base.py).
     busy_policy: str = "reject"
     busy_handler: str | None = None  # key of a special mid-run handler in Guard-2 table
-    # Key in ``hermes_cli.slash_exec.EXECUTORS`` (a string, not a callable: keeps this module
+    # Key in ``eir_cli.slash_exec.EXECUTORS`` (a string, not a callable: keeps this module
     # import-light for the gateway).
     execute: str | None = None
     argument_mode: str | None = None  # desktop composer: options|text|mixed; None inferred
@@ -116,7 +116,7 @@ COMMAND_REGISTRY: list[CommandDef] = [
                aliases=("compact",), args_hint="[here [N] | focus topic | --preview|--dry-run]"),
     CommandDef("rollback", "List or restore filesystem checkpoints (restores keep your hand-edits; --all overrides)", "Session",
                args_hint="[number] [--all]"),
-    CommandDef("snapshot", "Create or restore state snapshots of Hermes config/state", "Session",
+    CommandDef("snapshot", "Create or restore state snapshots of Eir config/state", "Session",
                cli_only=True, aliases=("snap",), args_hint="[create|restore <id>|prune]",
                desktop="terminal"),
     CommandDef("export", "Export a profile (config, skills, theme) to a shareable archive", "Configuration",
@@ -125,7 +125,7 @@ COMMAND_REGISTRY: list[CommandDef] = [
                cli_only=True, args_hint="<archive.tar.gz> [--name <name>]"),
     CommandDef("stop", "Kill all running background processes", "Session",
                busy_policy="interrupt_then_dispatch", busy_handler="stop"),
-    CommandDef("discard", "Drop a turn lost when Hermes restarted so this chat's queue runs again", "Session",
+    CommandDef("discard", "Drop a turn lost when Eir restarted so this chat's queue runs again", "Session",
                gateway_only=True, busy_policy="dispatch"),
     CommandDef("pause", "Pause new work globally (emergency stop); '/pause off' resumes", "Session",
                gateway_only=True, args_hint="[reason | off]", busy_policy="dispatch"),
@@ -148,7 +148,7 @@ COMMAND_REGISTRY: list[CommandDef] = [
                busy_policy="dispatch", busy_handler="queue"),
     CommandDef("steer", "Inject a message after the next tool call without interrupting", "Session",
                aliases=("s",), args_hint="<prompt>", busy_policy="dispatch", busy_handler="steer"),
-    CommandDef("goal", "Set a standing goal Hermes works on across turns until achieved", "Session",
+    CommandDef("goal", "Set a standing goal Eir works on across turns until achieved", "Session",
                args_hint="[text | -- <text> | draft <text> | show | gate add <cmd> | pause | resume | clear | status | wait <pid> | unwait]",
                argument_mode="mixed", busy_policy="dispatch", busy_handler="goal"),
     CommandDef("heartbeat", "Set a recurring prompt that re-enters this session when idle", "Session",
@@ -163,7 +163,7 @@ COMMAND_REGISTRY: list[CommandDef] = [
                aliases=("proactive",),
                args_hint="[interval] <prompt> [--times N] [--until <condition>] | status | pause | resume | stop",
                argument_mode="mixed", busy_policy="dispatch", busy_handler="loop"),
-    CommandDef("plan", "Write a markdown implementation plan to .hermes/plans/ without executing anything", "Session",
+    CommandDef("plan", "Write a markdown implementation plan to .eir/plans/ without executing anything", "Session",
                args_hint="[task]"),
     CommandDef("moa", "Run one prompt through the default Mixture of Agents preset, then restore your model", "Session",
                args_hint="<prompt>", busy_policy="reject", busy_handler="moa"),
@@ -236,9 +236,9 @@ COMMAND_REGISTRY: list[CommandDef] = [
     CommandDef("voice", "Toggle voice mode", "Configuration",
                args_hint="[on|off|tts|status]", subcommands=("on", "off", "tts", "status"),
                desktop="composer-voice"),
-    CommandDef("wake", "Toggle the 'Hey Hermes' wake word listener", "Configuration",
+    CommandDef("wake", "Toggle the 'Hey Eir' wake word listener", "Configuration",
                cli_only=True, args_hint="[on|off|status]", subcommands=("on", "off", "status")),
-    CommandDef("busy", "Control how messages behave while Hermes is working", "Configuration",
+    CommandDef("busy", "Control how messages behave while Eir is working", "Configuration",
                args_hint="[queue|steer|interrupt|status]",
                subcommands=("queue", "steer", "interrupt", "status"),
                busy_policy="dispatch", desktop="terminal"),
@@ -302,7 +302,7 @@ COMMAND_REGISTRY: list[CommandDef] = [
                cli_only=True, desktop="terminal"),
     CommandDef("reload-mcp", "Reload MCP servers from config", "Tools & Skills",
                aliases=("reload_mcp",), desktop="advanced"),
-    CommandDef("reload-skills", "Re-scan ~/.hermes/skills/ for newly installed or removed skills",
+    CommandDef("reload-skills", "Re-scan ~/.eir/skills/ for newly installed or removed skills",
                "Tools & Skills", aliases=("reload_skills",), desktop="advanced"),
     CommandDef("browser", "Connect browser tools to your live Chromium-family browser via CDP", "Tools & Skills",
                cli_only=True, args_hint="[connect|disconnect|status]",
@@ -340,9 +340,9 @@ COMMAND_REGISTRY: list[CommandDef] = [
                cli_only=True, desktop="terminal"),
     CommandDef("image", "Attach a local image file for your next prompt", "Info",
                cli_only=True, args_hint="<path>", desktop="terminal"),
-    CommandDef("update", "Update Hermes Agent to the latest version", "Info",
+    CommandDef("update", "Update Eir Agent to the latest version", "Info",
                busy_policy="dispatch", desktop="terminal"),
-    CommandDef("version", "Show Hermes Agent version", "Info", aliases=("v",),
+    CommandDef("version", "Show Eir Agent version", "Info", aliases=("v",),
                busy_policy="dispatch", execute="version"),
     CommandDef("debug", "Debug report (versions, config keys, error counts; no log text): shows the privacy notice; /debug upload shares links",
                "Info",
@@ -438,7 +438,7 @@ def build_commands() -> dict[str, str]:
 
 
 # ``COMMANDS`` / ``COMMANDS_BY_CATEGORY`` resolve lazily through the module ``__getattr__`` below so
-# every ``from hermes_cli.commands import COMMANDS`` sees the active language.
+# every ``from eir_cli.commands import COMMANDS`` sees the active language.
 _LAZY_LOCALIZED_TABLES = {"COMMANDS": build_commands, "COMMANDS_BY_CATEGORY": build_commands_by_category}
 
 # Subcommands lookup: "/cmd" -> ["sub1", ...]; explicit ``subcommands`` first (in
@@ -511,7 +511,7 @@ def _resolve_config_gates() -> set[str]:
     if not gated:
         return set()
     try:
-        from hermes_cli.config import cfg_get, read_raw_config
+        from eir_cli.config import cfg_get, read_raw_config
         cfg = read_raw_config()
     except Exception:
         return set()
@@ -558,7 +558,7 @@ def _iter_plugin_command_entries() -> list[tuple[str, str, str]]:
     """(name, description, args_hint) for ``PluginContext.register_command`` slash commands.
     Lazy so importing this module never forces plugin discovery."""
     try:
-        from hermes_cli.plugins import get_plugin_commands
+        from eir_cli.plugins import get_plugin_commands
         commands = get_plugin_commands() or {}
     except Exception:
         return []

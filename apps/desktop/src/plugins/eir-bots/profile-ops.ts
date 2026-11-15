@@ -8,7 +8,7 @@
  * surface.
  */
 
-import { forgetSessionUnread, host, queryClient } from '@hermes/plugin-sdk'
+import { forgetSessionUnread, host, queryClient } from '@eir/plugin-sdk'
 
 import { isBackfilledFacePng } from './avatar-image'
 import {
@@ -83,7 +83,7 @@ function pushLocalAvatars(roster: RosterRow[]) {
       Promise.resolve(request)
         .then(() =>
           queryClient.invalidateQueries({
-            queryKey: ['hermes-bots', 'roster']
+            queryKey: ['eir-bots', 'roster']
           })
         )
         .catch(() => avatarPushInflight.delete(key))
@@ -110,7 +110,7 @@ function pushLocalAvatars(roster: RosterRow[]) {
               data: png
             }).then(() =>
               queryClient.invalidateQueries({
-                queryKey: ['hermes-bots', 'roster']
+                queryKey: ['eir-bots', 'roster']
               })
             )
           : Promise.reject(new Error('rasterize failed'))
@@ -269,7 +269,7 @@ export function mergeServerMeta(roster: RosterRow[], fetchedAt = 0) {
       continue
     }
 
-    const raw = bot.ui_meta?.['hermes-bots']
+    const raw = bot.ui_meta?.['eir-bots']
     const server = raw && typeof raw === 'object' ? raw : null
     const title = serverReportedTitle(bot, server)
 
@@ -429,7 +429,7 @@ interface CliExecResult {
   output?: string
 }
 
-/** Permanently delete a bot's Hermes profile, then remove plugin-local state
+/** Permanently delete a bot's Eir profile, then remove plugin-local state
  * that would otherwise leave stale appearance/unread data behind.
  *
  * Prefer the SDK's `host.deleteProfile` when this Desktop build ships it: it
@@ -439,7 +439,7 @@ interface CliExecResult {
  * roster's hover pre-warm just woke (right-click hovers the row!) holds the
  * profile dir open — the CLI's rmtree races the live backend and the
  * renderer's socket reconnect respawns it mid-delete, resurrecting the
- * directory (hermes-agent#52279). That is the "can't delete a bot" error. */
+ * directory (eir-agent#52279). That is the "can't delete a bot" error. */
 export async function deleteBot(bot: RosterRow) {
   const route = botConnectionRoute(bot)
 

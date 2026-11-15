@@ -31,7 +31,7 @@ def source_build_env(base_env: dict | None = None, *, explicit: bool = False, ve
     from pm import ensure
     from pm.environments import project_python, running_from_selected_environment
     from pm.packages import pnpm_env
-    from pm.index_config import hermes_npmrc, user_npmrc
+    from pm.index_config import eir_npmrc, user_npmrc
     from pm.paths import repo_root
 
     # The historical update runs on store Python with the selected environment
@@ -39,25 +39,25 @@ def source_build_env(base_env: dict | None = None, *, explicit: bool = False, ve
     # the selected venv executable rather than the store interpreter.
     root = repo_root()
     python = str(project_python(root)) if running_from_selected_environment(root) else sys.executable
-    env = {**os.environ, **(base_env or {}), "CI": "1", "HERMES_PYTHON": python,
+    env = {**os.environ, **(base_env or {}), "CI": "1", "EIR_PYTHON": python,
            "PYTHON": python}
     # Electron's installer unpacks its binary with a native module that imports
     # VCRUNTIME140.dll, which a fresh Windows lacks. Our Python ships one, and
     # scripts/build/electron-runtime.mjs copies it beside that module.
     vc_runtime = Path(sys.base_prefix) / "vcruntime140.dll"
     if vc_runtime.is_file():
-        env["HERMES_VC_RUNTIME"] = str(vc_runtime)
+        env["EIR_VC_RUNTIME"] = str(vc_runtime)
     env.pop("ESBUILD_BINARY_PATH", None)
     npmrc = user_npmrc(env)
     twins = [name for name in env if name.upper() == "NPM_CONFIG_USERCONFIG"]
-    if npmrc == hermes_npmrc() or twins:
+    if npmrc == eir_npmrc() or twins:
         # npm reads the last non-empty twin in environ order; pnpm reads the lowercase name when
         # set, even empty (as unset: ~/.npmrc), else the uppercase one, and never a mixed-case one.
-        # So twins split the installers and an empty one hides the Hermes file. One variable naming
+        # So twins split the installers and an empty one hides the Eir file. One variable naming
         # the file user_npmrc picked (a non-empty lowercase one first) replaces them.
         env = {name: value for name, value in env.items() if name.upper() != "NPM_CONFIG_USERCONFIG"}
         env["NPM_CONFIG_USERCONFIG"] = str(npmrc)
-    # pnpm reads the npmrc that user_npmrc selects (an explicit userconfig, else Hermes's, else
+    # pnpm reads the npmrc that user_npmrc selects (an explicit userconfig, else Eir's, else
     # ~/.npmrc) only for its registry and auth. npm also handed every other key to the processes it
     # spawned as npm_config_<key>; keep doing that, since it is how node-pre-gyp (run by
     # stage-native-deps.mjs) finds a binary mirror (node_get_windows_binary_host_mirror).
@@ -93,7 +93,7 @@ def run_in_custody(project_root: Path, command: list, label: str, **kwargs):
     kill-on-close job), so the checkout is never handed to a contender while one of them still
     writes. Outside an update it is ``run_contained`` as is."""
     from pm.progress import run_contained
-    from hermes_cli.update_custody import contained_command
+    from eir_cli.update_custody import contained_command
 
     with contained_command(command, root=project_root) as (argv, custody):
         return run_contained(argv, label, **kwargs, **custody)
@@ -122,7 +122,7 @@ def prepare_source_dependencies(project_root: Path, workspaces: tuple[str, ...],
 
 def prepare_launch_dependencies(project_root: Path, *, env: dict) -> None:
     """A launch rebuild must not prune another installed source frontend."""
-    from hermes_cli.main_desktop import _desktop_dist_exists, _desktop_packaged_executable
+    from eir_cli.main_desktop import _desktop_dist_exists, _desktop_packaged_executable
 
     desktop_dir = project_root / "apps/desktop"
     desktop = _desktop_dist_exists(desktop_dir) or _desktop_packaged_executable(desktop_dir) is not None
@@ -141,7 +141,7 @@ def _fetch_retries_configured(project_root: Path, env: dict) -> bool:
     that cannot answer counts as configured: the default stays."""
     if any(key.lower() == "pnpm_config_fetch_retries" for key in env):
         return True
-    from hermes_platform.resolver import LookupContext, locate_command
+    from eir_platform.resolver import LookupContext, locate_command
 
     # The PATH of the env PM's ensure("pnpm") composed, never this process's.
     found = locate_command("pnpm", LookupContext(path=env["PATH"])).command
@@ -165,13 +165,13 @@ def build_source_tui(project_root: Path, *, env: dict) -> None:
 def build_source_web(project_root: Path, *, env: dict, icons: Path | None = None) -> None:
     # Bounded build (#63338): the Vite/Rolldown dashboard build saturates small
     # hosts; cap the V8 heap and the native bundler's rayon thread pool.
-    from hermes_cli.web_build_limits import apply_web_build_limits
+    from eir_cli.web_build_limits import apply_web_build_limits
 
     apply_web_build_limits(env)
     # Default-brand icons are committed; installs never render them.
     icons = icons or project_root
     run_source_script(project_root, "scripts/build/web.mjs", "--source", str(project_root),
-                      "--icons", str(icons), "--out", str(project_root / "hermes_cli/web_dist"), env=env,
+                      "--icons", str(icons), "--out", str(project_root / "eir_cli/web_dist"), env=env,
                       label="Building the web UI")
 
 
@@ -216,8 +216,8 @@ def build_update_products(project_root: Path, *, desktop: bool, after_dependenci
     """
     # Both current updates and historical takeover reach this in a fresh target
     # interpreter, never in the updater's pre-sync import graph.
-    from hermes_cli.main_install_repair import _install_configured_features_missing_deps
-    from hermes_cli.update_stage import publish_stage
+    from eir_cli.main_install_repair import _install_configured_features_missing_deps
+    from eir_cli.update_stage import publish_stage
 
     failures: list[tuple[str, BaseException]] = []
     publish_stage("Building the apps")
@@ -263,7 +263,7 @@ def build_update_products(project_root: Path, *, desktop: bool, after_dependenci
             after_dependencies()
         desktop_reason = failures[-1][0] if failures else ""
         if desktop and (desktop_skipped or _headless_linux()):
-            print("  ⓘ If this host never runs the desktop app, `hermes uninstall --gui` removes it "
+            print("  ⓘ If this host never runs the desktop app, `eir uninstall --gui` removes it "
                   "and future updates stop building it.")
         if prepared:
             # An update that changed no TUI/web input reuses the receipted output, as the
@@ -278,7 +278,7 @@ def build_update_products(project_root: Path, *, desktop: bool, after_dependenci
                     publish_stage("Building the TUI")
                     attempt("TUI build", lambda: build_source_tui(project_root, env=env))
             if "web" in frontends:
-                if source_product_current(project_root, "web", project_root / "hermes_cli/web_dist"):
+                if source_product_current(project_root, "web", project_root / "eir_cli/web_dist"):
                     print("  ✓ Web UI is up to date")
                 else:
                     publish_stage("Building the web UI")
@@ -297,15 +297,15 @@ def build_update_products(project_root: Path, *, desktop: bool, after_dependenci
     # catalog for every profile home sharing this venv (config, data and tool names
     # unchanged). The update must finish even if the migration blows up.
     try:
-        from hermes_cli.memory_provider_migration import migrate_all_homes
+        from eir_cli.memory_provider_migration import migrate_all_homes
 
         migrate_all_homes()
     except Exception as exc:  # health: allow BLE001 -- post-commit boundary: printed as ⚠, never fails the committed update; every later update/tail re-runs it
         print(f"  ⚠ Memory provider migration skipped: {exc}")
     # Same for a gateway platform / toolset that left core (Home Assistant): every home that used
-    # it gets its catalog plugin (hermes_cli/left_core_migration.py).
+    # it gets its catalog plugin (eir_cli/left_core_migration.py).
     try:
-        from hermes_cli.left_core_migration import migrate_all_homes as migrate_left_core
+        from eir_cli.left_core_migration import migrate_all_homes as migrate_left_core
 
         migrate_left_core()
     except Exception as exc:  # health: allow BLE001 -- post-commit boundary: printed as ⚠, never fails the committed update; every later update/tail re-runs it
@@ -317,11 +317,11 @@ def build_update_products(project_root: Path, *, desktop: bool, after_dependenci
 def _rebuild_served_webapp(project_root: Path, publish_stage) -> None:
     """The Webapp bundle (``apps/desktop/dist-webapp``), when a home sharing this install serves it
     (``webapp.enabled``): its gateway serves the bundle as built, so one older than the updated
-    backend would talk to it with an outdated contract. Built with the function ``hermes webapp``
+    backend would talk to it with an outdated contract. Built with the function ``eir webapp``
     uses, which reuses a current bundle. A failed build leaves the previous bundle on disk, marked
-    out of date: its gateways report the Webapp unavailable until ``hermes webapp`` rebuilds it."""
+    out of date: its gateways report the Webapp unavailable until ``eir webapp`` rebuilds it."""
     from gateway.webapp_listener import webapp_settings
-    from hermes_cli.webapp import mark_webapp_stale, prepare_webapp_renderer
+    from eir_cli.webapp import mark_webapp_stale, prepare_webapp_renderer
     from pm.plugins_state import dependency_homes
 
     if not any(webapp_settings(home).enabled for home in dependency_homes()):
@@ -332,15 +332,15 @@ def _rebuild_served_webapp(project_root: Path, publish_stage) -> None:
     except BaseException:
         try:
             if mark_webapp_stale(project_root):
-                print("  ⓘ The Webapp stays unavailable until `hermes webapp` rebuilds it.")
+                print("  ⓘ The Webapp stays unavailable until `eir webapp` rebuilds it.")
         except OSError as exc:
             print(f"  ⚠ Could not mark the Webapp out of date: {exc}")
         raise
 
 
 def _build_desktop_product(project_root: Path, env: dict, publish_stage) -> None:
-    from hermes_cli.desktop_build_reuse import packaged_desktop_reusable
-    from hermes_cli.main_desktop import (
+    from eir_cli.desktop_build_reuse import packaged_desktop_reusable
+    from eir_cli.main_desktop import (
         _packaged_desktop_current_for_head, _refresh_installed_desktop_apps, build_prepared_desktop)
 
     desktop_dir = project_root / "apps/desktop"
@@ -352,10 +352,10 @@ def _build_desktop_product(project_root: Path, env: dict, publish_stage) -> None
         publish_stage("Building the desktop app")
         # The desktop build mutates checkout-scoped node_modules and
         # apps/desktop/release; serialize it against a concurrent manual
-        # `hermes desktop` (#93940). The update path waits rather than exits:
+        # `eir desktop` (#93940). The update path waits rather than exits:
         # the in-flight build it queues behind produces the same fresh tree
         # this update needs.
-        from hermes_cli.desktop_build_lock import DesktopBuildLock
+        from eir_cli.desktop_build_lock import DesktopBuildLock
 
         build_lock = DesktopBuildLock(project_root)
         build_lock.acquire(wait=True)

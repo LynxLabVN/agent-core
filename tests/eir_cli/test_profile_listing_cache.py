@@ -4,7 +4,7 @@ The listing is the shared body of ``GET /api/profiles`` and JSON-RPC ``profiles.
 Bots roster polls every 5s per connection, and it parsed three YAML files per profile every time —
 including an installer-seeded ``config.yaml`` (the annotated template, ~119KB) for two strings.
 
-The memo must be invisible: every edit has to show up on the very next read, or `hermes profile
+The memo must be invisible: every edit has to show up on the very next read, or `eir profile
 list` and the roster paint stale names and models. Only derived values are cached — the raw
 readers keep their uncached contract, because callers write those documents back.
 """
@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from hermes_cli import profiles
+from eir_cli import profiles
 
 
 @pytest.fixture(autouse=True)
@@ -76,7 +76,7 @@ def test_an_unchanged_file_is_parsed_once_across_repeated_reads(profile_dir, mon
 
 def test_the_raw_config_reader_keeps_its_uncached_contract(profile_dir):
     """``read_user_config_raw`` feeds write-back round-trips, so it must NOT be memoised here."""
-    from hermes_cli.config import read_user_config_raw
+    from eir_cli.config import read_user_config_raw
 
     config_path = profile_dir / "config.yaml"
     assert read_user_config_raw(config_path)["model"]["provider"] == "openai"
@@ -88,7 +88,7 @@ def test_the_raw_config_reader_keeps_its_uncached_contract(profile_dir):
 
 def test_config_model_cache_is_keyed_on_the_backend_version_not_the_local_file(profile_dir, monkeypatch):
     """The user layer changes through the config backend, which need not touch the local file."""
-    from hermes_cli import config_backend
+    from eir_cli import config_backend
 
     assert profiles._read_config_model(profile_dir) == ("gpt-4o", "openai")
     version = [("v2",)]

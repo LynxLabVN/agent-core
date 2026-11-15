@@ -1,6 +1,6 @@
 """Plugin activation writes and reads the SAME key on every surface (#27548, #73131, #82898).
 
-Runs the real ``hermes_cli.plugins_cmd`` commands against a temp HERMES_HOME and checks the verdict
+Runs the real ``eir_cli.plugins_cmd`` commands against a temp EIR_HOME and checks the verdict
 through the loader's own gate (``plugins_discovery.gate_manifest``) — never by re-reading the list
 the command just wrote.
 """
@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import pytest
 
-from hermes_cli import plugins_cmd
-from hermes_cli.config import load_config, save_config
-from hermes_cli.plugins_discovery import collect_directory_manifests, gate_manifest
+from eir_cli import plugins_cmd
+from eir_cli.config import load_config, save_config
+from eir_cli.plugins_discovery import collect_directory_manifests, gate_manifest
 
 
 def _write_plugin(root, rel, name, extra=""):
@@ -35,11 +35,11 @@ def _write_tool_plugin(root, name):
 
 @pytest.fixture
 def home(tmp_path, monkeypatch):
-    hermes_home = tmp_path / "hermes-home"
-    (hermes_home / "plugins").mkdir(parents=True)
-    (hermes_home / "config.yaml").write_text("plugins:\n  enabled: []\n  disabled: []\n", encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
-    return hermes_home
+    eir_home = tmp_path / "eir-home"
+    (eir_home / "plugins").mkdir(parents=True)
+    (eir_home / "config.yaml").write_text("plugins:\n  enabled: []\n  disabled: []\n", encoding="utf-8")
+    monkeypatch.setenv("EIR_HOME", str(eir_home))
+    return eir_home
 
 
 @pytest.fixture(autouse=True)
@@ -50,7 +50,7 @@ def _commit_plugin_selection_without_building_an_environment(monkeypatch):
         cfg["plugins"] = {"enabled": sorted(enabled), "disabled": sorted(disabled)}
         save_config(cfg)
 
-    monkeypatch.setattr("hermes_cli.plugins_admission.admit_plugin_set_change", admit)
+    monkeypatch.setattr("eir_cli.plugins_admission.admit_plugin_set_change", admit)
 
 
 def _lists():
@@ -59,7 +59,7 @@ def _lists():
 
 
 def test_disable_bundled_platform_by_manifest_name_gates_the_loader(home):
-    """`hermes plugins disable photon-platform` must produce a key the loader's gate matches; the
+    """`eir plugins disable photon-platform` must produce a key the loader's gate matches; the
     CLI wrote ``platforms/photon`` while discovery keyed the adapter ``photon-platform``."""
     plugins_cmd.cmd_disable("photon-platform")
 
@@ -98,9 +98,9 @@ def test_dashboard_toggle_writes_canonical_key_and_clears_stale_aliases(home):
 
 def test_dashboard_enable_on_a_fresh_config_keeps_the_core_tools(home):
     """Desktop/TUI/dashboard enable with no saved ``platform_toolsets`` must not write one: the old
-    seed ``platform_toolsets.cli: [<plugin_ts>]`` replaced the ``hermes-cli`` composite, so the model
+    seed ``platform_toolsets.cli: [<plugin_ts>]`` replaced the ``eir-cli`` composite, so the model
     lost every built-in tool (27 -> 2, no ``terminal``). The plugin toolset is on by default anyway."""
-    from hermes_cli.tools_config import _get_platform_tools
+    from eir_cli.tools_config import _get_platform_tools
     from tools.registry import registry
 
     _write_tool_plugin(home / "plugins", "zzseed")
@@ -115,7 +115,7 @@ def test_dashboard_enable_on_a_fresh_config_keeps_the_core_tools(home):
 
 def _restart_backend():
     """A new process: no plugin manager has scanned yet and no plugin tool is registered."""
-    from hermes_cli.plugins import _reset_plugin_managers_for_tests
+    from eir_cli.plugins import _reset_plugin_managers_for_tests
     from tools.registry import registry
 
     _reset_plugin_managers_for_tests()
@@ -132,7 +132,7 @@ def saved_list_plugin(home):
     _write_tool_plugin(home / "plugins", "zzre")
     cfg = load_config()
     cfg["plugins"]["enabled"] = ["zzre"]
-    cfg["platform_toolsets"] = {"cli": ["hermes-cli", "zzre_ts"]}
+    cfg["platform_toolsets"] = {"cli": ["eir-cli", "zzre_ts"]}
     save_config(cfg)
     yield
     _restart_backend()
@@ -142,27 +142,27 @@ def test_dashboard_reenable_restores_the_toolset_in_a_saved_list(saved_list_plug
     """Desktop/TUI/dashboard disable drops the plugin toolset from a saved list; re-enabling from a
     backend that scanned while the plugin was off must add it back. The toggle ran before the plugin
     loaded, found no registered tool, and left the plugin enabled with its tools off."""
-    from hermes_cli.plugins import discover_plugins
+    from eir_cli.plugins import discover_plugins
 
     discover_plugins()  # long-lived backend: scanned while the plugin was on
     assert plugins_cmd.dashboard_set_agent_plugin_enabled("zzre", enabled=False)["ok"] is True
-    assert _saved_cli_list() == ["hermes-cli"]
+    assert _saved_cli_list() == ["eir-cli"]
 
     _restart_backend()
     discover_plugins()  # the backend now holds only a placeholder for the disabled plugin
     assert plugins_cmd.dashboard_set_agent_plugin_enabled("zzre", enabled=True)["ok"] is True
-    assert _saved_cli_list() == ["hermes-cli", "zzre_ts"]
+    assert _saved_cli_list() == ["eir-cli", "zzre_ts"]
 
 
 def test_cli_disable_and_enable_round_trip_the_toolset_in_a_saved_list(saved_list_plugin):
-    """``hermes plugins disable`` / ``enable`` edit a saved list the same way the dashboard does, each
+    """``eir plugins disable`` / ``enable`` edit a saved list the same way the dashboard does, each
     in its own process; they never touched it, so a toolset the dashboard dropped stayed off."""
     plugins_cmd.cmd_disable("zzre")
-    assert _saved_cli_list() == ["hermes-cli"]
+    assert _saved_cli_list() == ["eir-cli"]
 
     _restart_backend()
     plugins_cmd.cmd_enable("zzre")
-    assert _saved_cli_list() == ["hermes-cli", "zzre_ts"]
+    assert _saved_cli_list() == ["eir-cli", "zzre_ts"]
 
 
 def test_cli_enable_on_a_fresh_config_writes_no_toolset_list(home):

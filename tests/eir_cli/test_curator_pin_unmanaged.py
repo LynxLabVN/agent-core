@@ -1,12 +1,12 @@
 """Pin/unpin messaging on unmanaged skills (#92993).
 
-`hermes curator pin <name>` on an unmanaged skill (curation-eligible but no
+`eir curator pin <name>` on an unmanaged skill (curation-eligible but no
 `created_by` marker — the pre-marker population `list-unmanaged` shows) used
 to print "will bypass auto-transitions" and exit 0. But `curated_report()`
 only walks marker-carrying skills, so auto-transitions never consider an
 unmanaged skill at all: the pin is recorded yet inert, and the message
 claimed an effect that does not exist. The fix keeps the write (the flag
-becomes meaningful after `hermes curator adopt`) and makes the message say
+becomes meaningful after `eir curator adopt`) and makes the message say
 what actually happened.
 """
 
@@ -48,7 +48,7 @@ def _stub(monkeypatch, *, managed: bool):
 
 
 def test_pin_still_refuses_bundled_skills(monkeypatch, capsys):
-    import hermes_cli.curator as curator_cli
+    import eir_cli.curator as curator_cli
     from tools import skill_usage
 
     calls = _stub(monkeypatch, managed=True)

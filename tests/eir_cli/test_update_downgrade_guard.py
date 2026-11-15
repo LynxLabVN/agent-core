@@ -1,4 +1,4 @@
-"""`hermes update` refuses a target that predates the gateway runtime once a state.db holds ledger rows.
+"""`eir update` refuses a target that predates the gateway runtime once a state.db holds ledger rows.
 
 Downgrading is unsupported (#106742, jquesnelle item 6): the older release cannot delete or prune
 the sessions with runtime history, so the move is refused before the tree changes and the message
@@ -12,9 +12,9 @@ from unittest.mock import Mock
 
 import pytest
 
-import hermes_state_runtime as rt
-from hermes_cli import update_downgrade_guard as guard
-from hermes_state import SessionDB
+import eir_state_runtime as rt
+from eir_cli import update_downgrade_guard as guard
+from eir_state import SessionDB
 
 
 def _git(root, *args):
@@ -29,11 +29,11 @@ def repo(tmp_path):
     _git(root, "init", "-b", "main")
     _git(root, "config", "user.email", "t@example.invalid")
     _git(root, "config", "user.name", "T")
-    (root / "hermes_state_common.py").write_text("SCHEMA_SQL = 'CREATE TABLE IF NOT EXISTS sessions (id TEXT)'\n")
+    (root / "eir_state_common.py").write_text("SCHEMA_SQL = 'CREATE TABLE IF NOT EXISTS sessions (id TEXT)'\n")
     _git(root, "add", ".")
     _git(root, "commit", "-m", "release before the cutover")
     _git(root, "tag", "old-release")
-    (root / "hermes_state_common.py").write_text(
+    (root / "eir_state_common.py").write_text(
         "SCHEMA_SQL = '''CREATE TABLE IF NOT EXISTS session_admissions (seq INTEGER)'''\n")
     _git(root, "commit", "-am", "gateway runtime")
     return root
@@ -57,14 +57,14 @@ def _pre_cutover_snapshot(home, snap_id):
 
 def test_a_pre_runtime_target_is_refused_before_the_move_with_the_snapshot_that_predates_it(
         repo, tmp_path, monkeypatch, capsys):
-    from hermes_cli import main as hermes_main
-    from hermes_cli import update_cmd
+    from eir_cli import main as eir_main
+    from eir_cli import update_cmd
 
     home = tmp_path / "home"
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.setattr("hermes_cli.backup._sibling_profile_homes", lambda h: [])
+    monkeypatch.setenv("EIR_HOME", str(home))
+    monkeypatch.setattr("eir_cli.backup._sibling_profile_homes", lambda h: [])
     monkeypatch.setattr(update_cmd._commit, "preflight_refusal", lambda *a, **k: None)
-    monkeypatch.setattr(hermes_main, "PROJECT_ROOT", repo)
+    monkeypatch.setattr(eir_main, "PROJECT_ROOT", repo)
     _ledgered_store(home)
     _pre_cutover_snapshot(home, "20261001-000000-pre-update")
     # A newer snapshot already holding the runtime ledger is not a way back.
@@ -80,11 +80,11 @@ def test_a_pre_runtime_target_is_refused_before_the_move_with_the_snapshot_that_
     out = capsys.readouterr().out
     assert "Downgrading is unsupported" in out and str(home / "state.db") in out
     assert "/snapshot restore 20261001-000000-pre-update" in out and "20261008" not in out
-    assert "hermes gateway stop" in out and "No update was applied" in out
+    assert "eir gateway stop" in out and "No update was applied" in out
 
 
 def test_forward_updates_and_stores_without_ledger_rows_are_never_refused(repo, tmp_path, monkeypatch):
-    monkeypatch.setattr("hermes_cli.backup._sibling_profile_homes", lambda h: [])
+    monkeypatch.setattr("eir_cli.backup._sibling_profile_homes", lambda h: [])
     old = _git(repo, "rev-parse", "old-release")
     plain = tmp_path / "plain"
     plain.mkdir()
@@ -101,15 +101,15 @@ def test_forward_updates_and_stores_without_ledger_rows_are_never_refused(repo, 
 
 @pytest.mark.parametrize("divergent", [True, False], ids=["beside-history", "in-history"])
 def test_check_holds_a_release_that_update_would_refuse(repo, tmp_path, monkeypatch, capsys, divergent):
-    """`hermes update --check` must neither offer nor promise a move back to a release the update then
+    """`eir update --check` must neither offer nor promise a move back to a release the update then
     refuses (#139099): one cut beside this checkout's history, or one it already contains."""
     from types import SimpleNamespace
 
-    from hermes_cli import source_releases, update_cmd_check
+    from eir_cli import source_releases, update_cmd_check
 
     home = tmp_path / "home"
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.setattr("hermes_cli.backup._sibling_profile_homes", lambda h: [])
+    monkeypatch.setenv("EIR_HOME", str(home))
+    monkeypatch.setattr("eir_cli.backup._sibling_profile_homes", lambda h: [])
     release = _git(repo, "rev-parse", "old-release")
     if divergent:
         _git(repo, "checkout", "-q", "-b", "release-line", "old-release")
@@ -119,7 +119,7 @@ def test_check_holds_a_release_that_update_would_refuse(repo, tmp_path, monkeypa
         release = _git(repo, "rev-parse", "HEAD")
         _git(repo, "checkout", "-q", "main")
     target = SimpleNamespace(commit=release, retired=False, ahead=False, label="v1.2.3", branch=None,
-                             repository="NousResearch/hermes-agent")
+                             repository="NousResearch/eir-agent")
     monkeypatch.setattr(source_releases, "resolve_source_target", lambda *a, **k: target)
 
     update_cmd_check.channel_compare_branch("stable", ["git"], repo)
@@ -135,13 +135,13 @@ def test_check_holds_a_release_that_update_would_refuse(repo, tmp_path, monkeypa
 
 @pytest.mark.parametrize("blobless", [False, True], ids=["full-clone", "blobless-clone"])
 def test_a_runtime_target_whose_state_modules_moved_into_the_package_is_not_refused(repo, tmp_path, blobless):
-    """A target beside this checkout's history that keeps the state store under ``hermes_agent/``
+    """A target beside this checkout's history that keeps the state store under ``eir_agent/``
     still defines the runtime ledger: the guard must find it there, and must not trust a no-match
     while those nested blobs are missing from a blobless clone."""
     _git(repo, "checkout", "-q", "-b", "moved", "HEAD~1")
-    package = repo / "hermes_agent" / "hermes_state"
+    package = repo / "eir_agent" / "eir_state"
     package.mkdir(parents=True)
-    _git(repo, "mv", "hermes_state_common.py", str(package / "common.py"))
+    _git(repo, "mv", "eir_state_common.py", str(package / "common.py"))
     (package / "common.py").write_text(
         "SCHEMA_SQL = '''CREATE TABLE IF NOT EXISTS session_admissions (seq INTEGER)'''\n")
     _git(repo, "commit", "-qam", "state store inside the package")
@@ -162,7 +162,7 @@ def test_a_runtime_target_whose_state_modules_moved_into_the_package_is_not_refu
 
 
 def test_the_runtime_schema_marker_is_still_in_this_trees_state_schema():
-    from hermes_state_common import SCHEMA_SQL
+    from eir_state_common import SCHEMA_SQL
 
     assert guard.defines_runtime([SCHEMA_SQL])
 
@@ -171,7 +171,7 @@ def test_the_runtime_schema_marker_is_still_in_this_trees_state_schema():
 @pytest.mark.parametrize("runtime", [False, True], ids=["pre-runtime", "runtime"])
 def test_present_commit_with_missing_schema_blobs_uses_remote_without_git_writes(
         repo, tmp_path, monkeypatch, remote_result, runtime):
-    from hermes_cli.source_check import source_git_env
+    from eir_cli.source_check import source_git_env
 
     # Release commits change the version, not the schema: pathspec history simplification must
     # not skip their inherited schema objects (Git 2.53 does; newer Git can mask the regression).
@@ -181,7 +181,7 @@ def test_present_commit_with_missing_schema_blobs_uses_remote_without_git_writes
     _git(repo, "commit", "-qm", "release version bump")
     target = _git(repo, "rev-parse", "HEAD")
     _git(repo, "checkout", "-q", "main")
-    (repo / "hermes_state_common.py").write_text(
+    (repo / "eir_state_common.py").write_text(
         "SCHEMA_SQL = '''CREATE TABLE IF NOT EXISTS session_admissions (seq INTEGER, extra TEXT)'''\n",
         encoding="utf-8")
     _git(repo, "commit", "-qam", "newer runtime schema")
@@ -201,7 +201,7 @@ def test_present_commit_with_missing_schema_blobs_uses_remote_without_git_writes
 
     before = {p.relative_to(clone): p.read_bytes() for p in (clone / ".git").rglob("*") if p.is_file()}
     assert git("cat-file", "-e", f"{target}^{{commit}}") == 0
-    assert git("cat-file", "-e", f"{target}:hermes_state_common.py") != 0
+    assert git("cat-file", "-e", f"{target}:eir_state_common.py") != 0
     grep = probe("grep", "-q", "-F", guard._RUNTIME_SCHEMA_MARKER, target, "--", *guard.STATE_MODULES)
     assert grep.returncode != 0 and grep.stderr
     remote = None if remote_result == "no-reader" else Mock(return_value=remote_result)

@@ -1,7 +1,7 @@
 """Gateway launchd (macOS LaunchAgent) backend: plist generation/refresh, bootstrap, start/stop/restart/status.
 
-Extracted from ``hermes_cli/gateway.py``. Bodies read facade helpers through ``_gw()`` (late
-binding on ``hermes_cli.gateway``) so the seams tests and callers patch on the facade keep
+Extracted from ``eir_cli/gateway.py``. Bodies read facade helpers through ``_gw()`` (late
+binding on ``eir_cli.gateway``) so the seams tests and callers patch on the facade keep
 intercepting the moved code.
 """
 from __future__ import annotations
@@ -17,20 +17,20 @@ import time
 from xml.sax.saxutils import escape
 from datetime import UTC
 
-from hermes_cli import gateway_service_owner
+from eir_cli import gateway_service_owner
 
 from agent.deadline import poll_until
 
 
 def _gw():
-    from hermes_cli import gateway  # late: the facade imports this module
+    from eir_cli import gateway  # late: the facade imports this module
     return gateway
 
 
 def get_launchd_label() -> str:
     """Return the launchd service label, scoped per profile."""
     suffix = _gw()._profile_suffix()
-    return f"ai.hermes.gateway-{suffix}" if suffix else "ai.hermes.gateway"
+    return f"ai.eir.gateway-{suffix}" if suffix else "ai.eir.gateway"
 
 
 def _probe_launchd_domain_for_label(label: str) -> str:
@@ -64,7 +64,7 @@ def _launchd_domain() -> str:
 
     See #40831, #23387.
     """
-    # The cache lives on the facade: tests and callers reset ``hermes_cli.gateway._resolved_launchd_domain``.
+    # The cache lives on the facade: tests and callers reset ``eir_cli.gateway._resolved_launchd_domain``.
     gw = _gw()
     if gw._resolved_launchd_domain is None:
         gw._resolved_launchd_domain = _probe_launchd_domain_for_label(gw.get_launchd_label())
@@ -81,7 +81,7 @@ _LAUNCHD_JOB_UNLOADED_EXIT_CODES = frozenset({3, 113, 125})
 # services (macOS 26+). Only when the retry ALSO fails do callers degrade to a detached process.
 # launchctl returns 5 ("Input/output error") or a persistent 125 in two very different situations, so exit 5
 # is NOT on its own proof the domain is broken: 1. See #42914. 2. Here launchd cannot supervise the gateway
-# at all and we degrade to a detached background process (the `nohup hermes gateway run` workaround). See
+# at all and we degrade to a detached background process (the `nohup eir gateway run` workaround). See
 # #23387.
 _LAUNCHCTL_DOMAIN_UNSUPPORTED_CODES = frozenset({5, 125})
 
@@ -121,7 +121,7 @@ def _launchctl_bootstrap(domain: str, plist_path, label: str, *, timeout: int = 
 
 def _launchd_reload_log_path() -> Path:
     """Path the launchd reload watchdog tails for persistent-orphan detection."""
-    return _gw().get_hermes_home() / "logs" / "launchd-reload.log"
+    return _gw().get_eir_home() / "logs" / "launchd-reload.log"
 
 
 def _append_launchd_reload_log(message: str) -> None:
@@ -188,7 +188,7 @@ def _retry_launchctl_bootstrap_until_registered(
 # launchd-unsupported marker: written when the domain can't be managed (exit 5/125, macOS 26+) so
 # `launchd_status()` can explain missing supervision; cleared on successful bootstrap/kickstart.
 def _launchd_unsupported_marker_path() -> Path:
-    return _gw().get_hermes_home() / ".gateway-launchd-unsupported"
+    return _gw().get_eir_home() / ".gateway-launchd-unsupported"
 
 
 def _write_launchd_unsupported_marker() -> None:
@@ -213,12 +213,12 @@ def _launchd_unsupported_marker_exists() -> bool:
 
 
 def _gateway_run_command() -> list[str]:
-    from hermes_cli._launchers import runtime_command
-    from hermes_constants import get_default_hermes_root
+    from eir_cli._launchers import runtime_command
+    from eir_constants import get_default_eir_root
     # Every caller spawns an UNSUPERVISED child, which follows the sticky active_profile unless a
     # selector pins it (main._apply_profile_override): the root's replacement booted that profile.
     selector = shlex.split(_gw()._profile_arg())
-    if not selector and _gw().get_hermes_home().resolve() == get_default_hermes_root().resolve():
+    if not selector and _gw().get_eir_home().resolve() == get_default_eir_root().resolve():
         selector = ["--profile", "default"]
     return runtime_command(_gw().PROJECT_ROOT, [*selector, "gateway", "run", "--replace"],
                            python=_gw().get_python_path())
@@ -257,12 +257,12 @@ def launchd_program_arguments(command: list[str], stdout_log: Path, stderr_log: 
 
 def _timestamped_stderr_gateway_command(error_log: Path, *, external_supervisor: bool = False) -> list[str]:
     """Wrap gateway run so raw stderr lines are timestamped before file write. ``external_supervisor``
-    (launchd ProgramArguments only) adds ``--external-supervisor`` so ``hermes update`` hands back to
+    (launchd ProgramArguments only) adds ``--external-supervisor`` so ``eir update`` hands back to
     launchd, and drops ``--replace``: KeepAlive respawns would re-arm takeover, so two profiles sharing
     a token would kill each other forever.
 
     ``external_supervisor=True`` is for launchd ProgramArguments only: the inner ``gateway run`` must carry
-    ``--external-supervisor`` so ``hermes update`` sees the flag on the live grandchild argv and hands the
+    ``--external-supervisor`` so ``eir update`` sees the flag on the live grandchild argv and hands the
     process back to launchd instead of starting a detached watcher (#86893 / #87005). The detached nohup
     fallback stays unmarked.
     Supervised starts also drop ``--replace`` (issue #79048): a launchd service is respawned by KeepAlive,
@@ -272,7 +272,7 @@ def _timestamped_stderr_gateway_command(error_log: Path, *, external_supervisor:
     bootout+bootstrap in install/refresh), which run before supervision resumes. Mirrors
     ``generate_systemd_unit``, whose ExecStart also runs ``gateway run`` without ``--replace``.
     """
-    from hermes_cli._launchers import installation_command, runtime_command
+    from eir_cli._launchers import installation_command, runtime_command
     inner = _gw()._gateway_run_command()
     if external_supervisor:
         inner = installation_command(_gw().PROJECT_ROOT, [*shlex.split(_gw()._profile_arg()), "gateway", "run"],
@@ -282,7 +282,7 @@ def _timestamped_stderr_gateway_command(error_log: Path, *, external_supervisor:
             inner.append("--external-supervisor")
     command = installation_command if external_supervisor else runtime_command
     return command(_gw().PROJECT_ROOT, ["--error-log", str(error_log), "--", *inner],
-                   module="hermes_cli.stderr_timestamp", python=_gw().get_python_path())
+                   module="eir_cli.stderr_timestamp", python=_gw().get_python_path())
 
 
 def _spawn_detached_gateway() -> bool:
@@ -290,19 +290,19 @@ def _spawn_detached_gateway() -> bool:
     stdout → gateway.log, timestamped stderr → gateway.error.log, PID via gateway.pid so stop/status work.
 
     Used when launchctl can no longer bootstrap/kickstart the gateway on macOS 26+ (issue #23387). Mirrors
-    the `nohup hermes gateway run --replace` workaround but keeps it CLI-managed: stdout goes to
+    the `nohup eir gateway run --replace` workaround but keeps it CLI-managed: stdout goes to
     gateway.log, stderr is timestamped into gateway.error.log, and the PID is tracked via the gateway.pid
     file that `run_gateway` writes, so stop/status/restart keep working.
     """
-    from hermes_cli._subprocess_compat import windows_detach_popen_kwargs
-    from hermes_constants import get_hermes_home
+    from eir_cli._subprocess_compat import windows_detach_popen_kwargs
+    from eir_constants import get_eir_home
     from tools.environments.local import served_profile_child_env
-    log_dir = _gw().get_hermes_home() / "logs"
+    log_dir = _gw().get_eir_home() / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     child_env = served_profile_child_env(
-        target_home=get_hermes_home(), inherit_credentials=True,
+        target_home=get_eir_home(), inherit_credentials=True,
     )
-    child_env.pop("_HERMES_GATEWAY", None)
+    child_env.pop("_EIR_GATEWAY", None)
     try:
         with open(log_dir / "gateway.log", "ab") as out:
             subprocess.Popen(
@@ -320,17 +320,17 @@ def _spawn_detached_gateway() -> bool:
 def _launchd_fallback_to_detached(reason: str, *, exit_on_failure: bool = True) -> bool:
     """Start the gateway detached when launchd can't manage it; on failure print the manual workaround
     and (by default) exit 1."""
-    from hermes_constants import display_hermes_home as _dhh
+    from eir_constants import display_eir_home as _dhh
     _gw()._write_launchd_unsupported_marker()
     print(f"⚠ launchd cannot manage the gateway on this macOS version ({reason}).")
     if _gw()._spawn_detached_gateway():
         print("✓ Started gateway as a background process instead")
         print("  It will NOT auto-start at login or auto-restart on crash.")
         print(f"  Logs: {_dhh()}/logs/gateway.log")
-        print("  Stop it with: hermes gateway stop")
+        print("  Stop it with: eir gateway stop")
         return True
     _gw().print_error("Failed to start the gateway as a background process.")
-    print(f"  Try manually: nohup hermes gateway run --replace > {_dhh()}/logs/gateway.log 2>&1 &")
+    print(f"  Try manually: nohup eir gateway run --replace > {_dhh()}/logs/gateway.log 2>&1 &")
     if exit_on_failure:
         sys.exit(1)
     return False
@@ -354,13 +354,13 @@ def _launchd_degrade_or_raise(exc: subprocess.CalledProcessError, what: str) -> 
     if _gw()._launchctl_label_supervising_process(label):
         print(f"⚠ {what} failed (exit {exc.returncode}), but launchd still supervises {label}")
         print("  Not switching to the detached fallback — this host manages the job.")
-        print("  Apply the definition with: hermes gateway stop && hermes gateway install --force")
+        print("  Apply the definition with: eir gateway stop && eir gateway install --force")
         raise exc
     _launchd_fallback_to_detached(f"{what} exit {exc.returncode}")
 
 
 def service_path_prefix_entries() -> list[str]:
-    """The Hermes-owned PATH entries a generated definition puts BEFORE the invoking shell's PATH.
+    """The Eir-owned PATH entries a generated definition puts BEFORE the invoking shell's PATH.
 
     Both sources are deterministic — the venv/node bin dirs that exist on disk, and the pm-managed Node
     the target home's ``facts.json`` records — so the staleness check may compare them; only the shell
@@ -375,8 +375,8 @@ def generate_launchd_plist() -> str:
     from html import escape
     # Stable cwd anchor — never the volatile source checkout (same rot risk as systemd's WorkingDirectory).
     working_dir = _gw()._stable_service_working_dir()
-    hermes_home = str(_gw().get_hermes_home().resolve())
-    log_dir = _gw().get_hermes_home() / "logs"
+    eir_home = str(_gw().get_eir_home().resolve())
+    log_dir = _gw().get_eir_home() / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     label = _gw().get_launchd_label()
 
@@ -384,7 +384,7 @@ def generate_launchd_plist() -> str:
     # systemd unit) so node stays resolvable even if the shell PATH changes, then the shell PATH.
     priority_dirs = service_path_prefix_entries()
     # Only the prefix may carry a store Node: a refresh run inside the gateway inherits the old plist PATH.
-    store_node = str(_gw().get_hermes_home() / "tools" / "node-")
+    store_node = str(_gw().get_eir_home() / "tools" / "node-")
     shell_dirs = [p for p in os.environ.get("PATH", "").split(":") if p and not p.startswith(store_node)]
     sane_path = ":".join(dict.fromkeys(priority_dirs + shell_dirs))
 
@@ -396,14 +396,14 @@ def generate_launchd_plist() -> str:
         f"<string>{escape(part)}</string>" for part in launchd_program_arguments(command, stdout_log, stderr_log)
     )
 
-    from hermes_cli.gateway_bundled_env import launchd_bundled_env_xml
+    from eir_cli.gateway_bundled_env import launchd_bundled_env_xml
     bundled_env_xml = launchd_bundled_env_xml(_gw().get_launchd_plist_path())  # #85357
 
     # Persist the configured RLIMIT_NOFILE floor: launchd defaults to soft 256, and every plist
     # rewrite would otherwise strip a manual limit and reintroduce EMFILE crashes.
     nofile_block = ""
     try:
-        from hermes_cli.resource_limits import configured_nofile_soft_limit
+        from eir_cli.resource_limits import configured_nofile_soft_limit
         nofile_target = configured_nofile_soft_limit()
     except Exception:
         nofile_target = None
@@ -436,9 +436,9 @@ def generate_launchd_plist() -> str:
         <key>PATH</key>
         <string>{sane_path}</string>
 
-        <key>HERMES_HOME</key>
-        <string>{hermes_home}</string>
-        <key>HERMES_SUPERVISED_CHILD</key>
+        <key>EIR_HOME</key>
+        <string>{eir_home}</string>
+        <key>EIR_SUPERVISED_CHILD</key>
         <string>1</string>{bundled_env_xml}
     </dict>
 
@@ -485,13 +485,13 @@ def generate_launchd_plist() -> str:
 """
 
 
-# The generated PATH is ``<Hermes-owned prefix> + $PATH``; only the tail is environment-derived.
+# The generated PATH is ``<Eir-owned prefix> + $PATH``; only the tail is environment-derived.
 _PLIST_PATH_PATTERN = r"(<key>PATH</key>\s*<string>)(.*?)(</string>)"
-_PLIST_PATH_TAIL = "__HERMES_SHELL_PATH__"
+_PLIST_PATH_TAIL = "__EIR_SHELL_PATH__"
 
 
 def normalize_plist_path_for_comparison(text: str) -> str:
-    """Mask only the shell-derived PATH tail so the Hermes-owned prefix stays comparable.
+    """Mask only the shell-derived PATH tail so the Eir-owned prefix stays comparable.
 
     Blanking the whole payload (the previous rule) also hid the pm-managed Node dir, so a Node update
     left the installed plist "current" forever (#144735).
@@ -500,7 +500,7 @@ def normalize_plist_path_for_comparison(text: str) -> str:
     from html import unescape
 
     keep = len(service_path_prefix_entries())
-    managed_node_prefix = str(_gw().get_hermes_home() / "tools" / "node-")
+    managed_node_prefix = str(_gw().get_eir_home() / "tools" / "node-")
 
     def _mask(match: re.Match[str]) -> str:
         entries = [part for part in match.group(2).split(":") if part]
@@ -619,8 +619,8 @@ def _rewrite_stale_launchd_plist() -> bool:
     if not plist_path.exists() or _gw().launchd_plist_is_current():
         return False
     # Runs on every gateway start/restart: a plist pinning another home is another install's gateway.
-    from hermes_cli.gateway_service_owner import definition_belongs_to_home
-    if not definition_belongs_to_home(plist_path, _gw().get_hermes_home(), "rewrite"):
+    from eir_cli.gateway_service_owner import definition_belongs_to_home
+    if not definition_belongs_to_home(plist_path, _gw().get_eir_home(), "rewrite"):
         return False
 
     new_plist = _gw().generate_launchd_plist()
@@ -641,7 +641,7 @@ def refresh_unloaded_launchd_plist() -> bool:
         return False
     if not _rewrite_stale_launchd_plist():
         return False
-    print(f"  ↻ Updated {_gw().get_launchd_plist_path().name} to match the current Hermes install")
+    print(f"  ↻ Updated {_gw().get_launchd_plist_path().name} to match the current Eir install")
     return True
 
 
@@ -689,7 +689,7 @@ def refresh_launchd_plist_if_needed() -> bool:
             target, int(_reload_budget), _launchd_reload_log_path(),
         )
         return False
-    print("↻ Updated gateway launchd service definition to match the current Hermes install")
+    print("↻ Updated gateway launchd service definition to match the current Eir install")
     return True
 
 
@@ -697,8 +697,8 @@ def launchd_install(force: bool = False, *, start_now: bool = True, force_unit_p
     plist_path = _gw().get_launchd_plist_path()
     label = _gw().get_launchd_label()
     # A plist pinning another home is another install's gateway, --force included; --force-unit-path repoints.
-    from hermes_cli.gateway_service_owner import definition_belongs_to_home
-    if not force_unit_path and not definition_belongs_to_home(plist_path, _gw().get_hermes_home(), "overwrite"):
+    from eir_cli.gateway_service_owner import definition_belongs_to_home
+    if not force_unit_path and not definition_belongs_to_home(plist_path, _gw().get_eir_home(), "overwrite"):
         sys.exit(1)
     # Loading the plist starts the gateway (RunAtLoad), so a no-start install writes it without
     # loading it. A gateway that launchd already runs is still reloaded; this install did not start it.
@@ -721,11 +721,11 @@ def launchd_install(force: bool = False, *, start_now: bool = True, force_unit_p
             else:
                 # The plist was rewritten but launchd never registered it (or the write was refused):
                 # a success line here would hide an unloaded service with no KeepAlive.
-                from hermes_constants import display_hermes_home
+                from eir_constants import display_eir_home
                 print(
                     "⚠ Service definition could not be reloaded with launchd. "
-                    "Run 'hermes gateway install --force' or check "
-                    f"{display_hermes_home()}/logs/launchd-reload.log for details."
+                    "Run 'eir gateway install --force' or check "
+                    f"{display_eir_home()}/logs/launchd-reload.log for details."
                 )
             return
 
@@ -739,7 +739,7 @@ def launchd_install(force: bool = False, *, start_now: bool = True, force_unit_p
 
     if not load:
         # A job left loaded but idle (a parked clean exit) keeps its old definition, and that is
-        # what `hermes gateway start` would kickstart instead of loading this plist.
+        # what `eir gateway start` would kickstart instead of loading this plist.
         subprocess.run(
             ["launchctl", "bootout", f"{_gw()._launchd_domain()}/{label}"],
             check=False, timeout=90, **_gw()._CAPTURE_TEXT)
@@ -747,8 +747,8 @@ def launchd_install(force: bool = False, *, start_now: bool = True, force_unit_p
         print("✓ Service installed, not started (launchd starts it at your next login)")
         print()
         print("Next steps:")
-        print("  hermes gateway start              # Start it now")
-        print("  hermes gateway status             # Check status")
+        print("  eir gateway start              # Start it now")
+        print("  eir gateway status             # Check status")
         return
 
     if force_old_pid is not None:
@@ -777,8 +777,8 @@ def launchd_install(force: bool = False, *, start_now: bool = True, force_unit_p
     _gw()._clear_launchd_unsupported_marker()
     print()
     print("Next steps:")
-    print("  hermes gateway status             # Check status")
-    from hermes_constants import display_hermes_home as _dhh
+    print("  eir gateway status             # Check status")
+    from eir_constants import display_eir_home as _dhh
     print(f"  tail -f {_dhh()}/logs/gateway.log  # View logs")
 
 
@@ -851,7 +851,7 @@ def launchd_stop():
     gateway_service_owner.refuse_foreign_launchd_plist("stop")
     target = f"{_launchd_domain()}/{get_launchd_label()}"
     _gw()._mark_planned_stop()
-    # bootout unloads the definition so KeepAlive doesn't respawn; `hermes gateway start` re-bootstraps.
+    # bootout unloads the definition so KeepAlive doesn't respawn; `eir gateway start` re-bootstraps.
     try:
         # Captured: an already-unloaded job (3/113/125) is handled below, so launchctl's own
         # "Boot-out failed: 3" must not print around the ✓ line; e.stderr stays on the raised error.
@@ -909,12 +909,12 @@ def launchd_restart() -> int | None:
             return
         if pid is not None and _gw().probe_gateway_loop_liveness(pid) == _gw().GATEWAY_LOOP_WEDGED:
             # Event loop provably dead: it can't process a graceful shutdown, so a full drain wait
-            # only stalls the restart (and `hermes update`). Bounded SIGTERM → SIGKILL, ~10s.
+            # only stalls the restart (and `eir update`). Bounded SIGTERM → SIGKILL, ~10s.
             print(f"⚠ Gateway PID {pid} event loop is unresponsive — " "skipping drain and forcing a bounded stop...")
             _gw()._escalate_wedged_gateway(pid)
             pid = None
-        from hermes_cli.update_cmd_drain_report import leave_restart_pending
-        from hermes_cli.update_cmd_posix_pause import is_left_pending
+        from eir_cli.update_cmd_drain_report import leave_restart_pending
+        from eir_cli.update_cmd_posix_pause import is_left_pending
         if pid is not None and is_left_pending(pid) and leave_restart_pending(pid, f"Gateway PID {pid}", start_time=born):
             return pid  # the update's pause already waited it out
         if pid is not None:
@@ -923,7 +923,7 @@ def launchd_restart() -> int | None:
             # surfaces with no other feedback (desktop updater) read silence as "update stuck".
             wait_budget = _gw()._get_restart_exit_wait_budget()
             print(f"→ Stopping gateway (PID {pid}) — draining in-flight runs (up to {wait_budget:.0f}s)...")
-            from hermes_cli.update_cmd_drain_report import drain_progress_reporter
+            from eir_cli.update_cmd_drain_report import drain_progress_reporter
             if _gw()._graceful_restart_via_sigusr1(pid, wait_budget, on_progress=drain_progress_reporter(budget_s=wait_budget)):
                 # KeepAlive revives a planned exit, so do NOT kickstart (-k would kill the replacement) —
                 # but a clean exit doesn't prove supervision, so verify a replacement PID appears first.
@@ -1026,7 +1026,7 @@ def launchd_status(deep: bool = False):
     # `launchctl list` exits 0 for any registered definition (even `state = not running`); only a PID proves a process.
     launchd_pid = _gw()._parse_launchd_pid_from_list_output(list_output) if service_listed else None
 
-    # Hermes PID may be a detached fallback process; when launchd IS supervising both PIDs match — don't double-count.
+    # Eir PID may be a detached fallback process; when launchd IS supervising both PIDs match — don't double-count.
     from gateway.status import get_running_pid
     fallback_pid = get_running_pid(cleanup_stale=False)
     if launchd_pid is not None and fallback_pid == launchd_pid:
@@ -1037,15 +1037,15 @@ def launchd_status(deep: bool = False):
 
     print(f"Launchd plist: {plist_path}")
     if _gw().launchd_plist_is_current():
-        print("✓ Service definition matches the current Hermes install")
+        print("✓ Service definition matches the current Eir install")
     else:
-        print("⚠ Service definition is stale relative to the current Hermes install")
-        print("  Run: hermes gateway start")
+        print("⚠ Service definition is stale relative to the current Eir install")
+        print("  Run: eir gateway start")
 
     if not service_listed:
         print("✗ Gateway service is not loaded")
         print("  Service definition exists locally but launchd has not loaded it.")
-        print("  Run: hermes gateway start")
+        print("  Run: eir gateway start")
         if fallback_pid:
             print(f"  Note: a detached gateway process is running (PID {fallback_pid})")
     elif launchd_pid is not None:
@@ -1058,10 +1058,10 @@ def launchd_status(deep: bool = False):
         print("  launchd cannot manage the gateway on this macOS version.")
         if fallback_pid:
             print(f"✓ Detached fallback process is running (PID {fallback_pid})")
-            print("  Cron jobs will fire. Stop with: hermes gateway stop")
+            print("  Cron jobs will fire. Stop with: eir gateway stop")
         else:
             print("✗ No fallback process is running")
-            print("  Run: hermes gateway start")
+            print("  Run: eir gateway start")
         print("  ⚠ Auto-start at login and auto-restart on crash are NOT available.")
     else:
         print("✓ Gateway service is registered with launchd")
@@ -1070,7 +1070,7 @@ def launchd_status(deep: bool = False):
             print(f"  Detached gateway process is running (PID {fallback_pid})")
 
     if deep:
-        log_file = _gw().get_hermes_home() / "logs" / "gateway.log"
+        log_file = _gw().get_eir_home() / "logs" / "gateway.log"
         if log_file.exists():
             print()
             print("Recent logs:")

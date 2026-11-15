@@ -2,7 +2,7 @@
 to that Foundry endpoint, never the Claude Code OAuth token the ``anthropic`` credential pool seeds
 (#154242), neither at resolution nor when a 429/401 rotates the attached pool.
 
-Real pool: the test's HERMES_HOME holds config.yaml and auth.json, and a temporary
+Real pool: the test's EIR_HOME holds config.yaml and auth.json, and a temporary
 CLAUDE_CONFIG_DIR holds the Claude Code login that ``load_pool("anthropic")`` seeds.
 """
 
@@ -12,7 +12,7 @@ import json
 
 import pytest
 
-from hermes_cli import runtime_provider as rp
+from eir_cli import runtime_provider as rp
 
 FOUNDRY_URL = "https://myres.services.ai.azure.com/anthropic"
 OAUTH_TOKEN = "sk-ant-" + "oat01-" + "c" * 24  # concatenated: push protection rejects token-shaped literals
@@ -20,8 +20,8 @@ OAUTH_TOKEN = "sk-ant-" + "oat01-" + "c" * 24  # concatenated: push protection r
 
 @pytest.fixture
 def home(tmp_path, monkeypatch):
-    """The test HERMES_HOME with a Claude Code login present and no ambient Anthropic/Azure keys."""
-    from hermes_constants import get_hermes_home
+    """The test EIR_HOME with a Claude Code login present and no ambient Anthropic/Azure keys."""
+    from eir_constants import get_eir_home
     for name in ("ANTHROPIC_API_KEY", "ANTHROPIC_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "AZURE_ANTHROPIC_KEY",
                  "ANTHROPIC_BASE_URL"):
         monkeypatch.delenv(name, raising=False)
@@ -30,7 +30,7 @@ def home(tmp_path, monkeypatch):
     (claude_dir / ".credentials.json").write_text(json.dumps({"claudeAiOauth": {
         "accessToken": OAUTH_TOKEN, "refreshToken": "r", "expiresAt": 4102444800000}}))
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(claude_dir))
-    return get_hermes_home()
+    return get_eir_home()
 
 
 def write_home(home, *, rows=(), extra=None, **model):
@@ -61,7 +61,7 @@ def test_foundry_model_api_key_wins_over_the_claude_code_login(home):
 
 
 def test_foundry_azure_env_key_wins_without_an_explicit_request(home, monkeypatch):
-    """``hermes chat`` passes no ``--provider``: the saved provider takes the same path."""
+    """``eir chat`` passes no ``--provider``: the saved provider takes the same path."""
     monkeypatch.setenv("AZURE_ANTHROPIC_KEY", "KAZ-ENV")
     write_home(home, base_url=FOUNDRY_URL)
     runtime = rp.resolve_runtime_provider()
@@ -77,7 +77,7 @@ def test_foundry_endpoint_without_any_azure_key_fails_loudly(home):
 def test_foundry_bound_pool_row_is_chosen_even_when_the_oauth_row_ranks_first(home):
     """Manual rows rank first, so put the OAuth row ahead explicitly: selection must still reach the Foundry key."""
     write_home(home, base_url=FOUNDRY_URL, rows=[
-        {"access_token": OAUTH_TOKEN, "auth_type": "oauth", "source": "manual:hermes_pkce"},
+        {"access_token": OAUTH_TOKEN, "auth_type": "oauth", "source": "manual:eir_pkce"},
         {"access_token": "KAZ-POOL", "base_url": FOUNDRY_URL}])
     runtime = rp.resolve_runtime_provider(requested="anthropic")
     assert (runtime["api_key"], runtime["base_url"]) == ("KAZ-POOL", FOUNDRY_URL)
@@ -96,7 +96,7 @@ def test_recovery_pool_attached_to_a_foundry_session_holds_only_foundry_rows(hom
 
 
 def test_pool_key_recorded_for_another_origin_never_follows_model_base_url_to_foundry(home):
-    """``hermes auth add anthropic`` records api.anthropic.com (an unrecorded row means it too):
+    """``eir auth add anthropic`` records api.anthropic.com (an unrecorded row means it too):
     a later Foundry ``model.base_url`` is another host."""
     write_home(home, base_url=FOUNDRY_URL, api_key="KAZ", rows=[
         {"access_token": "CONSOLE", "base_url": "https://api.anthropic.com"}, {"access_token": "UNRECORDED"}])

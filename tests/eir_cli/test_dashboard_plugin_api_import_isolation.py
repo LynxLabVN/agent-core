@@ -8,15 +8,15 @@ execute in-process, registered in ``sys.modules`` while the body runs and remove
 import sys
 from unittest.mock import patch
 
-import hermes_yaml as yaml
+import eir_yaml as yaml
 import pytest
 from fastapi import FastAPI
 
-from hermes_cli import web_server_dashboard as dashboard
-from hermes_constants import get_hermes_home
+from eir_cli import web_server_dashboard as dashboard
+from eir_constants import get_eir_home
 
 NAME = "isoprobe"
-MODULE = f"hermes_dashboard_plugin_{NAME}"
+MODULE = f"eir_dashboard_plugin_{NAME}"
 # The body records whether it ran registered in sys.modules; a 'raise' file next to it makes it fail.
 API = (
     "import sys\n"
@@ -32,7 +32,7 @@ API = (
 
 
 def _plugin(tmp_path, isolation, source):
-    (get_hermes_home() / "config.yaml").write_text(
+    (get_eir_home() / "config.yaml").write_text(
         yaml.safe_dump({"plugins": {"isolation": isolation, "enabled": [NAME]}}), encoding="utf-8")
     dash = tmp_path / NAME / "dashboard"
     dash.mkdir(parents=True)
@@ -88,7 +88,7 @@ def test_non_python_api_file_is_skipped_without_a_warning(tmp_path, caplog):
     (dash / "plugin_api.py").rename(dash / "plugin_api.txt")
     plugin["_api_file"] = "plugin_api.txt"
 
-    with caplog.at_level("DEBUG", logger="hermes_cli"):
+    with caplog.at_level("DEBUG", logger="eir_cli"):
         app, mounted, hosted = _mount(plugin)
 
     assert mounted is False

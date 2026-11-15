@@ -4,8 +4,8 @@ the same way, live or already reaped, or the next bot click resolves the archive
 "Waking up" (#139779)."""
 import pytest
 
-import hermes_state_runtime as rt
-from hermes_state import SessionDB
+import eir_state_runtime as rt
+from eir_state import SessionDB
 
 
 @pytest.mark.parametrize('reaped', [False, True])
@@ -41,12 +41,12 @@ async def test_delivery_after_archive_of_delivery_minted_bot_chat_mints_fresh(hi
     ``admission_conflict`` (visible) nor re-title the archived row (hidden) (#139779)."""
     from gateway import run
     from gateway.session_bot import _target
-    from hermes_constants import get_hermes_home
+    from eir_constants import get_eir_home
     from tests.gateway.test_follow_profile_followups import _profile
     from tests.gateway.test_session_follow_profile_config import _owner
-    home = get_hermes_home()
+    home = get_eir_home()
     home.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setattr(run, '_hermes_home', home)
+    monkeypatch.setattr(run, '_eir_home', home)
     _profile(home, 'm', 1, 'k')
     store, runner, authority, owner = _owner(home)
     runner._peek_session_state = lambda key: None

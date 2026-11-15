@@ -1,11 +1,11 @@
-"""Tests for hermes_cli.model_normalize — provider-aware model name normalization.
+"""Tests for eir_cli.model_normalize — provider-aware model name normalization.
 
 Covers issue #5211: opencode-go model names with dots (e.g. minimax-m2.7)
 must NOT be mangled to hyphens (minimax-m2-7).
 """
 import pytest
 
-from hermes_cli.model_normalize import (
+from eir_cli.model_normalize import (
     normalize_model_for_provider,
     _normalize_for_deepseek,
 )
@@ -167,7 +167,7 @@ class TestIssue78796NvidiaPrefixRepair:
 
 
 class TestColonProviderPrefixIsStrippedLikeSlash:
-    """Issue #64787: ``-m openai-codex:gpt-5.6-sol`` (Hermes's own ``provider:model`` switch syntax)
+    """Issue #64787: ``-m openai-codex:gpt-5.6-sol`` (Eir's own ``provider:model`` switch syntax)
     reached the Codex wire with the prefix attached and got HTTP 400. A matching ``provider:`` prefix
     must normalize exactly like ``provider/``; a later colon (Ollama tags) is never a separator."""
 
@@ -175,7 +175,7 @@ class TestColonProviderPrefixIsStrippedLikeSlash:
         """Production path: ``AIAgent(model="openai-codex:gpt-5.6-sol", provider="openai-codex")`` —
         the form that survives ``-m provider:model --provider X``, programmatic construction and
         gateway config — must leave ``agent.model`` without the prefix (agent/agent_init.py)."""
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("EIR_HOME", str(tmp_path))
         (tmp_path / ".env").write_text("", encoding="utf-8")
         (tmp_path / "config.yaml").write_text("{}\n", encoding="utf-8")
         from run_agent import AIAgent

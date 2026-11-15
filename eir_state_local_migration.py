@@ -3,13 +3,13 @@ import functools
 import json
 import time
 
-from hermes_state_runtime import RuntimeStoreError, _json
+from eir_state_runtime import RuntimeStoreError, _json
 
 LEGACY_PREFIX = 'gateway.local_legacy.v1:'
 
 
 # Sources the pre-authority local CLI/TUI/GUI wrote. ``oneshot`` (finite ``chat -q`` / ``-z``) and ``tool``
-# (``chat --source tool``) are CLI runs that printed ``hermes --resume <id>``: adopted for resume like
+# (``chat --source tool``) are CLI runs that printed ``eir --resume <id>``: adopted for resume like
 # ``cli`` and keeping their label, so human pickers still hide them (INTERNAL_LISTING_SOURCES).
 # ``desktop`` is the label main's Desktop stored; it is adopted as the ``gui`` creation source.
 # ``acp`` is main's in-process editor server (Zed, VS Code, JetBrains): adopted under its own source.
@@ -26,8 +26,8 @@ NOT_CLIENT_LABELS = frozenset({'cron', 'subagent', 'kanban', 'bot_room', 'a2a', 
 
 @functools.lru_cache(maxsize=1)
 def _messaging_labels():
-    """Every platform Hermes ships: the enum and the bundled platform plugins. A runtime-registered
-    catalog plugin (hermes-mobile's ``mobile``) is not in it: its rows are routed, which excludes them."""
+    """Every platform Eir ships: the enum and the bundled platform plugins. A runtime-registered
+    catalog plugin (eir-mobile's ``mobile``) is not in it: its rows are routed, which excludes them."""
     from gateway.config import Platform
     bundled, aliases = Platform._scan_bundled_plugin_platforms()
     return frozenset({platform.value for platform in Platform} | set(bundled) | set(aliases))
@@ -47,10 +47,10 @@ def client_label(source):
 def client_history_row(row):
     """A chat a client app wrote under its own label before ``session.create`` took only surfaces.
 
-    The pre-authority ``hermes serve`` stored whatever ``source`` a client sent, so phone apps signed
+    The pre-authority ``eir serve`` stored whatever ``source`` a client sent, so phone apps signed
     in through the dashboard login left routeless rows labelled ``mobile``, ``ios`` and the like. They
     are the owner's Desktop-style chats: adopted as ``gui``. A routed row is never one, which keeps a
-    plugin platform sharing the label (hermes-mobile registers ``mobile``) on its messaging route."""
+    plugin platform sharing the label (eir-mobile registers ``mobile``) on its messaging route."""
     return client_label(row.get('source')) and not any(row.get(k) for k in ('session_key', 'chat_id', 'origin_json'))
 
 
@@ -74,9 +74,9 @@ def legacy_account_label(row):
 def login_owned_by(row, subject):
     """Whether *subject* owns the login stamp a served dashboard put on this row.
 
-    Older ``hermes serve`` builds stamped the WS-upgrade login as ``<provider>:<user id>``
+    Older ``eir serve`` builds stamped the WS-upgrade login as ``<provider>:<user id>``
     (tui_gateway/session_transports.py), and the gateway stored a Webapp login as its
-    ``auth:v1:[...]`` subject. Hermes is single-user and sign-in is owner-only, so both name the
+    ``auth:v1:[...]`` subject. Eir is single-user and sign-in is owner-only, so both name the
     machine owner: the host owner's subject adopts them (gateway.owner_identity.same_owner).
     """
     user_id = row.get('user_id')
@@ -108,14 +108,14 @@ def bind_legacy_target(db, conn, receipt):
     if row is None:
         raise RuntimeStoreError('not_found')
     validate_legacy_row(db, dict(row), subject=receipt['principal_id'])
-    from hermes_state_mutation_binding import BINDING_PREFIX, binding_names
+    from eir_state_mutation_binding import BINDING_PREFIX, binding_names
     imported = conn.execute('SELECT value FROM state_meta WHERE key=?', (BINDING_PREFIX + target,)).fetchone()
     if imported and not binding_names(imported[0], receipt['principal_id']):
         raise RuntimeStoreError('permission_denied')
-    from hermes_state_compression import _CHAIN_STEP_SQL
+    from eir_state_compression import _CHAIN_STEP_SQL
     if conn.execute(_CHAIN_STEP_SQL, (target,)).fetchone() is not None:
         raise RuntimeStoreError('admission_conflict')
-    from hermes_state_mutation_guards import require_idle
+    from eir_state_mutation_guards import require_idle
     require_idle(db, conn, [target])
     root = db._session_turn_lease_key_on_conn(conn, target)
     if conn.execute('SELECT 1 FROM session_turn_leases WHERE conversation_id=? AND expires_at>?',

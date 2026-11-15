@@ -17,7 +17,7 @@ import {
   relativeTime,
   Tip,
   useI18n
-} from '@hermes/plugin-sdk'
+} from '@eir/plugin-sdk'
 import { type ComponentProps, type FormEvent, type ReactNode, useLayoutEffect, useReducer, useSyncExternalStore } from 'react'
 
 import type { GroupReasonMessages } from './group-reason-locales'

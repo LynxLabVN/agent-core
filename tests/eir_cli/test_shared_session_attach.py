@@ -8,7 +8,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 
-from hermes_cli.active_sessions import try_acquire_active_session
+from eir_cli.active_sessions import try_acquire_active_session
 
 
 def test_discovery_uses_exact_profile_and_owner_handshake(tmp_path):
@@ -16,7 +16,7 @@ def test_discovery_uses_exact_profile_and_owner_handshake(tmp_path):
     import hmac as hmac_mod
     from urllib.parse import parse_qs, urlsplit
 
-    from hermes_cli.shared_session_attach import discover_attach_url
+    from eir_cli.shared_session_attach import discover_attach_url
 
     home = tmp_path / "profile"
     other = tmp_path / "other"
@@ -29,7 +29,7 @@ def test_discovery_uses_exact_profile_and_owner_handshake(tmp_path):
             params = parse_qs(urlsplit(self.path).query)
             proof = hmac_mod.new(
                 lease.lease_id.encode(),
-                (f"hermes-session-attach:{params['session_id'][0]}:{params['nonce'][0]}:"
+                (f"eir-session-attach:{params['session_id'][0]}:{params['nonce'][0]}:"
                  f"{reply['profile_home']}:{reply['websocket_url']}").encode(),
                 hashlib.sha256,
             ).hexdigest()
@@ -59,10 +59,10 @@ def test_discovery_uses_exact_profile_and_owner_handshake(tmp_path):
         assert requests == []
         assert discover_attach_url("same-id", registry_home=home) == reply["websocket_url"]
         assert len(requests) == 1
-        from hermes_cli.shared_session_attach import configure_tui_attachment
-        env = {"HERMES_TUI_GATEWAY_URL": "   "}
+        from eir_cli.shared_session_attach import configure_tui_attachment
+        env = {"EIR_TUI_GATEWAY_URL": "   "}
         configure_tui_attachment(env, "same-id", registry_home=home)
-        assert env["HERMES_TUI_GATEWAY_URL"] == reply["websocket_url"]
+        assert env["EIR_TUI_GATEWAY_URL"] == reply["websocket_url"]
         reply["profile_home"] = str(other.resolve())
         with pytest.raises(ValueError, match="identity"):
             discover_attach_url("same-id", registry_home=home)
@@ -78,8 +78,8 @@ def test_discovery_uses_exact_profile_and_owner_handshake(tmp_path):
 
 
 def test_discovery_refuses_unsupported_owner_without_releasing_lease(tmp_path, monkeypatch):
-    from hermes_cli.shared_session_attach import discover_attach_url
-    from hermes_cli.active_sessions import active_session_registry_snapshot
+    from eir_cli.shared_session_attach import discover_attach_url
+    from eir_cli.active_sessions import active_session_registry_snapshot
 
     lease, error = try_acquire_active_session(
         session_id="old", surface="desktop", config={}, registry_home=tmp_path,
@@ -89,13 +89,13 @@ def test_discovery_refuses_unsupported_owner_without_releasing_lease(tmp_path, m
         with pytest.raises(ValueError, match="not available in this build") as caught:
             discover_attach_url("old", registry_home=tmp_path)
         first, details = str(caught.value).splitlines()
-        assert "hermes --resume old" in first
+        assert "eir --resume old" in first
         assert details.startswith("Details: ")
         assert active_session_registry_snapshot(tmp_path)[0]["lease_id"] == lease.lease_id
         registry = tmp_path / "runtime" / "active_sessions.json"
         with monkeypatch.context() as patch:
             # Our own pid is never probed (#108005), so model a FOREIGN owner whose inspection is denied.
-            from hermes_cli.active_sessions import _read_entries, _write_entries
+            from eir_cli.active_sessions import _read_entries, _write_entries
             entries = _read_entries(registry)
             entries[0]["pid"] = os.getpid() + 2**22
             _write_entries(registry, entries)
@@ -113,7 +113,7 @@ def test_discovery_refuses_unsupported_owner_without_releasing_lease(tmp_path, m
 
 def test_discovery_failure_message_names_state_and_resume_path(tmp_path):
     """A refused handshake keeps the lease and points at the working alternative."""
-    from hermes_cli.shared_session_attach import discover_attach_url
+    from eir_cli.shared_session_attach import discover_attach_url
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
@@ -136,7 +136,7 @@ def test_discovery_failure_message_names_state_and_resume_path(tmp_path):
         with pytest.raises(ValueError, match="just failed") as caught:
             discover_attach_url("held", registry_home=tmp_path)
         first, details = str(caught.value).splitlines()
-        assert "hermes --resume held" in first
+        assert "eir --resume held" in first
         assert details.startswith("Details: ")
     finally:
         lease.release()
@@ -150,7 +150,7 @@ def test_discovery_refuses_a_listener_that_only_echoes_the_request(tmp_path):
     must demand proof of a secret the listener cannot learn from the request."""
     from urllib.parse import parse_qs, urlsplit
 
-    from hermes_cli.shared_session_attach import discover_attach_url
+    from eir_cli.shared_session_attach import discover_attach_url
 
     extra = {}
 
@@ -203,7 +203,7 @@ def test_the_request_never_discloses_the_lease_id(tmp_path):
     import hmac as hmac_mod
     from urllib.parse import parse_qs, urlsplit
 
-    from hermes_cli.shared_session_attach import discover_attach_url
+    from eir_cli.shared_session_attach import discover_attach_url
 
     requests = []
     reply = {}
@@ -214,7 +214,7 @@ def test_the_request_never_discloses_the_lease_id(tmp_path):
             params = parse_qs(urlsplit(self.path).query)
             proof = hmac_mod.new(
                 lease.lease_id.encode(),
-                (f"hermes-session-attach:{params['session_id'][0]}:{params['nonce'][0]}:"
+                (f"eir-session-attach:{params['session_id'][0]}:{params['nonce'][0]}:"
                  f"{reply['profile_home']}:{reply['websocket_url']}").encode(),
                 hashlib.sha256,
             ).hexdigest()
@@ -249,7 +249,7 @@ def test_the_request_never_discloses_the_lease_id(tmp_path):
         # The documented request MAC, so the server side (#113486) can verify it.
         assert sent["client_proof"][0] == hmac_mod.new(
             lease.lease_id.encode(),
-            f"hermes-session-attach-request:quiet:{sent['nonce'][0]}".encode(),
+            f"eir-session-attach-request:quiet:{sent['nonce'][0]}".encode(),
             hashlib.sha256,
         ).hexdigest()
     finally:
@@ -288,8 +288,8 @@ def _rogue_server():
 
 def test_e2e_tui_attachment_refuses_a_rogue_owner_and_keeps_the_env(tmp_path):
     """configure_tui_attachment is the exact seam _launch_tui calls: a rogue
-    listener must leave HERMES_TUI_GATEWAY_URL unset and raise."""
-    from hermes_cli.shared_session_attach import configure_tui_attachment
+    listener must leave EIR_TUI_GATEWAY_URL unset and raise."""
+    from eir_cli.shared_session_attach import configure_tui_attachment
 
     server, thread, origin = _rogue_server()
     lease, error = try_acquire_active_session(
@@ -301,7 +301,7 @@ def test_e2e_tui_attachment_refuses_a_rogue_owner_and_keeps_the_env(tmp_path):
         env = {}
         with pytest.raises(ValueError, match="identity"):
             configure_tui_attachment(env, "prey", registry_home=tmp_path)
-        assert "HERMES_TUI_GATEWAY_URL" not in env
+        assert "EIR_TUI_GATEWAY_URL" not in env
     finally:
         lease.release()
         server.shutdown()
@@ -310,9 +310,9 @@ def test_e2e_tui_attachment_refuses_a_rogue_owner_and_keeps_the_env(tmp_path):
 
 
 def test_e2e_launch_tui_exits_cleanly_against_a_rogue_listener(tmp_path, monkeypatch, capsys):
-    """hermes --resume against a hijacked port: the refusal reaches the user as
+    """eir --resume against a hijacked port: the refusal reaches the user as
     Error + exit 1, before any TUI child is spawned."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
 
     server, thread, origin = _rogue_server()
     lease, error = try_acquire_active_session(
@@ -321,7 +321,7 @@ def test_e2e_launch_tui_exits_cleanly_against_a_rogue_listener(tmp_path, monkeyp
     )
     assert error is None
     try:
-        from hermes_cli.main_tui_launch import _launch_tui
+        from eir_cli.main_tui_launch import _launch_tui
         with pytest.raises(SystemExit) as caught:
             _launch_tui(resume_session_id="prey")
         assert caught.value.code == 1
@@ -337,7 +337,7 @@ def test_e2e_launch_tui_exits_cleanly_against_a_rogue_listener(tmp_path, monkeyp
 def test_registry_entries_are_never_readable_by_other_users(tmp_path):
     """The registry carries the lease ids that key the attach MACs, so every
     write must leave the file and its directory closed to other users."""
-    from hermes_cli.active_sessions import _read_entries, _write_entries
+    from eir_cli.active_sessions import _read_entries, _write_entries
 
     lease, error = try_acquire_active_session(
         session_id="locked", surface="desktop", config={}, registry_home=tmp_path,
@@ -360,7 +360,7 @@ def test_registry_entries_are_never_readable_by_other_users(tmp_path):
 def test_a_loose_registry_is_closed_on_read_without_a_write(tmp_path):
     """Attach discovery only reads: a registry an older build left world-readable
     must not stay readable until some later acquire/release rewrites it."""
-    from hermes_cli.active_sessions import active_session_registry_snapshot
+    from eir_cli.active_sessions import active_session_registry_snapshot
 
     lease, error = try_acquire_active_session(
         session_id="old-build", surface="desktop", config={}, registry_home=tmp_path,
@@ -379,11 +379,11 @@ def test_a_loose_registry_is_closed_on_read_without_a_write(tmp_path):
 
 @pytest.mark.platforms("posix")  # POSIX file modes
 def test_shared_group_home_keeps_group_access_and_setgid(tmp_path):
-    """The NixOS module runs Hermes with UMask 0007 under a setgid 2770 HERMES_HOME so
-    hermes-group users share session fencing. Hardening against other users must only
+    """The NixOS module runs Eir with UMask 0007 under a setgid 2770 EIR_HOME so
+    eir-group users share session fencing. Hardening against other users must only
     strip the 'other' bits: squashing to owner-only locks group members out of
     active_sessions.lock, and their CLI/gateway then run with no lease at all."""
-    from hermes_cli.active_sessions import _read_entries, _write_entries
+    from eir_cli.active_sessions import _read_entries, _write_entries
 
     home = tmp_path / "shared"
     home.mkdir()
@@ -425,7 +425,7 @@ def test_discovery_refuses_a_relay_that_swaps_the_websocket(tmp_path):
     import hmac as hmac_mod
     from urllib.parse import parse_qs, urlsplit
 
-    from hermes_cli.shared_session_attach import discover_attach_url
+    from eir_cli.shared_session_attach import discover_attach_url
 
     home = tmp_path / "profile"
     swap = {"on": False}
@@ -437,7 +437,7 @@ def test_discovery_refuses_a_relay_that_swaps_the_websocket(tmp_path):
             genuine = f"ws://127.0.0.1:{port}/api/ws?token=real"
             proof = hmac_mod.new(
                 lease.lease_id.encode(),
-                (f"hermes-session-attach:{params['session_id'][0]}:{params['nonce'][0]}:"
+                (f"eir-session-attach:{params['session_id'][0]}:{params['nonce'][0]}:"
                  f"{params['profile_home'][0]}:{genuine}").encode(),
                 hashlib.sha256,
             ).hexdigest()
@@ -486,7 +486,7 @@ def test_discovery_refuses_a_listener_that_reads_the_registry_as_another_user(tm
     import hmac as hmac_mod
     from urllib.parse import parse_qs, urlsplit
 
-    from hermes_cli.shared_session_attach import discover_attach_url
+    from eir_cli.shared_session_attach import discover_attach_url
 
     home = tmp_path / "profile"
 
@@ -512,7 +512,7 @@ def test_discovery_refuses_a_listener_that_reads_the_registry_as_another_user(tm
             else:
                 proof = hmac_mod.new(
                     lease_id.encode(),
-                    (f"hermes-session-attach:{params['session_id'][0]}:{params['nonce'][0]}:"
+                    (f"eir-session-attach:{params['session_id'][0]}:{params['nonce'][0]}:"
                      f"{params['profile_home'][0]}:{stolen}").encode(),
                     hashlib.sha256,
                 ).hexdigest()

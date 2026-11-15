@@ -5,20 +5,20 @@ import sys
 
 import pytest
 
-from hermes_cli.console_engine import HermesConsoleEngine, run_console_repl
+from eir_cli.console_engine import EirConsoleEngine, run_console_repl
 
 
-def test_sessions_optimize_accepts_the_force_override_it_advertises(_isolate_hermes_home):
+def test_sessions_optimize_accepts_the_force_override_it_advertises(_isolate_eir_home):
     """The held-store refusal this command prints points at `sessions optimize --force`; if the
     console rejected the flag, the command could only ever refuse whenever a gateway is running."""
-    result = HermesConsoleEngine().execute("sessions optimize --force", confirmed=True)
+    result = EirConsoleEngine().execute("sessions optimize --force", confirmed=True)
 
     assert result.status == "ok", result.output
     assert "Usage:" not in result.output
 
 
-def test_sessions_list_and_stats_use_isolated_session_store(_isolate_hermes_home):
-    from hermes_state import SessionDB
+def test_sessions_list_and_stats_use_isolated_session_store(_isolate_eir_home):
+    from eir_state import SessionDB
 
     db = SessionDB()
     try:
@@ -27,7 +27,7 @@ def test_sessions_list_and_stats_use_isolated_session_store(_isolate_hermes_home
     finally:
         db.close()
 
-    engine = HermesConsoleEngine()
+    engine = EirConsoleEngine()
     listed = engine.execute("sessions list --limit 10")
     stats = engine.execute("sessions stats")
 
@@ -39,12 +39,12 @@ def test_sessions_list_and_stats_use_isolated_session_store(_isolate_hermes_home
 
 
 def test_sessions_export_rejects_oversized_single_before_touching_output(
-    _isolate_hermes_home,
+    _isolate_eir_home,
     monkeypatch,
     tmp_path,
 ):
-    import hermes_state
-    from hermes_state import SessionDB
+    import eir_state
+    from eir_state import SessionDB
 
     db = SessionDB()
     try:
@@ -56,7 +56,7 @@ def test_sessions_export_rejects_oversized_single_before_touching_output(
     finally:
         db.close()
 
-    monkeypatch.setattr(hermes_state, "resolved_max_export_messages", lambda: 2)
+    monkeypatch.setattr(eir_state, "resolved_max_export_messages", lambda: 2)
     materialized = []
     original_export_session = SessionDB.export_session
 
@@ -68,7 +68,7 @@ def test_sessions_export_rejects_oversized_single_before_touching_output(
     output = tmp_path / "sessions.jsonl"
     output.write_text("keep me\n", encoding="utf-8")
 
-    result = HermesConsoleEngine().execute(
+    result = EirConsoleEngine().execute(
         f"sessions export {output} --session-id too-large",
         confirmed=True,
     )
@@ -82,7 +82,7 @@ def test_sessions_export_rejects_oversized_single_before_touching_output(
 
 
 def test_sessions_export_all_uses_per_session_budget(
-    _isolate_hermes_home,
+    _isolate_eir_home,
     monkeypatch,
     tmp_path,
 ):
@@ -93,8 +93,8 @@ def test_sessions_export_all_uses_per_session_budget(
     """
     import json
 
-    import hermes_state
-    from hermes_state import SessionDB
+    import eir_state
+    from eir_state import SessionDB
 
     db = SessionDB()
     try:
@@ -107,12 +107,12 @@ def test_sessions_export_all_uses_per_session_budget(
     finally:
         db.close()
 
-    monkeypatch.setattr(hermes_state, "resolved_max_export_messages", lambda: 3)
+    monkeypatch.setattr(eir_state, "resolved_max_export_messages", lambda: 3)
     output = tmp_path / "all-sessions.jsonl"
 
     # 3 sessions x 2 messages = 6 total > 3, but each session is under the
     # per-session limit, so the full-DB export succeeds.
-    result = HermesConsoleEngine().execute(
+    result = EirConsoleEngine().execute(
         f"sessions export {output}",
         confirmed=True,
     )
@@ -130,12 +130,12 @@ def test_sessions_export_all_uses_per_session_budget(
 
 
 def test_sessions_export_all_rejects_single_oversized_session(
-    _isolate_hermes_home,
+    _isolate_eir_home,
     monkeypatch,
     tmp_path,
 ):
-    import hermes_state
-    from hermes_state import SessionDB
+    import eir_state
+    from eir_state import SessionDB
 
     db = SessionDB()
     try:
@@ -152,7 +152,7 @@ def test_sessions_export_all_rejects_single_oversized_session(
     finally:
         db.close()
 
-    monkeypatch.setattr(hermes_state, "resolved_max_export_messages", lambda: 3)
+    monkeypatch.setattr(eir_state, "resolved_max_export_messages", lambda: 3)
     export_all_calls = []
 
     def tracked_export_all(self, source=None):
@@ -162,7 +162,7 @@ def test_sessions_export_all_rejects_single_oversized_session(
     monkeypatch.setattr(SessionDB, "export_all", tracked_export_all)
     output = tmp_path / "all-sessions.jsonl"
 
-    result = HermesConsoleEngine().execute(
+    result = EirConsoleEngine().execute(
         f"sessions export {output}",
         confirmed=True,
     )
@@ -177,12 +177,12 @@ def test_sessions_export_all_rejects_single_oversized_session(
 
 
 def test_sessions_export_zero_limit_disables_guard(
-    _isolate_hermes_home,
+    _isolate_eir_home,
     monkeypatch,
     tmp_path,
 ):
-    import hermes_state
-    from hermes_state import SessionDB
+    import eir_state
+    from eir_state import SessionDB
 
     db = SessionDB()
     try:
@@ -194,10 +194,10 @@ def test_sessions_export_zero_limit_disables_guard(
     finally:
         db.close()
 
-    monkeypatch.setattr(hermes_state, "resolved_max_export_messages", lambda: 0)
+    monkeypatch.setattr(eir_state, "resolved_max_export_messages", lambda: 0)
     output = tmp_path / "huge.jsonl"
 
-    result = HermesConsoleEngine().execute(
+    result = EirConsoleEngine().execute(
         f"sessions export {output} --session-id huge",
         confirmed=True,
     )
@@ -205,11 +205,11 @@ def test_sessions_export_zero_limit_disables_guard(
     assert output.exists()
 
 
-def test_cron_pause_resume_and_run_require_confirmation(_isolate_hermes_home):
+def test_cron_pause_resume_and_run_require_confirmation(_isolate_eir_home):
     from cron.jobs import create_job, get_job
 
     job = create_job(prompt="say hello", schedule="every 1h", name="alpha")
-    engine = HermesConsoleEngine()
+    engine = EirConsoleEngine()
 
     pending = engine.execute(f"cron pause {job['id']}")
     assert pending.status == "confirm_required"
@@ -234,7 +234,7 @@ def test_cron_pause_resume_and_run_require_confirmation(_isolate_hermes_home):
     assert "Triggered job" in triggered.output
 
 
-def test_repl_runs_non_interactive_lines_without_prompts(_isolate_hermes_home):
+def test_repl_runs_non_interactive_lines_without_prompts(_isolate_eir_home):
     stdin = io.StringIO("help\nexit\n")
     stdout = io.StringIO()
     stderr = io.StringIO()
@@ -247,13 +247,13 @@ def test_repl_runs_non_interactive_lines_without_prompts(_isolate_hermes_home):
     )
 
     assert code == 0
-    assert "Hermes Console" in stdout.getvalue()
-    assert "hermes>" not in stdout.getvalue()
+    assert "Eir Console" in stdout.getvalue()
+    assert "eir>" not in stdout.getvalue()
     assert stderr.getvalue() == ""
 
 
 def test_capture_output_surfaces_string_exit_code_as_command_error():
-    from hermes_cli.console_engine import ConsoleCommandError, _capture_output
+    from eir_cli.console_engine import ConsoleCommandError, _capture_output
 
     def _boom():
         sys.exit("No credential matching \"nope\".")
@@ -266,8 +266,8 @@ def test_capture_output_surfaces_string_exit_code_as_command_error():
 
 
 
-def test_execute_handler_string_exit_returns_error_not_crash(_isolate_hermes_home):
-    result = HermesConsoleEngine().execute(
+def test_execute_handler_string_exit_returns_error_not_crash(_isolate_eir_home):
+    result = EirConsoleEngine().execute(
         "auth remove openrouter __no_such_credential__", confirmed=True
     )
 
@@ -303,7 +303,7 @@ def _patch_checkpoint_manager(monkeypatch, prune_calls: list) -> None:
 
 
 def test_console_checkpoints_prune_does_not_reprompt_for_orphans(
-    _isolate_hermes_home, monkeypatch
+    _isolate_eir_home, monkeypatch
 ):
     """`checkpoints prune` is console-mutating, so the nested prompt must be skipped.
 
@@ -322,7 +322,7 @@ def test_console_checkpoints_prune_does_not_reprompt_for_orphans(
 
     monkeypatch.setattr("builtins.input", _unexpected_input)
 
-    result = HermesConsoleEngine().execute("checkpoints prune", confirmed=True)
+    result = EirConsoleEngine().execute("checkpoints prune", confirmed=True)
 
     assert result.status == "ok"
     assert len(prune_calls) == 1
@@ -341,9 +341,9 @@ def test_config_set_on_unparseable_yaml_reports_error_not_crash(tmp_path, monkey
     config_path = tmp_path / "config.yaml"
     original = "model:\n  default: keep\nbroken: [unterminated\n"
     config_path.write_text(original, encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
 
-    result = HermesConsoleEngine().execute(
+    result = EirConsoleEngine().execute(
         "config set model.default gpt-4o", confirmed=True
     )
 

@@ -8,16 +8,16 @@ import time as _time
 
 from pathlib import Path
 from typing import NoReturn
-from hermes_cli import _early_recovery as _early_recovery_mod
-from hermes_cli._startup_fast import project_root_str
+from eir_cli import _early_recovery as _early_recovery_mod
+from eir_cli._startup_fast import project_root_str
 
 # Log-record parity with the origin module.
-logger = logging.getLogger("hermes_cli.main")
+logger = logging.getLogger("eir_cli.main")
 
 
 def _pyproject_project(debug_fmt: str | None = None) -> dict | None:
     """``[project]`` table of pyproject.toml, or ``None`` when absent/unreadable."""
-    from hermes_cli.main import PROJECT_ROOT
+    from eir_cli.main import PROJECT_ROOT
     pyproject = PROJECT_ROOT / "pyproject.toml"
     if not pyproject.is_file():
         return None
@@ -32,7 +32,7 @@ def _pyproject_project(debug_fmt: str | None = None) -> dict | None:
     return project if isinstance(project, dict) else None
 
 
-# Install-scoped breadcrumbs live next to the venv (not under $HERMES_HOME)
+# Install-scoped breadcrumbs live next to the venv (not under $EIR_HOME)
 # because the venv is shared across profiles.
 #   ``.update-incomplete``       — generic core ``.[all]`` install was interrupted;
 #     cleared only after a confirmed full dependency reinstall/recovery.
@@ -41,12 +41,12 @@ def _pyproject_project(debug_fmt: str | None = None) -> dict | None:
 # Narrow lazy probes must NEVER clear the generic core marker.
 # See #58004.
 def _update_marker_path() -> Path:
-    from hermes_cli.main import PROJECT_ROOT
+    from eir_cli.main import PROJECT_ROOT
     return PROJECT_ROOT / ".update-incomplete"
 
 
 def _lazy_refresh_marker_path() -> Path:
-    from hermes_cli.main import PROJECT_ROOT
+    from eir_cli.main import PROJECT_ROOT
     return PROJECT_ROOT / ".lazy-refresh-incomplete"
 
 
@@ -78,13 +78,13 @@ def _clear_lazy_refresh_incomplete_marker() -> None:
 
 
 # Frozen old-updater import; current updates never detach dependency work.
-_UPDATE_REEXEC_ENV = "HERMES_UPDATE_REEXEC"
+_UPDATE_REEXEC_ENV = "EIR_UPDATE_REEXEC"
 
 
 def _reexec_dependency_sync_off_windows_shim() -> NoReturn:
     """Stop a mixed old-code/new-files updater at the retired sync boundary."""
-    from hermes_cli._old_updater import stop_historical_updater
-    stop_historical_updater("hermes_cli.main_install_repair._reexec_dependency_sync_off_windows_shim")
+    from eir_cli._old_updater import stop_historical_updater
+    stop_historical_updater("eir_cli.main_install_repair._reexec_dependency_sync_off_windows_shim")
 
 
 def _is_windows() -> bool:
@@ -93,8 +93,8 @@ def _is_windows() -> bool:
 
 def _venv_scripts_dir() -> Path | None:
     """Return the venv Scripts directory if we're running inside the project venv."""
-    from hermes_cli.main import PROJECT_ROOT
-    from hermes_constants import project_venv_dir
+    from eir_cli.main import PROJECT_ROOT
+    from eir_constants import project_venv_dir
     from pm.environments import venv_bin_dir
     venv_dir = project_venv_dir(PROJECT_ROOT)
     if venv_dir is None:
@@ -103,15 +103,15 @@ def _venv_scripts_dir() -> Path | None:
     return scripts if scripts.is_dir() else None
 
 
-def _hermes_exe_shims(scripts_dir: Path) -> list[Path]:
+def _eir_exe_shims(scripts_dir: Path) -> list[Path]:
     """Entry-point shims uv may rewrite during ``pip install -e .`` — Windows .exe launchers
     only; POSIX shims are plain scripts replaced atomically."""
     if not _is_windows():
         return []
-    names = set(_load_console_script_names()) or {"hermes", "hermes-agent", "hermes-acp"}
+    names = set(_load_console_script_names()) or {"eir", "eir-agent", "eir-acp"}
     # Not a [project.scripts] entry point, but older update/install paths still
     # rewrite and quarantine it.
-    names.add("hermes-gateway")
+    names.add("eir-gateway")
     return [scripts_dir / f"{name}.exe" for name in sorted(names)]
 
 
@@ -146,7 +146,7 @@ def _filter_pending_shim_renames(entries: list[str], shims: list[Path]) -> tuple
 
 
 def _cleanup_pending_shim_renames(scripts_dir: Path) -> int:
-    """Drop reboot renames older Hermes versions queued for our shims: ``MOVEFILE_DELAY_UNTIL_REBOOT``
+    """Drop reboot renames older Eir versions queued for our shims: ``MOVEFILE_DELAY_UNTIL_REBOOT``
     fallbacks outlive the update that queued them and move away whatever sits at the shim path
     at next boot — even a shim a later repair just wrote. Needs elevation; a no-op otherwise."""
     if not _is_windows():
@@ -160,7 +160,7 @@ def _cleanup_pending_shim_renames(scripts_dir: Path) -> int:
             entries, value_type = winreg.QueryValueEx(key, _PENDING_RENAME_VALUE)
             if value_type != winreg.REG_MULTI_SZ or not isinstance(entries, list):
                 return 0
-            kept, removed = _filter_pending_shim_renames(entries, _hermes_exe_shims(scripts_dir))
+            kept, removed = _filter_pending_shim_renames(entries, _eir_exe_shims(scripts_dir))
             if not removed:
                 return 0
             if kept:
@@ -192,22 +192,22 @@ def _recover_update_debts_on_startup() -> None:
     # still owed by a previous update without restarting services here.
     if "update" not in sys.argv[1:]:
         try:
-            from hermes_cli.update_cmd_fleet import _warn_pending_fleet_restart_on_startup
+            from eir_cli.update_cmd_fleet import _warn_pending_fleet_restart_on_startup
 
             _warn_pending_fleet_restart_on_startup()
         except Exception:  # a startup warning never blocks the launch it warns about
             logger.debug("pending fleet restart check failed", exc_info=True)
-    from hermes_cli.update_pause_record import recover as _recover_paused_gateways
+    from eir_cli.update_pause_record import recover as _recover_paused_gateways
     # Unconditional: recover() itself skips the PARSED `update`/`gateway run` commands; a raw argv
     # value equal to "update" (`--resume update`) is no reason to strand paused gateways.
-    _recover_paused_gateways()  # a killed `hermes update` left gateways paused (Windows)
+    _recover_paused_gateways()  # a killed `eir update` left gateways paused (Windows)
 
 
 def _cleanup_quarantined_exes(scripts_dir: Path | None = None) -> None:
-    """Sweep — and where necessary RESCUE — ``hermes.exe.old.*`` from updates.
+    """Sweep — and where necessary RESCUE — ``eir.exe.old.*`` from updates.
 
     Called early on every invocation. Two cases an unconditional ``unlink()`` gets wrong:
-    (1) orphan rescue — ``hermes.exe`` missing while ``hermes.exe.old.*`` exists means the .old
+    (1) orphan rescue — ``eir.exe`` missing while ``eir.exe.old.*`` exists means the .old
     file is the ONLY surviving copy (update died between rename and uv's write); put it back via
     the same retry-and-report helper the update-time restore uses. (2) concurrency — a fresh
     quarantine file may belong to an update in flight in another process; leave anything inside
@@ -220,8 +220,8 @@ def _cleanup_quarantined_exes(scripts_dir: Path | None = None) -> None:
     scripts_dir = scripts_dir if scripts_dir is not None else _venv_scripts_dir()
     if scripts_dir is None:
         return
-    from hermes_cli.main import PROJECT_ROOT
-    from hermes_cli.update_lock import update_in_progress
+    from eir_cli.main import PROJECT_ROOT
+    from eir_cli.update_lock import update_in_progress
 
     if update_in_progress(PROJECT_ROOT):
         return  # every quarantine may be that update's own, mid rename-back
@@ -264,16 +264,16 @@ def _configured_features_missing_deps() -> list[tuple[str, str, str]]:
         for platform in load_gateway_config().get_connected_platforms():
             entry = platform_registry.get(platform.value)
             if entry is not None and not entry.check_fn():
-                missing.append((entry.label, entry.install_hint or "Run `hermes setup` to install support.",
+                missing.append((entry.label, entry.install_hint or "Run `eir setup` to install support.",
                                 entry.name))
     except Exception as exc:
         logger.debug("configured-platform dependency check skipped: %s", exc)
     try:
         import importlib.util
-        from hermes_cli.config import load_config_readonly
+        from eir_cli.config import load_config_readonly
 
         if (load_config_readonly().get("mcp_servers") or {}) and importlib.util.find_spec("mcp") is None:
-            missing.append(("MCP servers", "Run `hermes pm install` to install MCP support.", "mcp"))
+            missing.append(("MCP servers", "Run `eir pm install` to install MCP support.", "mcp"))
     except Exception as exc:
         logger.debug("configured-MCP dependency check skipped: %s", exc)
     return missing
@@ -292,7 +292,7 @@ def _install_configured_features_missing_deps(project_root: Path) -> None:
     missing = _configured_features_missing_deps()
     if not missing:
         return
-    # `hermes pm install --without NAME` outranks a platform still left in config.
+    # `eir pm install --without NAME` outranks a platform still left in config.
     declared = set(declared_extras(project_root)) - declined_extras(project_root)
     extras = sorted({extra for *_, name in missing
                      if (extra := name.replace("_", "-")) in declared and extra_supported(extra)})
@@ -320,7 +320,7 @@ def _load_console_script_names() -> list[str]:
 
 
 def _is_termux_env(env: dict[str, str] | None = None) -> bool:
-    from hermes_cli.main import _is_termux_startup_environment
+    from eir_cli.main import _is_termux_startup_environment
     return _is_termux_startup_environment(env)
 
 
@@ -341,9 +341,9 @@ def _is_windows_npm_path(npm_path: str) -> bool:
 def _resolve_node_runtime_npm() -> str | None:
     """PM's npm, refused on a POSIX host when it is a Windows shim (EISDIR over WSL UNC paths, #30271).
 
-    Never re-scans the user's PATH for another npm: Hermes runs only its PM-managed toolchain.
+    Never re-scans the user's PATH for another npm: Eir runs only its PM-managed toolchain.
     """
-    from hermes_constants import find_node_executable
+    from eir_constants import find_node_executable
     npm = find_node_executable("npm")
     if _is_windows() or not npm:
         return npm

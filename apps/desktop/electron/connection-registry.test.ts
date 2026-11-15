@@ -51,7 +51,7 @@ import { matchingConnectionId } from './connection-route-identity'
 // excludes apps/shared sources, but vitest resolves the workspace package fine
 // at runtime. Loaded once here, not in the test body, where a cold import under
 // CI load can outlast the 5s test timeout.
-const shared = (await import(String('@hermes/shared'))) as {
+const shared = (await import(String('@eir/shared'))) as {
   backendScopeKey: typeof backendScopeKey
   backendScopePrefix: typeof backendScopePrefix
   LOCAL_CONNECTION_ID: string
@@ -248,10 +248,10 @@ test('primary SSH reuse rejects a descriptor with different effective dialing co
   )
 })
 
-test('primary SSH reuse rejects a descriptor with a different remote Hermes path', async () => {
+test('primary SSH reuse rejects a descriptor with a different remote Eir path', async () => {
   const registry = migrateV1ToRegistry({
     mode: 'ssh',
-    remote: { mode: 'ssh', host: 'build-host', remoteHermesPath: '/srv/hermes', user: 'alice' },
+    remote: { mode: 'ssh', host: 'build-host', remoteEirPath: '/srv/eir', user: 'alice' },
     profiles: {}
   })
 
@@ -267,7 +267,7 @@ test('primary SSH reuse rejects a descriptor with a different remote Hermes path
         ssh: {
           effectiveConfigFingerprint: 'same-effective-config',
           host: 'build-host',
-          remoteHermesPath: '/opt/hermes',
+          remoteEirPath: '/opt/eir',
           remoteProfile: '',
           user: 'alice'
         }
@@ -283,23 +283,23 @@ test('primary SSH reuse rejects a descriptor with a different remote Hermes path
 test('registry primary reuses a matching primary backend descriptor', () => {
   const registry = normalizeRegistry({
     version: REGISTRY_VERSION,
-    primary: 'hermes-vps',
+    primary: 'eir-vps',
     launchMode: 'primary',
-    lastUsed: 'hermes-vps',
+    lastUsed: 'eir-vps',
     connections: [
       { id: LOCAL_CONNECTION_ID, kind: 'local', label: 'This device' },
-      { id: 'hermes-vps', kind: 'ssh', label: 'Hermes VPS', host: 'hermes-vps' }
+      { id: 'eir-vps', kind: 'ssh', label: 'Eir VPS', host: 'eir-vps' }
     ]
   })
 
   const descriptor = {
-    connectionId: 'hermes-vps',
+    connectionId: 'eir-vps',
     mode: 'remote' as const,
     remoteKind: 'ssh' as const,
-    ssh: { host: 'hermes-vps' }
+    ssh: { host: 'eir-vps' }
   }
 
-  assert.equal(registrySourceOwnsPrimaryBackend(registry, 'hermes-vps', descriptor), true)
+  assert.equal(registrySourceOwnsPrimaryBackend(registry, 'eir-vps', descriptor), true)
   assert.equal(registrySourceOwnsPrimaryBackend(registry, LOCAL_CONNECTION_ID, descriptor), false)
 })
 
@@ -570,7 +570,7 @@ test('resolvedConnectionId keeps same-host SSH routes distinct by port, key, pat
     host: 'work-host',
     keyPath: '/keys/a',
     kind: 'ssh' as const,
-    remoteHermesPath: '/srv/hermes',
+    remoteEirPath: '/srv/eir',
     remoteProfile: 'alpha',
     user: 'root'
   }
@@ -585,7 +585,7 @@ test('resolvedConnectionId keeps same-host SSH routes distinct by port, key, pat
       { ...base, id: 'ssh-base', label: 'SSH base' },
       { ...base, id: 'ssh-port', label: 'SSH port', port: 2222 },
       { ...base, id: 'ssh-key', keyPath: '/keys/b', label: 'SSH key' },
-      { ...base, id: 'ssh-path', label: 'SSH path', remoteHermesPath: '/opt/hermes' },
+      { ...base, id: 'ssh-path', label: 'SSH path', remoteEirPath: '/opt/eir' },
       { ...base, id: 'ssh-profile', label: 'SSH profile', remoteProfile: 'beta' }
     ]
   }
@@ -596,7 +596,7 @@ test('resolvedConnectionId keeps same-host SSH routes distinct by port, key, pat
   assert.equal(resolve(base), 'ssh-base')
   assert.equal(resolve({ ...base, port: 2222 }), 'ssh-port')
   assert.equal(resolve({ ...base, keyPath: '/keys/b' }), 'ssh-key')
-  assert.equal(resolve({ ...base, remoteHermesPath: '/opt/hermes' }), 'ssh-path')
+  assert.equal(resolve({ ...base, remoteEirPath: '/opt/eir' }), 'ssh-path')
   assert.equal(resolve({ ...base, remoteProfile: 'beta' }), 'ssh-profile')
   assert.equal(
     resolvedConnectionId(registry, {
@@ -719,7 +719,7 @@ test('uniqueLabel counts up (never "X 2 2") and clamps long candidates', () => {
 
 // --- backendScopeKey (composite pool keys) ---
 
-// The electron and @hermes/shared implementations MUST stay byte-identical —
+// The electron and @eir/shared implementations MUST stay byte-identical —
 // the renderer keys its socket registry with the shared copy while the main
 // process keys the backend pool with this one. This contract test is the
 // enforcement (see the NOTE on backendScopeKey).
@@ -813,7 +813,7 @@ test('registry local route: a concrete remote-only profile is refused on the for
   assert.match(String(named.refuse ?? ''), /Profile "inbox" no longer exists/)
   assert.equal(named.delegate, false)
 
-  // default is $HERMES_HOME, not profiles/default: a profiles/default probe
+  // default is $EIR_HOME, not profiles/default: a profiles/default probe
   // reports absent, but This device -> default must still open locally.
   assert.deepEqual(resolveRegistryLocalRoute('default', { globalRemote: true, localProfileExists: false }), {
     delegate: false,
@@ -900,7 +900,7 @@ test('roster: source profile metadata follows the connection-qualified row', () 
 
   const vpsMeta = {
     display_name: 'Emma',
-    ui_meta: { 'hermes-bots': { title: 'Emma', shape: 'blobatar::sun', color: '#8b5cf6' } },
+    ui_meta: { 'eir-bots': { title: 'Emma', shape: 'blobatar::sun', color: '#8b5cf6' } },
     has_avatar: true
   }
 
@@ -1285,14 +1285,14 @@ test('merge preserves fields the editor does not carry (org, ssh extras)', () =>
     kind: 'ssh' as const,
     label: 'Box',
     port: 2222,
-    remoteHermesPath: '/opt/hermes',
+    remoteEirPath: '/opt/eir',
     remoteProfile: 'research',
     user: 'k'
   }
 
   const labelOnly = mergeConnectionInput({ id: 's', kind: 'ssh', label: 'Renamed box' }, ssh)
 
-  assert.equal(labelOnly.remoteHermesPath, '/opt/hermes')
+  assert.equal(labelOnly.remoteEirPath, '/opt/eir')
   assert.equal(labelOnly.remoteProfile, 'research')
   assert.equal(labelOnly.host, 'homelab.lan')
   assert.equal(labelOnly.user, 'k')
@@ -1494,7 +1494,7 @@ test('normalizeRegistry round-trips a valid registry unchanged in shape', () => 
       {
         id: 'cloud-1',
         kind: 'cloud',
-        label: 'Hermes Cloud',
+        label: 'Eir Cloud',
         url: 'https://a.hermes.cloud',
         authMode: 'oauth',
         org: 'nous'
@@ -1730,7 +1730,7 @@ test('Apply remote preserves an existing URL identity and label without duplicat
   let registry = emptyRegistry()
 
   registry = upsertConnection(registry, {
-    id: 'hermes-alex',
+    id: 'eir-alex',
     kind: 'remote',
     label: 'Existing gateway',
     url: 'https://gateway.example.com',
@@ -1746,11 +1746,11 @@ test('Apply remote preserves an existing URL identity and label without duplicat
   const matches = applied.connections.filter(connection => connection.url === 'https://gateway.example.com')
 
   assert.equal(matches.length, 1)
-  assert.equal(matches[0].id, 'hermes-alex')
+  assert.equal(matches[0].id, 'eir-alex')
   assert.equal(matches[0].label, 'Existing gateway')
   assert.equal(matches[0].authMode, 'oauth')
-  assert.equal(applied.primary, 'hermes-alex')
-  assert.equal(applied.lastUsed, 'hermes-alex')
+  assert.equal(applied.primary, 'eir-alex')
+  assert.equal(applied.lastUsed, 'eir-alex')
 })
 
 test('Apply local moves primary/current to This device without deleting registered remotes', () => {

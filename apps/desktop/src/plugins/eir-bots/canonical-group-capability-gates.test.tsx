@@ -1,5 +1,5 @@
-import type * as HermesSdk from '@hermes/plugin-sdk'
-import { host } from '@hermes/plugin-sdk'
+import type * as EirSdk from '@eir/plugin-sdk'
+import { host } from '@eir/plugin-sdk'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { WritableAtom } from 'nanostores'
 import { useSyncExternalStore } from 'react'
@@ -21,8 +21,8 @@ import { renderRosterToolbar } from './roster-pane-toolbar'
 import type { RosterRow } from './types'
 
 const { request, notify, openWorkspace, activation } = vi.hoisted(() => ({ request: vi.fn(), notify: vi.fn(), openWorkspace: vi.fn(), activation: { epoch: 1, listeners: new Set<() => void>() } }))
-vi.mock('@hermes/plugin-sdk', async importOriginal => {
-  const sdk = await importOriginal<typeof HermesSdk>()
+vi.mock('@eir/plugin-sdk', async importOriginal => {
+  const sdk = await importOriginal<typeof EirSdk>()
   const { captureGroupRequests } = await import('./canonical-group-contract-test-utils')
   const { en } = await import('@/i18n/en')
 
@@ -533,7 +533,7 @@ it('explains a refused gateway group creation in the reader\'s language with the
   expect((await screen.findByRole('alert')).textContent).toBe(words)
 })
 
-// Desktop's own backend and SSH, URL and Cloud connections reach `hermes serve`
+// Desktop's own backend and SSH, URL and Cloud connections reach `eir serve`
 // (tui_gateway/methods_groups.py): it refuses a create with 4110, or 4123/5111 for a missing worker
 // or a failure, and puts the reason in the message. The session gateway answers 4001 with data.detail.
 it('keeps the gateway\'s own reason for a refused create from either server', () => {

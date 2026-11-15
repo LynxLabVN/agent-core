@@ -1,4 +1,4 @@
-"""Regression tests for the OAuth dispatcher in hermes_cli.web_server.
+"""Regression tests for the OAuth dispatcher in eir_cli.web_server.
 
 Bug history (2026-05-09): the `_OAUTH_PROVIDER_CATALOG` had two entries
 flagged ``flow: "pkce"`` — anthropic and minimax-oauth — and the
@@ -6,7 +6,7 @@ dispatcher ``start_oauth_login`` hardcoded ``_start_anthropic_pkce()``
 for any pkce-flagged provider. So clicking "Login" next to MiniMax in
 the dashboard's Keys tab silently launched the Anthropic/Claude OAuth
 flow. The Anthropic dashboard flow was later removed entirely because
-Hermes must not mint subscription OAuth tokens from an unattended HTTP
+Eir must not mint subscription OAuth tokens from an unattended HTTP
 endpoint; only the approved external CLI path remains.
 
 The fix:
@@ -30,16 +30,16 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from hermes_cli.web_server import _SESSION_TOKEN, app
-import hermes_cli.web_routers.oauth as _rt_oauth
-import hermes_cli.web_server_oauth as _web_server_oauth
+from eir_cli.web_server import _SESSION_TOKEN, app
+import eir_cli.web_routers.oauth as _rt_oauth
+import eir_cli.web_server_oauth as _web_server_oauth
 
 client = TestClient(app)
-HEADERS = {"X-Hermes-Session-Token": _SESSION_TOKEN}
+HEADERS = {"X-Eir-Session-Token": _SESSION_TOKEN}
 
 
 def _make_profile_home(tmp_path, monkeypatch, profile="coder"):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     profile_home = tmp_path / "profiles" / profile
     profile_home.mkdir(parents=True)
     (profile_home / "config.yaml").write_text("{}\n")  # identity marker: a bare dir is not a profile
@@ -83,13 +83,13 @@ def test_minimax_login_does_not_launch_anthropic_flow():
         "state": "stub-state",
     }
     with patch(
-        "hermes_cli.auth._minimax_request_user_code",
+        "eir_cli.auth._minimax_request_user_code",
         return_value=fake_user_code_resp,
     ), patch(
-        "hermes_cli.auth._minimax_pkce_pair",
+        "eir_cli.auth._minimax_pkce_pair",
         return_value=("verifier-stub", "challenge-stub", "stub-state"),
     ), patch(
-        "hermes_cli.web_server_oauth._minimax_poller",
+        "eir_cli.web_server_oauth._minimax_poller",
         return_value=None,
     ):
         resp = client.post(
@@ -126,7 +126,7 @@ def test_minimax_start_route_honors_poller_mock_on_owning_module(tmp_path, monke
     """
     import threading
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     fake_user_code_resp = {
         "user_code": "ABCD-1234",
         "verification_uri": "https://api.minimax.io/oauth/verify",
@@ -145,16 +145,16 @@ def test_minimax_start_route_honors_poller_mock_on_owning_module(tmp_path, monke
         raise AssertionError("real _minimax_poller body must not run under the mock")
 
     with patch(
-        "hermes_cli.auth._minimax_request_user_code",
+        "eir_cli.auth._minimax_request_user_code",
         return_value=fake_user_code_resp,
     ), patch(
-        "hermes_cli.auth._minimax_pkce_pair",
+        "eir_cli.auth._minimax_pkce_pair",
         return_value=("verifier-stub", "challenge-stub", "stub-state"),
     ), patch(
-        "hermes_cli.auth._minimax_poll_token",
+        "eir_cli.auth._minimax_poll_token",
         fail_poll_token,
     ), patch(
-        "hermes_cli.web_server_oauth._minimax_poller",
+        "eir_cli.web_server_oauth._minimax_poller",
         fake_poller,
     ):
         resp = client.post("/api/providers/oauth/minimax-oauth/start", headers=HEADERS)
@@ -165,20 +165,20 @@ def test_minimax_start_route_honors_poller_mock_on_owning_module(tmp_path, monke
 
 
 def test_oauth_provider_status_uses_profile_query(tmp_path, monkeypatch):
-    from hermes_constants import get_hermes_home
+    from eir_constants import get_eir_home
 
     profile_home = _make_profile_home(tmp_path, monkeypatch)
     observed_homes = []
 
     def fake_status():
-        observed_homes.append(get_hermes_home())
+        observed_homes.append(get_eir_home())
         return {"logged_in": False, "source": None}
 
     fake_catalog = ({
         "id": "fake-oauth",
         "name": "Fake OAuth",
         "flow": "pkce",
-        "cli_command": "hermes auth add fake-oauth",
+        "cli_command": "eir auth add fake-oauth",
         "docs_url": "https://example.com",
         "status_fn": fake_status,
     },)
@@ -201,13 +201,13 @@ def test_oauth_start_stores_profile_for_background_completion(tmp_path, monkeypa
         "state": "stub-state",
     }
     with patch(
-        "hermes_cli.auth._minimax_request_user_code",
+        "eir_cli.auth._minimax_request_user_code",
         return_value=fake_user_code_resp,
     ), patch(
-        "hermes_cli.auth._minimax_pkce_pair",
+        "eir_cli.auth._minimax_pkce_pair",
         return_value=("verifier-stub", "challenge-stub", "stub-state"),
     ), patch(
-        "hermes_cli.web_server_oauth._minimax_poller",
+        "eir_cli.web_server_oauth._minimax_poller",
         return_value=None,
     ):
         resp = client.post(
@@ -228,7 +228,7 @@ def test_oauth_session_cannot_be_polled_or_cancelled_from_another_profile(
 ):
     """A named-profile OAuth session must reject default-profile retargeting."""
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     (tmp_path / "profiles" / "worker").mkdir(parents=True)
     (tmp_path / "profiles" / "worker" / "config.yaml").write_text("{}\n")  # identity marker
     session_id, _session = _rt_oauth._new_oauth_session(
@@ -284,8 +284,8 @@ def test_codex_dashboard_worker_stops_polling_after_cancel(tmp_path, monkeypatch
     endpoint/worker race and the real removal from `_oauth_sessions` are
     both under test.
     """
-    from hermes_cli import auth as auth_mod
-    from hermes_cli import web_server as ws
+    from eir_cli import auth as auth_mod
+    from eir_cli import web_server as ws
 
     class _Resp:
         def __init__(self, status_code, payload):
@@ -357,8 +357,8 @@ def test_codex_worker_final_save_is_atomic_with_cancel_delete(tmp_path, monkeypa
     """
     import threading
 
-    from hermes_cli import auth as auth_mod
-    from hermes_cli import web_server as ws
+    from eir_cli import auth as auth_mod
+    from eir_cli import web_server as ws
 
     class _Resp:
         def __init__(self, status_code, payload):
@@ -491,11 +491,11 @@ def test_anthropic_dashboard_oauth_is_removed_and_external():
 
 def test_accounts_offers_every_oauth_provider_from_catalog():
     """PARITY CONTRACT: every accounts-tab provider in the unified catalog (the
-    `hermes model` universe) must be offered by /api/providers/oauth. This keeps
+    `eir model` universe) must be offered by /api/providers/oauth. This keeps
     the desktop Accounts tab in lockstep with the CLI picker — no provider the
     CLI can sign into may be missing from the GUI.
     """
-    from hermes_cli.provider_catalog import provider_catalog
+    from eir_cli.provider_catalog import provider_catalog
 
     resp = client.get("/api/providers/oauth", headers=HEADERS)
     assert resp.status_code == 200, resp.text
@@ -503,7 +503,7 @@ def test_accounts_offers_every_oauth_provider_from_catalog():
     for d in provider_catalog():
         if d.tab == "accounts":
             assert d.slug in offered, (
-                f"{d.slug} is an accounts-tab provider in `hermes model` but is "
+                f"{d.slug} is an accounts-tab provider in `eir model` but is "
                 f"missing from the desktop Accounts tab (/api/providers/oauth)"
             )
 
@@ -514,7 +514,7 @@ def test_accounts_offers_every_oauth_provider_from_catalog():
 
 def test_external_oauth_disconnect_rejected_before_auth_mutation(monkeypatch):
     """DELETE must not pretend to remove credentials owned by another CLI."""
-    from hermes_cli import auth as auth_mod
+    from eir_cli import auth as auth_mod
 
     def fail_clear_provider_auth(provider_id=None):
         raise AssertionError("external providers must not reach clear_provider_auth")
@@ -552,14 +552,14 @@ def test_xai_dashboard_poller_seeds_single_entry_and_clears_suppression(tmp_path
     singleton only; the seed is the single source of truth.
 
     Suppression: an interactive dashboard login must also clear any
-    ``device_code`` suppression left by a prior ``hermes auth remove
+    ``device_code`` suppression left by a prior ``eir auth remove
     xai-oauth``.
     """
-    from hermes_cli import auth as auth_mod
+    from eir_cli import auth as auth_mod
     from agent.credential_pool import load_pool
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-    monkeypatch.delenv("HERMES_XAI_BASE_URL", raising=False)
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
+    monkeypatch.delenv("EIR_XAI_BASE_URL", raising=False)
     monkeypatch.delenv("XAI_BASE_URL", raising=False)
 
     # Existing chat provider must not be overwritten by dashboard OAuth.
@@ -575,7 +575,7 @@ def test_xai_dashboard_poller_seeds_single_entry_and_clears_suppression(tmp_path
         encoding="utf-8",
     )
 
-    # Prior `hermes auth remove xai-oauth` left the source suppressed.
+    # Prior `eir auth remove xai-oauth` left the source suppressed.
     auth_mod.suppress_credential_source("xai-oauth", "device_code")
     assert auth_mod.is_source_suppressed("xai-oauth", "device_code") is True
 
@@ -643,7 +643,7 @@ def test_status_falls_through_to_generic_dispatcher_for_catalog_only_provider():
     Providers appended to the Accounts tab from the unified provider_catalog()
     carry status_fn=None and may have no explicit branch in
     _resolve_provider_status. Before the fallthrough they rendered permanently
-    logged-out; now they dispatch to hermes_cli.auth.get_auth_status (the
+    logged-out; now they dispatch to eir_cli.auth.get_auth_status (the
     canonical slug dispatcher) so membership AND status both auto-extend.
     """
 
@@ -655,7 +655,7 @@ def test_status_falls_through_to_generic_dispatcher_for_catalog_only_provider():
         "expires_at": "2026-12-01T00:00:00Z",
         "has_refresh_token": True,
     }
-    with patch("hermes_cli.auth.get_auth_status", return_value=fake_status):
+    with patch("eir_cli.auth.get_auth_status", return_value=fake_status):
         out = _rt_oauth._resolve_provider_status("some-future-oauth", None)
 
     assert out["logged_in"] is True
@@ -676,7 +676,7 @@ def test_qwen_status_card_carries_the_getter_expiry_token_and_auth_file():
         "logged_in": True, "auth_file": "/home/u/.qwen/oauth_creds.json", "source": "qwen-cli",
         "api_key": "qwen-access-token-secret-xyz", "expires_at_ms": expires_at_ms,
     }
-    with patch("hermes_cli.auth.get_qwen_auth_status", return_value=qwen_status):
+    with patch("eir_cli.auth.get_qwen_auth_status", return_value=qwen_status):
         out = _rt_oauth._resolve_provider_status("qwen-oauth", None)
 
     assert out["logged_in"] is True
@@ -700,8 +700,8 @@ def test_dashboard_poller_saves_only_into_the_profile_the_login_started_in(tmp_p
     profile up by session id AFTER the provider answered; a cancel (DELETE) or the 15-minute sweep
     had removed the registry entry by then, so the tokens landed in the dashboard's launch profile
     (the Codex path was fixed the same way as IA-01). A cancelled login saves nothing."""
-    from hermes_cli import auth as auth_mod
-    from hermes_constants import get_hermes_home
+    from eir_cli import auth as auth_mod
+    from eir_constants import get_eir_home
 
     coder_home = _make_profile_home(tmp_path, monkeypatch, profile="coder")
     saved_into = []
@@ -716,7 +716,7 @@ def test_dashboard_poller_saves_only_into_the_profile_the_login_started_in(tmp_p
         return {"access_token": "at", "refresh_token": "rt", "id_token": "", "expires_in": 3600,
                 "expired_in": 3600, "token_type": "Bearer"}
 
-    record = lambda *_a, **_k: saved_into.append(str(get_hermes_home()))
+    record = lambda *_a, **_k: saved_into.append(str(get_eir_home()))
     if provider == "xai-oauth":
         sess.update(device_code="dc", expires_at=time.time() + 600, interval=1)
         monkeypatch.setattr(auth_mod, "_xai_oauth_discovery", lambda *a, **k: {"token_endpoint": "https://x.test/t"})

@@ -1,4 +1,4 @@
-"""``hermes update`` leaves a busy manual gateway running with its restart pending, after arming the
+"""``eir update`` leaves a busy manual gateway running with its restart pending, after arming the
 detached restart watcher. The watcher used to respawn ``gateway run --replace`` at its 120 s
 deadline, and ``--replace`` SIGTERMs/SIGKILLs the still-busy gateway: the live work the update had
 just declined to stop was killed anyway. On POSIX the watcher now waits for the old PID to exit.
@@ -12,7 +12,7 @@ import time
 
 import pytest
 
-from hermes_cli import gateway
+from eir_cli import gateway
 from tests.waiting import wait_until
 
 
@@ -21,7 +21,7 @@ def test_watcher_never_respawns_while_the_old_gateway_is_still_running(tmp_path,
     release, exited, marker = tmp_path / "release", tmp_path / "old-exited", tmp_path / "respawned"
     home = tmp_path / "home"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     # The busy gateway: runs until released, and records its own exit.
     old = subprocess.Popen([sys.executable, "-c", (
         "import os, time\n"
@@ -61,11 +61,11 @@ def test_watcher_judges_the_old_gateway_by_pid_and_start_time(tmp_path, monkeypa
     own (pid, start time) keeps it waiting. A reused PID is simulated by arming the watcher with a
     start time the live process does not have."""
     from gateway import status as gateway_status
-    from hermes_cli import gateway_restart_watcher
+    from eir_cli import gateway_restart_watcher
 
     home = tmp_path / "home"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     old = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(600)"])
     real_start = gateway_status.get_process_start_time(old.pid)
     spawned = []

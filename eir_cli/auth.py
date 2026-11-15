@@ -1,13 +1,13 @@
-"""Multi-provider authentication system for Hermes Agent.
+"""Multi-provider authentication system for Eir Agent.
 
 - ``ProviderConfig`` / ``PROVIDER_REGISTRY`` describe every known inference provider.
-- The auth store (``~/.hermes/auth.json``) holds per-provider state, the credential pool and
+- The auth store (``~/.eir/auth.json``) holds per-provider state, the credential pool and
   suppression markers; ``_auth_store_lock`` / ``_load_auth_store`` / ``_save_auth_store`` are the
   only I/O primitives (cross-process flock, atomic 0o600 writes).
 - ``resolve_provider()`` picks the active provider via the documented priority chain.
 - ``OAUTH_PROVIDER_FLOWS`` maps each OAuth provider to its resolver/status builder; the flows live in
   ``auth_nous``/``auth_codex``/``auth_xai``/``auth_qwen``/``auth_minimax``/``auth_openrouter`` and are
-  re-imported here so ``hermes_cli.auth.<name>`` stays the public/patchable surface."""
+  re-imported here so ``eir_cli.auth.<name>`` stays the public/patchable surface."""
 
 from __future__ import annotations
 
@@ -30,27 +30,27 @@ from pathlib import Path
 from typing import Any, Callable, Dict, FrozenSet, Iterable, List, Optional, Tuple
 from urllib.parse import urlparse
 
-from hermes_constants import OPENROUTER_BASE_URL, hermes_home_key, secure_parent_dir
+from eir_constants import OPENROUTER_BASE_URL, eir_home_key, secure_parent_dir
 from agent.credential_persistence import sanitize_borrowed_credential_payload
 from utils import atomic_json_write, env_float, file_cache_version, is_truthy_value
-from hermes_cli.auth_zai_kimi import (
+from eir_cli.auth_zai_kimi import (
     KIMI_CODE_BASE_URL, ZAI_ENDPOINTS, _normalize_lmstudio_runtime_base_url, _resolve_kimi_base_url,
     _resolve_zai_base_url, detect_zai_endpoint)
-from hermes_cli.auth_declared_providers import (
+from eir_cli.auth_declared_providers import (
     default_api_key_base_url, provider_env_base_url, resolve_declared_api_key_provider)
-from hermes_cli.auth_model_picker import (
+from eir_cli.auth_model_picker import (
     _prompt_model_selection, _save_model_choice)
-from hermes_cli.auth_device_flow import (
+from eir_cli.auth_device_flow import (
     _can_open_graphical_browser, _default_verify, _is_remote_session,
     _nous_device_auth_timeout_message, _offer_existing_oauth_credentials,
     _poll_device_token_generic, _poll_for_token, _print_device_code_instructions,
     _print_login_success, _print_loopback_ssh_hint, _prompt_yes_no, _request_device_code,
     _resolve_verify, _ssh_user_at_host)
-from hermes_cli.auth_oauth_grants import (
+from eir_cli.auth_oauth_grants import (
     SINGLE_USE_REFRESH_POOL_PROVIDERS, _oauth_heal_clean_marks, _oauth_heal_notices,
     consume_oauth_heal_notices, heal_forked_single_use_oauth_grants,
     strip_cloned_single_use_oauth_grants)
-from hermes_cli.auth_nous import (
+from eir_cli.auth_nous import (
     NOUS_SESSION_TERMINAL, NOUS_SESSION_UNKNOWN, NOUS_SESSION_VALID, _ALLOWED_NOUS_INFERENCE_HOSTS,
     _agent_key_is_usable, _apply_nous_refreshed_tokens, _assert_nous_inference_jwt_usable,
     _compute_nous_auth_status, _format_nous_entitlement_auth_error, _healed_nous_inference_url,
@@ -64,32 +64,32 @@ from hermes_cli.auth_nous import (
     _write_shared_nous_state, fetch_nous_models, get_nous_auth_status_local,
     get_nous_session_validity, persist_nous_credentials, refresh_nous_oauth_from_state,
     resolve_nous_runtime_credentials, step_up_nous_billing_scope)
-from hermes_cli.auth_minimax import (
+from eir_cli.auth_minimax import (
     _MINIMAX_OAUTH_ERROR_BODY_LIMIT, _login_minimax_oauth, _minimax_oauth_login, _minimax_pkce_pair,
     _minimax_poll_token, _minimax_post_form, _minimax_request_user_code,
     _minimax_resolve_token_expiry_unix, _minimax_response_error_text, _minimax_save_auth_state,
     _refresh_minimax_oauth_state, build_minimax_oauth_token_provider,
     resolve_minimax_oauth_runtime_credentials)
-from hermes_cli.auth_xai import (
+from eir_cli.auth_xai import (
     _login_xai_oauth, _read_xai_oauth_tokens, _refresh_xai_oauth_tokens, _save_xai_oauth_tokens,
     _write_through_xai_oauth_to_global_root, _xai_access_token_is_expiring,
     _xai_oauth_device_code_login, _xai_oauth_discovery, _xai_oauth_poll_device_token,
     _xai_oauth_request_device_code, _xai_proactive_refresh_skew_seconds,
     _xai_validate_inference_base_url, refresh_xai_oauth_pure, resolve_xai_oauth_runtime_credentials)
-from hermes_cli.auth_codex import (
+from eir_cli.auth_codex import (
     _codex_access_token_is_expiring, _codex_device_code_login, _codex_http_client,
     _codex_pool_rate_limit_status, _codex_quota_probe_cache, _codex_usage_probe_url,
     _import_codex_cli_tokens, _is_codex_rate_limit_shaped, _login_openai_codex,
     _probe_codex_quota_restored, _read_codex_tokens, _refresh_codex_auth_tokens,
     _refresh_expired_codex_probe_token, _save_codex_tokens, clear_codex_pool_quota_cooldowns,
     refresh_codex_oauth_pure, resolve_codex_runtime_credentials)
-from hermes_cli.auth_openrouter import _openrouter_pkce_login
-from hermes_cli.guest_handoff import note_store_write
-from hermes_cli.auth_qwen import (
+from eir_cli.auth_openrouter import _openrouter_pkce_login
+from eir_cli.guest_handoff import note_store_write
+from eir_cli.auth_qwen import (
     _qwen_access_token_is_expiring, _qwen_base_url, _qwen_cli_auth_path, _read_qwen_cli_tokens,
     _refresh_qwen_cli_tokens, _save_qwen_cli_tokens, get_qwen_auth_status,
     resolve_qwen_runtime_credentials)
-from hermes_cli.auth_constants import (
+from eir_cli.auth_constants import (
     _decode_jwt_claims, AUTH_STORE_VERSION, AUTH_LOCK_TIMEOUT_SECONDS, DEFAULT_NOUS_PORTAL_URL,
     DEFAULT_NOUS_INFERENCE_URL, DEFAULT_NOUS_CLIENT_ID, NOUS_BILLING_MANAGE_SCOPE,
     DEFAULT_NOUS_SCOPE, NOUS_DEVICE_CODE_SOURCE, NOUS_AUTH_PATH_INVOKE_JWT,
@@ -240,22 +240,22 @@ _REGISTRY_ROWS: tuple[Any, ...] = (
     # region (agent/vertex_adapter.py build_vertex_base_url), not a fixed host.
     ("vertex", "Google Vertex AI", "", (), "", "vertex"),
     ("azure-foundry", "Azure Foundry", "", ("AZURE_FOUNDRY_API_KEY",), "AZURE_FOUNDRY_BASE_URL"))
-from hermes_cli.auth_plugin_providers import HomeScopedRegistry  # mirrored rows are read per home
+from eir_cli.auth_plugin_providers import HomeScopedRegistry  # mirrored rows are read per home
 PROVIDER_REGISTRY: dict[str, ProviderConfig] = HomeScopedRegistry(
     (p.id, p) for p in (r if isinstance(r, ProviderConfig) else _api_key_provider(*r) for r in _REGISTRY_ROWS))
 # The rows above, before any plugin touches the dict (a user plugin may override these; #48450).
 BUILTIN_PROVIDER_IDS = frozenset(dict.keys(PROVIDER_REGISTRY))
 
-# ``hermes_cli.config`` discovers model-provider plugins while importing, and a plugin may read this
+# ``eir_cli.config`` discovers model-provider plugins while importing, and a plugin may read this
 # module's registry during that discovery. Keep the import below ProviderConfig / PROVIDER_REGISTRY so
 # a plugin never observes a partially initialized auth module (CONTRACT: during discovery a plugin may
 # rely only on ``ProviderConfig`` and ``PROVIDER_REGISTRY`` from here — nothing defined below).
-from hermes_cli.config import (
-    atomic_config_replace, config_exists, get_hermes_home, get_config_path, read_raw_config, require_readable_config_before_write)
+from eir_cli.config import (
+    atomic_config_replace, config_exists, get_eir_home, get_config_path, read_raw_config, require_readable_config_before_write)
 
 # Plugin profiles (plugins/model-providers/<name>/) are mirrored into PROVIDER_REGISTRY with the
 # auth_type they declare; the mirror lives in the sibling so it can be re-run after discovery.
-from hermes_cli.auth_plugin_providers import (
+from eir_cli.auth_plugin_providers import (
     canonical_registry_rows as _canonical_registry_rows, get_plugin_oauth_auth_status,
     registry_lookup as _registry_lookup, sync_plugin_provider_registry)
 
@@ -267,10 +267,10 @@ def get_anthropic_key() -> str:
 
     Order mirrors ``PROVIDER_REGISTRY["anthropic"].api_key_env_vars``.
 
-    Checks both the ``.env`` file and the process environment, preferring ``~/.hermes/.env`` so a deliberate
+    Checks both the ``.env`` file and the process environment, preferring ``~/.eir/.env`` so a deliberate
     key rotation isn't shadowed by a stale shell export (matches the api-key resolution path — see #20591).
     """
-    from hermes_cli.config import get_env_value_prefer_dotenv
+    from eir_cli.config import get_env_value_prefer_dotenv
     env_vars = PROVIDER_REGISTRY["anthropic"].api_key_env_vars
     return next((v for v in (get_env_value_prefer_dotenv(var) or "" for var in env_vars) if v), "")
 
@@ -356,11 +356,11 @@ def _model_level_key_env(provider_id: str) -> str:
     """``model.key_env`` when config.yaml's main model targets *provider_id*, else ``""``.
 
     The Desktop settings UI saves registry-provider keys as a credential pointer
-    (``model.key_env`` → ``$HERMES_HOME/.env``) instead of the registry's canonical env var,
+    (``model.key_env`` → ``$EIR_HOME/.env``) instead of the registry's canonical env var,
     so credential resolution must consult it (#106336).
     """
     try:
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
         model_cfg = (load_config() or {}).get("model")
     except Exception:
         return ""
@@ -378,12 +378,12 @@ def _resolve_api_key_provider_secret(provider_id: str, pconfig: ProviderConfig) 
     if owned is not None:  # provider-owned resolution (token validation / exchange) is final
         return owned
 
-    # Prefer ~/.hermes/.env over os.environ so a deliberate key rotation in .env isn't shadowed by
+    # Prefer ~/.eir/.env over os.environ so a deliberate key rotation in .env isn't shadowed by
     # a stale shell export inherited from a parent process (Codex CLI, test runners, etc.).
-    from hermes_cli.config import get_env_value_prefer_dotenv
+    from eir_cli.config import get_env_value_prefer_dotenv
 
     # Desktop-saved credential pointer: the settings UI persists registry-provider keys as
-    # model.key_env → $HERMES_HOME/.env (e.g. HERMES_CUSTOM_LMSTUDIO_API_KEY) while keeping
+    # model.key_env → $EIR_HOME/.env (e.g. EIR_CUSTOM_LMSTUDIO_API_KEY) while keeping
     # model.provider on the registry id, so the pointer must be honored here or the UI-saved
     # key is silently ignored and lmstudio falls through to its no-auth placeholder (#106336).
     key_env = _model_level_key_env(provider_id)
@@ -428,7 +428,7 @@ def _resolve_api_key_provider_secret(provider_id: str, pconfig: ProviderConfig) 
 
 def is_rate_limited_auth_error(error: Exception) -> bool:
     """True when an :class:`AuthError` is upstream rate-limiting / quota: transient, and
-    re-authenticating cannot fix it, so callers should say "retry later", not ``hermes auth``."""
+    re-authenticating cannot fix it, so callers should say "retry later", not ``eir auth``."""
     return (isinstance(error, AuthError) and not error.relogin_required
             and error.code == CODEX_RATE_LIMITED_CODE)
 
@@ -457,10 +457,10 @@ def format_auth_error(error: Exception) -> str:
         # Rate-limit / quota errors are not credential problems: never append "re-authenticate".
         return str(error)
     if error.relogin_required:
-        # Profile-aware: a bare `hermes model` from a named profile re-signs the ROOT store (#114012).
-        from hermes_constants import profile_cli_selector
+        # Profile-aware: a bare `eir model` from a named profile re-signs the ROOT store (#114012).
+        from eir_constants import profile_cli_selector
 
-        return f"{error} Run `hermes {profile_cli_selector()}model` to re-authenticate."
+        return f"{error} Run `eir {profile_cli_selector()}model` to re-authenticate."
     if error.code in _ENTITLEMENT_ERROR_CODES:
         if error.provider == "nous":
             return _format_nous_entitlement_auth_error(error)
@@ -476,17 +476,17 @@ def _nonempty_str(value: Any) -> bool:
     return isinstance(value, str) and bool(value.strip())
 
 
-# ── Auth Store — persistence layer for ~/.hermes/auth.json ──────────────────────────────────────────
+# ── Auth Store — persistence layer for ~/.eir/auth.json ──────────────────────────────────────────
 
 def _auth_file_path() -> Path:
-    path = get_hermes_home() / "auth.json"
+    path = get_eir_home() / "auth.json"
     # Seat belt: under pytest, refuse to touch the real user's auth store (tests that forgot to
-    # monkeypatch HERMES_HOME or escaped the hermetic conftest). In production: one dict lookup.
+    # monkeypatch EIR_HOME or escaped the hermetic conftest). In production: one dict lookup.
     if (os.environ.get("PYTEST_CURRENT_TEST")
-            and _same_path(path, Path.home() / ".hermes" / "auth.json")):
+            and _same_path(path, Path.home() / ".eir" / "auth.json")):
         raise RuntimeError(
             f"Refusing to touch real user auth store during test run: {path}. "
-            "Set HERMES_HOME to a tmp_path in your test fixture, or run "
+            "Set EIR_HOME to a tmp_path in your test fixture, or run "
             "via scripts/run_tests.sh for hermetic CI-parity env.")
     return path
 
@@ -496,11 +496,11 @@ def _global_auth_file_path() -> Optional[Path]:
 
     Read-only fallback path, so no pytest seat belt here (it lives on ``_auth_file_path()``)."""
     try:
-        from hermes_constants import get_default_hermes_root
-        global_root = get_default_hermes_root()
+        from eir_constants import get_default_eir_root
+        global_root = get_default_eir_root()
     except Exception:
         return None
-    return None if _same_path(get_hermes_home(), global_root) else global_root / "auth.json"
+    return None if _same_path(get_eir_home(), global_root) else global_root / "auth.json"
 
 
 def _load_global_auth_store() -> dict[str, Any]:
@@ -520,7 +520,7 @@ def _load_global_auth_store() -> dict[str, Any]:
     if cache_key is not None and cached is not None and cached[:2] == cache_key:
         return cached[2]
     if os.environ.get("PYTEST_CURRENT_TEST") and os.environ.get("HOME"):
-        real_root = Path(os.environ["HOME"]) / ".hermes" / "auth.json"
+        real_root = Path(os.environ["HOME"]) / ".eir" / "auth.json"
         try:
             if os.path.normcase(os.path.abspath(global_path)) == os.path.normcase(os.path.abspath(real_root)):
                 _global_auth_store_cache = None
@@ -621,7 +621,7 @@ def _lock_holder_hint(lock_path: Path) -> str:
         except OSError:
             pass  # exists but is not signalable (e.g. EPERM): still a live holder
     # No example holder: many stores use this lock; the caller's timeout_message names which one.
-    return f"another hermes process (pid {pid}) probably still holds it"
+    return f"another eir process (pid {pid}) probably still holds it"
 
 
 def _stamp_lock_holder_pid(lock_file: Any) -> None:
@@ -776,8 +776,8 @@ def _load_auth_store(auth_file: Optional[Path] = None) -> dict[str, Any]:
 def _save_private_json(target: Path, data: Any, *, fsync_dir: bool = False, **dump_kwargs: Any) -> None:
     """0600 credential JSON under a 0700 parent (``secure_parent_dir`` refuses ``/``, top-level dirs
     and the install tree). ``atomic_json_write`` creates the temp file 0600 before any byte lands."""
-    from hermes_constants import mkdir_under_hermes_home
-    mkdir_under_hermes_home(target.parent)
+    from eir_constants import mkdir_under_eir_home
+    mkdir_under_eir_home(target.parent)
     secure_parent_dir(target)
     atomic_json_write(target, data, mode=0o600, fsync_dir=fsync_dir, **dump_kwargs)
 
@@ -896,7 +896,7 @@ def _save_provider_state_to_source(
 
 
 def mark_provider_active_if_unset(provider_id: str) -> None:
-    """Set ``active_provider`` only when none is set yet: the first ``hermes auth add`` credential must
+    """Set ``active_provider`` only when none is set yet: the first ``eir auth add`` credential must
     make its provider active (else setup reports "No inference provider configured"); later adds
     leave the user's choice untouched."""
     with _auth_store_lock():
@@ -937,7 +937,7 @@ def read_credential_pool(provider_id: Optional[str] = None) -> dict[str, Any]:
     """Return the persisted credential pool, or one provider slice.
 
     In profile mode the global-root ``auth.json`` is a read-only fallback applied per provider ONLY
-    when the profile has zero entries for it (``hermes auth add`` in the profile shadows global)."""
+    when the profile has zero entries for it (``eir auth add`` in the profile shadows global)."""
     pool = _load_auth_store().get("credential_pool")
     pool = pool if isinstance(pool, dict) else {}
     global_pool = _load_global_auth_store().get("credential_pool")
@@ -1034,7 +1034,7 @@ def _merge_disk_cooldown_state(
     ``write_credential_pool`` persists an in-memory snapshot that may predate another process
     marking the same credential exhausted/dead; without this merge the later rewrite resurrects a
     rate-limited key as healthy and both processes resume hammering it. The mirror image is a
-    ``hermes auth reset`` that postdates the snapshot's cooldown (``status_cleared_at`` newer than
+    ``eir auth reset`` that postdates the snapshot's cooldown (``status_cleared_at`` newer than
     its ``last_status_at``): the disk row wins there too, or a live session's next ordinary flush
     would write the reset cooldown straight back (#89415)."""
     if not isinstance(disk_entry, dict):
@@ -1091,7 +1091,7 @@ def write_credential_pool(
     Final disk-boundary sanitizer for borrowed credentials (callers may pass raw dicts). Entries on
     disk but missing from *entries* (added concurrently) are merged back unless in *removed_ids*,
     so a rotation/exhaustion rewrite never drops a concurrent credential. Entries in
-    *status_cleared_ids* were cleared deliberately (``hermes auth reset``) and skip the
+    *status_cleared_ids* were cleared deliberately (``eir auth reset``) and skip the
     recency merge, which would otherwise read their cleared ``last_status_at`` (None ->
     epoch 0) as a stale snapshot and copy a still-binding cooldown back."""
     removed = {rid for rid in (removed_ids or ()) if rid}
@@ -1230,7 +1230,7 @@ def _config_selects_provider(normalized: str) -> bool:
     Anthropic credentials for that slot even when the main model is another provider; otherwise
     Claude Code OAuth entries get pruned by ``load_pool("anthropic")`` and MoA advisors fail with
     "no ANTHROPIC_API_KEY" while the picker says Anthropic is logged in."""
-    from hermes_cli.config import load_config
+    from eir_cli.config import load_config
     cfg = load_config()
     if _slot_selects(cfg.get("model"), normalized):
         return True
@@ -1254,30 +1254,30 @@ def _config_selects_provider(normalized: str) -> bool:
 
 
 def _explicit_pool_entry_present(normalized: str) -> bool:
-    """Pool rows from EXPLICIT Hermes flows (manual add / device-code / PKCE) or live env keys;
+    """Pool rows from EXPLICIT Eir flows (manual add / device-code / PKCE) or live env keys;
     ambient borrowed sources (gh_cli / claude_code / qwen-cli) are deliberately excluded."""
     return any(_pool_entry_is_explicit(entry) for entry in read_credential_pool(normalized))
 
 
-# Set by Claude Code itself, not by the user explicitly configuring anthropic in Hermes.
+# Set by Claude Code itself, not by the user explicitly configuring anthropic in Eir.
 _IMPLICIT_ENV_VARS = frozenset({"CLAUDE_CODE_OAUTH_TOKEN"})
-_EXPLICIT_POOL_SOURCES = frozenset({"device_code", "loopback_pkce", "hermes_pkce", "manual"})
+_EXPLICIT_POOL_SOURCES = frozenset({"device_code", "loopback_pkce", "eir_pkce", "manual"})
 _VERTEX_PROVIDER_IDS = ("vertex", "google-vertex", "vertex-ai", "gcp-vertex", "vertexai")
 
 
 def _env_secret(name: str) -> bool:
     """True when *name* resolves to a usable secret in the active profile scope.
 
-    Must not read raw ``os.getenv``: under ``hermes serve`` / Desktop multiplex the
+    Must not read raw ``os.getenv``: under ``eir serve`` / Desktop multiplex the
     process environ is the *launch* profile, so a DeepSeek key pasted into another
     profile's ``.env`` would be invisible to ``explicit_only`` Settings → Model
     until a Bot-chat Refresh ran against that profile's own backend.
     Same reader as the credential resolver (``get_env_value_prefer_dotenv``: the current
-    HERMES_HOME ``.env`` first, then the scope-checked environ) so the gate and the key that
+    EIR_HOME ``.env`` first, then the scope-checked environ) so the gate and the key that
     actually authenticates never disagree — an empty ``DEEPSEEK_API_KEY=`` export in the parent
     shell must not hide a real key in ``.env`` (#77007).
     """
-    from hermes_cli.config import get_env_value_prefer_dotenv
+    from eir_cli.config import get_env_value_prefer_dotenv
     return has_usable_secret(get_env_value_prefer_dotenv(name) or "")
 
 
@@ -1289,7 +1289,7 @@ def _explicit_env_credentials_present(normalized: str) -> bool:
     ambient EC2 IMDS / SSO profiles never auto-surface."""
     pconfig = PROVIDER_REGISTRY.get(normalized)
     if pconfig is None:
-        from hermes_cli.providers import get_provider
+        from eir_cli.providers import get_provider
         pconfig = get_provider(normalized)
         if not pconfig:
             return False
@@ -1302,7 +1302,7 @@ def _explicit_env_credentials_present(normalized: str) -> bool:
 
 
 def _pool_entry_is_explicit(entry: Any) -> bool:
-    """True for pool rows the user created via an explicit Hermes flow (or a still-live env key)."""
+    """True for pool rows the user created via an explicit Eir flow (or a still-live env key)."""
     if not isinstance(entry, dict):
         return False
     source = str(entry.get("source") or "").strip().lower()
@@ -1316,17 +1316,17 @@ def _pool_entry_is_explicit(entry: Any) -> bool:
 
 
 def _keyless_provider_has_explicit_config(normalized: str) -> bool:
-    """Vertex / Bedrock count as explicit when Hermes-scoped routing config is present.
+    """Vertex / Bedrock count as explicit when Eir-scoped routing config is present.
 
     Uses has_explicit_vertex_config(), NOT has_vertex_credentials(): the latter also counts an
     ambient GOOGLE_APPLICATION_CREDENTIALS path (commonly set for unrelated GCP work). Only
-    Hermes-scoped signals (VERTEX_PROJECT_ID / vertex.project_id / VERTEX_CREDENTIALS_PATH) count
+    Eir-scoped signals (VERTEX_PROJECT_ID / vertex.project_id / VERTEX_CREDENTIALS_PATH) count
     here."""
     if normalized in _VERTEX_PROVIDER_IDS:
         from agent.vertex_adapter import has_explicit_vertex_config
         return bool(has_explicit_vertex_config())
     if normalized == "bedrock":
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
         bedrock_cfg = load_config().get("bedrock")
         return isinstance(bedrock_cfg, dict) and bool(str(bedrock_cfg.get("region") or "").strip())
     return False
@@ -1344,7 +1344,7 @@ _EXPLICIT_CONFIG_CHECKS: tuple[tuple[Callable[[str], bool], bool], ...] = (
 def is_provider_explicitly_configured(provider_id: str) -> bool:
     """True only if the user explicitly configured this provider: auth.json ``active_provider``,
     config.yaml ``model.provider`` / MoA slots, a pasted provider env var, a pool entry from a
-    Hermes-initiated flow, or Hermes-scoped routing config for keyless cloud-SDK providers. Ambient
+    Eir-initiated flow, or Eir-scoped routing config for keyless cloud-SDK providers. Ambient
     borrowed credentials (gh CLI, qwen-cli, ~/.claude/.credentials.json) never count."""
     normalized = (provider_id or "").strip().lower()
     for check, best_effort in _EXPLICIT_CONFIG_CHECKS:
@@ -1360,7 +1360,7 @@ def is_provider_explicitly_configured(provider_id: str) -> bool:
 
 def clear_provider_auth(provider_id: Optional[str] = None) -> bool:
     """Clear auth state for a provider (the active one when *provider_id* is None). Used by
-    ``hermes logout``. Returns True if something was cleared."""
+    ``eir logout``. Returns True if something was cleared."""
     with _auth_store_lock():
         auth_store = _load_auth_store()
         target = provider_id or auth_store.get("active_provider")
@@ -1399,7 +1399,7 @@ def _refuse_env_adoption_if_config_corrupt() -> None:
     silently adopt the PAID openrouter provider over whatever the broken config really names.
     Fires ONLY on the auto path and clears itself once the file parses again."""
     try:
-        from hermes_cli.config_read_errors import get_active_config_parse_failure
+        from eir_cli.config_read_errors import get_active_config_parse_failure
         err = get_active_config_parse_failure()
         if not err:
             return
@@ -1410,7 +1410,7 @@ def _refuse_env_adoption_if_config_corrupt() -> None:
     raise AuthError(
         f"config.yaml at {path} is corrupt ({err}) — refusing to auto-select "
         f"an inference provider from environment keys. Fix the YAML (a backup "
-        f"was saved next to it) or run hermes setup.",
+        f"was saved next to it) or run eir setup.",
         code="corrupt_config")
 
 
@@ -1490,7 +1490,7 @@ def _scoped_key_env_reader() -> Callable[[str], str]:
 
 def _openrouter_auto_detected(scoped_key_env: Callable[[str], str]) -> bool:
     """True when an OpenRouter credential exists via env key or the credential pool (a key added via
-    `hermes auth add openrouter` has no env var; without the pool check it is invisible to
+    `eir auth add openrouter` has no env var; without the pool check it is invisible to
     auto-detection and requests go out with no Authorization header)."""
     if has_usable_secret(scoped_key_env("OPENROUTER_API_KEY")):
         return True
@@ -1500,9 +1500,9 @@ def _openrouter_auto_detected(scoped_key_env: Callable[[str], str]) -> bool:
     if has_usable_secret(legacy_key) and looks_like_openrouter_key(legacy_key):
         return True
     try:
-        # Auto-detect an OpenRouter credential added via `hermes auth add openrouter` (manual pool entry, no
+        # Auto-detect an OpenRouter credential added via `eir auth add openrouter` (manual pool entry, no
         # env var). Without this, a key that only lives in the credential pool is invisible to
-        # auto-detection — the user sees `hermes auth list` showing the credential while requests go out
+        # auto-detection — the user sees `eir auth list` showing the credential while requests go out
         # with no Authorization header ("HTTP 401: Missing Authentication header"). The env-var check above
         # only covers OPENROUTER_API_KEY and an sk-or- key in OPENAI_API_KEY. See issue #42130.
         from agent.credential_pool import load_pool as _load_pool
@@ -1517,7 +1517,7 @@ def _logged_in_oauth_active_provider(*, skip_free_tier: bool = False) -> Optiona
     try:
         _maybe = _load_auth_store().get("active_provider")
         if _maybe == "nous":
-            from hermes_cli.anon_auth import free_inference_active, has_guest
+            from eir_cli.anon_auth import free_inference_active, has_guest
             if has_guest() and (skip_free_tier or not free_inference_active()):
                 return None  # this guest carries no inference here (or is being discounted): not a login
         if _maybe and _maybe in PROVIDER_REGISTRY and get_auth_status(_maybe).get("logged_in"):
@@ -1536,10 +1536,10 @@ def _config_model_provider() -> tuple[Any, Optional[str]]:
     this is the safety net for the direct ``resolve_provider("auto")`` callers. A configured custom
     endpoint is explicit intent like any registry pin: without this rung the boot inventory
     (``free_tier_bootstrap``) read a llama.cpp/vLLM install as "nothing configured" and the
-    dashboard's Ink chat parked every session on Setup Required while ``hermes chat`` worked
+    dashboard's Ink chat parked every session on Setup Required while ``eir chat`` worked
     (#108383)."""
     try:
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
         model_cfg = (load_config() or {}).get("model")
         provider = model_cfg.get("provider") if isinstance(model_cfg, dict) else None
         provider = provider.strip().lower() if isinstance(provider, str) else ""
@@ -1553,14 +1553,14 @@ def _config_model_provider() -> tuple[Any, Optional[str]]:
         # Bare ``providers:`` name (the ``custom:<name>`` intent spelled without the prefix); reuse the
         # runtime's own lookup so disabled / endpoint-less entries stay excluded.
         if provider:
-            from hermes_cli.runtime_provider_custom import has_named_custom_provider
+            from eir_cli.runtime_provider_custom import has_named_custom_provider
             if has_named_custom_provider(provider):
                 return model_cfg, "custom"
         # No provider pin but a base_url the bare-custom runtime rung would honour (a loopback
         # llama.cpp/vLLM/ollama server) — same explicit intent, spelled by URL.
         base_url = str(model_cfg.get("base_url") or "").strip() if isinstance(model_cfg, dict) else ""
         if base_url:
-            from hermes_cli.runtime_provider import _config_base_url_trustworthy_for_bare_custom
+            from eir_cli.runtime_provider import _config_base_url_trustworthy_for_bare_custom
             if _config_base_url_trustworthy_for_bare_custom(base_url, provider):
                 return model_cfg, "custom"
         return model_cfg, None
@@ -1585,7 +1585,7 @@ def _credential_profile(provider_id: str) -> Any:
 def _env_key_auto_detected(
     scoped_key_env: Callable[[str], str], oauth_active: Optional[str]) -> Optional[str]:
     """First registry api_key provider (registry order) with a usable env key, warning when it
-    preempts a logged-in OAuth provider so a stale key in ~/.hermes/.env never switches silently."""
+    preempts a logged-in OAuth provider so a stale key in ~/.eir/.env never switches silently."""
     from providers import list_providers
 
     ambient = {p.name for p in list_providers() if p.ambient_credentials}  # never per-pid lookups: a miss walks the ladder
@@ -1598,7 +1598,7 @@ def _env_key_auto_detected(
                     logger.warning(
                         # An exported API key now wins over a logged-in OAuth provider (the #29285 fix).
                         # Surface that so a user who deliberately uses OAuth but has a stale key in
-                        # ~/.hermes/.env isn't silently switched without knowing why.
+                        # ~/.eir/.env isn't silently switched without knowing why.
                         "Provider resolved to %r via %s, preempting your "
                         "logged-in OAuth provider %r. If you meant to use the "
                         "OAuth login, unset %s or set `model.provider` "
@@ -1635,10 +1635,10 @@ def resolve_provider(
     if normalized in ("openrouter", "custom") or _registry_lookup(normalized) is not None:
         return normalized
     if normalized != "auto":
-        from hermes_cli.auth_error_copy import unknown_provider_hint
+        from eir_cli.auth_error_copy import unknown_provider_hint
         hint = unknown_provider_hint(normalized)
-        tail = (f"\n\n{hint}" if hint else " Check 'hermes model' for available providers, "
-                "or run 'hermes doctor' to diagnose config issues.")
+        tail = (f"\n\n{hint}" if hint else " Check 'eir model' for available providers, "
+                "or run 'eir doctor' to diagnose config issues.")
         raise AuthError(f"Unknown provider '{normalized}'." + tail, code="invalid_provider")
 
     if explicit_api_key or explicit_base_url:  # one-off CLI creds always mean openrouter/custom
@@ -1681,7 +1681,7 @@ def resolve_provider(
     # only the desktop's trial claim does (welcome_trial), so provider resolution stays free of network.
     if not skip_free_tier:
         try:
-            from hermes_cli.anon_auth import free_inference_active
+            from eir_cli.anon_auth import free_inference_active
             if free_inference_active():
                 return "nous"
         except Exception as exc:
@@ -1690,16 +1690,16 @@ def resolve_provider(
     # below explicit keys and below the free tier.
     try:
         from agent.bedrock_adapter import has_aws_credentials
-        from hermes_cli.anon_auth import on_local_desktop_backend  # a laptop: no EC2 metadata lookup
+        from eir_cli.anon_auth import on_local_desktop_backend  # a laptop: no EC2 metadata lookup
         if has_aws_credentials(instance_metadata=not on_local_desktop_backend()):
             return "bedrock"
     except ImportError:
         pass  # boto3 not installed
-    from hermes_constants import display_hermes_home
+    from eir_constants import display_eir_home
     raise AuthError(
-        "Hermes is not connected to any AI provider yet. Run `hermes model` to pick one, type `/login` in chat, "
-        f"or add a key with `hermes auth add <provider>`. (Advanced: put an API key such as OPENROUTER_API_KEY in "
-        f"{display_hermes_home()}/.env.)",
+        "Eir is not connected to any AI provider yet. Run `eir model` to pick one, type `/login` in chat, "
+        f"or add a key with `eir auth add <provider>`. (Advanced: put an API key such as OPENROUTER_API_KEY in "
+        f"{display_eir_home()}/.env.)",
         code="no_provider_configured")
 
 
@@ -1777,8 +1777,8 @@ _NOUS_PORTAL_ALLOWED_HOSTS: frozenset[str] = frozenset({
 # Per-process memo for resolve_nous_access_token: startup runs one check_fn per managed tool and
 # each would trigger its own ~15s blocking refresh of an expired token; a short-TTL memo collapses
 # the burst into one round-trip. Callers needing freshness use force_fresh/refresh_nous_oauth_pure.
-# Keyed by hermes_home_key(): the resolution itself is profile-scoped (_auth_file_path reads the
-# per-turn HERMES_HOME override a multiplex gateway sets), so a single slot would hand profile A's
+# Keyed by eir_home_key(): the resolution itself is profile-scoped (_auth_file_path reads the
+# per-turn EIR_HOME override a multiplex gateway sets), so a single slot would hand profile A's
 # Portal bearer to profile B for up to the TTL.
 _RESOLVE_TOKEN_CACHE_LOCK = threading.Lock()
 _RESOLVE_TOKEN_CACHE: dict[str, tuple[float, str]] = {}
@@ -1793,8 +1793,8 @@ def resolve_nous_access_token(
     refresh_skew_seconds: int = ACCESS_TOKEN_REFRESH_SKEW_SECONDS) -> str:
     """Refresh-aware Nous Portal token for managed tool gateways, connectors and account reads, never
     the free model: a guest gets a live held token, else a connectors-only mint NAS never challenges.
-    Only a NAS from before hermes-portal#1516 challenges that mint; it is worked here as before."""
-    from hermes_cli.anon_challenge import run_with_challenge
+    Only a NAS from before eir-portal#1516 challenges that mint; it is worked here as before."""
+    from eir_cli.anon_challenge import run_with_challenge
     return run_with_challenge(lambda: _resolve_nous_access_token(
         timeout_seconds=timeout_seconds, insecure=insecure, ca_bundle=ca_bundle,
         refresh_skew_seconds=refresh_skew_seconds))
@@ -1808,7 +1808,7 @@ def _resolve_nous_access_token(
     refresh_skew_seconds: int) -> str:
     # Only a default-TLS resolution is memoised; error paths never populate the memo.
     memoable = not insecure and ca_bundle is None
-    cache_key = hermes_home_key()
+    cache_key = eir_home_key()
     if memoable:
         with _RESOLVE_TOKEN_CACHE_LOCK:
             cached = _RESOLVE_TOKEN_CACHE.get(cache_key)
@@ -1823,7 +1823,7 @@ def _resolve_nous_access_token(
 
     with _provider_state_transaction("nous") as (auth_store, state, state_source_path):
         if not state:
-            raise _nous_err("Hermes is not logged into Nous Portal.", "nous_auth_missing", relogin=True)
+            raise _nous_err("Eir is not logged into Nous Portal.", "nous_auth_missing", relogin=True)
         portal_base_url = _nous_portal_base_url(state)
         client_id = str(state.get("client_id") or DEFAULT_NOUS_CLIENT_ID)
         verify = _resolve_verify(insecure=insecure, ca_bundle=ca_bundle, auth_state=state)
@@ -1832,7 +1832,7 @@ def _resolve_nous_access_token(
 
         lock_timeout = max(timeout_seconds + 5.0, AUTH_LOCK_TIMEOUT_SECONDS)
         with _nous_shared_store_lock(timeout_seconds=lock_timeout):
-            from hermes_cli.anon_auth import held_connectors_token, is_guest_state, refresh_guest_state
+            from eir_cli.anon_auth import held_connectors_token, is_guest_state, refresh_guest_state
             if is_guest_state(state):
                 # A live held token serves (an inference one is a superset); else mint connectors-only.
                 if access_token := held_connectors_token(state, skew_seconds=refresh_skew_seconds):
@@ -1930,12 +1930,12 @@ class OAuthProviderFlow:
     """Per-provider OAuth plumbing, keyed by provider id in ``OAUTH_PROVIDER_FLOWS``.
 
     Callables are named (strings) and looked up in this module at call time so
-    ``monkeypatch.setattr("hermes_cli.auth.resolve_codex_runtime_credentials", ...)`` applies."""
+    ``monkeypatch.setattr("eir_cli.auth.resolve_codex_runtime_credentials", ...)`` applies."""
     provider_id: str
     resolve_fn: str
     status_fn: str
     terminal_refresh_codes: frozenset[str] = frozenset()  # retrying the same refresh token cannot succeed
-    # ``hermes logout`` with no active provider falls back to config.yaml ``model.provider`` only
+    # ``eir logout`` with no active provider falls back to config.yaml ``model.provider`` only
     # for providers whose credentials live in auth.json.
     logout_from_config: bool = False
 
@@ -2012,7 +2012,7 @@ def get_codex_auth_status() -> dict[str, Any]:
         on_pool_miss=_codex_pool_rate_limited_status)
     if str(status.get("source") or "").startswith("pool:"):
         # Pool rows keep the canonical URL; the chat route may send this key to model.base_url.
-        from hermes_cli.auth_codex import _codex_pool_route_base_url
+        from eir_cli.auth_codex import _codex_pool_route_base_url
         status["base_url"] = _codex_pool_route_base_url(status.get("base_url"))
     return status
 
@@ -2052,7 +2052,7 @@ def _external_process_auth_evidence(provider_id: str, resolved_command: Optional
 
     False means "not verifiable from here", NOT "signed out". Subprocess-free (spawning the CLI from
     status endpoints/pickers re-creates a cold-start stall). Generic evidence
-    for any external-process profile is its binary resolving: the subprocess owns real auth and Hermes
+    for any external-process profile is its binary resolving: the subprocess owns real auth and Eir
     has nothing else to inspect, so out-of-tree ACP rows pass credential-gated surfaces (Desktop
     ``explicit_only`` picker); a profile whose CLI exposes readable token stores answers
     ``external_auth_evidence()`` instead."""
@@ -2077,7 +2077,7 @@ def _external_process_spec(
         profile = None
     command_env_vars = tuple(getattr(profile, "process_command_env_vars", ()) or ())
     args_env_var = str(getattr(profile, "process_args_env_var", "") or "")
-    from hermes_cli.auth_external_process import external_process_command, resolve_external_process_command
+    from eir_cli.auth_external_process import external_process_command, resolve_external_process_command
     command = external_process_command(profile)
     raw_args = os.getenv(args_env_var, "").strip() if args_env_var else ""
     args = shlex.split(raw_args) if raw_args else list(getattr(profile, "process_args", ()) or [])
@@ -2114,7 +2114,7 @@ def get_auth_status(provider_id: Optional[str] = None) -> dict[str, Any]:
     """Generic auth status dispatcher: bespoke builders (``OAUTH_PROVIDER_FLOWS`` plus Azure
     Foundry) first, then the registry ``auth_type`` so a whole provider class (e.g. every
     external-process ACP backend) gets a real status. Builders are looked up by NAME at call time so
-    tests that patch ``hermes_cli.auth.get_*_auth_status`` still apply."""
+    tests that patch ``eir_cli.auth.get_*_auth_status`` still apply."""
     target = (provider_id or get_active_provider() or "").strip().lower()
     if not target:
         return {"logged_in": False}
@@ -2145,11 +2145,11 @@ def _get_azure_foundry_auth_status() -> dict[str, Any]:
     """Structural auth status for Azure Foundry.
 
     ``entra_id``: ``azure-identity`` importable — never invokes the Entra credential chain (keeps
-    CLI startup flat; ``hermes doctor`` runs the live probe). ``api_key`` (default): usable
+    CLI startup flat; ``eir doctor`` runs the live probe). ``api_key`` (default): usable
     ``AZURE_FOUNDRY_API_KEY``."""
     info: dict[str, Any] = {"provider": "azure-foundry"}
     try:
-        from hermes_cli.config import load_config, get_env_value_prefer_dotenv
+        from eir_cli.config import load_config, get_env_value_prefer_dotenv
         cfg = load_config()
     except Exception:
         cfg = {}
@@ -2172,11 +2172,11 @@ def _get_azure_foundry_auth_status() -> dict[str, Any]:
                 credential_verified=False, logged_in=bool(installed),
                 hint=(
                     "azure-identity is installed; live credential validation "
-                    "is skipped here. Run `hermes doctor` to verify token acquisition."
+                    "is skipped here. Run `eir doctor` to verify token acquisition."
                 ) if installed else (
-                    "azure-identity not installed. From the Hermes environment, run: "
+                    "azure-identity not installed. From the Eir environment, run: "
                     f"{install_hint('azure-identity')}. "
-                    "Then restart Hermes."))
+                    "Then restart Eir."))
         except Exception as exc:
             info["logged_in"] = False
             info["error"] = f"azure-identity check failed: {exc}"
@@ -2294,7 +2294,7 @@ def _update_config_for_provider(
 
     # Built-in providers resolve credentials from env/auth state, not inline model.api_key left
     # over from a previous custom provider.
-    from hermes_cli.config import clear_model_endpoint_credentials
+    from eir_cli.config import clear_model_endpoint_credentials
     clear_model_endpoint_credentials(model_cfg)
 
     # An OpenRouter-formatted default like "anthropic/claude-opus-4.6" fails on direct-API
@@ -2355,9 +2355,9 @@ def _reset_config_provider() -> Path:
 
 
 def login_command(args) -> None:
-    """Deprecated: use 'hermes model' or 'hermes setup' instead."""
-    print("The 'hermes login' command has been removed.\nUse 'hermes auth' to manage credentials,\n"
-          "'hermes model' to select a provider, or 'hermes setup' for full setup.")
+    """Deprecated: use 'eir model' or 'eir setup' instead."""
+    print("The 'eir login' command has been removed.\nUse 'eir auth' to manage credentials,\n"
+          "'eir model' to select a provider, or 'eir setup' for full setup.")
     raise SystemExit(0)
 
 
@@ -2386,7 +2386,7 @@ def logout_command(args) -> None:
         print("No provider is currently logged in.")
         return
     if target == "nous":
-        from hermes_cli.anon_auth import FREE_TIER_NOT_SIGNED_IN, is_guest_state
+        from eir_cli.anon_auth import FREE_TIER_NOT_SIGNED_IN, is_guest_state
         if is_guest_state(get_provider_auth_state("nous")):
             # Free tier is not a login; there is nothing to log out of and nothing is cleared.
             print(FREE_TIER_NOT_SIGNED_IN)
@@ -2398,7 +2398,7 @@ def logout_command(args) -> None:
         return
     if target == "nous":
         # A profile logout must not be re-adopted from the cross-profile store on the next boot.
-        from hermes_cli.auth_nous import _clear_shared_nous_state
+        from eir_cli.auth_nous import _clear_shared_nous_state
         _clear_shared_nous_state("logout")
     if should_reset_config:
         _reset_config_provider()
@@ -2406,6 +2406,6 @@ def logout_command(args) -> None:
     if not should_reset_config:
         print("Model provider configuration was unchanged.")
     elif os.getenv("OPENROUTER_API_KEY"):
-        print("Hermes will use OpenRouter for inference.")
+        print("Eir will use OpenRouter for inference.")
     else:
-        print("Run `hermes model` or configure an API key to use Hermes.")
+        print("Run `eir model` or configure an API key to use Eir.")

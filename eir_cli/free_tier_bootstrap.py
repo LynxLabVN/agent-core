@@ -1,8 +1,8 @@
 """Record of who carries inference, for ``setup.status`` and ``setup.ready``.
 
-It runs once per process on a daemon thread: at ``hermes serve`` boot, and on the gateway when the
+It runs once per process on a daemon thread: at ``eir serve`` boot, and on the gateway when the
 local Desktop first connects (``tui_gateway.methods_onboarding.begin_local_desktop_boot``). It never
-creates an identity: the desktop's welcome-trial claim (``hermes_cli.welcome_trial``) and the first
+creates an identity: the desktop's welcome-trial claim (``eir_cli.welcome_trial``) and the first
 hosted connector action are the only creators. For the desktop's local backend it first records a
 fresh install's onboarding decision (``onboarding_run.latch_first_install``) and settles a claim cut
 off before its marker write (``welcome_trial.settle_interrupted_claim``). Then it inventories
@@ -19,7 +19,7 @@ import time
 from dataclasses import asdict, dataclass, field, replace
 from typing import Any, Dict, Optional
 
-logger = logging.getLogger("hermes_cli.auth")
+logger = logging.getLogger("eir_cli.auth")
 
 # The desktop's first ``setup.status`` waits this long for the record before falling back to a live probe.
 SETUP_READY_WAIT_SECONDS = 8.0
@@ -95,15 +95,15 @@ def reconcile_record() -> Optional[SetupRecord]:
     inference. The identity and failure block are kept as is. A record that already says ``True`` is never re-probed, so the answer
     only moves false -> true here. Every write path that assigns the main model (the Models page,
     a picker key save) calls this for the immediate broadcast; ``setup.status`` calls it for
-    writes this process never saw (``hermes setup`` / ``hermes model`` from a shell, a hand edit).
+    writes this process never saw (``eir setup`` / ``eir model`` from a shell, a hand edit).
     The record is the LAUNCH profile's: a call scoped to another profile's home (a dashboard
     write with ``?profile=B``) leaves it alone, or B's providers would open the launch gate."""
     global _record
     record = _record
     if record is None or record.provider_configured:
         return record
-    from hermes_constants import get_process_hermes_home, hermes_home_key
-    if hermes_home_key() != hermes_home_key(get_process_hermes_home()) or _inventory_stamp == _config_stamp():
+    from eir_constants import get_process_eir_home, eir_home_key
+    if eir_home_key() != eir_home_key(get_process_eir_home()) or _inventory_stamp == _config_stamp():
         return record
     if not _inventory_other_providers():
         return _record
@@ -129,9 +129,9 @@ def reset_for_tests() -> None:
 
 
 def _config_stamp() -> tuple:
-    from hermes_cli.config import get_hermes_home
+    from eir_cli.config import get_eir_home
     from utils import file_cache_version
-    home = get_hermes_home()
+    home = get_eir_home()
     stamp = []
     for name in _INVENTORY_FILES:
         try:
@@ -153,7 +153,7 @@ def _inventory_other_providers() -> bool:
     seen by the next :func:`reconcile_record`.
     """
     global _inventory_stamp
-    from hermes_cli.auth import resolve_provider
+    from eir_cli.auth import resolve_provider
     _inventory_stamp = _config_stamp()
     try:
         return resolve_provider("auto", skip_free_tier=True) != "nous"
@@ -163,7 +163,7 @@ def _inventory_other_providers() -> bool:
 
 
 def _resolve_inference() -> str:
-    from hermes_cli.auth import resolve_provider
+    from eir_cli.auth import resolve_provider
     try:
         return str(resolve_provider("auto") or "")
     except Exception:
@@ -172,7 +172,7 @@ def _resolve_inference() -> str:
 
 def _build_record(*, other: bool) -> SetupRecord:
     """One inventory pass into a record. Reads only: no identity is created here."""
-    from hermes_cli import anon_auth
+    from eir_cli import anon_auth
 
     state: Optional[dict[str, Any]] = anon_auth.current_nous_state()
     failure: dict[str, Any] = {} if state else (anon_auth.last_mint_failure() or {})
@@ -217,15 +217,15 @@ def _settle_install() -> bool:
     logged: onboarding.state still answers live, and the record still says who carries inference."""
     settled = True
     try:
-        from hermes_cli import anon_auth
-        from hermes_cli.onboarding_run import latch_first_install
+        from eir_cli import anon_auth
+        from eir_cli.onboarding_run import latch_first_install
         if anon_auth.on_local_desktop_backend():
             latch_first_install()
     except Exception:
         settled = False
         logger.warning("onboarding: could not record the first-install decision", exc_info=True)
     try:
-        from hermes_cli.welcome_trial import settle_interrupted_claim
+        from eir_cli.welcome_trial import settle_interrupted_claim
         settle_interrupted_claim()
     except Exception:
         settled = False
@@ -267,7 +267,7 @@ def refresh_record(*, announce: bool = True) -> Optional[SetupRecord]:
 
 
 def _due_changed() -> None:
-    from hermes_cli import onboarding_due
+    from eir_cli import onboarding_due
 
     onboarding_due.invalidate()
 

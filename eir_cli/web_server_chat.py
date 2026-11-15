@@ -20,20 +20,20 @@ from typing import Optional
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from pathlib import Path
 from typing import Optional
-from hermes_cli.pty_session import PtySessionRegistry
+from eir_cli.pty_session import PtySessionRegistry
 
 # Same logger the code used before extraction (record parity).
-_log = logging.getLogger("hermes_cli.web_server")
+_log = logging.getLogger("eir_cli.web_server")
 
 
-# /api/pty spawns ``hermes --tui`` behind a pseudo-terminal and forwards bytes +
+# /api/pty spawns ``eir --tui`` behind a pseudo-terminal and forwards bytes +
 # resize escapes to xterm.js.  POSIX uses pty_bridge (fcntl/termios); native
 # Windows uses win_pty_bridge (pywinpty/ConPTY); same surface, no handler guards.
 try:
     if sys.platform.startswith("win"):
-        from hermes_cli.win_pty_bridge import WinPtyBridge as PtyBridge, PtyUnavailableError
+        from eir_cli.win_pty_bridge import WinPtyBridge as PtyBridge, PtyUnavailableError
     else:
-        from hermes_cli.pty_bridge import PtyBridge, PtyUnavailableError
+        from eir_cli.pty_bridge import PtyBridge, PtyUnavailableError
     _PTY_BRIDGE_AVAILABLE = True
 except ImportError:  # pragma: no cover - pywinpty / ptyprocess missing
     PtyBridge = None  # type: ignore[assignment]
@@ -132,14 +132,14 @@ async def _legacy_pump(ws: WebSocket, bridge) -> None:
         await asyncio.to_thread(bridge.close)
 
 
-from hermes_cli.web_server_boundary import _LOOPBACK_HOSTS
+from eir_cli.web_server_boundary import _LOOPBACK_HOSTS
 
 
 def _ws_client_reason(ws: WebSocket) -> Optional[str]:
     """Return a rejection reason token for the peer IP, or None when allowed
-    (:func:`hermes_cli.web_server_boundary.ws_client_reason` on the dashboard app state)."""
-    from hermes_cli.web_server import app
-    from hermes_cli.web_server_boundary import ws_client_reason
+    (:func:`eir_cli.web_server_boundary.ws_client_reason` on the dashboard app state)."""
+    from eir_cli.web_server import app
+    from eir_cli.web_server_boundary import ws_client_reason
     return ws_client_reason(ws, app.state)
 
 
@@ -150,9 +150,9 @@ def _ws_client_is_allowed(ws: WebSocket) -> bool:
 
 def _ws_host_origin_reason(ws: WebSocket) -> Optional[str]:
     """Return ``host_mismatch …`` / ``origin_mismatch …``, or None when allowed
-    (:func:`hermes_cli.web_server_boundary.ws_host_origin_reason` on the dashboard app state)."""
-    from hermes_cli.web_server import app
-    from hermes_cli.web_server_boundary import ws_host_origin_reason
+    (:func:`eir_cli.web_server_boundary.ws_host_origin_reason` on the dashboard app state)."""
+    from eir_cli.web_server import app
+    from eir_cli.web_server_boundary import ws_host_origin_reason
     return ws_host_origin_reason(ws, app.state)
 
 
@@ -166,7 +166,7 @@ def _ws_request_is_allowed(ws: WebSocket) -> bool:
     return _ws_host_origin_is_allowed(ws) and _ws_client_is_allowed(ws)
 
 
-from hermes_cli.web_server_boundary import (
+from eir_cli.web_server_boundary import (
     _GATEWAY_WS_PROTOCOL,
     _GATEWAY_WS_TICKET_PROTOCOL_PREFIX,
     _gateway_ws_ticket_from_subprotocol,
@@ -228,18 +228,18 @@ def _ws_auth_reason(ws: WebSocket, *, allow_internal: bool = False,
     must not grant access.
 
     Either mode: a local Desktop (no static token) presents the private one-use
-    ``X-Hermes-Gateway-Ticket`` grant its REST calls use (``authenticate_native_ws``).
+    ``X-Eir-Gateway-Ticket`` grant its REST calls use (``authenticate_native_ws``).
     A socket that sends that header is judged by it alone: on a core socket
     (``/api/ws``, ``/api/pty``, the audio streams) the grant is refused
     (``native_invalid``) even when a valid ``token`` query credential rides along.
     That is intended; only the plugin WebSocket gate accepts the grant. The audio
     streams instead take the ``interactive`` grant of the Desktop's ``/api/ws`` dial,
-    in its gateway subprotocol (``redeem_audio_ws``), stamped on ``_hermes_native_grant``.
+    in its gateway subprotocol (``redeem_audio_ws``), stamped on ``_eir_native_grant``.
     """
-    from hermes_cli.dashboard_auth.native_http import HEADER, authenticate_native_ws, redeem_audio_ws
-    from hermes_cli.web_server import _SESSION_TOKEN, app
-    from hermes_cli.browser_credential import generation_of
-    from hermes_cli.web_session_sockets import OWN_TICKET_SOCKETS, track
+    from eir_cli.dashboard_auth.native_http import HEADER, authenticate_native_ws, redeem_audio_ws
+    from eir_cli.web_server import _SESSION_TOKEN, app
+    from eir_cli.browser_credential import generation_of
+    from eir_cli.web_session_sockets import OWN_TICKET_SOCKETS, track
     auth_required = bool(getattr(app.state, "auth_required", False))
     # The Webapp's own rules (socket tickets on the loopback gate, the server's credential only where
     # its spawned clients dial) apply on its listener; the standalone dashboard and serve keep main's.
@@ -252,19 +252,19 @@ def _ws_auth_reason(ws: WebSocket, *, allow_internal: bool = False,
         grant = authenticate_native_ws(ws)
         if grant is None:
             return "native_invalid", "native"
-        ws._hermes_auth_identity = {"user_id": grant["subject"], "provider": "local"}
+        ws._eir_auth_identity = {"user_id": grant["subject"], "provider": "local"}
         return None, "native"
     grant = redeem_audio_ws(ws)
     if grant is not None:
-        ws._hermes_auth_identity = {"user_id": grant["subject"], "provider": "local"}
-        ws._hermes_native_grant = grant
-        ws._hermes_ws_subprotocol = _GATEWAY_WS_PROTOCOL
+        ws._eir_auth_identity = {"user_id": grant["subject"], "provider": "local"}
+        ws._eir_native_grant = grant
+        ws._eir_ws_subprotocol = _GATEWAY_WS_PROTOCOL
         return None, "native"
     if auth_required:
         # Lazy import — keeps this function importable in test harnesses
         # that don't bring in the dashboard_auth layer.
-        from hermes_cli.dashboard_auth.audit import AuditEvent, audit_log
-        from hermes_cli.dashboard_auth.ws_tickets import TicketInvalid, consume_internal_credential
+        from eir_cli.dashboard_auth.audit import AuditEvent, audit_log
+        from eir_cli.dashboard_auth.ws_tickets import TicketInvalid, consume_internal_credential
 
         _reject = functools.partial(_audit_ws_rejection, ws)
 
@@ -274,10 +274,10 @@ def _ws_auth_reason(ws: WebSocket, *, allow_internal: bool = False,
             # registration); a client can never supply it through RPC params.
             # Only identity fields are carried — bookkeeping such as
             # ``minted_at`` is not part of the identity contract.
-            ws._hermes_auth_identity = {
+            ws._eir_auth_identity = {
                 "user_id": info.get("user_id"), "provider": info.get("provider")}
             if info.get("issuer"):
-                ws._hermes_auth_identity["issuer"] = info["issuer"]
+                ws._eir_auth_identity["issuer"] = info["issuer"]
 
         internal = ws.query_params.get("internal", "")
         if internal:
@@ -310,9 +310,9 @@ def _ws_auth_reason(ws: WebSocket, *, allow_internal: bool = False,
         # login's tokens work only as its cookies, which sign-out ends.
         token = ws.query_params.get("token", "")
         if token:
-            from hermes_cli import webapp_sign_in
-            from hermes_cli.dashboard_auth.base import ProviderError
-            from hermes_cli.dashboard_auth.middleware import _verify_access_token
+            from eir_cli import webapp_sign_in
+            from eir_cli.dashboard_auth.base import ProviderError
+            from eir_cli.dashboard_auth.middleware import _verify_access_token
 
             view = _ws_request_view(ws, app)
             try:
@@ -369,20 +369,20 @@ def _ignore_rejection(reason: str) -> None:
 
 def _audit_ws_rejection(ws: WebSocket, reason: str) -> None:
     """The gated gate's audit record of a refused upgrade credential."""
-    from hermes_cli.dashboard_auth.audit import AuditEvent, audit_log
+    from eir_cli.dashboard_auth.audit import AuditEvent, audit_log
     audit_log(AuditEvent.WS_TICKET_REJECTED, reason=reason, ip=(ws.client.host if ws.client else ""),
               path=ws.url.path)
 
 
 def _consume_ws_ticket(ws: WebSocket, reject, socket: Optional[str] = None, *,
                        auth_required: bool = False) -> Optional[tuple[Optional[str], str]]:
-    """A one-use ticket offered as the ``hermes-gateway-ticket.`` subprotocol or ``?ticket=``:
+    """A one-use ticket offered as the ``eir-gateway-ticket.`` subprotocol or ``?ticket=``:
     ``(reason, credential)`` once judged, or None when the upgrade presents none. An accepted ticket
     stamps the server-minted identity onto the socket; the client never supplies it through RPC
     params. *socket* is the route's socket (``web_session_sockets.ticket_refusal``); a socket a
     session-token ticket, or a Webapp login's ticket, opens is tracked so signing out closes it."""
-    from hermes_cli.dashboard_auth.ws_tickets import TicketInvalid, consume_ticket
-    from hermes_cli.web_session_sockets import admitted_with, ticket_refusal, track
+    from eir_cli.dashboard_auth.ws_tickets import TicketInvalid, consume_ticket
+    from eir_cli.web_session_sockets import admitted_with, ticket_refusal, track
     protocol_ticket, protocol_reason = _gateway_ws_ticket_from_subprotocol(ws)
     if protocol_reason == "invalid":
         return "ticket_invalid", "ticket-subprotocol"
@@ -404,18 +404,18 @@ def _consume_ws_ticket(ws: WebSocket, reject, socket: Optional[str] = None, *,
         reject("display ticket presented as a gateway login")
         return "ticket_invalid", "ticket"
     # Only identity fields are carried; bookkeeping such as ``minted_at`` is not part of it.
-    ws._hermes_auth_identity = {"user_id": info.get("user_id"), "provider": info.get("provider")}
+    ws._eir_auth_identity = {"user_id": info.get("user_id"), "provider": info.get("provider")}
     if info.get("issuer"):
-        ws._hermes_auth_identity["issuer"] = info["issuer"]
+        ws._eir_auth_identity["issuer"] = info["issuer"]
     if info.get("profile_home"):
-        ws._hermes_ticket_profile_home = info["profile_home"]
+        ws._eir_ticket_profile_home = info["profile_home"]
     if (admitted := admitted_with(info)) is not None:
         track(ws, admitted)
     if not protocol_ticket:
         return None, "ticket"
     # Select only the stable public protocol during accept. The ticket-bearing protocol is a
     # credential and must never be reflected back to the browser or retained after admission.
-    ws._hermes_ws_subprotocol = _GATEWAY_WS_PROTOCOL
+    ws._eir_ws_subprotocol = _GATEWAY_WS_PROTOCOL
     return None, "ticket-subprotocol"
 
 
@@ -426,7 +426,7 @@ def _ws_auth_ok(ws: WebSocket, *, allow_internal: bool = False, socket: Optional
 
 def _ws_auth_mode() -> str:
     """Short label for the active WS auth mode — logged on every connection."""
-    from hermes_cli.web_server import app
+    from eir_cli.web_server import app
     if getattr(app.state, "auth_required", False):
         return "gated"
     bound_host = (getattr(app.state, "bound_host", "") or "").strip().lower()
@@ -452,7 +452,7 @@ async def _ws_gate(ws: WebSocket, kind: str) -> Optional[tuple[str, str, str]]:
     mismatch, 4408 peer not allowed. Returns ``(peer, mode, cred)``
     once every gate passes, or None after closing the socket.
     """
-    from hermes_cli.web_server import _DASHBOARD_EMBEDDED_CHAT_ENABLED
+    from eir_cli.web_server import _DASHBOARD_EMBEDDED_CHAT_ENABLED
     peer = ws.client.host if ws.client else "?"
     if not _DASHBOARD_EMBEDDED_CHAT_ENABLED:
         _log.info("%s refused: embedded chat disabled peer=%s", kind, peer)
@@ -483,7 +483,7 @@ async def _ws_gate(ws: WebSocket, kind: str) -> Optional[tuple[str, str, str]]:
 async def _pty_fail(ws: WebSocket, exc: BaseException, *, surface: str = "Chat") -> None:
     """Tell the user why chat could not start, then close 1011 so the SPA renders
     "Start new session". The raw exception goes to the server log only."""
-    from hermes_cli.web_routers.chat_ws_errors import chat_start_failure_message
+    from eir_cli.web_routers.chat_ws_errors import chat_start_failure_message
     _log.warning("pty start failed: %s: %s", type(exc).__name__, exc)
     await ws.send_text(f"\r\n\x1b[31m{chat_start_failure_message(exc, surface=surface)}\x1b[0m\r\n")
     await ws.close(code=1011)
@@ -493,25 +493,25 @@ def _resolve_chat_argv(
     resume: Optional[str] = None, sidecar_url: Optional[str] = None, profile: Optional[str] = None,
     active_session_file: Optional[str] = None,
     workspace_cwd: Optional[str] = None) -> tuple[list[str], Optional[str], Optional[dict]]:
-    """Resolve the argv + cwd + env for the chat PTY (what ``hermes --tui`` runs).
+    """Resolve the argv + cwd + env for the chat PTY (what ``eir --tui`` runs).
 
     Tests monkeypatch this with a tiny fake command.  Env contract: resume goes
-    through ``HERMES_TUI_RESUME`` (``ui-tui`` does not parse argv), resolved to
-    the newest descendant; ``HERMES_TUI_GATEWAY_URL`` attaches to this process's
+    through ``EIR_TUI_RESUME`` (``ui-tui`` does not parse argv), resolved to
+    the newest descendant; ``EIR_TUI_GATEWAY_URL`` attaches to this process's
     in-memory gateway but is SKIPPED for profile-scoped chats (that gateway runs
     under the dashboard's own profile, so a scoped chat attaches to its profile's gateway);
-    ``profile`` scopes the ENTIRE chat by pointing ``HERMES_HOME`` at the profile
-    dir, the same propagation ``hermes -p <name>`` performs. ``workspace_cwd``
+    ``profile`` scopes the ENTIRE chat by pointing ``EIR_HOME`` at the profile
+    dir, the same propagation ``eir -p <name>`` performs. ``workspace_cwd``
     (an already-validated host directory, ``chat_workspaces.resolve_chat_cwd``)
-    is the workspace the user picked for a FRESH chat: it becomes ``HERMES_CWD``
-    (where a self-spawned gateway starts) and ``HERMES_TUI_CWD`` (what the TUI
+    is the workspace the user picked for a FRESH chat: it becomes ``EIR_CWD``
+    (where a self-spawned gateway starts) and ``EIR_TUI_CWD`` (what the TUI
     passes as the explicit ``cwd`` of ``session.create`` when attached to the
     in-memory gateway, whose own cwd is the dashboard's launch dir).
     """
-    from hermes_cli.web_server_profiles import _config_profile_scope, _resolve_profile_dir
-    from hermes_cli.web_server_sessions import _open_session_db_for_profile, _session_latest_descendant
-    from hermes_cli.main import PROJECT_ROOT
-    from hermes_cli.main_tui_launch import _apply_tui_python_env, _make_tui_argv
+    from eir_cli.web_server_profiles import _config_profile_scope, _resolve_profile_dir
+    from eir_cli.web_server_sessions import _open_session_db_for_profile, _session_latest_descendant
+    from eir_cli.main import PROJECT_ROOT
+    from eir_cli.main_tui_launch import _apply_tui_python_env, _make_tui_argv
 
     profile_dir: Optional[Path] = None
     requested = (profile or "").strip()
@@ -520,13 +520,13 @@ def _resolve_chat_argv(
 
     argv, cwd = _make_tui_argv(PROJECT_ROOT / "ui-tui", tui_dev=False)
     # Secrets kept — the spawned agent needs provider creds.  An explicit profile
-    # scope overrides HERMES_HOME before config is bridged into the env.
+    # scope overrides EIR_HOME before config is bridged into the env.
     from tools.environments.local import build_subprocess_env
     env = build_subprocess_env(scrub_secrets=False, inherit_profile_home=True)
     if profile_dir is not None:
-        env["HERMES_HOME"] = str(profile_dir)
+        env["EIR_HOME"] = str(profile_dir)
     try:
-        from hermes_cli.config import (
+        from eir_cli.config import (
             apply_terminal_config_to_env, read_raw_config, terminal_config_owned_env_vars)
 
         if profile_dir is not None:
@@ -542,18 +542,18 @@ def _resolve_chat_argv(
     except Exception:
         _log.warning("Failed to apply terminal config bridge for dashboard chat", exc_info=True)
     if workspace_cwd:
-        env["HERMES_CWD"] = workspace_cwd
-        env["HERMES_TUI_CWD"] = workspace_cwd
+        env["EIR_CWD"] = workspace_cwd
+        env["EIR_TUI_CWD"] = workspace_cwd
     _apply_tui_python_env(env)
     env.setdefault("NODE_ENV", "production")
     # Mouse tracking would swallow wheel events the browser needs for
     # transcript scrolling; disable it for the dashboard PTY only.
-    env.setdefault("HERMES_TUI_DISABLE_MOUSE", "1")
-    env.setdefault("HERMES_TUI_INLINE", "1")
+    env.setdefault("EIR_TUI_DISABLE_MOUSE", "1")
+    env.setdefault("EIR_TUI_INLINE", "1")
     # chalk in the child picks its color depth from the SERVER env; hosted
     # deploys have no COLORTERM, so hex colors would snap to the 256 palette.
     env.setdefault("COLORTERM", "truecolor")
-    env["HERMES_TUI_DASHBOARD"] = "1"
+    env["EIR_TUI_DASHBOARD"] = "1"
 
     if resume:
         _resume_db = _open_session_db_for_profile(
@@ -564,19 +564,19 @@ def _resolve_chat_argv(
             _resume_db.close()
         if latest_resume:
             resume = latest_resume
-        env["HERMES_TUI_RESUME"] = resume
+        env["EIR_TUI_RESUME"] = resume
 
     if sidecar_url:
-        env["HERMES_TUI_SIDECAR_URL"] = sidecar_url
+        env["EIR_TUI_SIDECAR_URL"] = sidecar_url
 
     if active_session_file:
-        env["HERMES_TUI_ACTIVE_SESSION_FILE"] = active_session_file
+        env["EIR_TUI_ACTIVE_SESSION_FILE"] = active_session_file
 
     # Without the attach URL, gatewayClient bootstraps through the profile's own
-    # gateway (ui-tui/scripts/gateway_bootstrap.py) under the HERMES_HOME set above;
+    # gateway (ui-tui/scripts/gateway_bootstrap.py) under the EIR_HOME set above;
     # it never spawns a standalone `tui_gateway.entry` writer.
     if profile_dir is None and (gateway_ws_url := _build_gateway_ws_url()):
-        env["HERMES_TUI_GATEWAY_URL"] = gateway_ws_url
+        env["EIR_TUI_GATEWAY_URL"] = gateway_ws_url
 
     return list(argv), str(cwd) if cwd else None, env
 
@@ -587,10 +587,10 @@ _WILDCARD_HOSTS = frozenset({"0.0.0.0", "::"})
 
 
 def _resolve_client_ws_host() -> Optional[str]:
-    """Host the in-container WS client should dial: ``HERMES_DASHBOARD_WS_HOST``
+    """Host the in-container WS client should dial: ``EIR_DASHBOARD_WS_HOST``
     wins always; a wildcard bind becomes ``127.0.0.1``; others verbatim."""
-    from hermes_cli.web_server import app
-    explicit = os.environ.get("HERMES_DASHBOARD_WS_HOST", "").strip()
+    from eir_cli.web_server import app
+    explicit = os.environ.get("EIR_DASHBOARD_WS_HOST", "").strip()
     if explicit:
         return explicit
     host = getattr(app.state, "bound_host", None)
@@ -607,14 +607,14 @@ def _server_internal_ws_url(path: str, **extra_qs) -> Optional[str]:
     browser ticket: the child reads the URL once and reuses it on every
     reconnect, and a 30s-TTL ticket can expire before a slow cold boot dials.
     """
-    from hermes_cli.web_server import _SESSION_TOKEN, app
+    from eir_cli.web_server import _SESSION_TOKEN, app
     host = _resolve_client_ws_host()
     port = getattr(app.state, "bound_port", None)
     if not host or not port:
         return None
     netloc = f"[{host}]:{port}" if ":" in host and not host.startswith("[") else f"{host}:{port}"
     if getattr(app.state, "auth_required", False):
-        from hermes_cli.dashboard_auth.ws_tickets import internal_ws_credential
+        from eir_cli.dashboard_auth.ws_tickets import internal_ws_credential
 
         auth = {"internal": internal_ws_credential()}
     else:
@@ -638,7 +638,7 @@ async def _resolve_chat_argv_async(
     workspace_cwd: Optional[str] = None) -> tuple[list[str], Optional[str], Optional[dict]]:
     """Resolve chat argv off the event loop (it may run ``npm run build``); the
     async lock keeps one-build-at-a-time without parking worker threads."""
-    from hermes_cli.web_server import _get_chat_argv_lock, app
+    from eir_cli.web_server import _get_chat_argv_lock, app
     kwargs = {"resume": resume, "sidecar_url": sidecar_url, "profile": profile}
     if active_session_file is not None:
         kwargs["active_session_file"] = active_session_file
@@ -651,10 +651,10 @@ async def _resolve_chat_argv_async(
 
 def _active_session_file_for_channel(app: FastAPI, channel: str) -> Path:
     """Return the per-channel file where a dashboard TUI writes its active sid."""
-    from hermes_cli.web_server import _get_pty_active_session_files
+    from eir_cli.web_server import _get_pty_active_session_files
     files = _get_pty_active_session_files(app)
     if files.get(channel) is None:
-        fd, raw_path = tempfile.mkstemp(prefix="hermes-pty-active-", suffix=".json")
+        fd, raw_path = tempfile.mkstemp(prefix="eir-pty-active-", suffix=".json")
         os.close(fd)
         files[channel] = Path(raw_path)
     return files[channel]
@@ -674,7 +674,7 @@ def _get_console_executor() -> concurrent.futures.ThreadPoolExecutor:
         with _console_executor_lock:
             if _console_executor is None:
                 _console_executor = concurrent.futures.ThreadPoolExecutor(
-                    max_workers=_CONSOLE_EXECUTOR_MAX_WORKERS, thread_name_prefix="hermes-console")
+                    max_workers=_CONSOLE_EXECUTOR_MAX_WORKERS, thread_name_prefix="eir-console")
                 # Tear down on interpreter exit without waiting on in-flight
                 # workers: a stuck 60s console command must not block shutdown.
                 atexit.register(

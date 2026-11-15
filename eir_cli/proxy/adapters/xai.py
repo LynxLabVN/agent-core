@@ -7,8 +7,8 @@ import threading
 from typing import FrozenSet, Optional
 
 from agent.credential_pool import CredentialPool, PooledCredential, load_pool
-from hermes_cli.auth import DEFAULT_XAI_OAUTH_BASE_URL
-from hermes_cli.proxy.adapters.base import UpstreamAdapter, UpstreamCredential
+from eir_cli.auth import DEFAULT_XAI_OAUTH_BASE_URL
+from eir_cli.proxy.adapters.base import UpstreamAdapter, UpstreamCredential
 
 logger = logging.getLogger(__name__)
 
@@ -21,9 +21,9 @@ _ALLOWED_PATHS: frozenset[str] = frozenset(
 
 
 class XAIGrokAdapter(UpstreamAdapter):
-    """Proxy upstream for xAI Grok via Hermes-managed OAuth credentials."""
+    """Proxy upstream for xAI Grok via Eir-managed OAuth credentials."""
 
-    auth_hint = "hermes auth add xai-oauth --type oauth"
+    auth_hint = "eir auth add xai-oauth --type oauth"
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
@@ -50,13 +50,13 @@ class XAIGrokAdapter(UpstreamAdapter):
             pool = self._load_pool()
             if pool is None or not pool.has_credentials():
                 raise RuntimeError(
-                    "No xAI OAuth credentials found. Run `hermes auth add xai-oauth --type oauth` first."
+                    "No xAI OAuth credentials found. Run `eir auth add xai-oauth --type oauth` first."
                 )
             entry = pool.select()
             if entry is None:
                 raise RuntimeError(
                     "No available xAI OAuth credentials found. Run "
-                    "`hermes auth reset xai-oauth` or re-authenticate with `hermes auth add xai-oauth --type oauth`."
+                    "`eir auth reset xai-oauth` or re-authenticate with `eir auth add xai-oauth --type oauth`."
                 )
             self._pool = pool
             return self._credential_from_entry(entry)
@@ -95,7 +95,7 @@ class XAIGrokAdapter(UpstreamAdapter):
         if not bearer:
             raise RuntimeError(
                 "xAI OAuth credential pool entry did not contain an access token. "
-                "Re-authenticate with `hermes auth add xai-oauth --type oauth`."
+                "Re-authenticate with `eir auth add xai-oauth --type oauth`."
             )
         base_url = str(
             getattr(entry, "runtime_base_url", None) or entry.base_url or DEFAULT_XAI_OAUTH_BASE_URL

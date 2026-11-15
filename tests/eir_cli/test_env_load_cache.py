@@ -1,6 +1,6 @@
 """Tests for the load_env() process-level cache.
 
-The cache exists to keep `hermes tools` → "All Platforms" fast: every
+The cache exists to keep `eir tools` → "All Platforms" fast: every
 `get_env_value()` lookup used to re-read and re-sanitise the entire
 .env file, racking up hundreds of ms across one menu render. The
 cache is keyed on (path, mtime, size); writers (save_env_value /
@@ -22,8 +22,8 @@ def _write_env(path: Path, contents: str) -> None:
 
 def test_remove_env_value_invalidates_cache(tmp_path, monkeypatch):
     """remove_env_value() invalidates the cache so the removed key disappears."""
-    from hermes_cli import config as config_mod
-    from hermes_cli.config import (
+    from eir_cli import config as config_mod
+    from eir_cli.config import (
         invalidate_env_cache,
         load_env,
         remove_env_value,
@@ -34,7 +34,7 @@ def test_remove_env_value_invalidates_cache(tmp_path, monkeypatch):
 
     env_path = tmp_path / ".env"
     monkeypatch.setattr(config_mod, "get_env_path", lambda: env_path)
-    monkeypatch.setattr(config_mod, "ensure_hermes_home", lambda: None)
+    monkeypatch.setattr(config_mod, "ensure_eir_home", lambda: None)
     monkeypatch.setattr(config_mod, "_secure_file", lambda _p: None)
     monkeypatch.setattr(config_mod, "is_managed", lambda: False)
 

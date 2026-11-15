@@ -5,7 +5,7 @@ from __future__ import annotations
 import textwrap
 
 import pytest
-from hermes_cli import main_install_repair
+from eir_cli import main_install_repair
 
 pytestmark = pytest.mark.platforms("windows")
 
@@ -21,13 +21,13 @@ def temp_pyproject(tmp_path, monkeypatch):
         version = "0.0.0"
 
         [project.scripts]
-        hermes = "hermes_cli.main:main"
-        hermes-agent = "run_agent:main"
-        hermes-acp = "acp_adapter.entry:main"
+        eir = "eir_cli.main:main"
+        eir-agent = "run_agent:main"
+        eir-acp = "acp_adapter.entry:main"
     """
         )
     )
-    import hermes_cli.main as main_mod
+    import eir_cli.main as main_mod
 
     monkeypatch.setattr(main_mod, "PROJECT_ROOT", tmp_path)
     return tmp_path
@@ -40,13 +40,13 @@ def fake_scripts_dir(tmp_path):
     return scripts
 
 
-class TestHermesExeShims:
+class TestEirExeShims:
     """The orphan sweep includes declared scripts and the legacy gateway shim."""
 
     def test_shims_include_declared_console_scripts(
         self, temp_pyproject, fake_scripts_dir
     ):
-        names = {path.name for path in main_install_repair._hermes_exe_shims(fake_scripts_dir)}
+        names = {path.name for path in main_install_repair._eir_exe_shims(fake_scripts_dir)}
 
-        assert {"hermes.exe", "hermes-agent.exe", "hermes-acp.exe"} <= names
-        assert "hermes-gateway.exe" in names
+        assert {"eir.exe", "eir-agent.exe", "eir-acp.exe"} <= names
+        assert "eir-gateway.exe" in names

@@ -8,17 +8,17 @@ from pathlib import Path
 
 import pytest
 from fastapi import HTTPException
-import hermes_cli.web_models as _web_models
-import hermes_cli.web_routers.cron as _rt_cron
-import hermes_cli.web_server_cron as _web_server_cron
+import eir_cli.web_models as _web_models
+import eir_cli.web_routers.cron as _rt_cron
+import eir_cli.web_server_cron as _web_server_cron
 
 
 @pytest.fixture()
 def isolated_profiles(tmp_path, monkeypatch):
     """Give profile discovery an isolated default home with one named profile."""
-    from hermes_cli import profiles
+    from eir_cli import profiles
 
-    default_home = tmp_path / ".hermes"
+    default_home = tmp_path / ".eir"
     profiles_root = default_home / "profiles"
     worker_home = profiles_root / "worker_alpha"
 
@@ -26,7 +26,7 @@ def isolated_profiles(tmp_path, monkeypatch):
         (home / "cron").mkdir(parents=True, exist_ok=True)
         (home / "config.yaml").write_text("model: test-model\n", encoding="utf-8")
 
-    monkeypatch.setattr(profiles, "_get_default_hermes_home", lambda: default_home)
+    monkeypatch.setattr(profiles, "_get_default_eir_home", lambda: default_home)
     monkeypatch.setattr(profiles, "_get_profiles_root", lambda: profiles_root)
     return {"default": default_home, "worker_alpha": worker_home}
 
@@ -52,20 +52,20 @@ def test_fire_cron_job_scopes_store_and_runtime_home_together(
     from cron import jobs as cron_jobs
     from cron import scheduler
 
-    from hermes_constants import (
-        reset_hermes_home_override,
-        set_hermes_home_override,
+    from eir_constants import (
+        reset_eir_home_override,
+        set_eir_home_override,
     )
 
     default_home = isolated_profiles["default"]
     worker_home = isolated_profiles["worker_alpha"]
-    monkeypatch.setattr(scheduler, "_hermes_home", None)
+    monkeypatch.setattr(scheduler, "_eir_home", None)
     captured = {}
 
     class RecordingProvider:
         def fire_due(self, job_id, *, adapters=None, loop=None):
             captured["job_id"] = job_id
-            captured["runtime_home"] = scheduler._get_hermes_home()
+            captured["runtime_home"] = scheduler._get_eir_home()
             captured["jobs_file"] = cron_jobs._current_cron_store().jobs_file
             return True
 
@@ -74,7 +74,7 @@ def test_fire_cron_job_scopes_store_and_runtime_home_together(
         lambda: RecordingProvider(),
     )
 
-    outer_token = set_hermes_home_override(default_home)
+    outer_token = set_eir_home_override(default_home)
     try:
         assert _web_server_cron._fire_cron_job_for_profile("worker_alpha", "worker-job") is True
         assert captured == {
@@ -82,9 +82,9 @@ def test_fire_cron_job_scopes_store_and_runtime_home_together(
             "runtime_home": worker_home,
             "jobs_file": worker_home / "cron" / "jobs.json",
         }
-        assert scheduler._get_hermes_home() == default_home
+        assert scheduler._get_eir_home() == default_home
     finally:
-        reset_hermes_home_override(outer_token)
+        reset_eir_home_override(outer_token)
 
 
 def test_create_registers_scheduler_inside_target_profile(
@@ -94,7 +94,7 @@ def test_create_registers_scheduler_inside_target_profile(
     """Dashboard create must resolve and register under the selected profile."""
     from cron import jobs as cron_jobs
     from cron.scheduler_provider import CronScheduler
-    from hermes_constants import get_hermes_home
+    from eir_constants import get_eir_home
 
     worker_home = isolated_profiles["worker_alpha"]
     captured = {}
@@ -109,7 +109,7 @@ def test_create_registers_scheduler_inside_target_profile(
 
         def register_job(self, job):
             captured["job"] = job
-            captured["runtime_home"] = get_hermes_home()
+            captured["runtime_home"] = get_eir_home()
             captured["jobs_file"] = cron_jobs._current_cron_store().jobs_file
 
     monkeypatch.setattr(
@@ -178,14 +178,14 @@ def test_notify_cron_provider_scopes_store_and_runtime_home_together(
     from cron import jobs as cron_jobs
     from cron import scheduler
 
-    from hermes_constants import (
-        reset_hermes_home_override,
-        set_hermes_home_override,
+    from eir_constants import (
+        reset_eir_home_override,
+        set_eir_home_override,
     )
 
     default_home = isolated_profiles["default"]
     worker_home = isolated_profiles["worker_alpha"]
-    monkeypatch.setattr(scheduler, "_hermes_home", None)
+    monkeypatch.setattr(scheduler, "_eir_home", None)
     monkeypatch.setattr(
         _web_server_cron,
         "_cron_profile_dicts",
@@ -195,7 +195,7 @@ def test_notify_cron_provider_scopes_store_and_runtime_home_together(
 
     class RecordingProvider:
         def on_jobs_changed(self):
-            captured["runtime_home"] = scheduler._get_hermes_home()
+            captured["runtime_home"] = scheduler._get_eir_home()
             captured["jobs_file"] = cron_jobs._current_cron_store().jobs_file
 
     monkeypatch.setattr(
@@ -203,16 +203,16 @@ def test_notify_cron_provider_scopes_store_and_runtime_home_together(
         lambda: RecordingProvider(),
     )
 
-    outer_token = set_hermes_home_override(default_home)
+    outer_token = set_eir_home_override(default_home)
     try:
         _web_server_cron._notify_cron_provider_for_profile("worker_alpha")
         assert captured == {
             "runtime_home": worker_home,
             "jobs_file": worker_home / "cron" / "jobs.json",
         }
-        assert scheduler._get_hermes_home() == default_home
+        assert scheduler._get_eir_home() == default_home
     finally:
-        reset_hermes_home_override(outer_token)
+        reset_eir_home_override(outer_token)
 
 
 def test_notify_cron_provider_failure_is_best_effort(
@@ -258,7 +258,7 @@ def test_external_provider_reconcile_fails_closed_with_multiple_profiles(
     succeeds (fail-closed only skips the remote converge)."""
     from cron import scheduler
 
-    monkeypatch.setattr(scheduler, "_hermes_home", None)
+    monkeypatch.setattr(scheduler, "_eir_home", None)
     monkeypatch.setattr(
         _web_server_cron,
         "_cron_profile_dicts",
@@ -306,7 +306,7 @@ def test_builtin_provider_hook_still_fires_with_multiple_profiles(
     from cron import scheduler
     from cron.scheduler_provider import InProcessCronScheduler
 
-    monkeypatch.setattr(scheduler, "_hermes_home", None)
+    monkeypatch.setattr(scheduler, "_eir_home", None)
     monkeypatch.setattr(
         _web_server_cron,
         "_cron_profile_dicts",
@@ -982,11 +982,11 @@ async def test_create_cron_job_without_profile_uses_backend_own_profile(
     isolated_profiles, monkeypatch
 ):
     """A pool backend scoped to a named profile must not default creates to
-    ``~/.hermes`` when the request carries no explicit ``profile`` (the
+    ``~/.eir`` when the request carries no explicit ``profile`` (the
     Desktop app's pre-profileScoped clients sent none)."""
 
     monkeypatch.setenv(
-        "HERMES_HOME", str(isolated_profiles["worker_alpha"])
+        "EIR_HOME", str(isolated_profiles["worker_alpha"])
     )
 
     job = await _rt_cron.create_cron_job(
@@ -1007,10 +1007,10 @@ async def test_create_cron_job_without_profile_uses_backend_own_profile(
 async def test_create_cron_job_without_profile_defaults_when_unscoped(
     isolated_profiles, monkeypatch
 ):
-    """HERMES_HOME at the default home (or unrecognized) keeps the legacy
+    """EIR_HOME at the default home (or unrecognized) keeps the legacy
     ``default`` fallback."""
 
-    monkeypatch.setenv("HERMES_HOME", str(isolated_profiles["default"]))
+    monkeypatch.setenv("EIR_HOME", str(isolated_profiles["default"]))
 
     job = await _rt_cron.create_cron_job(
         _web_models.CronJobCreate(
@@ -1298,19 +1298,19 @@ class TestCronRunHistoryFallback:
     def test_output_doc_timestamps_honor_configured_timezone(
         self, isolated_profiles, monkeypatch, no_session_rows
     ):
-        """The filename stem is written by save_job_output via hermes_time.now()
+        """The filename stem is written by save_job_output via eir_time.now()
         — the configured zone. Reading it back must use that zone, not the
         server's (review of #61403: a fixed-offset snapshot was off by hours
-        when HERMES_TIMEZONE differs from the server zone)."""
+        when EIR_TIMEZONE differs from the server zone)."""
         from zoneinfo import ZoneInfo
-        from hermes_time import _tz_cache
+        from eir_time import _tz_cache
 
         job_id = "job-tz"
         home = isolated_profiles["default"]
         # Wall time 2026-07-10_00-14-10 in Asia/Taipei (+08:00) = 2026-07-09 16:14:10 UTC.
         self._write_output_doc(monkeypatch, home, job_id, "2026-07-10_00-14-10.md", "tz output\n")
 
-        monkeypatch.setenv("HERMES_TIMEZONE", "Asia/Taipei")
+        monkeypatch.setenv("EIR_TIMEZONE", "Asia/Taipei")
         _tz_cache.clear()
 
         monkeypatch.setattr(_rt_cron, "_job_owner_profile", lambda _job_id, _profile: "default")
@@ -1324,7 +1324,7 @@ class TestCronRunHistoryFallback:
         try:
             result = _rt_cron._list_cron_job_runs_sync(job_id, limit=5)
         finally:
-            monkeypatch.delenv("HERMES_TIMEZONE", raising=False)
+            monkeypatch.delenv("EIR_TIMEZONE", raising=False)
             _tz_cache.clear()
 
         started = result["runs"][0]["started_at"]
@@ -1471,11 +1471,11 @@ class TestCronRunHistoryFallback:
     ):
         """Review of #42433: the filename stem is written with the OWNER
         profile's configured zone. A cross-profile request must decode it in
-        that zone — not the dashboard's — with no global HERMES_TIMEZONE set
+        that zone — not the dashboard's — with no global EIR_TIMEZONE set
         (both profiles configure config.yaml timezones, so a shared env var
         cannot mask the mix-up)."""
         from zoneinfo import ZoneInfo
-        from hermes_time import _tz_cache
+        from eir_time import _tz_cache
 
         job_id = "job-owner-tz"
         worker_home = isolated_profiles["worker_alpha"]
@@ -1526,14 +1526,14 @@ class TestCronRunHistoryFallback:
             return datetime.strptime(name, "%Y-%m-%d_%H-%M-%S").replace(tzinfo=ZoneInfo("UTC"))
 
         # Attempt 1 (10:00): succeeded; its doc survives.
-        monkeypatch.setattr(cron_executions, "_hermes_now", lambda: _at("2026-09-25_10-00-00"))
+        monkeypatch.setattr(cron_executions, "_eir_now", lambda: _at("2026-09-25_10-00-00"))
         first = cron_executions.create_execution(job_id, source="direct")
-        monkeypatch.setattr(cron_executions, "_hermes_now", lambda: _at("2026-09-25_10-00-30"))
+        monkeypatch.setattr(cron_executions, "_eir_now", lambda: _at("2026-09-25_10-00-30"))
         cron_executions.finish_execution(first["id"], success=True)
         # Attempt 2 (10:01): failed; its doc is gone.
-        monkeypatch.setattr(cron_executions, "_hermes_now", lambda: _at("2026-09-25_10-01-00"))
+        monkeypatch.setattr(cron_executions, "_eir_now", lambda: _at("2026-09-25_10-01-00"))
         second = cron_executions.create_execution(job_id, source="direct")
-        monkeypatch.setattr(cron_executions, "_hermes_now", lambda: _at("2026-09-25_10-01-20"))
+        monkeypatch.setattr(cron_executions, "_eir_now", lambda: _at("2026-09-25_10-01-20"))
         cron_executions.finish_execution(second["id"], success=False, error="new run failed")
         self._write_output_doc(monkeypatch, home, job_id, "2026-09-25_10-00-00.md", "successful older run\n")
 
@@ -1575,7 +1575,7 @@ class TestCronRunHistoryFallback:
 
 @pytest.mark.asyncio
 async def test_create_cron_job_scans_prompt(isolated_profiles):
-    from hermes_cli import web_server
+    from eir_cli import web_server
 
     with pytest.raises(HTTPException) as exc:
         await _rt_cron.create_cron_job(
@@ -1594,7 +1594,7 @@ async def test_create_cron_job_scans_prompt(isolated_profiles):
 async def test_create_cron_job_rejects_bare_base_url(isolated_profiles):
     """base_url with no provider would route the default provider's stored
     credential to an arbitrary endpoint."""
-    from hermes_cli import web_server
+    from eir_cli import web_server
 
     with pytest.raises(HTTPException) as exc:
         await _rt_cron.create_cron_job(
@@ -1612,7 +1612,7 @@ async def test_create_cron_job_rejects_bare_base_url(isolated_profiles):
 
 @pytest.mark.asyncio
 async def test_create_cron_job_rejects_unknown_bot_chat_target(isolated_profiles):
-    from hermes_cli import web_server
+    from eir_cli import web_server
 
     with pytest.raises(HTTPException) as exc:
         await _rt_cron.create_cron_job(
@@ -1633,7 +1633,7 @@ async def test_update_cron_job_rechecks_effective_base_url(isolated_profiles):
     """Mirroring the tool path: EVERY update re-validates the effective
     provider+base_url pair, so an unrelated-looking edit can't leave an
     unsafe pair schedulable."""
-    from hermes_cli import web_server
+    from eir_cli import web_server
 
     job = _web_server_cron._call_cron_for_profile(
         "worker_alpha",
@@ -1682,7 +1682,7 @@ async def test_update_cron_job_rechecks_stored_base_url_on_unrelated_edit(isolat
 
 @pytest.mark.asyncio
 async def test_update_cron_job_scans_new_prompt(isolated_profiles):
-    from hermes_cli import web_server
+    from eir_cli import web_server
 
     job = _web_server_cron._call_cron_for_profile(
         "worker_alpha",
@@ -1709,7 +1709,7 @@ async def test_update_cron_job_scans_new_prompt(isolated_profiles):
 async def test_blueprint_instantiate_scans_filled_prompt(isolated_profiles):
     """Blueprint slot values are user text interpolated into the stored
     prompt; a hostile value must trip the same scan the tool path runs."""
-    from hermes_cli import web_server
+    from eir_cli import web_server
 
     with pytest.raises(HTTPException) as exc:
         await _rt_cron.instantiate_blueprint(
@@ -1732,9 +1732,9 @@ async def test_create_cron_job_checks_base_url_against_the_jobs_profile(isolated
     """The pairing check must read the OWNING profile's providers: a named provider the
     launch profile points at the override must not vouch for another profile's same-named
     provider, whose stored key would then ship to that endpoint."""
-    from hermes_constants import get_hermes_home
+    from eir_constants import get_eir_home
 
-    get_hermes_home().joinpath("config.yaml").write_text(
+    get_eir_home().joinpath("config.yaml").write_text(
         "providers:\n  myproxy:\n    base_url: https://attacker.invalid/v1\n", encoding="utf-8")
     isolated_profiles["worker_alpha"].joinpath("config.yaml").write_text(
         "providers:\n  myproxy:\n    base_url: https://real.example/v1\n", encoding="utf-8")

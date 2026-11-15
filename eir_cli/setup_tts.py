@@ -1,5 +1,5 @@
 """Text-to-speech provider setup (provider picker, API-key prompts, local engine installs, xAI OAuth).
-setup.py names are resolved through the module object so test patches on ``hermes_cli.setup.<name>``
+setup.py names are resolved through the module object so test patches on ``eir_cli.setup.<name>``
 take effect; setup.py re-exports the public entry points."""
 
 import logging
@@ -8,7 +8,7 @@ import subprocess
 import sys
 from tools import tool_backend_helpers
 
-logger = logging.getLogger("hermes_cli.setup")
+logger = logging.getLogger("eir_cli.setup")
 
 
 def _install_tts_extra(extra: str) -> bool:
@@ -19,9 +19,9 @@ def _install_tts_extra(extra: str) -> bool:
         pm.sync_venv([extra], explicit=True)
     except (pm.InstallError, OSError, ValueError) as exc:
         _setup.print_error(f"Failed to install {extra}: {exc}")
-        _setup.print_info("Retry with: hermes setup tts")
+        _setup.print_info("Retry with: eir setup tts")
         return False
-    _setup.print_success(f"{extra} installed. Restart Hermes to use it.")
+    _setup.print_success(f"{extra} installed. Restart Eir to use it.")
     return True
 
 
@@ -70,9 +70,9 @@ def _install_kittentts_deps() -> bool:
 
 def _xai_oauth_logged_in_for_setup() -> bool:
     """True iff xAI Grok OAuth credentials are stored locally, so TTS/STT setup can skip the
-    API-key prompt for users who logged in via ``hermes model`` -> xAI Grok OAuth."""
+    API-key prompt for users who logged in via ``eir model`` -> xAI Grok OAuth."""
     try:
-        from hermes_cli.auth import get_xai_oauth_auth_status
+        from eir_cli.auth import get_xai_oauth_auth_status
         return bool(get_xai_oauth_auth_status().get("logged_in"))
     except Exception:
         return False
@@ -83,7 +83,7 @@ def _run_xai_oauth_login_from_setup() -> bool:
     only — does **not** switch the active provider or rewrite ``model.provider`` (callers only need
     credentials for side tools). False on any failure (caller falls back)."""
     try:
-        from hermes_cli.auth import (
+        from eir_cli.auth import (
             _is_remote_session, _save_xai_oauth_tokens, _xai_oauth_device_code_login,
             unsuppress_credential_source)
     except Exception as exc:
@@ -203,8 +203,8 @@ def _xai_api_key_path():
         _setup.save_env_value("XAI_API_KEY", api_key)
         _setup.print_success("xAI TTS API key saved")
         return None
-    from hermes_constants import display_hermes_home as _dhh
-    return ("No xAI API key provided for TTS. Configure XAI_API_KEY via hermes setup model "
+    from eir_constants import display_eir_home as _dhh
+    return ("No xAI API key provided for TTS. Configure XAI_API_KEY via eir setup model "
             f"or {_dhh()}/.env to use xAI TTS. Falling back to Edge TTS.")
 
 
@@ -238,7 +238,7 @@ def _tts_xai_step(config: dict) -> str:
 
 def _setup_tts_provider(config: dict):
     """Interactive TTS provider selection with install flow for local engines."""
-    from hermes_cli import nous_subscription
+    from eir_cli import nous_subscription
     current_provider = config.get("tts", {}).get("provider", "edge")
     current_label = _TTS_PROVIDER_LABELS.get(current_provider, current_provider)
     print()
@@ -259,7 +259,7 @@ def _setup_tts_provider(config: dict):
         _setup.print_info("OpenAI TTS will use the managed Nous gateway and bill to your subscription.")
         if _setup.get_env_value("VOICE_TOOLS_OPENAI_KEY") or _setup.get_env_value("OPENAI_API_KEY"):
             _setup.print_warning("Direct OpenAI credentials are still configured and may take precedence "
-                                 "until removed from ~/.hermes/.env.")
+                                 "until removed from ~/.eir/.env.")
     elif selected in _TTS_LOCAL_PROVIDERS:
         selected = _tts_local_install_step(selected)
     elif selected in _TTS_API_KEY_PROVIDERS:
@@ -290,8 +290,8 @@ def _setup_tts_provider(config: dict):
 
 
 def setup_tts(config: dict):
-    """Standalone TTS setup (for 'hermes setup tts')."""
+    """Standalone TTS setup (for 'eir setup tts')."""
     _setup_tts_provider(config)
 
 
-import hermes_cli.setup as _setup
+import eir_cli.setup as _setup

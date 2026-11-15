@@ -14,14 +14,14 @@ thing:
 from __future__ import annotations
 
 from agent.i18n import t
-from hermes_cli.gateway_client import GatewayClientError
+from eir_cli.gateway_client import GatewayClientError
 
 
 def _diff(cli, connection, cmd):
     args = cmd.partition(" ")[2].strip().lower().split()
     if "session" not in args:
         return False
-    from hermes_cli.cli_commands_session_tools import _lines, _pr, _t, print_session_diff
+    from eir_cli.cli_commands_session_tools import _lines, _pr, _t, print_session_diff
     result = connection.call("rollback.session_diff", session_id=cli.session_id) or {}
     if not result.get("enabled"):
         _pr(*_lines(_t("diff.not_enabled")))
@@ -31,7 +31,7 @@ def _diff(cli, connection, cmd):
 
 
 def _reload(cli, connection, cmd):
-    from hermes_cli.config import reload_env
+    from eir_cli.config import reload_env
     reload_env()
     updated = (connection.call("reload.env", session_id=cli.session_id) or {}).get("updated", 0)
     print(f"  {t('cli.reload.env_reloaded', count=updated)}")
@@ -46,8 +46,8 @@ EXIT_SESSION = object()
 def _handoff(cli, connection, cmd):
     """``/handoff <platform>`` on the owner: ``handoff.request`` writes the pending row in the owner's
     store, where its watcher claims it (this process's own store write would never be seen), and
-    main's two-phase wait (``HermesCLI._handoff_wait``) polls it through the owner."""
-    from hermes_cli.cli_commands_session_tools import _command_arg, _cp, _t
+    main's two-phase wait (``EirCLI._handoff_wait``) polls it through the owner."""
+    from eir_cli.cli_commands_session_tools import _command_arg, _cp, _t
     platform_name = _command_arg(cmd, lower=True)
     if not platform_name:
         _cp(f"  {_t('handoff.usage')}", f"  {_t('handoff.usage_detail_1')}", f"  {_t('handoff.usage_detail_2')}")
@@ -76,7 +76,7 @@ def run(cli, canonical, cmd):
     route = _ROUTES.get(canonical)
     if route is None:
         return False
-    from hermes_cli.gateway_side import connection_for
+    from eir_cli.gateway_side import connection_for
     connection = connection_for(cli)
     if connection is None:
         return False

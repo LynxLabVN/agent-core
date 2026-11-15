@@ -32,7 +32,7 @@ describe('update child proxy env from the system proxy (#123387)', () => {
       ...proxied('http://10.0.0.7:7890'),
       NO_PROXY: noProxy,
       no_proxy: noProxy,
-      HERMES_UPDATE_SYSTEM_PROXY: 'HTTPS_PROXY,https_proxy,HTTP_PROXY,http_proxy,NO_PROXY,no_proxy'
+      EIR_UPDATE_SYSTEM_PROXY: 'HTTPS_PROXY,https_proxy,HTTP_PROXY,http_proxy,NO_PROXY,no_proxy'
     })
   })
 
@@ -110,13 +110,13 @@ describe('update child proxy env from the system proxy (#123387)', () => {
     const restored = restoreUserProxyEnv({ ...user, ...env })
 
     expect(env.NO_PROXY?.split(',')).toContain('corp.internal')
-    expect(env.HERMES_UPDATE_SYSTEM_PROXY?.split(',')).not.toContain('NO_PROXY')
+    expect(env.EIR_UPDATE_SYSTEM_PROXY?.split(',')).not.toContain('NO_PROXY')
     expect(new Set(Object.entries(restored).filter(([key]) => key.toLowerCase() === 'no_proxy').map(([, v]) => v)))
       .toEqual(new Set(['corp.internal']))
   })
 
   it("keeps a fork origin and the user's package mirrors direct when the system sends them direct (S2)", async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-update-hosts-'))
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'eir-update-hosts-'))
 
     try {
       fs.mkdirSync(path.join(root, '.git'))
@@ -137,17 +137,17 @@ describe('update child proxy env from the system proxy (#123387)', () => {
     }
   })
 
-  it("keeps the npm mirror of the profile's $HERMES_HOME/npmrc direct, as the update's pnpm reads it", async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-update-hosts-'))
+  it("keeps the npm mirror of the profile's $EIR_HOME/npmrc direct, as the update's pnpm reads it", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'eir-update-hosts-'))
 
     try {
       fs.mkdirSync(path.join(root, '.git'))
       fs.writeFileSync(path.join(root, '.git', 'config'), '[remote "origin"]\n\turl = https://github.com/x/y.git\n')
-      const hermesHome = path.join(root, 'home')
-      fs.mkdirSync(hermesHome)
-      fs.writeFileSync(path.join(hermesHome, 'npmrc'), 'registry=http://npm.lan.example:4873/\n')
+      const eirHome = path.join(root, 'home')
+      fs.mkdirSync(eirHome)
+      fs.writeFileSync(path.join(eirHome, 'npmrc'), 'registry=http://npm.lan.example:4873/\n')
 
-      const env = await updateProxyEnv({}, undefined, root, hermesHome)
+      const env = await updateProxyEnv({}, undefined, root, eirHome)
 
       expect(env.NO_PROXY?.split(',')).toContain('npm.lan.example')
     } finally {

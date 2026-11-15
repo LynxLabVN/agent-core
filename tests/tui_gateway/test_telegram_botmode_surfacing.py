@@ -63,7 +63,7 @@ def _add_bot_chat(db, sid="botchat1", ts=None):
 
 def test_telegram_dm_topic_threads_are_distinct_sessions(tmp_path):
     """Lane isolation: different thread_id in one DM are different sessions."""
-    from hermes_state import SessionDB
+    from eir_state import SessionDB
 
     db = SessionDB(db_path=tmp_path / "state.db")
     try:
@@ -89,7 +89,7 @@ def test_telegram_dm_topic_threads_are_distinct_sessions(tmp_path):
 
 def test_telegram_threads_surface_in_messaging_slice_not_recents(tmp_path):
     """Desktop sidebar split: telegram threads belong to messaging, never recents."""
-    from hermes_state import SessionDB
+    from eir_state import SessionDB
 
     db = SessionDB(db_path=tmp_path / "state.db")
     try:
@@ -127,7 +127,7 @@ def test_telegram_threads_surface_in_messaging_slice_not_recents(tmp_path):
 def test_profiles_roster_reports_telegram_as_last_session(tmp_path):
     """Roster door: last_session is the newest visible thread (telegram when
     freshest); canonical_session stays the hidden Bot Chat."""
-    from hermes_state import SessionDB
+    from eir_state import SessionDB
     from tui_gateway.methods_session import _denied_source
     from tui_gateway.methods_profiles import _canonical_session_row, _latest_profile_session_rows
 

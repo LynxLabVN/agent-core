@@ -1,7 +1,7 @@
 name: hermes-gauge
 repo: https://github.com/SidelightAi/hermes-gauge
 sha: 38bb1937b2ea9cf48816ed65015bb7efc69ad24c
-description: "Context gauge — a live ring/dash showing how full your agent's context window is, per session and topic, with a desktop plugin and tools (gauge_check, gauge_report, gauge_set_window, gauge_render, gauge_action). Runs fully local: no API key, no telemetry. Disclosure — reads Hermes' state.db (read-only) for session titles and scans the memories folders (including other profiles' when run from the default profile) for size metrics; `gauge_action` lets the agent queue `/compact` and `/new` in the current session when you answer a gauge alert; with `alerts.route` set to `home` or `custom:` it runs `hermes send` to deliver alerts to that chat, and `/gauge audit` runs `hermes doctor`."
+description: "Context gauge — a live ring/dash showing how full your agent's context window is, per session and topic, with a desktop plugin and tools (gauge_check, gauge_report, gauge_set_window, gauge_render, gauge_action). Runs fully local: no API key, no telemetry. Disclosure — reads Eir' state.db (read-only) for session titles and scans the memories folders (including other profiles' when run from the default profile) for size metrics; `gauge_action` lets the agent queue `/compact` and `/new` in the current session when you answer a gauge alert; with `alerts.route` set to `home` or `custom:` it runs `eir send` to deliver alerts to that chat, and `/gauge audit` runs `eir doctor`."
 maintainer: SidelightAi
 tier: community
 category: desktop
@@ -16,4 +16,4 @@ capabilities:
   provides_hooks: [post_llm_call, on_stream_delta, on_stream_end, api_request_error, post_api_request, post_compaction, on_session_reset, subagent_stop]
   provides_middleware: []
   requires_env: []
-requires_hermes: ">=0.22.3"
+requires_eir: ">=0.22.3"

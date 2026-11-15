@@ -158,7 +158,7 @@ def rmtree_collecting_permission_errors(entry: Path) -> list[str]:
 
 
 def removal_hint(entry: Path) -> str:
-    from hermes_platform.resolver import locate_command
+    from eir_platform.resolver import locate_command
 
     hint = f"sudo rm -rf {shlex.quote(os.fspath(entry))}"
     if locate_command("docker").command:
@@ -188,5 +188,5 @@ def record(root: Path, entry: Path, blockers: list[str], audit) -> None:
 
 
 def stuck_entries(root: Path) -> list[Path]:
-    """Entries the prune is currently skipping as not removable (for ``hermes doctor``)."""
+    """Entries the prune is currently skipping as not removable (for ``eir doctor``)."""
     return [root / name for name in sorted(load_skips(root, persist=False))]

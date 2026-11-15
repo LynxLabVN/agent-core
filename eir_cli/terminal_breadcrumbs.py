@@ -1,4 +1,4 @@
-"""Per-terminal session breadcrumbs for ``hermes -c`` / ``--continue``. Strictly best-effort: no
+"""Per-terminal session breadcrumbs for ``eir -c`` / ``--continue``. Strictly best-effort: no
 function raises; without a stable terminal identity (no tty, no known multiplexer env var) ``-c``
 falls back to latest-session. Gated by ``session.terminal_continue`` (default true)."""
 
@@ -25,8 +25,8 @@ _SANITIZE_RE = re.compile(r"[^A-Za-z0-9._-]")
 
 
 def _breadcrumbs_dir() -> Path:
-    from hermes_constants import get_hermes_home
-    return get_hermes_home() / "terminal-sessions"
+    from eir_constants import get_eir_home
+    return get_eir_home() / "terminal-sessions"
 
 
 def _sanitize(raw: str) -> str:
@@ -54,7 +54,7 @@ def get_terminal_id() -> Optional[str]:
 def is_enabled() -> bool:
     """Config gate: ``session.terminal_continue`` (default true)."""
     try:
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
 
         return bool((load_config().get("session") or {}).get("terminal_continue", True))
     except Exception:
@@ -71,8 +71,8 @@ def write_breadcrumb(session_id: str, cwd: Optional[str] = None) -> None:
         if not terminal_id:
             return
         directory = _breadcrumbs_dir()
-        from hermes_constants import mkdir_under_hermes_home
-        mkdir_under_hermes_home(directory)
+        from eir_constants import mkdir_under_eir_home
+        mkdir_under_eir_home(directory)
         now = time.time()
         payload = {"session_id": session_id, "cwd": cwd or os.getcwd(), "ts": now}
         atomic_json_write(directory / terminal_id, payload, indent=None)
@@ -112,10 +112,10 @@ def resolve_breadcrumb_session() -> Optional[str]:
     if not session_id:
         return None
     try:
-        from hermes_state import SessionDB
-        from hermes_constants import get_hermes_home
+        from eir_state import SessionDB
+        from eir_constants import get_eir_home
 
-        db = SessionDB(db_path=get_hermes_home() / "state.db", read_only=True)
+        db = SessionDB(db_path=get_eir_home() / "state.db", read_only=True)
     except Exception:
         return None
     try:

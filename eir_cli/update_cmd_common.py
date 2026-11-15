@@ -1,11 +1,11 @@
-"""Shared leaf helpers for the ``hermes update`` modules (no Hermes imports; no cycle)."""
+"""Shared leaf helpers for the ``eir update`` modules (no Eir imports; no cycle)."""
 
 import logging
 import sys
 from contextlib import contextmanager
 
 # Log-record parity with the origin module.
-logger = logging.getLogger("hermes_cli.update_cmd")
+logger = logging.getLogger("eir_cli.update_cmd")
 
 
 def _record_stop(reason: str, *, without_receipt: str | None = None) -> None:
@@ -16,7 +16,7 @@ def _record_stop(reason: str, *, without_receipt: str | None = None) -> None:
     an older updater can load this tree after the swap while its own, older ``update_receipt``
     (without these calls) stays loaded.
     """
-    receipt = sys.modules.get("hermes_cli.update_receipt")
+    receipt = sys.modules.get("eir_cli.update_receipt")
     if without_receipt is None:
         record = getattr(receipt, "record_stop_reason", None)
         if record is not None:

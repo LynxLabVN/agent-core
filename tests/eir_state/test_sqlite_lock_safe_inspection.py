@@ -1,4 +1,4 @@
-"""POSIX advisory locks must survive Hermes' own database inspection.
+"""POSIX advisory locks must survive Eir' own database inspection.
 
 close() on ANY file descriptor for a SQLite database cancels every POSIX
 advisory lock the process holds on that file -- including a running VACUUM's
@@ -6,14 +6,14 @@ EXCLUSIVE lock and an in-flight BEGIN IMMEDIATE's RESERVED lock:
 
     https://sqlite.org/howtocorrupt.html#_posix_advisory_locks_canceled_by_a_separate_thread_doing_close_
 
-Hermes used to byte-probe live databases in several places (kanban's
+Eir used to byte-probe live databases in several places (kanban's
 post-commit page-count check, the zeroed-state.db detector run on every
-SessionDB construction, backup header verification). Under `hermes sessions
+SessionDB construction, backup header verification). Under `eir sessions
 optimize` this let an external process write into a database while VACUUM was
 rewriting it, producing "database disk image is malformed".
 
 These tests pin the behavioural contract: an external process must stay locked
-out across Hermes' inspection calls.
+out across Eir' inspection calls.
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ import threading
 
 import pytest
 
-from hermes_cli.sqlite_safe_read import (
+from eir_cli.sqlite_safe_read import (
     file_length_matches_header,
     has_live_connection,
     page_count_bytes,
@@ -79,7 +79,7 @@ def _make_db(path, journal_mode: str) -> None:
 def clean_registry():
     yield
     # Keep the module-level registry from leaking across tests.
-    import hermes_cli.sqlite_safe_read as mod
+    import eir_cli.sqlite_safe_read as mod
 
     with mod._live_lock:
         mod._live_connections.clear()
@@ -121,7 +121,7 @@ def test_tracking_registry_does_not_leak_across_close_paths(tmp_path, clean_regi
     """
     import contextlib
 
-    from hermes_cli.sqlite_safe_read import connect_tracked
+    from eir_cli.sqlite_safe_read import connect_tracked
 
     db = tmp_path / "state.db"
     boot = connect_tracked(db, isolation_level=None)
@@ -173,11 +173,11 @@ def test_failed_close_keeps_connection_tracked(tmp_path, clean_registry):
     ``has_live_connection`` reports false, so the byte-probe guard permits
     ``open``/``close`` on a live database — cancelling POSIX advisory locks.
     """
-    from hermes_cli.sqlite_safe_read import connect_tracked
+    from eir_cli.sqlite_safe_read import connect_tracked
 
     class ControllableConnection(sqlite3.Connection):
         def close(self):
-            if getattr(self, "_hermes_fail_close", False):
+            if getattr(self, "_eir_fail_close", False):
                 raise sqlite3.ProgrammingError(
                     "SQLite objects created in a thread can only be used in "
                     "that same thread"
@@ -191,14 +191,14 @@ def test_failed_close_keeps_connection_tracked(tmp_path, clean_registry):
     assert has_live_connection(db)
     assert read_header_bytes_preopen(db, length=16) is None
 
-    conn._hermes_fail_close = True
+    conn._eir_fail_close = True
     with pytest.raises(sqlite3.ProgrammingError):
         conn.close()
 
     assert has_live_connection(db), "failed close must leave the registry entry"
     assert read_header_bytes_preopen(db, length=16) is None
 
-    conn._hermes_fail_close = False
+    conn._eir_fail_close = False
     conn.close()
     assert not has_live_connection(db)
     assert read_header_bytes_preopen(db, length=16) is not None
@@ -217,7 +217,7 @@ def test_probe_and_connect_do_not_race(tmp_path, clean_registry, monkeypatch):
     interleaving is possible. If the lock is only held across the check, that
     thread slips in and the probe's ``close()`` cancels its POSIX locks.
     """
-    import hermes_cli.sqlite_safe_read as ssr
+    import eir_cli.sqlite_safe_read as ssr
 
     db = tmp_path / "state.db"
     _make_db(db, "DELETE")
@@ -272,8 +272,8 @@ def test_probe_and_connect_do_not_race(tmp_path, clean_registry, monkeypatch):
 
 def test_session_db_read_only_is_tracked(tmp_path, clean_registry, monkeypatch):
     """End-to-end: a real read-only SessionDB blocks byte-probes."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-    from hermes_state import SessionDB
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
+    from eir_state import SessionDB
 
     db_path = tmp_path / "state.db"
     seed = SessionDB(db_path=db_path)
@@ -303,9 +303,9 @@ def test_repair_connections_are_tracked_for_byte_probe_safety(tmp_path, clean_re
     (``howtocorrupt`` §2.2), letting an external writer commit into the database
     the repair still believed it owned.
     """
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-    from hermes_state import SessionDB
-    from hermes_state_repair import _connect_repair_durable, _repair_conn
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
+    from eir_state import SessionDB
+    from eir_state_repair import _connect_repair_durable, _repair_conn
 
     db_path = tmp_path / "state.db"
     seed = SessionDB(db_path=db_path)
@@ -330,13 +330,13 @@ def test_repair_connections_are_tracked_for_byte_probe_safety(tmp_path, clean_re
 
 
 def test_byte_probe_never_cancels_the_repair_exclusion(tmp_path, clean_registry):
-    """A live repair's EXCLUSIVE lock must survive Hermes' own inspection (#63386).
+    """A live repair's EXCLUSIVE lock must survive Eir' own inspection (#63386).
 
     With the connection tracked the probe is refused, so nothing closes an fd and
     the exclusion keeps holding; if the probe were allowed through, its ``close()``
     would cancel the lock and the intruder would commit into the file mid-repair.
     """
-    import hermes_state_repair as repair
+    import eir_state_repair as repair
 
     db_path = tmp_path / "state.db"
     _make_db(db_path, "DELETE")

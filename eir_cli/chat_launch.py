@@ -1,4 +1,4 @@
-"""What a local chat launcher does around its client process: the command that runs this Hermes
+"""What a local chat launcher does around its client process: the command that runs this Eir
 install, and the lines printed after the client exits. Public for plugins (plugin_api.json); the
 Ink launcher (``main_tui_launch.py``) uses the same functions.
 """
@@ -11,21 +11,21 @@ from pathlib import Path
 from agent.i18n import t
 
 
-def hermes_command(args=()) -> list[str]:
-    """The argv that runs this Hermes install with *args*, for a child process or a client that
+def eir_command(args=()) -> list[str]:
+    """The argv that runs this Eir install with *args*, for a child process or a client that
     keeps it: the install's launcher file when it has one, else this interpreter with an inline
     bootstrap. It needs no extra environment (no ``PYTHONPATH``); the child serves the profile
-    named by the inherited ``HERMES_HOME``. The first item is always a file a child process can
+    named by the inherited ``EIR_HOME``. The first item is always a file a child process can
     start without a shell."""
-    from hermes_cli._launchers import installation_command, runtime_command
-    from hermes_cli.main import PROJECT_ROOT
+    from eir_cli._launchers import installation_command, runtime_command
+    from eir_cli.main import PROJECT_ROOT
     command = installation_command(PROJECT_ROOT, args)
     launcher = Path(command[0])
-    if os.name != "nt" or launcher.name != "hermes":
+    if os.name != "nt" or launcher.name != "eir":
         return command
-    # Windows publishes ``hermes.exe``, or ``hermes.cmd`` when it could not make one. Neither is
+    # Windows publishes ``eir.exe``, or ``eir.cmd`` when it could not make one. Neither is
     # the extensionless path, and a batch file is not startable without a shell.
-    exe = launcher.with_name("hermes.exe")
+    exe = launcher.with_name("eir.exe")
     return [str(exe), *command[1:]] if exe.is_file() else runtime_command(PROJECT_ROOT, args)
 
 
@@ -66,13 +66,13 @@ def _branch_lineage(db, session: dict) -> list:
 
 def print_exit_summary(session_id: str, *, command: str) -> None:
     """Print the lines a chat launcher shows after its client exits: how to resume the session
-    with *command* (for example ``hermes --tui``), its id, title, message count and tokens. Prints
+    with *command* (for example ``eir --tui``), its id, title, message count and tokens. Prints
     nothing when the profile's store has no such session or the session has no messages."""
     db = None
     try:
-        from hermes_state import SessionDB
-        from hermes_cli.config import get_hermes_home
-        db = SessionDB(db_path=get_hermes_home() / "state.db", read_only=True)
+        from eir_state import SessionDB
+        from eir_cli.config import get_eir_home
+        db = SessionDB(db_path=get_eir_home() / "state.db", read_only=True)
         session = db.get_session(session_id)
         if not session:
             return
@@ -92,8 +92,8 @@ def print_exit_summary(session_id: str, *, command: str) -> None:
         if db is not None:
             db.close()
 
-    # Sessions live under the profile's HERMES_HOME — mirror cli_session_mixin::_print_exit_summary.
-    from hermes_cli.profiles import get_active_profile_name
+    # Sessions live under the profile's EIR_HOME — mirror cli_session_mixin::_print_exit_summary.
+    from eir_cli.profiles import get_active_profile_name
     active_profile = get_active_profile_name()
     profile_flag = "" if active_profile in ("default", "custom") else f" -p {active_profile}"
     print(f"\n{t('cli.session.exit_resume_hint')}\n  {command} --resume {resume_id}{profile_flag}")

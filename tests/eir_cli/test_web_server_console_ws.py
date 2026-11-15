@@ -1,4 +1,4 @@
-"""Dashboard Hermes Console websocket tests."""
+"""Dashboard Eir Console websocket tests."""
 
 from __future__ import annotations
 
@@ -9,11 +9,11 @@ import pytest
 from starlette.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
-from hermes_cli import web_server
+from eir_cli import web_server
 
 
 @pytest.fixture
-def console_client(monkeypatch, _isolate_hermes_home):
+def console_client(monkeypatch, _isolate_eir_home):
     previous_auth_required = getattr(web_server.app.state, "auth_required", None)
     previous_bound_host = getattr(web_server.app.state, "bound_host", None)
     web_server.app.state.auth_required = False
@@ -71,13 +71,13 @@ def test_console_ws_rejects_missing_or_bad_token(console_client):
 
 
 def test_console_ws_cancel_returns_to_prompt(console_client, monkeypatch):
-    from hermes_cli.console_engine import ConsoleResult, HermesConsoleEngine
+    from eir_cli.console_engine import ConsoleResult, EirConsoleEngine
 
     def slow_execute(self, line: str, *, confirmed: bool = False):
         time.sleep(0.2)
         return ConsoleResult("ok", output="late", command=line)
 
-    monkeypatch.setattr(HermesConsoleEngine, "execute", slow_execute)
+    monkeypatch.setattr(EirConsoleEngine, "execute", slow_execute)
 
     with console_client.websocket_connect(_url()) as conn:
         assert conn.receive_json()["type"] == "ready"
@@ -85,7 +85,7 @@ def test_console_ws_cancel_returns_to_prompt(console_client, monkeypatch):
         conn.send_json({"type": "cancel"})
 
         complete = _recv_until(conn, "complete", status="cancelled")
-        assert complete["prompt"] == "hermes> "
+        assert complete["prompt"] == "eir> "
 
 
 @pytest.fixture
@@ -144,13 +144,13 @@ def test_console_cancel_stops_forked_agent_request_before_reporting(console_clie
     import threading
 
     from agent import curator
-    from hermes_cli.web_routers import chat_ws
-    from hermes_constants import get_hermes_home
+    from eir_cli.web_routers import chat_ws
+    from eir_constants import get_eir_home
     from tools import skill_usage
 
     # The LLM pass only forks when an agent-created skill is a candidate: bundled
     # built-ins are excluded from the review list, so the temp home needs one.
-    skill_dir = get_hermes_home() / "skills" / "console-cancel-probe"
+    skill_dir = get_eir_home() / "skills" / "console-cancel-probe"
     skill_dir.mkdir(parents=True, exist_ok=True)
     (skill_dir / "SKILL.md").write_text("---\nname: console-cancel-probe\ndescription: x\n---\n", encoding="utf-8")
     skill_usage.record_created("console-cancel-probe", agent_created=True)

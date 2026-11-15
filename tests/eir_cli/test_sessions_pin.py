@@ -14,7 +14,7 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def existing_store(tmp_path, monkeypatch):
-    monkeypatch.setattr("hermes_constants.get_hermes_home", lambda: tmp_path)
+    monkeypatch.setattr("eir_constants.get_eir_home", lambda: tmp_path)
     (tmp_path / "state.db").touch()
 
 
@@ -47,15 +47,15 @@ class _FakeDB:
         self.closed = True
 
 def _run(monkeypatch, capsys, argv_tail, db):
-    import hermes_cli.main as main_mod
-    import hermes_state
+    import eir_cli.main as main_mod
+    import eir_state
 
     def open_db(**kwargs):
         assert kwargs.get("read_only", False) == (argv_tail[0] == "pinned")
         return db
 
-    monkeypatch.setattr(hermes_state, "SessionDB", open_db)
-    monkeypatch.setattr(sys, "argv", ["hermes", "sessions", *argv_tail])
+    monkeypatch.setattr(eir_state, "SessionDB", open_db)
+    monkeypatch.setattr(sys, "argv", ["eir", "sessions", *argv_tail])
     try:
         main_mod.main()
         code = 0
@@ -82,7 +82,7 @@ def test_pin_multiple_ids_one_missing(monkeypatch, capsys):
     code, out = _run(monkeypatch, capsys, ["pin", "aaa", "nope", "bbb"], db)
     assert ("aaa111", True) in db.pin_calls
     assert ("bbb222", True) in db.pin_calls
-    assert "No session 'nope'" in out and "hermes sessions list" in out
+    assert "No session 'nope'" in out and "eir sessions list" in out
     assert code == 1
 
 def test_pinned_lists_only_pinned_rows(monkeypatch, capsys):

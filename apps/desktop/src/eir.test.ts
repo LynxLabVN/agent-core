@@ -32,7 +32,7 @@ import {
   speakText,
   transcribeAudio,
   triggerCronJob
-} from './hermes'
+} from './eir'
 import { $transcriptTailBySessionId, transcriptTailState } from './store/transcript-tail'
 
 const emptySessionsResponse = {
@@ -42,13 +42,13 @@ const emptySessionsResponse = {
   total: 0
 }
 
-describe('Hermes REST helpers', () => {
+describe('Eir REST helpers', () => {
   let api: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
     resetSidebarBatchCapability()
     api = vi.fn().mockResolvedValue(emptySessionsResponse)
-    Object.defineProperty(window, 'hermesDesktop', {
+    Object.defineProperty(window, 'eirDesktop', {
       configurable: true,
       value: { api }
     })
@@ -58,7 +58,7 @@ describe('Hermes REST helpers', () => {
     setApiRequestConnection(null)
     setApiRequestProfile(null)
     vi.restoreAllMocks()
-    Reflect.deleteProperty(window, 'hermesDesktop')
+    Reflect.deleteProperty(window, 'eirDesktop')
   })
 
   it('batches the sidebar slices into a single request with per-slice limits + excludes', async () => {
@@ -265,7 +265,7 @@ describe('Hermes REST helpers', () => {
         // The exact skew failure: Electron surfaces the backend catch-all.
         return Promise.reject(
           new Error(
-            'Error invoking remote method \'hermes:api\': Error: 404: {"detail":"No such API endpoint: /api/profiles/sessions/sidebar"}'
+            'Error invoking remote method \'eir:api\': Error: 404: {"detail":"No such API endpoint: /api/profiles/sessions/sidebar"}'
           )
         )
       }
@@ -814,7 +814,7 @@ describe('pluginSocket', () => {
 
   beforeEach(() => {
     getConnection = vi.fn().mockResolvedValue(null)
-    Object.defineProperty(window, 'hermesDesktop', {
+    Object.defineProperty(window, 'eirDesktop', {
       configurable: true,
       value: { api: vi.fn(), getConnection }
     })
@@ -822,7 +822,7 @@ describe('pluginSocket', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
-    Reflect.deleteProperty(window, 'hermesDesktop')
+    Reflect.deleteProperty(window, 'eirDesktop')
     setApiRequestProfile(null)
   })
 

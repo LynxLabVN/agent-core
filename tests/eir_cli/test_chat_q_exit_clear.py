@@ -32,7 +32,7 @@ def test_print_exit_summary_skips_clear_when_clear_screen_false(monkeypatch):
     ))
 
     fake = FakeCLI()
-    cli_mod.HermesCLI._print_exit_summary(fake, clear_screen=False)
+    cli_mod.EirCLI._print_exit_summary(fake, clear_screen=False)
 
     assert "clear" not in calls, (
         "_clear_terminal_on_exit should NOT be called when clear_screen=False"
@@ -66,7 +66,7 @@ def test_print_exit_summary_still_clears_in_interactive_path(monkeypatch):
     ))
 
     fake = FakeCLI()
-    cli_mod.HermesCLI._print_exit_summary(fake)  # default clear_screen=True
+    cli_mod.EirCLI._print_exit_summary(fake)  # default clear_screen=True
 
     assert "clear" in calls, (
         "Interactive mode should still clear the screen (regression test for #38928)"
@@ -98,7 +98,7 @@ def test_clear_fallback_spawns_no_shell(monkeypatch):
     resolved `clear` binary, with the real (0 off-Windows) hide flags."""
     import subprocess as sp
 
-    import hermes_cli.cli_session_mixin as mixin_mod
+    import eir_cli.cli_session_mixin as mixin_mod
 
     calls = []
     monkeypatch.setattr(mixin_mod.shutil, "which",
@@ -119,8 +119,8 @@ def test_clear_fallback_windows_runs_cls_with_hidden_console(monkeypatch):
     real windows_hide_flags() (CREATE_NO_WINDOW) so no console flashes (#116904)."""
     import subprocess as sp
 
-    import hermes_cli.cli_session_mixin as mixin_mod
-    from hermes_cli._subprocess_compat import windows_hide_flags
+    import eir_cli.cli_session_mixin as mixin_mod
+    from eir_cli._subprocess_compat import windows_hide_flags
 
     calls = []
     monkeypatch.setattr(sp, "run", lambda argv, **kwargs: calls.append((argv, kwargs)))
@@ -138,7 +138,7 @@ def test_clear_fallback_windows_runs_cls_with_hidden_console(monkeypatch):
 def test_clear_fallback_skips_spawn_when_no_clear(monkeypatch):
     """POSIX without `clear` on PATH: skip the spawn entirely instead of letting a
     shell swallow the failure (#116904's silent no-op)."""
-    import hermes_cli.cli_session_mixin as mixin_mod
+    import eir_cli.cli_session_mixin as mixin_mod
 
     calls = []
     monkeypatch.setattr(mixin_mod.shutil, "which", lambda _exe: None)

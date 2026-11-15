@@ -1,9 +1,9 @@
 """Who may register a password-manager login backend (``ctx.register_login_backend``).
 
-Only plugins bundled with Hermes, or installed from the plugin catalog at tier ``verified`` or ``official``
+Only plugins bundled with Eir, or installed from the plugin catalog at tier ``verified`` or ``official``
 and at the catalog's reviewed pin, are accepted. Provenance comes from the installer-owned
 ``.install-metadata.json`` record, never from the plugin tree. Real git, file:// repos, the real installer,
-and the real plugin manager loading into a temp ``HERMES_HOME``.
+and the real plugin manager loading into a temp ``EIR_HOME``.
 """
 
 from __future__ import annotations
@@ -17,10 +17,10 @@ from pathlib import Path
 
 import pytest
 
-from hermes_cli import plugin_catalog as pc_cat
-from hermes_cli import plugins_cmd as pc
-from hermes_cli import plugins_cmd_catalog as cat
-from tests.pm._fixtures import client, isolated_python  # pytest fixtures: PM-isolated HOME/HERMES_HOME
+from eir_cli import plugin_catalog as pc_cat
+from eir_cli import plugins_cmd as pc
+from eir_cli import plugins_cmd_catalog as cat
+from tests.pm._fixtures import client, isolated_python  # pytest fixtures: PM-isolated HOME/EIR_HOME
 
 pytestmark = pytest.mark.skipif(shutil.which("git") is None, reason="git not available")
 
@@ -61,7 +61,7 @@ def _commit(repo: Path, msg: str) -> str:
 def world(request, tmp_path, monkeypatch):
     """A file:// login-backend plugin repo (two commits), a catalog entry pinned to the first, a temp home."""
     request.getfixturevalue("client")
-    from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+    from eir_constants import reset_eir_home_override, set_eir_home_override
 
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -75,13 +75,13 @@ def world(request, tmp_path, monkeypatch):
     home = tmp_path / "home"
     plugins_dir = home / "plugins"
     plugins_dir.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    token = set_hermes_home_override(home)
+    monkeypatch.setenv("EIR_HOME", str(home))
+    token = set_eir_home_override(home)
     monkeypatch.setattr(pc, "_scan_on_install_enabled", lambda: False)
     monkeypatch.setattr(pc, "_console", lambda: type("C", (), {"print": lambda *a, **k: None})())
 
     def publish_without_environment(*_args, plugins=None, **_kwargs):
-        from hermes_cli.runtime_state import finish_publication
+        from eir_cli.runtime_state import finish_publication
         from pm import paths
         from pm.plugin_inputs import StagedUpdate
         from pm.publication import PluginSelection, StagedPlugin
@@ -105,7 +105,7 @@ def world(request, tmp_path, monkeypatch):
 
     def load():
         from agent import vault_backend_registry as registry
-        from hermes_cli.plugins import PluginManager
+        from eir_cli.plugins import PluginManager
 
         (home / "config.yaml").write_text("plugins:\n  enabled: [acme-vault]\nvault:\n  acme: {enabled: true}\n")
         manager = PluginManager(scope_key=str(home))
@@ -119,7 +119,7 @@ def world(request, tmp_path, monkeypatch):
     finally:
         for manager in managers:
             manager.unload()
-        reset_hermes_home_override(token)
+        reset_eir_home_override(token)
 
 
 @pytest.mark.parametrize("tier", ["verified", "official"])
@@ -145,16 +145,16 @@ def test_local_directory_plugin_is_refused(world, caplog):
     (plugin / "__init__.py").write_text(_PLUGIN)
     with caplog.at_level(logging.WARNING):
         assert world["load"]() is None
-    assert RULE in caplog.text and "not installed from the Hermes plugin catalog" in caplog.text
+    assert RULE in caplog.text and "not installed from the Eir plugin catalog" in caplog.text
 
 
 def test_url_install_with_forged_in_tree_catalog_file_is_refused(world, caplog):
-    """A repo can commit a ``.hermes-catalog.json`` claiming a verified entry; Python never reads it."""
-    (world["repo"] / ".hermes-catalog.json").write_text(json.dumps(
+    """A repo can commit a ``.eir-catalog.json`` claiming a verified entry; Python never reads it."""
+    (world["repo"] / ".eir-catalog.json").write_text(json.dumps(
         {"catalog_name": "acme-vault", "repo": world["repo"].as_uri(), "sha": world["sha1"], "tier": "verified"}))
     forged = _commit(world["repo"], "forge provenance")
     pc._install_plugin_core(world["repo"].as_uri(), force=False, ref=forged)
-    assert json.loads((world["plugins_dir"] / "acme-vault" / ".hermes-catalog.json").read_text())["tier"] == "verified"
+    assert json.loads((world["plugins_dir"] / "acme-vault" / ".eir-catalog.json").read_text())["tier"] == "verified"
     with caplog.at_level(logging.WARNING):
         assert world["load"]() is None
     assert RULE in caplog.text
@@ -178,8 +178,8 @@ def test_verified_entry_installed_with_allow_removed_is_refused(world, caplog):
 def test_bundled_plugins_register_and_project_or_pip_plugins_do_not(tmp_path, source, accepted):
     from agent import vault_backend_registry as registry
     from agent.vault_backends.base import LoginBackend
-    from hermes_cli.plugins import PluginContext, PluginManager
-    from hermes_cli.plugins_manifest import PluginManifest
+    from eir_cli.plugins import PluginContext, PluginManager
+    from eir_cli.plugins_manifest import PluginManifest
 
     class Backend(LoginBackend):
         name, prefix, display_name = "acme", "acme:", "Acme"

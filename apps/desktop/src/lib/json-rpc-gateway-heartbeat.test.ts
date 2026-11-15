@@ -1,4 +1,4 @@
-import { JsonRpcGatewayClient } from '@hermes/shared'
+import { JsonRpcGatewayClient } from '@eir/shared'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 interface ListenerEntry {

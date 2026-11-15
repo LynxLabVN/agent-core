@@ -1,9 +1,9 @@
-"""Hermes Plugin System — discovers, loads, and manages plugins.
+"""Eir Plugin System — discovers, loads, and manages plugins.
 
 Sources, later overriding earlier on key collision: bundled ``<repo>/plugins/<name>/`` (``memory/``
-and ``context_engine/`` have their own discovery), user ``~/.hermes/plugins/<name>/``, project
-``./.hermes/plugins/<name>/`` (opt-in via ``HERMES_ENABLE_PROJECT_PLUGINS``), and pip packages in
-the ``hermes_agent.plugins`` entry-point group. A directory plugin needs a ``plugin.yaml`` manifest
+and ``context_engine/`` have their own discovery), user ``~/.eir/plugins/<name>/``, project
+``./.eir/plugins/<name>/`` (opt-in via ``EIR_ENABLE_PROJECT_PLUGINS``), and pip packages in
+the ``eir_agent.plugins`` entry-point group. A directory plugin needs a ``plugin.yaml`` manifest
 and an ``__init__.py`` exposing ``register(ctx)``. Plugins register callbacks for ``VALID_HOOKS``
 (core fires ``invoke_hook(name, **kwargs)``) and tools via ``PluginContext.register_tool()``.
 """
@@ -26,29 +26,29 @@ from functools import cached_property
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional, Set, Tuple, Union
 
-from hermes_constants import get_hermes_home, get_process_hermes_home, hermes_home_key
+from eir_constants import get_eir_home, get_process_eir_home, eir_home_key
 from registration_lifecycle import replacement_coordinator
 from utils import env_var_enabled
-from hermes_cli.config import load_config_readonly
-from hermes_cli.middleware import VALID_MIDDLEWARE
-from hermes_cli.plugin_capabilities import plugin_capability_granted
-from hermes_cli.relay_plugin_cutover import RELAY_PLUGINS_CONFIG_ENV, legacy_relay_plugin_keys
+from eir_cli.config import load_config_readonly
+from eir_cli.middleware import VALID_MIDDLEWARE
+from eir_cli.plugin_capabilities import plugin_capability_granted
+from eir_cli.relay_plugin_cutover import RELAY_PLUGINS_CONFIG_ENV, legacy_relay_plugin_keys
 # Sibling modules' names are re-exported here (origin) so plugins and tests keep one import path.
-from hermes_cli.plugins_manifest import (
+from eir_cli.plugins_manifest import (
     _CONFIG_SCHEMA_TYPES, SUPPORTED_MANIFEST_VERSION, PluginManifest, _portable_data_namespace,
     manifest_key, parse_manifest_file, resolve_module_origin, resolve_plugin_load_order, validate_config_schema,
 )
-from hermes_cli.plugins_discovery import (
+from eir_cli.plugins_discovery import (
     ENTRY_POINTS_GROUP, _get_disabled_plugins, _get_enabled_plugins, collect_directory_manifests,
     discover_entrypoint_manifests, gate_manifest, plugin_discovery_suppressed, resolve_manifest_winners,
     scan_directory,
 )
-from hermes_cli.plugins_loader import (
+from eir_cli.plugins_loader import (
     PluginLoaderMixin, _BARE_MODULE_SCOPE, _MODULE_NAMESPACE_LOCK, _NS_PARENT, _evict_modules,
     _plugin_home_scope, _serialized_replacement, in_plugin_load_worker,
 )
-from hermes_cli.plugins_dispatch import (
-    DEFAULT_SYSTEM_PROMPT_SECTION_MAX_CHARS, HERMES_EVENT_NAMESPACE, MAX_SYSTEM_PROMPT_SECTION_CHARS,
+from eir_cli.plugins_dispatch import (
+    DEFAULT_SYSTEM_PROMPT_SECTION_MAX_CHARS, EIR_EVENT_NAMESPACE, MAX_SYSTEM_PROMPT_SECTION_CHARS,
     MAX_SYSTEM_PROMPT_SECTIONS_TOTAL_CHARS, PLUGIN_SECTIONS_END, PLUGIN_SECTIONS_START,
     SYSTEM_PROMPT_SECTION_POSITIONS, _EVENT_EMIT_DEPTH_CAP, _EVENT_PENDING_CAP,
     _HOOK_CALLBACK_TIMEOUT_SECS, _HOOK_TIMEOUT_SUPPRESSION_SECONDS, _MAX_HOOK_CALLBACK_TIMEOUT_SECS,
@@ -56,22 +56,22 @@ from hermes_cli.plugins_dispatch import (
     RenderedPluginSystemPromptSection, _EventSubscription, format_system_prompt_sections,
     is_valid_system_prompt_section_id, resolve_plugin_command_result,
 )
-from hermes_cli.plugins_capability_ctx import PluginCapabilityCtxMixin
-from hermes_cli.plugins_ledger import PluginLedgerMixin, PluginRegistration
-from hermes_cli.plugins_registrars import _SCOPED_PROVIDER_REGISTRARS, make_scoped_provider_registrar
-from hermes_cli.plugins_state import (
+from eir_cli.plugins_capability_ctx import PluginCapabilityCtxMixin
+from eir_cli.plugins_ledger import PluginLedgerMixin, PluginRegistration
+from eir_cli.plugins_registrars import _SCOPED_PROVIDER_REGISTRARS, make_scoped_provider_registrar
+from eir_cli.plugins_state import (
     PluginState, _locked_plugin_state, _nested_plugin_mapping, _nested_plugin_value,
     _plugin_relative_segments, _plugin_settings_entry, save_plugin_setting,
 )
 # PluginContext lives in plugins_context.py; this facade stays its public import path.
-from hermes_cli.plugins_context import PluginContext, _UNSET, _ignore_after_abandoned_load
-from hermes_cli._startup_fast import project_root_str
+from eir_cli.plugins_context import PluginContext, _UNSET, _ignore_after_abandoned_load
+from eir_cli._startup_fast import project_root_str
 
 
 def get_bundled_plugins_dir() -> Path:
-    """Bundled ``plugins/`` dir: ``HERMES_BUNDLED_PLUGINS`` (Nix wrapper / packaged installs, read-only
+    """Bundled ``plugins/`` dir: ``EIR_BUNDLED_PLUGINS`` (Nix wrapper / packaged installs, read-only
     store paths) first, else the in-repo path."""
-    env_override = os.getenv("HERMES_BUNDLED_PLUGINS")
+    env_override = os.getenv("EIR_BUNDLED_PLUGINS")
     if env_override:
         return Path(env_override)
     return Path(project_root_str()) / "plugins"
@@ -83,17 +83,17 @@ class PluginToolOverrideError(PermissionError):
 
 logger = logging.getLogger(__name__)
 
-# ``HERMES_PLUGINS_DEBUG=1`` tees verbose discovery logs to stderr in addition to agent.log. Read
+# ``EIR_PLUGINS_DEBUG=1`` tees verbose discovery logs to stderr in addition to agent.log. Read
 # once at import; tests flip it mid-process via ``_install_plugin_debug_handler(force=True)``.
-_PLUGINS_DEBUG = env_var_enabled("HERMES_PLUGINS_DEBUG")
+_PLUGINS_DEBUG = env_var_enabled("EIR_PLUGINS_DEBUG")
 _DEBUG_HANDLER_INSTALLED = False
 
 
 def _install_plugin_debug_handler(force: bool = False) -> None:
-    """When HERMES_PLUGINS_DEBUG is on, tee plugin logs to stderr at DEBUG (once per process)."""
+    """When EIR_PLUGINS_DEBUG is on, tee plugin logs to stderr at DEBUG (once per process)."""
     global _DEBUG_HANDLER_INSTALLED, _PLUGINS_DEBUG
     if force:
-        _PLUGINS_DEBUG = env_var_enabled("HERMES_PLUGINS_DEBUG")
+        _PLUGINS_DEBUG = env_var_enabled("EIR_PLUGINS_DEBUG")
     if not _PLUGINS_DEBUG or _DEBUG_HANDLER_INSTALLED:
         return
     handler = logging.StreamHandler(sys.stderr)
@@ -103,7 +103,7 @@ def _install_plugin_debug_handler(force: bool = False) -> None:
     logger.setLevel(logging.DEBUG)
     logger.propagate = True
     _DEBUG_HANDLER_INSTALLED = True
-    logger.debug("HERMES_PLUGINS_DEBUG=1 — verbose plugin discovery logging enabled")
+    logger.debug("EIR_PLUGINS_DEBUG=1 — verbose plugin discovery logging enabled")
 
 
 _install_plugin_debug_handler()
@@ -161,7 +161,7 @@ VALID_HOOKS: set[str] = {
     # provider, model, language, prompt, source. Return None or a dict mutating prompt/language/
     # model (registration order, last-writer-wins; file_path is read-only).
     "pre_transcription",
-    # Kanban task observers (hermes_cli.kanban_db), fired AFTER the DB commit so a slow plugin never
+    # Kanban task observers (eir_cli.kanban_db), fired AFTER the DB commit so a slow plugin never
     # holds the SQLite write lock; returns ignored. claimed fires in the DISPATCHER right before
     # spawn; completed/blocked fire in the WORKER (or whichever process drove it). Kwargs: task_id,
     # board, assignee, run_id, profile_name; completed adds summary, blocked adds reason.
@@ -188,7 +188,7 @@ VALID_HOOKS: set[str] = {
     # single-writer dispatch lock has been released (the #56066 original fired inside the lock — the #64231
     # disposition mandates the post-lock re-port), so a slow subscriber can never extend the writer critical
     # section. Kwargs: board: str | None, profile_name: str, dry_run: bool, outcome: "ok" | "skipped_locked"
-    # | "idle", result: hermes_cli.kanban_db.DispatchResult (spawned, reclaimed, promoted,
+    # | "idle", result: eir_cli.kanban_db.DispatchResult (spawned, reclaimed, promoted,
     # reconciled_orphans, crashed, stale, timed_out, auto_blocked, rate_limited, auto_assigned_default,
     # respawn_guarded, skipped_per_profile_capped, skipped_unassigned, skipped_nonspawnable,
     # skipped_locked). Privacy: result carries task ids, assignees, and workspace paths.
@@ -269,9 +269,9 @@ class PluginManager(PluginLoaderMixin, PluginDispatchMixin, PluginLedgerMixin):
     def __init__(self, scope_key: Optional[str] = None) -> None:
         # Capture the home immutably. Unload can run from a different ambient
         # profile context, but every inverse must target the registration's
-        # original scope.  Normalize through hermes_home_key so the scope
+        # original scope.  Normalize through eir_home_key so the scope
         # matches the key the registries store under (normcase on Windows).
-        self.scope_key = hermes_home_key(scope_key)
+        self.scope_key = eir_home_key(scope_key)
         self.home_path = Path(self.scope_key)
         self._discovery_lock = threading.RLock()
         self._discovered: bool = False
@@ -331,7 +331,7 @@ class PluginManager(PluginLoaderMixin, PluginDispatchMixin, PluginLedgerMixin):
         self._hook_failures_reported: set = set()
         # Ledger per plugin (ownership) plus global order (reverse teardown across plugins). Process-
         # global registries are shared across profiles while several managers coexist, so the ledger
-        # is keyed per (hermes_home, plugin_id) and every inverse is identity-conditional — one
+        # is keyed per (eir_home, plugin_id) and every inverse is identity-conditional — one
         # profile's unload can never clear another's. Persistent registrations that survived an
         # unload-all park in ``_persistent_carryover`` until force re-discovery evicts the stale ones.
         # Registration handles are kept both per plugin (ownership lookup) and globally (reverse-order
@@ -348,7 +348,7 @@ class PluginManager(PluginLoaderMixin, PluginDispatchMixin, PluginLedgerMixin):
         self._persistent_carryover: list[PluginRegistration] = []
         # Deferred platforms whose client tools registered at discovery (see
         # _register_deferred_platform_tools): imported package (don't re-execute on materialize)
-        # and contributed tool names (so `hermes plugins list` still attributes them).
+        # and contributed tool names (so `eir plugins list` still attributes them).
         self._predeclared_modules: dict[str, types.ModuleType] = {}
         self._predeclared_tools: dict[str, list[str]] = {}
 
@@ -412,8 +412,8 @@ class PluginManager(PluginLoaderMixin, PluginDispatchMixin, PluginLedgerMixin):
             loaded_before = frozenset(k for k, p in self._plugins.items() if not p.error and not p.deferred)
             if force:
                 self.unload()  # the ledger owns teardown of process-global registries
-            if env_var_enabled("HERMES_SAFE_MODE"):
-                logger.info("HERMES_SAFE_MODE=1 — plugin discovery skipped")
+            if env_var_enabled("EIR_SAFE_MODE"):
+                logger.info("EIR_SAFE_MODE=1 — plugin discovery skipped")
                 self._discovered = True
                 return
             # Flag set up front as a re-entrancy guard (register() can trigger discovery again) but
@@ -426,8 +426,8 @@ class PluginManager(PluginLoaderMixin, PluginDispatchMixin, PluginLedgerMixin):
                 # not come back (disabled, removed, or omitted from this discovery pass) so e.g. a disabled
                 # auth plugin's provider does not stay live process-wide until restart. See #91701.
                 self._evict_stale_persistent_registrations()
-                # load_hermes_dotenv() ran at import, before plugin secret sources existed: re-pull.
-                # Plugin secret sources register during discover; the initial load_hermes_dotenv() already
+                # load_eir_dotenv() ran at import, before plugin secret sources existed: re-pull.
+                # Plugin secret sources register during discover; the initial load_eir_dotenv() already
                 # ran at import time. Re-pull so the first process sees plugin backends (tracking #64177).
                 self._refresh_secret_sources_after_discovery()
                 if force:
@@ -462,14 +462,14 @@ class PluginManager(PluginLoaderMixin, PluginDispatchMixin, PluginLedgerMixin):
         activation), reset the cache and re-apply. Fail-open: never raises into discover_and_load."""
         try:
             from agent.secret_sources.registry import list_plugin_sources
-            from hermes_cli.env_loader import load_hermes_dotenv, reset_secret_source_cache
+            from eir_cli.env_loader import load_eir_dotenv, reset_secret_source_cache
             plugin_sources = list_plugin_sources()
         except Exception:
             return
         enabled_names: list[str] = []
         if plugin_sources:
             try:
-                from hermes_cli.config import load_config
+                from eir_cli.config import load_config
                 secrets = (load_config() or {}).get("secrets") or {}
             except Exception:
                 secrets = {}
@@ -498,10 +498,10 @@ class PluginManager(PluginLoaderMixin, PluginDispatchMixin, PluginLedgerMixin):
             # Reset and reload the SAME home the process (or routed turn) resolves to: under multiplex this
             # runs at gateway boot after sibling profiles may already have hydrated, and a global clear
             # wiped their snapshots; a routed discovery must rebuild the profile it just dropped.
-            from hermes_constants import get_hermes_home
-            home = get_hermes_home()
+            from eir_constants import get_eir_home
+            home = get_eir_home()
             reset_secret_source_cache(home)
-            load_hermes_dotenv(hermes_home=home)
+            load_eir_dotenv(eir_home=home)
             # A scope installed for this home was frozen BEFORE these sources existed — a routed cron
             # fire builds its scope in run_one_job and only then, on its first agent build, discovers
             # plugins; under multiplex semantics the load above is hydrate-only, so fold the values
@@ -531,7 +531,7 @@ class PluginManager(PluginLoaderMixin, PluginDispatchMixin, PluginLedgerMixin):
         enabled = _get_enabled_plugins()  # None = opt-in default (nothing enabled)
         stale_relay_keys = legacy_relay_plugin_keys(enabled)
         if stale_relay_keys:
-            logger.warning("Removed Hermes plugin %s is still listed in plugins.enabled; "
+            logger.warning("Removed Eir plugin %s is still listed in plugins.enabled; "
                            "remove it and configure a standard user or system Relay plugins.toml, or use %s "
                            "for an explicit user-file override",
                            ", ".join(stale_relay_keys), RELAY_PLUGINS_CONFIG_ENV)
@@ -572,7 +572,7 @@ class PluginManager(PluginLoaderMixin, PluginDispatchMixin, PluginLedgerMixin):
     def register_approval_transport(self, name: str, present_fn: Callable, *, plugin_id: str) -> None:
         """Manager-level registration (public API kept for out-of-tree plugins); the PluginContext
         method is the tracked path plugins normally use. Same validation, no unload tracking."""
-        from hermes_cli.approval_transport import RegisteredApprovalTransport
+        from eir_cli.approval_transport import RegisteredApprovalTransport
         clean = str(name).strip().lower()
         if clean == "builtin":
             raise ValueError("approval transport name 'builtin' is reserved")
@@ -584,14 +584,14 @@ class PluginManager(PluginLoaderMixin, PluginDispatchMixin, PluginLedgerMixin):
             owner = self._approval_transports[clean].plugin_id
             raise ValueError(f"approval transport {clean!r} is already registered by {owner!r}")
         self._approval_transports[clean] = RegisteredApprovalTransport(
-            name=clean, present=present_fn, plugin_id=plugin_id, profile_home=str(get_hermes_home().resolve()),
+            name=clean, present=present_fn, plugin_id=plugin_id, profile_home=str(get_eir_home().resolve()),
         )
         logger.info("Plugin %s registered approval transport: %s", plugin_id, clean)
 
     def get_approval_transport(self, name: str):
         """Return a transport only inside the profile that registered it."""
         registered = self._approval_transports.get(str(name).strip().lower())
-        if registered is None or registered.profile_home != str(get_hermes_home().resolve()):
+        if registered is None or registered.profile_home != str(get_eir_home().resolve()):
             return None
         return registered
 
@@ -602,7 +602,7 @@ class PluginManager(PluginLoaderMixin, PluginDispatchMixin, PluginLedgerMixin):
     def has_enabled_portable_mcp(self, raw_config: Mapping[str, Any]) -> bool:
         """Probe enabled portable MCP packages without loading plugins (shares the full-discovery
         manifest collection so precedence/gating cannot diverge)."""
-        if _env_enabled("HERMES_SAFE_MODE"):
+        if _env_enabled("EIR_SAFE_MODE"):
             return False
         plugins_config = raw_config.get("plugins")
         if not isinstance(plugins_config, dict):
@@ -620,8 +620,8 @@ class PluginManager(PluginLoaderMixin, PluginDispatchMixin, PluginLedgerMixin):
             if not manifest.portable or names & disabled or not names & enabled:
                 continue
             try:  # lazy: this is a startup probe, keep agent_plugins unimported unless needed
-                from hermes_cli.agent_plugins import _discover_mcp
-                if _discover_mcp(Path(manifest.path), get_hermes_home() / "plugin-data"
+                from eir_cli.agent_plugins import _discover_mcp
+                if _discover_mcp(Path(manifest.path), get_eir_home() / "plugin-data"
                                  / (manifest.data_namespace or lookup_key), [], create_data=False):
                     return True
             except (OSError, RuntimeError, ValueError):
@@ -712,8 +712,8 @@ sys.modules[PluginContext.__module__].PluginManager = PluginManager
 # working — ``get_plugin_manager()`` still reads/writes this name.
 _plugin_manager: Optional[PluginManager] = None
 
-# Resolved Hermes home -> PluginManager. A process can switch profiles via
-# ``set_hermes_home_override()``; a single slot would leak one profile's plugin/context-engine state
+# Resolved Eir home -> PluginManager. A process can switch profiles via
+# ``set_eir_home_override()``; a single slot would leak one profile's plugin/context-engine state
 # into another, and keying by resolved home lets a re-entered profile reuse its imported modules.
 _plugin_managers_by_home: dict[Path, PluginManager] = {}
 _plugin_managers_lock = threading.RLock()
@@ -731,12 +731,12 @@ _published_tui_host_lock = threading.Lock()
 
 
 def _plugin_home_key() -> Path:
-    """Resolved active Hermes home — the key for per-profile plugin managers (plugins capture the
+    """Resolved active Eir home — the key for per-profile plugin managers (plugins capture the
     home at registration, so a process serving several profiles cannot share one manager)."""
     try:
-        return get_hermes_home().expanduser().resolve()
+        return get_eir_home().expanduser().resolve()
     except Exception:
-        return get_hermes_home().expanduser()
+        return get_eir_home().expanduser()
 
 
 def _clear_plugin_submodules(manager: Optional[PluginManager]) -> None:
@@ -825,7 +825,7 @@ def _attach_published_tui_host(manager: PluginManager) -> None:
 
 
 def get_plugin_manager() -> PluginManager:
-    """Return the plugin manager for the active Hermes profile/home (cached per resolved home; a
+    """Return the plugin manager for the active Eir profile/home (cached per resolved home; a
     profile switch gets its own manager and plugin submodules)."""
     global _plugin_manager
     current_home = _plugin_home_key()
@@ -838,7 +838,7 @@ def get_plugin_manager() -> PluginManager:
         else:
             manager = _plugin_managers_by_home.get(current_home)
             if manager is None:
-                manager = PluginManager(scope_key=hermes_home_key(current_home))
+                manager = PluginManager(scope_key=eir_home_key(current_home))
                 _plugin_managers_by_home[current_home] = manager
             _plugin_manager = manager
     _attach_published_gateway_host(manager)
@@ -868,7 +868,7 @@ def _reset_plugin_managers_for_tests() -> None:
     # Dashboard-auth providers are persistent and survive a routine unload, so the clean-slate
     # reset must clear that process-global registry explicitly or a test's provider leaks.
     try:
-        from hermes_cli.dashboard_auth.registry import clear_providers
+        from eir_cli.dashboard_auth.registry import clear_providers
         clear_providers()
     except Exception:
         logger.debug("dashboard-auth registry clear failed", exc_info=True)
@@ -933,7 +933,7 @@ def _join_background_discovery(timeout: float = 30.0) -> bool:
 
 
 def _plugin_toolset_keys_cache_path() -> Path:
-    return get_hermes_home() / "cache" / "plugin_toolset_keys.json"
+    return get_eir_home() / "cache" / "plugin_toolset_keys.json"
 
 
 def _persist_plugin_toolset_keys() -> None:
@@ -1144,7 +1144,7 @@ def _get_pre_tool_call_directive_details(
     if allowed is not None and tool_name not in allowed:
         fmt = getattr(_thread_tool_whitelist, "fmt", "Tool '{tool_name}' denied")
         return _PreToolCallDirective(action="block", message=fmt.format(tool_name=tool_name))
-    from hermes_cli.lifecycle import invoke_hook as invoke_lifecycle_hook
+    from eir_cli.lifecycle import invoke_hook as invoke_lifecycle_hook
     hook_results = invoke_lifecycle_hook(
         "pre_tool_call", tool_name=tool_name, args=args if isinstance(args, dict) else {},
         task_id=task_id, session_id=session_id, tool_call_id=tool_call_id, turn_id=turn_id,
@@ -1359,7 +1359,7 @@ def get_plugin_auxiliary_tasks() -> list[dict[str, Any]]:
 
 
 def get_plugin_toolsets() -> list[tuple]:
-    """Plugin toolsets as ``(key, label, description)`` tuples for the ``hermes tools`` TUI."""
+    """Plugin toolsets as ``(key, label, description)`` tuples for the ``eir tools`` TUI."""
     manager = get_plugin_manager()
     if not manager._plugin_tool_names:
         return []

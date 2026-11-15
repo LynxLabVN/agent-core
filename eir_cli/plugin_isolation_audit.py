@@ -1,20 +1,20 @@
 """Static answer to "will this plugin run in the plugin host?" (``plugins.isolation: host``).
 
 Reads a plugin directory's manifest and Python source (never imports it) and reports whether the
-plugin reaches Hermes only through ``ctx`` surfaces that cross the host boundary. The rules come
-from :mod:`hermes_cli.plugin_isolation`, the same tables the host enforces at runtime, so a plugin
+plugin reaches Eir only through ``ctx`` surfaces that cross the host boundary. The rules come
+from :mod:`eir_cli.plugin_isolation`, the same tables the host enforces at runtime, so a plugin
 the audit calls host-ready loads in the host, and one it flags fails there with the same reason.
 
 What it cannot see in a process boundary it flags:
 
 * ctx methods that hand over live objects (platform adapters, SDK clients, argparse);
-* writing attributes of Hermes modules (monkeypatching): the patch lands in the host's copy;
+* writing attributes of Eir modules (monkeypatching): the patch lands in the host's copy;
 * mutating a global registry directly instead of through ``ctx``: the registration lands in the
-  host's registry, which Hermes never reads;
+  host's registry, which Eir never reads;
 * gateway platform adapters (``kind: platform``), model-provider profiles that build their own SDK
   client (``create_client``), and dashboard APIs that stream (the host bridge buffers responses).
 
-``hermes plugins validate`` prints the verdict; ``evals/plugin_isolation/audit_catalog.py`` runs it
+``eir plugins validate`` prints the verdict; ``evals/plugin_isolation/audit_catalog.py`` runs it
 over every catalog entry.
 """
 
@@ -25,19 +25,19 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Set
 
-from hermes_agent.compat.paths import current_module
+from eir_agent.compat.paths import current_module
 
 VERDICT_HOST = "host"
 VERDICT_IN_PROCESS = "in_process"
 VERDICT_PORTABLE = "portable"
 
-# Top-level packages that are Hermes's own process state when imported by a plugin.
-HERMES_PACKAGES: frozenset = frozenset({
-    "agent", "tools", "hermes_cli", "gateway", "cron", "providers", "plugins", "tui_gateway",
-    "acp_adapter", "run_agent", "cli", "model_tools", "toolsets", "hermes_state", "hermes_constants",
-    "hermes_logging", "hermes_time", "utils", "registration_lifecycle", "hermes_platform", "hermes_agent",
+# Top-level packages that are Eir's own process state when imported by a plugin.
+EIR_PACKAGES: frozenset = frozenset({
+    "agent", "tools", "eir_cli", "gateway", "cron", "providers", "plugins", "tui_gateway",
+    "acp_adapter", "run_agent", "cli", "model_tools", "toolsets", "eir_state", "eir_constants",
+    "eir_logging", "eir_time", "utils", "registration_lifecycle", "eir_platform", "eir_agent",
 })
-# ``<module>.<callable>`` that mutate a Hermes-process registry when called from plugin code.
+# ``<module>.<callable>`` that mutate a Eir-process registry when called from plugin code.
 _DIRECT_REGISTRY_CALLS: frozenset = frozenset({
     ("tools.registry", "register"), ("tools.registry", "deregister"),
     ("gateway.platform_registry", "register"), ("providers", "register_provider"),
@@ -45,7 +45,7 @@ _DIRECT_REGISTRY_CALLS: frozenset = frozenset({
 _DIRECT_REGISTRY_CALLS |= {(current_module(mod), attr) for mod, attr in _DIRECT_REGISTRY_CALLS}
 _PROVIDERS_MODULES = {"providers", current_module("providers")}
 _MANIFEST_KIND_REASONS: dict[str, str] = {
-    "platform": "kind 'platform': gateway platform adapters run in the Hermes process",
+    "platform": "kind 'platform': gateway platform adapters run in the Eir process",
 }
 _STREAMING_MARKERS = ("StreamingResponse", "EventSourceResponse", ".websocket(", "WebSocket")
 _SKIP_DIRS = frozenset({"tests", "test", ".git", "__pycache__", "node_modules", ".venv", "venv", "docs"})
@@ -87,10 +87,10 @@ def _python_files(plugin_dir: Path) -> list[Path]:
 
 
 class _SourceVisitor(ast.NodeVisitor):
-    """Collects ctx method calls, Hermes-module aliases, and writes through those aliases."""
+    """Collects ctx method calls, Eir-module aliases, and writes through those aliases."""
 
     def __init__(self, rel: str, *, model_provider: bool = False):
-        from hermes_cli.plugin_isolation import (
+        from eir_cli.plugin_isolation import (
             HOST_DEGRADED_HOOKS, HOST_OBJECT_BASES, HOST_SKIPPED_CTX_METHODS, HOST_UNSUPPORTED_CTX_METHODS,
         )
         self._unsupported, self._skipped = HOST_UNSUPPORTED_CTX_METHODS, HOST_SKIPPED_CTX_METHODS
@@ -98,22 +98,22 @@ class _SourceVisitor(ast.NodeVisitor):
         self.rel = rel
         # A model-provider plugin's register_provider() call is its contract; the host captures it.
         self.model_provider = model_provider
-        self.aliases: dict[str, str] = {}  # local name -> hermes module path (or module.attr)
+        self.aliases: dict[str, str] = {}  # local name -> eir module path (or module.attr)
         self.reasons: list[str] = []
         self.notes: list[str] = []
         self.ctx_methods: set[str] = set()
 
-    def _hermes(self, module: str) -> bool:
-        return module.split(".")[0] in HERMES_PACKAGES
+    def _eir(self, module: str) -> bool:
+        return module.split(".")[0] in EIR_PACKAGES
 
     def visit_Import(self, node: ast.Import) -> None:
         for alias in node.names:
-            if self._hermes(alias.name):
+            if self._eir(alias.name):
                 self.aliases[alias.asname or alias.name.split(".")[0]] = (
                     alias.name if alias.asname else alias.name.split(".")[0])
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
-        if node.level == 0 and node.module and self._hermes(node.module):
+        if node.level == 0 and node.module and self._eir(node.module):
             for alias in node.names:
                 self.aliases[alias.asname or alias.name] = f"{node.module}.{alias.name}"
 
@@ -129,8 +129,8 @@ class _SourceVisitor(ast.NodeVisitor):
         if isinstance(target, ast.Attribute):
             owner = self._resolve(target.value)
             if owner:
-                self.reasons.append(f"{self.rel}:{line} patches {owner}.{target.attr} (a Hermes module "
-                                    f"attribute; the host's copy is not the one Hermes runs)")
+                self.reasons.append(f"{self.rel}:{line} patches {owner}.{target.attr} (a Eir module "
+                                    f"attribute; the host's copy is not the one Eir runs)")
 
     def visit_Assign(self, node: ast.Assign) -> None:
         for target in node.targets:
@@ -146,7 +146,7 @@ class _SourceVisitor(ast.NodeVisitor):
         if isinstance(func, ast.Name) and func.id == "setattr" and node.args:
             owner = self._resolve(node.args[0])
             if owner:
-                self.reasons.append(f"{self.rel}:{node.lineno} setattr() on {owner} (patches a Hermes module)")
+                self.reasons.append(f"{self.rel}:{node.lineno} setattr() on {owner} (patches a Eir module)")
         if isinstance(func, ast.Attribute):
             name = func.attr
             if name in self._unsupported:
@@ -173,7 +173,7 @@ class _SourceVisitor(ast.NodeVisitor):
         if (module, attr) in _DIRECT_REGISTRY_CALLS or (
                 module.endswith("_registry") and attr in {"register", "register_provider"}):
             self.reasons.append(f"{self.rel}:{line} calls {target}() directly instead of "
-                                f"through ctx (registers in the host, not in Hermes)")
+                                f"through ctx (registers in the host, not in Eir)")
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         if self.model_provider and any(isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef))
@@ -229,7 +229,7 @@ def _read_manifest(plugin_dir: Path) -> dict[str, Any]:
         path = plugin_dir / name
         if path.is_file():
             try:
-                import hermes_yaml as yaml
+                import eir_yaml as yaml
                 data = yaml.safe_load(path.read_text(encoding="utf-8-sig"))
                 return data if isinstance(data, dict) else {}
             except Exception:

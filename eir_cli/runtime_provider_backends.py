@@ -1,7 +1,7 @@
-"""Provider-specific runtime builders for :mod:`hermes_cli.runtime_provider`: Azure Foundry, the
+"""Provider-specific runtime builders for :mod:`eir_cli.runtime_provider`: Azure Foundry, the
 OpenRouter / bare-custom fallback resolver, Bedrock, and external-process providers. Origin-internal
 collaborators are resolved on the origin module at call time via :func:`_rp` so test patches on
-``hermes_cli.runtime_provider.*`` (``_get_model_config``, ``load_config``, ``has_usable_secret``,
+``eir_cli.runtime_provider.*`` (``_get_model_config``, ``load_config``, ``has_usable_secret``,
 ``_try_resolve_from_custom_pool``, …) still apply."""
 
 from __future__ import annotations
@@ -12,12 +12,12 @@ from typing import Any, Dict, Optional
 
 from agent.azure_identity_adapter import is_token_provider
 from agent.secret_scope import get_secret_str
-from hermes_constants import OPENROUTER_BASE_URL
+from eir_constants import OPENROUTER_BASE_URL
 from utils import base_url_host_matches, base_url_hostname, base_url_origin
 
 
 def _rp():
-    import hermes_cli.runtime_provider as origin
+    import eir_cli.runtime_provider as origin
     return origin
 
 
@@ -33,7 +33,7 @@ def _azure_entra_credentials(cfg_entra: dict[str, Any]) -> Any:
     except Exception as exc:
         raise AuthError(
             "Could not load the Azure Foundry Entra ID adapter. "
-            "Run hermes pm repair, then restart Hermes. "
+            "Run eir pm repair, then restart Eir. "
             f"(import failed: {exc})"
         ) from exc
     scope = str(cfg_entra.get("scope") or "").strip() or SCOPE_AI_AZURE_DEFAULT
@@ -47,7 +47,7 @@ def _azure_foundry_api_key(rp, explicit_api_key: str) -> str:
     if explicit_api_key:
         return explicit_api_key
     try:
-        from hermes_cli.config import get_env_value
+        from eir_cli.config import get_env_value
         api_key = get_env_value("AZURE_FOUNDRY_API_KEY") or ""
     except Exception:
         api_key = ""
@@ -55,10 +55,10 @@ def _azure_foundry_api_key(rp, explicit_api_key: str) -> str:
     if not api_key:
         raise rp.AuthError(
             "Azure Foundry requires an API key. Set AZURE_FOUNDRY_API_KEY in "
-            "~/.hermes/.env or run 'hermes model' to configure. To use "
+            "~/.eir/.env or run 'eir model' to configure. To use "
             "keyless Microsoft Entra ID auth instead, set "
             "model.auth_mode: entra_id in config.yaml (or pick "
-            "'Microsoft Entra ID' in 'hermes model')."
+            "'Microsoft Entra ID' in 'eir model')."
         )
     return api_key
 
@@ -89,7 +89,7 @@ def _resolve_azure_foundry_runtime(*, requested_provider: str, model_cfg: dict[s
     base_url = explicit_base_url_clean or cfg_base_url or env_base_url
     if not base_url:
         raise rp.AuthError(
-            "Azure Foundry requires a base URL. Set it via 'hermes model' or "
+            "Azure Foundry requires a base URL. Set it via 'eir model' or "
             "the AZURE_FOUNDRY_BASE_URL environment variable."
         )
     if cfg_api_mode == "anthropic_messages":
@@ -158,19 +158,19 @@ def _resolve_openrouter_runtime(
     )
     # A ``providers:`` entry that owns the resolved URL and declares a credential supplies it: on a bare
     # ``custom`` route, and on an OpenRouter mirror off openrouter.ai (the built-in key is another account's).
-    from hermes_cli.runtime_provider_custom import _model_cfg_key_env_for, _owning_entry_credential
+    from eir_cli.runtime_provider_custom import _model_cfg_key_env_for, _owning_entry_credential
     owned_route = requested_norm == "custom" or (is_openrouter_context and not is_openrouter_url)
     declared, entry_key = _owning_entry_credential(rp, base_url) if owned_route else (False, "")
     if is_openrouter_context:
         # Same read order as the credential pool and _resolve_api_key_provider_secret
         # (.env, then scope-aware os.environ, raw op:// references yielding to the resolved
         # scoped value). get_secret_str sees os.environ only, so a key living solely in
-        # ~/.hermes/.env was lost once the pool entry went exhausted/benched (#117667).
+        # ~/.eir/.env was lost once the pool entry went exhausted/benched (#117667).
         # OPENAI_API_KEY is a legacy home for an OpenRouter key. When OPENAI_BASE_URL binds it, it
         # goes only to that origin: another scheme or port on the same host is another endpoint.
         # Unbound, openrouter.ai gets it only when it is OpenRouter-shaped (sk-or-), so a real OpenAI
         # key never reaches a third party.
-        from hermes_cli.config import get_env_value_prefer_dotenv
+        from eir_cli.config import get_env_value_prefer_dotenv
         openai_key = get_env_value_prefer_dotenv("OPENAI_API_KEY") or ""
         openai_base_url = get_secret_str("OPENAI_BASE_URL", "").strip()
         if base_url_hostname(openai_base_url):
@@ -217,7 +217,7 @@ def _resolve_bedrock_runtime(requested_provider: str, model_cfg: dict[str, Any],
     from agent.bedrock_adapter import (bedrock_openai_base_url, bedrock_openai_uses_mantle, has_aws_credentials,
                                        is_anthropic_bedrock_model, resolve_aws_auth_env_var, resolve_bedrock_bearer_token,
                                        resolve_bedrock_runtime_region, bedrock_guardrail_config)
-    from hermes_cli.config import load_config  # direct (not the origin delegate), as before
+    from eir_cli.config import load_config  # direct (not the origin delegate), as before
     rp = _rp()
     # Explicitly selected bedrock trusts boto3's credential chain (IMDS, ECS/Lambda roles, SSO)
     # which the env-var check can't detect.

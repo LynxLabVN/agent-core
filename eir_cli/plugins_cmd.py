@@ -1,4 +1,4 @@
-"""``hermes plugins`` CLI subcommand — install, update, remove, and list plugins.
+"""``eir plugins`` CLI subcommand — install, update, remove, and list plugins.
 
 Facade: shared primitives (errors, console/config helpers, manifest reading, discovery, enable/disable
 selection) and the dispatch table live here; each verb family lives in a ``plugins_cmd_<topic>.py``
@@ -15,41 +15,41 @@ import threading
 from pathlib import Path
 from typing import Any, NoReturn, Optional
 
-from hermes_constants import get_hermes_home, hermes_home_key
-from hermes_cli.config import cfg_get
-from hermes_cli.plugin_capabilities import _child_dict
+from eir_constants import get_eir_home, eir_home_key
+from eir_cli.config import cfg_get
+from eir_cli.plugin_capabilities import _child_dict
 # Tests patch these two on the facade; the install/remove siblings read them through it.
-from hermes_cli.secret_prompt import masked_secret_prompt
+from eir_cli.secret_prompt import masked_secret_prompt
 from utils import rmtree_readonly
 
 # Topical siblings. The facade re-exports what other modules, tests and the old updater import from
-# ``hermes_cli.plugins_cmd``; sibling bodies read those names back through the facade at call time.
-from hermes_cli.plugins_cmd_capabilities import (
+# ``eir_cli.plugins_cmd``; sibling bodies read those names back through the facade at call time.
+from eir_cli.plugins_cmd_capabilities import (
     _declared_capabilities_for_key, _declared_capabilities_from_manifest, _resolve_tool_override_grant,
     _run_capability_consent, cmd_capabilities,
 )
-from hermes_cli.plugins_cmd_git import (
+from eir_cli.plugins_cmd_git import (
     _EXACT_COMMIT_RE, _canonical_source, _checkout_exact_revision, _clone_plugin_repo, _git_head_revision,
     _git_or_raise, _git_pull_plugin_dir, _git_resolve_commit, _normalize_exact_revision, _pin_annotation,
     _read_install_metadata, _run_plugin_git, _safe_git_error, _scrub_cloned_origin, _update_install_record,
     _write_install_metadata, pinned_revision,
 )
-from hermes_cli.plugins_cmd_install import (
+from eir_cli.plugins_cmd_install import (
     _check_manifest_version, _consent_python_deps, _display_after_install, _install_plugin_core,
     _install_plugin_python_deps, _prompt_plugin_env_vars, _python_dependency_summary,
     _read_manifest_for_install, cmd_install, dashboard_install_plugin,
 )
-from hermes_cli.plugins_cmd_listing import (
+from eir_cli.plugins_cmd_listing import (
     _filter_plugin_entries, cmd_list, cmd_show,
 )
-from hermes_cli.plugins_cmd_remove import (
+from eir_cli.plugins_cmd_remove import (
     _remove_plugin_core, cmd_remove, dashboard_remove_user_plugin,
 )
-from hermes_cli.plugins_cmd_toggle import (
+from eir_cli.plugins_cmd_toggle import (
     _discover_context_engines, _persist_plugin_selection, _provider_categories, _run_composite_fallback,
     cmd_toggle,
 )
-from hermes_cli.plugins_cmd_update import (
+from eir_cli.plugins_cmd_update import (
     _clear_plugin_bytecode, cmd_adopt, cmd_check_updates, cmd_trust_update_url, cmd_update,
     dashboard_update_user_plugin,
 )
@@ -63,7 +63,7 @@ _CLONE_TIMEOUT_HINT = "On a slow connection, raise plugins.clone_timeout_seconds
 def _resolve_git_executable() -> Optional[str]:
     """The git plugin operations run: PM's pinned git, then PATH, then the usual install dirs
     (``PATH`` may be minimal)."""
-    from hermes_cli.boot_bootstrap import _git_binary
+    from eir_cli.boot_bootstrap import _git_binary
 
     found = _git_binary()
     if found:
@@ -151,7 +151,7 @@ def _ask_yes(prompt: str, reader=input) -> bool:
 def _config_value(*keys: str, default: Any) -> Any:
     """Read ``keys`` from config.yaml; *default* on a missing key or any load failure."""
     try:
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
         return cfg_get(load_config(), *keys, default=default)
     except Exception:
         return default
@@ -183,7 +183,7 @@ def _config_str(*keys: str, default: str) -> str:
 
 def _write_config_value(section: str, key: str, value: Any) -> None:
     """Persist ``config[section][key] = value`` to config.yaml (creating the section)."""
-    from hermes_cli.config import load_config, save_config
+    from eir_cli.config import load_config, save_config
     config = load_config()
     config.setdefault(section, {})[key] = value
     save_config(config)
@@ -263,7 +263,7 @@ def _scan_merged_tree(plugin_dir: Path, identifier: str, merged: Optional[list[s
 
 def _plugins_dir() -> Path:
     """Return the user plugins directory, creating it if needed."""
-    plugins = get_hermes_home() / "plugins"
+    plugins = get_eir_home() / "plugins"
     plugins.mkdir(parents=True, exist_ok=True)
     return plugins
 
@@ -394,7 +394,7 @@ def _read_manifest(plugin_dir: Path) -> dict:
         if not _has_portable_manifest(plugin_dir):
             return {}
         try:
-            from hermes_cli.agent_plugins import read_agent_plugin_manifest
+            from eir_cli.agent_plugins import read_agent_plugin_manifest
             return read_agent_plugin_manifest(plugin_dir)[0]
         except Exception as e:
             logger.warning("Failed to read plugin.json in %s: %s", plugin_dir, e)
@@ -431,7 +431,7 @@ def _copy_example_files(plugin_dir: Path, console) -> None:
 
 def _missing_env_specs(manifest: dict) -> list[dict]:
     """``requires_env`` entries (plain names or ``{name, description, url, secret}`` dicts,
-    normalised to dicts; nameless entries dropped) whose variable is unset in ``~/.hermes/.env``."""
+    normalised to dicts; nameless entries dropped) whose variable is unset in ``~/.eir/.env``."""
     env_specs = [
         {"name": entry} if isinstance(entry, str) else entry
         for entry in manifest.get("requires_env") or []
@@ -439,7 +439,7 @@ def _missing_env_specs(manifest: dict) -> list[dict]:
     ]
     if not env_specs:
         return []
-    from hermes_cli.config import get_env_value
+    from eir_cli.config import get_env_value
     return [s for s in env_specs if not get_env_value(s["name"])]
 
 
@@ -450,7 +450,7 @@ def _clone_failure_message(git_url: str, git_error: str) -> str:
     not parsed as markup."""
     from rich.markup import escape
     return (f"Could not download the plugin from {git_url}. Check the address (browse the catalog "
-            "with `hermes plugins search`), check your internet connection, or, if the repository "
+            "with `eir plugins search`), check your internet connection, or, if the repository "
             "is private, sign in first with `gh auth login` (or set GITHUB_TOKEN in your .env).\n"
             f"Details: {escape(git_error.strip())}")
 
@@ -465,7 +465,7 @@ def _require_installed_plugin(name: str, plugins_dir: Path, console) -> Path:
         if link.parent == plugins_dir and (link.is_symlink() or is_junction(link)):
             from rich.markup import escape
             _fail(console, f"[red]Error:[/red] Plugin '{escape(name)}' is a link to {escape(os.path.realpath(link))}, outside the "
-                           "plugins directory, and Hermes does not change files there. Pull updates in that "
+                           "plugins directory, and Eir does not change files there. Pull updates in that "
                            "checkout, or delete the link to remove the plugin.")
         _fail(console, f"[red]Error:[/red] {e}")
     if not target.exists():
@@ -479,12 +479,12 @@ def _unknown_plugin_message(name: str, *, downloaded_only: bool = False) -> str:
     """``No plugin named ...`` with the exact-name rule and the two commands that resolve it."""
     scope = (" This command only works on downloaded plugins; bundled ones can only be enabled or disabled."
              if downloaded_only else " Bundled plugins can only be enabled or disabled.")
-    from hermes_cli.left_core_migration import moved_plugin_hint
+    from eir_cli.left_core_migration import moved_plugin_hint
     if moved := moved_plugin_hint(name):
         return f"[red]No plugin named '{name}'.[/red] {moved}"
-    return (f"[red]No plugin named '{name}'.[/red] Run `hermes plugins list` to see the exact names "
+    return (f"[red]No plugin named '{name}'.[/red] Run `eir plugins list` to see the exact names "
             f"(nested plugins use their full key, e.g. web/firecrawl).{scope} "
-            "To add one: `hermes plugins install <owner/repo>`.")
+            "To add one: `eir plugins install <owner/repo>`.")
 
 
 # ``plugins.disabled`` is an explicit deny-list that wins over the ``plugins.enabled`` allow-list.
@@ -494,14 +494,14 @@ _get_enabled_set = functools.partial(_config_name_set, "plugins", "enabled")
 
 def _save_enabled_set(enabled: set) -> None:
     """Frozen old-updater import: never resurrect a raw plugin-selection write."""
-    from hermes_cli._old_updater import stop_historical_updater
+    from eir_cli._old_updater import stop_historical_updater
 
-    stop_historical_updater("hermes_cli.plugins_cmd._save_enabled_set")
+    stop_historical_updater("eir_cli.plugins_cmd._save_enabled_set")
 
 
 def _plugin_selection_version() -> str:
-    from hermes_cli.runtime_state import _digest
-    return _digest(get_hermes_home() / "config.yaml") or "missing"
+    from eir_cli.runtime_state import _digest
+    return _digest(get_eir_home() / "config.yaml") or "missing"
 
 
 def _admit_and_save_plugin_sets(
@@ -517,7 +517,7 @@ def _admit_and_save_plugin_sets(
     conflict raises its :class:`DependencyConflict` subclass naming *plugin*."""
     from rich.markup import escape
 
-    from hermes_cli.plugins_admission import AdmissionRefused, DependencyConflict, admit_plugin_set_change
+    from eir_cli.plugins_admission import AdmissionRefused, DependencyConflict, admit_plugin_set_change
 
     try:
         admit_plugin_set_change(
@@ -525,7 +525,7 @@ def _admit_and_save_plugin_sets(
             plugin=plugin, settled=settled,
         )
     except DependencyConflict as exc:
-        # `hermes pm install` cannot fix a conflict, so the retry hint below would mislead here.
+        # `eir pm install` cannot fix a conflict, so the retry hint below would mislead here.
         if console is not None:
             console.print(f"[red]✗[/red] {escape(str(exc))}")
             console.print("[dim]config.yaml and the active environment are unchanged.[/dim]")
@@ -535,7 +535,7 @@ def _admit_and_save_plugin_sets(
             console.print(f"[red]✗[/red] {action} refused: {exc}")
             console.print(
                 "[dim]config.yaml and the active environment are unchanged. "
-                "Run `hermes pm install` to resolve dependencies, then retry.[/dim]"
+                "Run `eir pm install` to resolve dependencies, then retry.[/dim]"
             )
         raise
 
@@ -547,7 +547,7 @@ _BASIC_AUTH_PLUGIN_KEYS = frozenset({"basic", "dashboard_auth/basic"})
 def ensure_basic_auth_plugin_enabled_in_config(cfg: dict) -> bool:
     """Drop the bundled basic dashboard-auth plugin from ``plugins.disabled`` in *cfg*.
 
-    ``hermes setup`` / ``hermes plugins disable basic`` can park it there while
+    ``eir setup`` / ``eir plugins disable basic`` can park it there while
     ``dashboard.basic_auth`` is configured, and password auth then silently fails.
     Returns True when modified.
     """
@@ -571,7 +571,7 @@ def _plugin_aliases(key: str, entries: Optional[list] = None) -> set:
     The loader matches BOTH the canonical key (``web/firecrawl``) and the manifest name
     (``web-firecrawl``), so a stale entry under any form vetoes an enable ("explicit disable wins").
     Pass *entries* to reuse one :func:`_discover_all_plugins` scan across several keys."""
-    from hermes_cli.left_core_migration import legacy_plugin_keys
+    from eir_cli.left_core_migration import legacy_plugin_keys
     names = {key, key.split("/")[-1], *legacy_plugin_keys(key)}
     names.update(e[0] for e in (_discover_all_plugins() if entries is None else entries) if e[5] == key)
     return names
@@ -598,7 +598,7 @@ def _disabled_by_update(key: str, aliases) -> bool:
     from pm.plugins_state import RECORD
     from pm.plugins_state import read_home_selection
 
-    record = ((read_home_selection(get_hermes_home()) or {}).get("plugins") or {}).get(RECORD)
+    record = ((read_home_selection(get_eir_home()) or {}).get("plugins") or {}).get(RECORD)
     return isinstance(record, dict) and bool({key, *aliases} & set(record))
 
 
@@ -609,7 +609,7 @@ def _forget_plugin_config(aliases: set) -> dict[str, Any]:
     decision, not inherit a stale enable or grant (#54336); a dangling ``memory.provider`` would make
     the next agent init re-clone the plugin from the catalog, silently undoing the uninstall.
     Returns ``{"cleared_memory_provider": True}`` when the selection was reset."""
-    from hermes_cli.config import load_config, save_config
+    from eir_cli.config import load_config, save_config
     config = load_config()
     changed = False
     result: dict[str, Any] = {}
@@ -634,7 +634,7 @@ def _forget_plugin_config(aliases: set) -> dict[str, Any]:
     return result
 
 
-# One lock per Hermes home. The Desktop install card enables several plugins at once, each on its own
+# One lock per Eir home. The Desktop install card enables several plugins at once, each on its own
 # thread; without it every thread read the same config version and all but the first commit were
 # refused as stale. The version check in PM stays: it still catches an edit from another process.
 _SELECTION_LOCKS: dict[str, threading.Lock] = {}
@@ -643,19 +643,19 @@ _SELECTION_LOCKS_GUARD = threading.Lock()
 
 def _selection_lock() -> threading.Lock:
     with _SELECTION_LOCKS_GUARD:
-        return _SELECTION_LOCKS.setdefault(hermes_home_key(), threading.Lock())
+        return _SELECTION_LOCKS.setdefault(eir_home_key(), threading.Lock())
 
 
 def _set_plugin_enabled(name: str, *, enable: bool, aliases=(), console=None) -> None:
     """Submit the command's delta with the version of the selection it read. Enabling a non-bundled plugin
-    on the kill list raises :class:`PluginOperationError`; the `hermes plugins` picker checks it itself."""
+    on the kill list raises :class:`PluginOperationError`; the `eir plugins` picker checks it itself."""
     from pm.plugins_state import read_home_selection
 
     if enable:
         _refuse_recalled_entry(_find_plugin_entry(name))
     with _selection_lock():
         expected_config = _plugin_selection_version()
-        config = read_home_selection(get_hermes_home()) or {}
+        config = read_home_selection(get_eir_home()) or {}
         plugins = config.get("plugins") or {}
         enabled = set(plugins.get("enabled") or ())
         disabled = set(plugins.get("disabled") or ())
@@ -672,7 +672,7 @@ def _refuse_recalled_entry(entry: Optional[tuple]) -> None:
     directory: re-resolving the bare leaf could read another plugin's install record (a nested
     ``obs/x`` beside a top-level ``x``)."""
     if entry is not None and entry[3] != "bundled":
-        from hermes_cli.plugins_cmd_catalog import refuse_if_installed_removed
+        from eir_cli.plugins_cmd_catalog import refuse_if_installed_removed
         refuse_if_installed_removed(entry[0], entry[4])
 
 
@@ -692,11 +692,11 @@ def _resolve_plugin_key(name: str) -> Optional[str]:
 
 
 def _catalog_installed_dir(name: str) -> Optional[Path]:
-    """Install dir whose installer-owned record names catalog entry *name* (``hermes-memory-wiki`` is
+    """Install dir whose installer-owned record names catalog entry *name* (``eir-memory-wiki`` is
     installed as ``plugins/memory-wiki``), else None (also when two dirs claim it). Read through
     :func:`catalog_install_record` (``.install-metadata.json``), never the tree, so a URL-installed
     repo cannot claim a catalog entry's name."""
-    from hermes_cli.plugins_cmd_catalog import catalog_install_record
+    from eir_cli.plugins_cmd_catalog import catalog_install_record
     try:
         keys = list(_read_install_metadata())
     except PluginOperationError:
@@ -713,7 +713,7 @@ def _find_plugin_entry(name: str) -> Optional[tuple]:
     ``web/exa``) only when unique; else the catalog name the plugin was installed under.
     Never guesses between two candidates."""
     entries = _discover_all_plugins()
-    from hermes_cli.left_core_migration import legacy_plugin_alias
+    from eir_cli.left_core_migration import legacy_plugin_alias
     target = legacy_plugin_alias(name) or name  # ``observability/langfuse`` -> its catalog plugin
     exact = next((entry for entry in entries if target in (entry[0], entry[5])), None)
     if exact is not None:
@@ -739,14 +739,14 @@ def cmd_enable(name: str, allow_tool_override: Optional[bool] = None) -> None:
     ``allow_tool_override`` grant changes only with an explicit True/False flag;
     None leaves it unchanged. Bundled plugins are trusted.
     """
-    from hermes_cli.relay_plugin_cutover import LEGACY_RELAY_PLUGIN_KEYS, RELAY_PLUGINS_CONFIG_ENV
+    from eir_cli.relay_plugin_cutover import LEGACY_RELAY_PLUGIN_KEYS, RELAY_PLUGINS_CONFIG_ENV
     console = _console()
 
     def _refuse_legacy_relay(plugin: str) -> None:
         if plugin in LEGACY_RELAY_PLUGIN_KEYS:
             _fail(console, (
                 f"[red]Plugin '{plugin}' was removed.[/red] Relay lifecycle is owned "
-                "by Hermes core; configure a standard user or system Relay plugins.toml, or use "
+                "by Eir core; configure a standard user or system Relay plugins.toml, or use "
                 f"{RELAY_PLUGINS_CONFIG_ENV} for an explicit user-file override."))
 
     _refuse_legacy_relay(name)
@@ -764,7 +764,7 @@ def cmd_enable(name: str, allow_tool_override: Optional[bool] = None) -> None:
 
     changed = _activate_key(key, enable=True, console=console)
     if changed:
-        from hermes_cli.plugins_activation import report_activation
+        from eir_cli.plugins_activation import report_activation
         console.print(f"[green]✓[/green] Plugin [bold]{key}[/bold] enabled.")  # the hint says when it applies
         report_activation(console, key)
     else:
@@ -800,7 +800,7 @@ def cmd_disable(name: str) -> None:
         console.print(f"[dim]Plugin '{key}' is already disabled.[/dim]")
         return
     _toggle_plugin_toolset(key, enable=False, toolset_key=toolset_key)
-    from hermes_cli.plugins_activation import gateway_reload_hint, reload_running_gateway
+    from eir_cli.plugins_activation import gateway_reload_hint, reload_running_gateway
     console.print(f"[yellow]⊘[/yellow] Plugin [bold]{key}[/bold] disabled.")
     console.print(f"[dim]{gateway_reload_hint(reload_running_gateway(), key)}[/dim]")
 
@@ -812,7 +812,7 @@ def _read_manifest_info(d: Path, prefix: str):
         if not _has_portable_manifest(d):
             return None
         try:
-            from hermes_cli.agent_plugins import read_agent_plugin_manifest
+            from eir_cli.agent_plugins import read_agent_plugin_manifest
             manifest = read_agent_plugin_manifest(d)[0]
             name = manifest["name"]
         except Exception:
@@ -912,7 +912,7 @@ def _discover_all_plugins() -> list:
     seen: dict = {}
     # memory/, context_engine/, computer_use/, model-providers/ and config_backends/ load through dedicated
     # paths, not the PluginManager opt-in surface, so listing them as toggleable plugins would mislead.
-    from hermes_cli.plugins import discover_entrypoint_manifests, get_bundled_plugins_dir
+    from eir_cli.plugins import discover_entrypoint_manifests, get_bundled_plugins_dir
     for base, source, skip in (
         (get_bundled_plugins_dir(), "bundled", {"memory", "context_engine", "computer_use", "model-providers", "config_backends"}),
         (_plugins_dir(), "user", set()),
@@ -968,7 +968,7 @@ def _get_plugin_toolset_key(name: str) -> Optional[str]:
         return next((e.toolset for t in tool_names if (e := registry.get_entry(t)) and e.toolset), None)
 
     def _from_loaded_plugin() -> Optional[str]:
-        from hermes_cli.plugins import discover_plugins, get_plugin_manager
+        from eir_cli.plugins import discover_plugins, get_plugin_manager
         discover_plugins()  # idempotent — ensures plugins are loaded
         for _key, loaded in get_plugin_manager()._plugins.items():
             if loaded.manifest.name == name or _key == name:
@@ -976,7 +976,7 @@ def _get_plugin_toolset_key(name: str) -> Optional[str]:
         return None
 
     def _from_manifest_on_disk() -> Optional[str]:
-        from hermes_cli.plugins import get_bundled_plugins_dir
+        from eir_cli.plugins import get_bundled_plugins_dir
         return next((
             toolset for base in (get_bundled_plugins_dir(), _plugins_dir())
             if base.is_dir() and (base / name).is_dir()
@@ -995,8 +995,8 @@ def _get_plugin_toolset_key(name: str) -> Optional[str]:
 def _saved_list_toolset_key(name: str) -> Optional[str]:
     """The plugin's toolset key, or None without loading any plugin when no platform has a SAVED
     ``platform_toolsets`` list (the only lists :func:`_toggle_plugin_toolset` edits)."""
-    from hermes_cli.config import load_config
-    from hermes_cli.toolset_validation import parse_platform_toolsets_value
+    from eir_cli.config import load_config
+    from eir_cli.toolset_validation import parse_platform_toolsets_value
     saved = load_config().get("platform_toolsets")
     if not isinstance(saved, dict) or all(parse_platform_toolsets_value(v) is None for v in saved.values()):
         return None
@@ -1012,13 +1012,13 @@ def _toggle_plugin_toolset(name: str, *, enable: bool, toolset_key: Optional[str
     toolset_key = toolset_key or _saved_list_toolset_key(name)
     if not toolset_key:
         return
-    from hermes_cli.config import load_config, save_config
-    from hermes_cli.toolset_validation import parse_platform_toolsets_value
+    from eir_cli.config import load_config, save_config
+    from eir_cli.toolset_validation import parse_platform_toolsets_value
     config = load_config()
     platform_toolsets = _child_dict(config, "platform_toolsets")
     changed = False
     for platform, raw in list(platform_toolsets.items()):
-        # A list-literal string (older `hermes config set`) is the user's real selection; toggling
+        # A list-literal string (older `eir config set`) is the user's real selection; toggling
         # it re-saves the entry as a proper list so the string never persists.
         ts_list = parse_platform_toolsets_value(raw)
         if ts_list is not None and enable != (toolset_key in ts_list):
@@ -1037,7 +1037,7 @@ def dashboard_set_agent_plugin_enabled(name: str, *, enabled: bool) -> dict[str,
     key = _resolve_plugin_key(name)
     if key is None:
         return {"ok": False, "error": f"Plugin '{name}' is not installed or bundled."}
-    from hermes_cli.plugins_admission import AdmissionRefused
+    from eir_cli.plugins_admission import AdmissionRefused
 
     toolset_key = None if enabled else _saved_list_toolset_key(key)
     try:
@@ -1053,7 +1053,7 @@ def dashboard_set_agent_plugin_enabled(name: str, *, enabled: bool) -> dict[str,
     if changed and enabled:
         # Load it now, here and in the running gateway; ``activation`` tells the UI what is live vs
         # deferred, and ``restart_required`` only survives when no gateway answered (#87770).
-        from hermes_cli.plugins_activation import activate_plugin_now
+        from eir_cli.plugins_activation import activate_plugin_now
         result = {"ok": True, "name": key, "unchanged": False, **activate_plugin_now(key)}
         # Only now is the plugin loaded here, so its toolset key resolves: a backend that scanned
         # while the plugin was off held a placeholder and the toolset was never re-added.
@@ -1067,7 +1067,7 @@ def dashboard_set_agent_plugin_enabled(name: str, *, enabled: bool) -> dict[str,
 
 
 def _user_installed_plugin_dir(name: str) -> Optional[Path]:
-    """Resolved path under ``~/.hermes/plugins/<name>`` if it exists, else the user install
+    """Resolved path under ``~/.eir/plugins/<name>`` if it exists, else the user install
     :func:`_find_plugin_entry` resolves *name* to (its manifest or catalog name)."""
     try:
         target = _sanitize_plugin_name(name, _plugins_dir(), allow_subdir=True)
@@ -1085,7 +1085,7 @@ def _resolved_user_plugin_dir(name: str) -> Optional[Path]:
 
 def cmd_plugin_doctor(target: str = ".", *, ci: bool = False) -> None:
     """Validate one plugin through runtime discovery and registration."""
-    from hermes_cli.plugin_dev import doctor_plugin
+    from eir_cli.plugin_dev import doctor_plugin
     report = doctor_plugin(target)
     _console().print(report.format_text())
     if ci and not report.ok:
@@ -1098,24 +1098,24 @@ def _tri_state_flag(args, yes_attr: str, no_attr: str) -> Optional[bool]:
 
 
 def _catalog():
-    from hermes_cli import plugins_cmd_catalog
+    from eir_cli import plugins_cmd_catalog
     return plugins_cmd_catalog
 
 
 def _action_update(args):
     if args.name:
         if getattr(args, "yes", False):
-            _fail(_console(), "[red]Error:[/red] --yes only applies to `hermes plugins update` with no name.")
+            _fail(_console(), "[red]Error:[/red] --yes only applies to `eir plugins update` with no name.")
         cmd_update(args.name, force=getattr(args, "force", False))
         return
     if getattr(args, "force", False):
-        _fail(_console(), "[red]Error:[/red] --force applies to one named plugin: `hermes plugins update <name> --force`.")
-    from hermes_cli.plugins_cmd_update_all import cmd_update_all
+        _fail(_console(), "[red]Error:[/red] --force applies to one named plugin: `eir plugins update <name> --force`.")
+    from eir_cli.plugins_cmd_update_all import cmd_update_all
     cmd_update_all(yes=getattr(args, "yes", False))
 
 
 def _action_auto_update(args):
-    from hermes_cli.plugins_auto_update import auto_update_state, set_auto_update
+    from eir_cli.plugins_auto_update import auto_update_state, set_auto_update
     console = _console()
     state = getattr(args, "state", None)
     try:
@@ -1129,12 +1129,12 @@ def _action_auto_update(args):
 
 
 def _action_pack(args):
-    from hermes_cli.plugin_packs import pack_command
+    from eir_cli.plugin_packs import pack_command
     pack_command(args)
 
 
 def _action_idle_tasks(args):
-    from hermes_cli.plugins_idle_tasks import cmd_idle_tasks
+    from eir_cli.plugins_idle_tasks import cmd_idle_tasks
     cmd_idle_tasks(args.name, pause=args.pause, resume=args.resume)
 
 
@@ -1180,7 +1180,7 @@ _PLUGIN_ACTIONS = {
 
 
 def plugins_command(args) -> None:
-    """Dispatch hermes plugins subcommands."""
+    """Dispatch eir plugins subcommands."""
     action = getattr(args, "plugins_action", None)
     handler = _PLUGIN_ACTIONS.get(action)
     if handler is None:

@@ -1,4 +1,4 @@
-"""Implementation of the ``hermes bundles`` CLI subcommand."""
+"""Implementation of the ``eir bundles`` CLI subcommand."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from typing import List
 from rich.console import Console
 from rich.table import Table
 
-from hermes_cli.cli_output import line_input
+from eir_cli.cli_output import line_input
 
 from agent.skill_bundles import (
     _bundles_dir, delete_bundle, get_bundle, list_bundles, reload_bundles, save_bundle, scan_bundles
@@ -30,7 +30,7 @@ def _cmd_list(args) -> None:
     if not bundles:
         c.print(
             f"[dim]No bundles installed yet. Create one with:\n"
-            f"  hermes bundles create <name> --skill skill1 --skill skill2[/]\n"
+            f"  eir bundles create <name> --skill skill1 --skill skill2[/]\n"
             f"Bundles directory: [bold]{_bundles_dir()}[/]")
         return
 
@@ -130,7 +130,7 @@ def _cmd_reload(args) -> None:
 
 
 def register_cli(subparser) -> None:
-    """Build the ``hermes bundles`` argparse tree (called from hermes_cli/main.py, which owns the
+    """Build the ``eir bundles`` argparse tree (called from eir_cli/main.py, which owns the
     top-level subparser)."""
     subs = subparser.add_subparsers(dest="bundles_action")
 
@@ -153,7 +153,7 @@ def register_cli(subparser) -> None:
         help="Skill name to include (repeat for multiple)")
     p_create.add_argument(
         "--description", "-d", default="",
-        help="Human-readable description shown in /help and `hermes bundles list`")
+        help="Human-readable description shown in /help and `eir bundles list`")
     p_create.add_argument(
         "--instruction", "-i", default="",
         help="Extra guidance prepended to the loaded skill content")
@@ -174,6 +174,6 @@ def register_cli(subparser) -> None:
 
 
 def bundles_command(args) -> None:
-    """Dispatch ``hermes bundles <subcommand>`` to the right handler."""
+    """Dispatch ``eir bundles <subcommand>`` to the right handler."""
     handler = getattr(args, "_bundles_handler", None) or _cmd_list  # no subcommand → list
     handler(args)

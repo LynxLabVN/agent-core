@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from hermes_cli.config import load_config, save_config
-from hermes_cli.inventory import build_models_payload, load_picker_context
-from hermes_cli.moa_config import DEFAULT_MOA_PRESET_NAME, normalize_moa_config
+from eir_cli.config import load_config, save_config
+from eir_cli.inventory import build_models_payload, load_picker_context
+from eir_cli.moa_config import DEFAULT_MOA_PRESET_NAME, normalize_moa_config
 
 
 def _prompt_choice(title: str, rows: list[str], default: int = 0) -> int:
     try:
-        from hermes_cli.curses_ui import curses_radiolist
+        from eir_cli.curses_ui import curses_radiolist
         return curses_radiolist(title, rows, selected=default, cancel_returns=default)
     except Exception:
         for idx, row in enumerate(rows, start=1):
@@ -49,7 +49,7 @@ def _model_options() -> list[dict[str, Any]]:
 def _pick_slot(current: dict[str, str] | None = None) -> dict[str, str]:
     providers = _model_options()
     if not providers:
-        raise RuntimeError("No configured model providers found. Run `hermes model` first.")
+        raise RuntimeError("No configured model providers found. Run `eir model` first.")
     current_provider = (current or {}).get("provider", "")
     provider_default = next((idx for idx, p in enumerate(providers) if p.get("slug") == current_provider), 0)
     provider_rows = [f"{p.get('name') or p.get('slug')}  ({p.get('slug')})" for p in providers]
@@ -159,7 +159,7 @@ def _cmd_delete(cfg: dict, args) -> None:
     moa = _moa_section(cfg)
     preset_name = (getattr(args, "name", None) or "").strip()
     if not preset_name:
-        raise SystemExit("Usage: hermes moa delete <name>")
+        raise SystemExit("Usage: eir moa delete <name>")
     if preset_name not in moa["presets"]:
         raise SystemExit(f"Unknown MoA preset: {preset_name}")
     if len(moa["presets"]) <= 1:

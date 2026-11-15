@@ -10,12 +10,12 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock
 
-import hermes_cli.models as models_mod
-import hermes_cli.models_pricing as mp
-from hermes_cli import model_setup_flows
-from hermes_cli import model_switch_providers as msp
-from hermes_cli.models import union_with_nous_on_sale_models
-from hermes_cli.models_pricing import fetch_models_with_pricing
+import eir_cli.models as models_mod
+import eir_cli.models_pricing as mp
+from eir_cli import model_setup_flows
+from eir_cli import model_switch_providers as msp
+from eir_cli.models import union_with_nous_on_sale_models
+from eir_cli.models_pricing import fetch_models_with_pricing
 
 _LIST = {"prompt": "0.000002", "completion": "0.00001"}
 
@@ -76,8 +76,8 @@ def test_nous_fetch_flags_tool_less_rows_so_the_union_can_skip_them(monkeypatch)
 
 def _stub_portal(monkeypatch, *, free_tier: bool, pricing: dict, allowed=None) -> None:
     monkeypatch.setattr(mp, "get_pricing_for_provider", lambda provider, **kw: pricing)
-    monkeypatch.setattr("hermes_cli.models.check_nous_free_tier", lambda **kw: free_tier)
-    monkeypatch.setattr("hermes_cli.models.fetch_nous_recommended_models", lambda *a, **kw: None)
+    monkeypatch.setattr("eir_cli.models.check_nous_free_tier", lambda **kw: free_tier)
+    monkeypatch.setattr("eir_cli.models.fetch_nous_recommended_models", lambda *a, **kw: None)
     monkeypatch.setattr(mp, "nous_policy_allowed_ids", lambda **kw: allowed)
 
 
@@ -98,7 +98,7 @@ def test_gui_picker_org_policy_still_narrows_on_sale_models(monkeypatch):
 
 
 def test_cli_setup_flow_and_gui_picker_agree(monkeypatch):
-    """``hermes model`` and the GUI/in-chat picker list the same Nous models for a paid account."""
+    """``eir model`` and the GUI/in-chat picker list the same Nous models for a paid account."""
     pricing = {"nous/a": dict(_LIST), "sale/x": _sale(80), "sale/y": _sale(30)}
     _stub_portal(monkeypatch, free_tier=False, pricing=pricing)
     monkeypatch.setattr(mp, "nous_policy_allowed_ids", lambda **kw: None)
@@ -109,11 +109,11 @@ def test_cli_setup_flow_and_gui_picker_agree(monkeypatch):
 
 
 def _login_picker_ids(monkeypatch, *, free_tier: bool, pricing: dict, allowed=None) -> list:
-    """Model ids the post-login picker (``hermes auth add nous`` / re-auth) offers."""
-    from hermes_cli import auth_nous
+    """Model ids the post-login picker (``eir auth add nous`` / re-auth) offers."""
+    from eir_cli import auth_nous
 
     _stub_portal(monkeypatch, free_tier=free_tier, pricing=pricing, allowed=allowed)
-    monkeypatch.setattr("hermes_cli.models.get_curated_nous_model_ids", lambda *a, **kw: ["curated/only"])
+    monkeypatch.setattr("eir_cli.models.get_curated_nous_model_ids", lambda *a, **kw: ["curated/only"])
     monkeypatch.setattr(auth_nous, "_portal_entitlement_message", lambda *a, **kw: "")
     offered: dict = {}
 
@@ -122,13 +122,13 @@ def _login_picker_ids(monkeypatch, *, free_tier: bool, pricing: dict, allowed=No
         offered["unavailable"] = list(kw.get("unavailable_models") or [])
         return model_ids[0] if model_ids else None
 
-    monkeypatch.setattr("hermes_cli.auth._prompt_model_selection", _prompt)
+    monkeypatch.setattr("eir_cli.auth._prompt_model_selection", _prompt)
     auth_nous._pick_nous_model_after_login({"agent_key": "k", "portal_base_url": ""}, "https://x.test/v1")
     return offered.get("ids", []) + offered.get("unavailable", [])  # selectable, then greyed-out
 
 
 def test_post_login_picker_paid_tier_shows_on_sale_model(monkeypatch):
-    """The sign-in picker applies the same on-sale union as ``hermes model`` (review on #121906)."""
+    """The sign-in picker applies the same on-sale union as ``eir model`` (review on #121906)."""
     pricing = {"curated/only": dict(_LIST), "vendor/sale": _sale(80)}
     assert _login_picker_ids(monkeypatch, free_tier=False, pricing=pricing) == ["curated/only", "vendor/sale"]
 
@@ -146,7 +146,7 @@ def test_post_login_picker_org_policy_still_narrows_on_sale_models(monkeypatch):
 
 
 def test_all_three_paid_pickers_agree(monkeypatch):
-    """Sign-in picker, ``hermes model`` and the GUI/in-chat picker list the same paid Nous models."""
+    """Sign-in picker, ``eir model`` and the GUI/in-chat picker list the same paid Nous models."""
     pricing = {"curated/only": dict(_LIST), "sale/x": _sale(80), "sale/y": _sale(30)}
     login = _login_picker_ids(monkeypatch, free_tier=False, pricing=pricing)
     cli = model_setup_flows._nous_model_catalog(False, "", ["curated/only"], pricing)

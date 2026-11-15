@@ -3,7 +3,7 @@
 Before this, a damaged store showed up as an empty Desktop sidebar (200 + an ``errors`` row),
 a 500 from ``/api/sessions``, ``components.storage: ok`` on ``/api/status`` and green
 readiness. Each surface guessed; none said the store was damaged, so it read as deleted
-history. ``hermes_state_health`` is now the one latch: readers, writers and the readiness
+history. ``eir_state_health`` is now the one latch: readers, writers and the readiness
 probe publish into it, and every surface below reads it.
 """
 
@@ -11,9 +11,9 @@ import sqlite3
 
 import pytest
 
-from hermes_state import SessionDB, StateDbCorruptError
-from hermes_state_errors import classify_persistence_error
-from hermes_state_health import (
+from eir_state import SessionDB, StateDbCorruptError
+from eir_state_errors import classify_persistence_error
+from eir_state_health import (
     is_structural_corruption_error,
     note_storage_error,
     reset_storage_state,
@@ -138,11 +138,11 @@ class TestPeerWritesAfterLatch:
 # ── Readiness ──────────────────────────────────────────────────────────────
 
 
-def test_readiness_state_db_and_session_store_agree_on_corrupt(_isolate_hermes_home):
+def test_readiness_state_db_and_session_store_agree_on_corrupt(_isolate_eir_home):
     from gateway.readiness import collect_runtime_readiness
-    from hermes_constants import get_hermes_home
+    from eir_constants import get_eir_home
 
-    path = get_hermes_home() / "state.db"
+    path = get_eir_home() / "state.db"
     _seed(path, count=1)
     healthy = collect_runtime_readiness(configured_model="m", runtime_status={"session_store": {"status": "ok"}})
     assert healthy["checks"]["state_db"]["status"] == "ok"
@@ -155,11 +155,11 @@ def test_readiness_state_db_and_session_store_agree_on_corrupt(_isolate_hermes_h
     assert ready["checks"]["session_store"] == {"status": "unavailable", "detail": "corrupt"}
 
 
-def test_readiness_probe_latches_a_file_that_is_not_a_database(_isolate_hermes_home):
+def test_readiness_probe_latches_a_file_that_is_not_a_database(_isolate_eir_home):
     from gateway.readiness import _probe_state_db
-    from hermes_constants import get_hermes_home
+    from eir_constants import get_eir_home
 
-    home = get_hermes_home()
+    home = get_eir_home()
     (home / "state.db").write_bytes(b"this is not sqlite" * 512)
     assert _probe_state_db(home) == {"status": "degraded", "detail": "corrupt"}
     assert storage_state(home / "state.db") == "corrupt"
@@ -169,29 +169,29 @@ def test_readiness_probe_latches_a_file_that_is_not_a_database(_isolate_hermes_h
 
 
 @pytest.fixture
-def client(monkeypatch, _isolate_hermes_home):
+def client(monkeypatch, _isolate_eir_home):
     try:
         from starlette.testclient import TestClient
     except ImportError:
         pytest.skip("fastapi/starlette not installed")
 
-    import hermes_state
-    from hermes_cli.web_routers import profiles as profiles_routes
-    from hermes_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
-    from hermes_constants import get_hermes_home
+    import eir_state
+    from eir_cli.web_routers import profiles as profiles_routes
+    from eir_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
+    from eir_constants import get_eir_home
 
     monkeypatch.setattr(profiles_routes, "_SIDEBAR_CACHE_TTL_SECONDS", 0.0)
-    monkeypatch.setattr(hermes_state, "DEFAULT_DB_PATH", get_hermes_home() / "state.db")
-    (get_hermes_home() / "config.yaml").write_text("{}\n", encoding="utf-8")
+    monkeypatch.setattr(eir_state, "DEFAULT_DB_PATH", get_eir_home() / "state.db")
+    (get_eir_home() / "config.yaml").write_text("{}\n", encoding="utf-8")
     c = TestClient(app)
     c.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
     return c
 
 
 def test_corrupt_state_db_is_published_to_every_desktop_surface(client):
-    from hermes_constants import get_hermes_home
+    from eir_constants import get_eir_home
 
-    path = get_hermes_home() / "state.db"
+    path = get_eir_home() / "state.db"
     _seed(path)
 
     healthy = client.get("/api/profiles/sessions/sidebar?recents_profile=all").json()

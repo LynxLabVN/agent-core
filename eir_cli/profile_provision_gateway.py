@@ -1,9 +1,9 @@
-"""``hermes profile create`` through the running gateway: one ``profiles.create`` RPC, one receipt.
+"""``eir profile create`` through the running gateway: one ``profiles.create`` RPC, one receipt.
 
-The CLI asks the gateway that serves its profile to make the profile (``HERMES_TUI_GATEWAY_URL``, the dial
+The CLI asks the gateway that serves its profile to make the profile (``EIR_TUI_GATEWAY_URL``, the dial
 ``connect_gateway`` honours for every client, names a remote one), so a terminal attached to a gateway
 creates profiles on the gateway's machine. The gateway answers with the same
-:class:`~hermes_cli.profile_provision.ProfileCreateReceipt` a local create builds, so the output does not depend
+:class:`~eir_cli.profile_provision.ProfileCreateReceipt` a local create builds, so the output does not depend
 on where the profile was made.
 """
 from __future__ import annotations
@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Optional
 from urllib.parse import urlsplit
 
-from hermes_cli.profile_provision import (
+from eir_cli.profile_provision import (
     ProfileCreateReceipt, ProfileCreateRequest, message_from, redact_create_text, refusal_from,
 )
 
@@ -45,7 +45,7 @@ class GatewayCreateError(RuntimeError):
 
 
 def _wire(request: ProfileCreateRequest, profile: Optional[str]) -> dict[str, Any]:
-    # ``no_alias`` always: the wrapper belongs to the terminal's machine, PATH and ``hermes``
+    # ``no_alias`` always: the wrapper belongs to the terminal's machine, PATH and ``eir``
     # (written here when the profile landed in this machine's profiles directory). ``profile``: a URL's
     # connection carries no profile-bound ticket, so the terminal's profile is named (Desktop's routing).
     wire = {"name": request.name, "description": request.description, "clone_from": request.clone_from,
@@ -69,14 +69,14 @@ def _where(remote: str) -> str:
     except ValueError:  # an out-of-range port or a malformed authority; its message quotes the authority
         ok = False
     if not ok:
-        raise GatewayCreateError("HERMES_TUI_GATEWAY_URL is not a ws:// or wss:// URL with a host; nothing was created")
+        raise GatewayCreateError("EIR_TUI_GATEWAY_URL is not a ws:// or wss:// URL with a host; nothing was created")
     from gateway.platforms.base_log_safety import safe_proxy_url_for_log  # a URL only: it loads gateway.platforms
     named = safe_proxy_url_for_log(remote)
-    return f"the gateway at {named}" if named.startswith(("ws://", "wss://")) else "the HERMES_TUI_GATEWAY_URL gateway"
+    return f"the gateway at {named}" if named.startswith(("ws://", "wss://")) else "the EIR_TUI_GATEWAY_URL gateway"
 
 
 def _local_profile_dir(name: str) -> Optional[Path]:
-    from hermes_cli.profiles import get_profile_dir
+    from eir_cli.profiles import get_profile_dir
     try:
         return Path(get_profile_dir(name))
     except ValueError:
@@ -86,14 +86,14 @@ def _local_profile_dir(name: str) -> Optional[Path]:
 def _is_profile(local: Optional[Path]) -> bool:
     """Whether ``-p <name>``'s directory here is a profile: it carries an identity marker. A shell a deleted
     profile left behind carries none (``create_profile`` replaces it), and nothing else creates one."""
-    from hermes_constants import named_profile_has_identity
+    from eir_constants import named_profile_has_identity
     return local is not None and local.is_dir() and named_profile_has_identity(local)
 
 
 def _made_here(made: ProfileCreateReceipt, local: Optional[Path], was_profile: bool) -> bool:
     """Whether this create made the profile ``-p <name>`` selects on this machine, given the gateway is this
     home's owner: not a profile before the request, one now, at the path the gateway reports."""
-    from hermes_cli.profiles import profile_matches_home
+    from eir_cli.profiles import profile_matches_home
     return (not was_profile and _is_profile(local)
             and profile_matches_home(local.name, Path(made.path)))
 
@@ -112,25 +112,25 @@ async def _described_instance(client) -> Optional[str]:
 def create_through_gateway(request: ProfileCreateRequest) -> Optional[ProfileCreateReceipt]:
     """The receipt of the gateway's create for *request*, or None to create here.
 
-    ``HERMES_TUI_GATEWAY_URL`` set: that gateway makes the profile, in this terminal's profile, and anything
+    ``EIR_TUI_GATEWAY_URL`` set: that gateway makes the profile, in this terminal's profile, and anything
     short of its answer is a :class:`GatewayCreateError`, never a local create. Otherwise a live gateway for
     this profile (discovery only; one is never started for this) makes it; with none, or one that predates
     the fields this sends, the caller creates locally. A refused create raises the gateway's own
     ``ValueError`` / ``FileExistsError`` / ``FileNotFoundError``. When this create made the profile in this
     machine's profiles directory, the terminal's ``~/.local/bin`` wrapper is written here.
     """
-    from hermes_cli.sessions_owner import live_owner
-    remote = os.environ.get("HERMES_TUI_GATEWAY_URL", "").strip()
+    from eir_cli.sessions_owner import live_owner
+    remote = os.environ.get("EIR_TUI_GATEWAY_URL", "").strip()
     where = _where(remote)
     endpoint, profile = None, None
     if remote:
         # The profile this terminal runs in, resolved like the local dial (an overlay task home is served by
         # the profile its lock names); a home outside the profiles tree has no name a gateway can resolve.
-        from hermes_cli.gateway_runtime import gateway_profile_home
-        from hermes_constants import get_hermes_home, profile_name_for_home
-        profile = profile_name_for_home(gateway_profile_home(get_hermes_home()))
+        from eir_cli.gateway_runtime import gateway_profile_home
+        from eir_constants import get_eir_home, profile_name_for_home
+        profile = profile_name_for_home(gateway_profile_home(get_eir_home()))
         if not profile:
-            raise GatewayCreateError(f"this terminal's HERMES_HOME is not a named profile, so {where} cannot "
+            raise GatewayCreateError(f"this terminal's EIR_HOME is not a named profile, so {where} cannot "
                                      "create from it; nothing was created")
     if not remote or request.alias:
         try:
@@ -139,9 +139,9 @@ def create_through_gateway(request: ProfileCreateRequest) -> Optional[ProfileCre
             logger.debug("profile create: gateway discovery failed", exc_info=True)
     if not remote and endpoint is None:
         return None
-    from hermes_cli.gateway_client import GatewayRPCError, NOT_SENT, connect_gateway
+    from eir_cli.gateway_client import GatewayRPCError, NOT_SENT, connect_gateway
     machine = " on the gateway's machine" if remote else ""
-    unknown = f"{where} may have created '{request.name}'; check `hermes profile list`{machine} before retrying"
+    unknown = f"{where} may have created '{request.name}'; check `eir profile list`{machine} before retrying"
     local = _local_profile_dir(request.name)
     was_profile = _is_profile(local)
     # A discovered owner serves this home. A URL's gateway is this home's owner only if it reports the
@@ -171,7 +171,7 @@ def create_through_gateway(request: ProfileCreateRequest) -> Optional[ProfileCre
         if exc.code in _OLDER_OR_RETIRING or unknown_method or draining:
             if remote:
                 why = "is restarting; retry" if exc.code == 5035 or draining else (
-                    "predates this version; update it, or unset HERMES_TUI_GATEWAY_URL to create locally")
+                    "predates this version; update it, or unset EIR_TUI_GATEWAY_URL to create locally")
                 raise GatewayCreateError(f"{where} cannot create profiles for this terminal (it {why})") from exc
             return None
         refused = refusal_from(exc.data)
@@ -200,7 +200,7 @@ def create_through_gateway(request: ProfileCreateRequest) -> Optional[ProfileCre
 
 
 def _with_local_alias(made: ProfileCreateReceipt, request: ProfileCreateRequest) -> ProfileCreateReceipt:
-    from hermes_cli.profile_provision import write_alias
+    from eir_cli.profile_provision import write_alias
     try:
         path, collision = write_alias(request.name)
     except Exception as exc:  # the profile exists: a wrapper failure is a warning, as for a local create

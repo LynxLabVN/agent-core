@@ -11,7 +11,7 @@ import urllib.request
 
 import pytest
 
-from hermes_cli.urllib_security import (
+from eir_cli.urllib_security import (
     SafeCredentialRedirectHandler,
     open_credentialed_url,
     url_origin,
@@ -84,7 +84,7 @@ def _credential_headers() -> dict[str, str]:
         "CF-Access-Client-Secret": "cloudflare-secret",
         "X-Custom-Auth": "tenant-secret",
         "Accept": "application/json",
-        "User-Agent": "hermes-test",
+        "User-Agent": "eir-test",
     }
 
 
@@ -108,7 +108,7 @@ def test_cross_host_redirect_drops_arbitrary_credentials_on_wire():
     method, headers = _RecordingHandler.requests[-1]
     assert method == "GET"
     assert headers["accept"] == "application/json"
-    assert headers["user-agent"] == "hermes-test"
+    assert headers["user-agent"] == "eir-test"
     for name in (
         "authorization",
         "cookie",
@@ -261,7 +261,7 @@ def test_multihop_redirects_never_resurrect_credentials():
 
 
 def test_probe_api_models_drops_custom_credentials_on_wire():
-    from hermes_cli.models import probe_api_models
+    from eir_cli.models import probe_api_models
 
     source = _server()
     sink = _server()
@@ -338,7 +338,7 @@ def test_anthropic_profile_drops_x_api_key_on_redirect(monkeypatch):
 
 
 def test_azure_catalog_probe_drops_api_key_and_bearer_on_redirect():
-    from hermes_cli import azure_detect
+    from eir_cli import azure_detect
 
     source = _server()
     sink = _server()
@@ -361,7 +361,7 @@ def test_azure_catalog_probe_drops_api_key_and_bearer_on_redirect():
 
 
 def test_azure_anthropic_probe_drops_api_key_and_bearer_on_redirect():
-    from hermes_cli import azure_detect
+    from eir_cli import azure_detect
 
     sink = _server()
     source = ThreadingHTTPServer(("127.0.0.1", 0), _LmStudioSourceHandler)
@@ -383,7 +383,7 @@ def test_azure_anthropic_probe_drops_api_key_and_bearer_on_redirect():
 
 def _clear_ca_bundle_env(monkeypatch) -> None:
     for name in (
-        "HERMES_CA_BUNDLE",
+        "EIR_CA_BUNDLE",
         "SSL_CERT_FILE",
         "REQUESTS_CA_BUNDLE",
         "CURL_CA_BUNDLE",
@@ -391,8 +391,8 @@ def _clear_ca_bundle_env(monkeypatch) -> None:
         monkeypatch.delenv(name, raising=False)
 
 
-def test_hermes_owned_opener_uses_resolved_https_context(monkeypatch):
-    from hermes_cli import urllib_security
+def test_eir_owned_opener_uses_resolved_https_context(monkeypatch):
+    from eir_cli import urllib_security
 
     context = ssl.create_default_context()
     monkeypatch.setattr(urllib.request, "_opener", None)
@@ -412,24 +412,24 @@ def test_hermes_owned_opener_uses_resolved_https_context(monkeypatch):
 
 
 def test_resolved_https_context_defers_to_the_platform_store(monkeypatch, tmp_path):
-    """Hermes-owned urllib openers verify against the OS certificate store.
+    """Eir-owned urllib openers verify against the OS certificate store.
 
     None means "urllib's default context", which — with truststore installed
     process-wide — IS the platform verifier. There is no CA-bundle ladder
     here any more: a stale or bogus env var must not steer or break trust,
     which is precisely what the removed env/certifi ladder used to do.
     """
-    from hermes_cli import urllib_security
+    from eir_cli import urllib_security
 
     assert urllib_security._resolved_https_context() is None
 
-    for var in ("HERMES_CA_BUNDLE", "SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE"):
+    for var in ("EIR_CA_BUNDLE", "SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE"):
         monkeypatch.setenv(var, str(tmp_path / "nope.pem"))
     assert urllib_security._resolved_https_context() is None
 
 
 def test_resolved_https_context_installs_the_platform_verifier():
-    """Resolving trust for a Hermes opener must put truststore in force.
+    """Resolving trust for a Eir opener must put truststore in force.
 
     A stdlib urllib request is the call path certifi never covered (the
     llama.cpp engine download among them), so the install has to happen here
@@ -437,7 +437,7 @@ def test_resolved_https_context_installs_the_platform_verifier():
     """
     import ssl
 
-    from hermes_cli import urllib_security
+    from eir_cli import urllib_security
 
     urllib_security._resolved_https_context()
 
@@ -445,7 +445,7 @@ def test_resolved_https_context_installs_the_platform_verifier():
 
 
 def test_installed_https_context_is_preserved(monkeypatch):
-    from hermes_cli import urllib_security
+    from eir_cli import urllib_security
 
     context = ssl.create_default_context()
     installed = urllib.request.build_opener(

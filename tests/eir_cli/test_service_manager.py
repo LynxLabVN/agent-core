@@ -1,4 +1,4 @@
-"""Tests for hermes_cli.service_manager — the abstract ServiceManager
+"""Tests for eir_cli.service_manager — the abstract ServiceManager
 protocol, the detect_service_manager() entry point, and the host-side
 adapter wrappers (Systemd / Launchd / Windows).
 
@@ -11,7 +11,7 @@ import subprocess
 
 import pytest
 
-from hermes_cli.service_manager import (
+from eir_cli.service_manager import (
     S6ServiceManager,
 )
 
@@ -113,7 +113,7 @@ def fake_subprocess_run(monkeypatch: pytest.MonkeyPatch):
 #
 # The skeleton helper pre-creates the dirs and FIFOs that s6-supervise
 # would otherwise create as root mode 0700, locking out the
-# unprivileged hermes user from every lifecycle op. These tests run
+# unprivileged eir user from every lifecycle op. These tests run
 # against tmp_path and assert the produced layout — the live-container
 # verification (against real s6-svc / s6-svstat) lives in
 # tests/docker/test_s6_profile_gateway_integration.py.
@@ -124,7 +124,7 @@ def test_seed_supervise_skeleton_creates_expected_layout(tmp_path) -> None:
     """Verifies the dirs + FIFO the helper lays down."""
     import stat
 
-    from hermes_cli.service_manager import _seed_supervise_skeleton
+    from eir_cli.service_manager import _seed_supervise_skeleton
 
     svc_dir = tmp_path / "gateway-foo"
     svc_dir.mkdir()
@@ -166,7 +166,7 @@ def test_seed_supervise_skeleton_sets_setgid_on_event_dirs(tmp_path) -> None:
     """
     import stat
 
-    from hermes_cli.service_manager import _seed_supervise_skeleton
+    from eir_cli.service_manager import _seed_supervise_skeleton
 
     svc_dir = tmp_path / "gateway-foo"
     svc_dir.mkdir()
@@ -190,20 +190,20 @@ def test_render_run_script_uses_replace_to_take_over_stale_holder() -> None:
     """NS-505: the supervised gateway must exec ``gateway run --replace``.
 
     Without ``--replace`` a gateway started OUTSIDE s6 (a stray shell
-    ``hermes gateway run``, an agent action, the Open WebUI helper) holds
-    the per-HERMES_HOME PID lock; the supervised slot then execs a bare
+    ``eir gateway run``, an agent action, the Open WebUI helper) holds
+    the per-EIR_HOME PID lock; the supervised slot then execs a bare
     ``gateway run``, hits the "Another gateway instance is already
     running" guard, exits non-zero, and s6 restarts it — a restart loop
     that never binds. ``--replace`` makes the supervised gateway reap the
     stale holder and win, so s6 is authoritative for the slot.
 
-    Covers both the default (root HERMES_HOME, no ``-p``) and named-profile
+    Covers both the default (root EIR_HOME, no ``-p``) and named-profile
     render paths.
     """
     default_text = S6ServiceManager._render_run_script("default", {})
-    # Root profile: bare `hermes gateway run --replace` (no -p flag).
-    assert "hermes gateway run --replace" in default_text
-    assert "hermes -p default" not in default_text
+    # Root profile: bare `eir gateway run --replace` (no -p flag).
+    assert "eir gateway run --replace" in default_text
+    assert "eir -p default" not in default_text
     # Every exec line that launches the gateway must carry --replace, so
     # neither the non-root nor the privilege-drop branch can spin.
     gateway_execs = [
@@ -269,7 +269,7 @@ def test_render_finish_script_does_not_restart_on_clean_exit(tmp_path) -> None:
 # ---------------------------------------------------------------------------
 # S6 stop writes a planned-stop marker (issue #42675)
 #
-# `hermes gateway stop` inside a container dispatches through
+# `eir gateway stop` inside a container dispatches through
 # S6ServiceManager.stop() -> `s6-svc -d`, which SIGTERMs the gateway.
 # That SIGTERM is indistinguishable from the one s6/Docker sends on a
 # container restart unless we mark the intentional stop first. Without
@@ -435,14 +435,14 @@ def _log_run_setup_fragment(rendered: str) -> str:
 
 
 @pytest.mark.platforms("linux")
-def test_s6_log_run_creates_leaf_as_hermes_without_chown(
+def test_s6_log_run_creates_leaf_as_eir_without_chown(
     s6_scandir, fake_subprocess_run,
 ) -> None:
-    """log/run must not root-chown/unlink volume paths; create leaf as hermes.
+    """log/run must not root-chown/unlink volume paths; create leaf as eir.
 
     #45258 parent ownership is stage2's job (``logs/gateways`` seeded as
-    hermes). Restartable log/run must not pathname-chown or pathname-rm a
-    hermes-writable tree from root — that is a symlink TOCTOU hole.
+    eir). Restartable log/run must not pathname-chown or pathname-rm a
+    eir-writable tree from root — that is a symlink TOCTOU hole.
     """
     mgr = S6ServiceManager(scandir=s6_scandir)
     mgr.register_profile_gateway("coder")
@@ -450,20 +450,20 @@ def test_s6_log_run_creates_leaf_as_hermes_without_chown(
     log_text = (s6_scandir / "gateway-coder" / "log" / "run").read_text()
 
     assert not any(line.lstrip().startswith("chown ") for line in log_text.splitlines()), (
-        "restartable log/run must not invoke chown on hermes-writable paths; "
+        "restartable log/run must not invoke chown on eir-writable paths; "
         f"saw: {log_text!r}"
     )
-    assert 's6-setuidgid hermes mkdir -p "$log_dir"' in log_text
-    assert 's6-setuidgid hermes rm -f "$log_dir/lock"' in log_text
+    assert 's6-setuidgid eir mkdir -p "$log_dir"' in log_text
+    assert 's6-setuidgid eir rm -f "$log_dir/lock"' in log_text
     assert 'else\n  mkdir -p "$log_dir"\n  rm -f "$log_dir/lock"\nfi\n' in log_text
     # Lock cleanup must not remain a bare root-context pathname op after fi.
     after_fi = log_text.split("fi\n", 1)[-1]
     assert 'rm -f "$log_dir/lock"' not in after_fi
 
-    mkdir_as_hermes_idx = log_text.index('s6-setuidgid hermes mkdir -p "$log_dir"')
-    rm_as_hermes_idx = log_text.index('s6-setuidgid hermes rm -f "$log_dir/lock"')
+    mkdir_as_eir_idx = log_text.index('s6-setuidgid eir mkdir -p "$log_dir"')
+    rm_as_eir_idx = log_text.index('s6-setuidgid eir rm -f "$log_dir/lock"')
     exec_idx = log_text.index("s6-log 1 ")
-    assert mkdir_as_hermes_idx < rm_as_hermes_idx < exec_idx
+    assert mkdir_as_eir_idx < rm_as_eir_idx < exec_idx
 
     # Runtime path expansion, never a baked-in absolute path.
     assert '/opt/data/logs/gateways"' not in log_text
@@ -482,8 +482,8 @@ def test_s6_log_run_never_invokes_chown_with_symlinked_log_dir(tmp_path) -> None
     if os.name == "nt":
         pytest.skip("POSIX symlink + /bin/sh required")
 
-    hermes_home = tmp_path / "hermes"
-    gateways = hermes_home / "logs" / "gateways"
+    eir_home = tmp_path / "eir"
+    gateways = eir_home / "logs" / "gateways"
     gateways.mkdir(parents=True)
     leaf = gateways / "coder"
     leaf.mkdir()
@@ -504,8 +504,8 @@ def test_s6_log_run_never_invokes_chown_with_symlinked_log_dir(tmp_path) -> None
         encoding="utf-8",
     )
     # Pretend we are root so the script takes the s6-setuidgid setup path.
-    # Mark the drop so fake rm can refuse unlink outside HERMES_HOME the way
-    # a real hermes uid cannot delete a foreign root-owned lock.
+    # Mark the drop so fake rm can refuse unlink outside EIR_HOME the way
+    # a real eir uid cannot delete a foreign root-owned lock.
     (bin_dir / "id").write_text(
         "#!/bin/sh\n"
         'if [ "$1" = "-u" ]; then echo 0; exit 0; fi\n'
@@ -515,17 +515,17 @@ def test_s6_log_run_never_invokes_chown_with_symlinked_log_dir(tmp_path) -> None
     (bin_dir / "s6-setuidgid").write_text(
         "#!/bin/sh\n"
         "shift\n"
-        'HERMES_TEST_DROPPED=1 exec "$@"\n',
+        'EIR_TEST_DROPPED=1 exec "$@"\n',
         encoding="utf-8",
     )
     real_rm = "/bin/rm"
     (bin_dir / "rm").write_text(
         "#!/bin/sh\n"
-        # Privilege-dropped: no-op. Models that hermes cannot unlink a foreign
+        # Privilege-dropped: no-op. Models that eir cannot unlink a foreign
         # root-owned lock outside the volume; avoids a realpath/rm TOCTOU in
         # the test double itself. Root-context: real rm — a residual bare
         # ``rm -f "$log_dir/lock"`` would delete victim/lock via the symlink.
-        'if [ -n "$HERMES_TEST_DROPPED" ]; then\n'
+        'if [ -n "$EIR_TEST_DROPPED" ]; then\n'
         "  exit 0\n"
         "fi\n"
         f'exec {real_rm} "$@"\n',
@@ -568,7 +568,7 @@ def test_s6_log_run_never_invokes_chown_with_symlinked_log_dir(tmp_path) -> None
             time.sleep(0.001)
 
     env = os.environ.copy()
-    env["HERMES_HOME"] = str(hermes_home)
+    env["EIR_HOME"] = str(eir_home)
     env["PATH"] = f"{bin_dir.as_posix()}{os.pathsep}{env.get('PATH', '')}"
 
     racer = threading.Thread(target=_swap_race, daemon=True)

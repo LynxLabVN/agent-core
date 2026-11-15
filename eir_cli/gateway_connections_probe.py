@@ -1,8 +1,8 @@
 """The Webapp's Test button for a saved gateway: the reachability probe Desktop's
-``hermes:connections:test`` runs, from the serving gateway's side.
+``eir:connections:test`` runs, from the serving gateway's side.
 
 The HTTP leg is the one Desktop runs first: ``GET <url>/api/status`` with the credential the entry
-saves (``X-Hermes-Session-Token`` for a token-mode remote, ``Authorization: Bearer`` for an
+saves (``X-Eir-Session-Token`` for a token-mode remote, ``Authorization: Bearer`` for an
 oauth-mode sign-in in ``gateway-connection-tokens.json``) plus its extra headers. ``local`` is the
 serving gateway itself. SSH entries use the shared reach module's managed tunnel and its
 session token, then run the same authenticated HTTP probe.
@@ -14,8 +14,8 @@ from typing import Any
 
 from starlette.concurrency import run_in_threadpool
 
-from hermes_cli import gateway_connections as store
-from hermes_cli import gateway_connections_reach as reach
+from eir_cli import gateway_connections as store
+from eir_cli import gateway_connections_reach as reach
 
 _TIMEOUT_S = 8.0
 
@@ -29,7 +29,7 @@ def _credential_headers(connection_id: str) -> tuple[str, dict[str, str]]:
             raise store.ConnectionStoreError("This connection is not signed in. Sign in to it first.")
         headers["Authorization"] = f"Bearer {snap['tokens']['accessToken']}"
     elif snap["token"]:
-        headers["X-Hermes-Session-Token"] = snap["token"]
+        headers["X-Eir-Session-Token"] = snap["token"]
     else:
         raise store.ConnectionStoreError(
             "This connection has no saved session token. Edit the connection and paste one.")
@@ -41,7 +41,7 @@ def _credential_headers(connection_id: str) -> tuple[str, dict[str, str]]:
 async def _probe(base_url: str, headers: dict[str, str]) -> dict[str, Any]:
     import httpx
 
-    from hermes_cli.web_routers.config_env import _endpoint_probe_client
+    from eir_cli.web_routers.config_env import _endpoint_probe_client
 
     async with _endpoint_probe_client(base_url, _TIMEOUT_S) as client:
         try:
@@ -65,7 +65,7 @@ async def probe_connection(connection_id: str) -> dict[str, Any]:
     if entry is None:
         raise store.NoSuchConnection(f'No connection with id "{connection_id}".')
     if entry["kind"] == "local":
-        from hermes_cli import __version__
+        from eir_cli import __version__
 
         return {"ok": True, "baseUrl": None, "version": __version__}
     if entry["kind"] == "ssh":

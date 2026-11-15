@@ -1,4 +1,4 @@
-import { Button, Codicon, ConfirmDialog, Input, Tip } from '@hermes/plugin-sdk'
+import { Button, Codicon, ConfirmDialog, Input, Tip } from '@eir/plugin-sdk'
 import { useState } from 'react'
 
 import { type CanonicalDriverStatus, CanonicalGroupAttention, CanonicalGroupRoster } from './canonical-group-activity'

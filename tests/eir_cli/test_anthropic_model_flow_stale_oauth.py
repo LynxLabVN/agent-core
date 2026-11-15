@@ -1,12 +1,12 @@
-"""Tests for Bug #12905 fix — stale OAuth token detection in hermes model flow.
+"""Tests for Bug #12905 fix — stale OAuth token detection in eir model flow.
 
-Bug 3: `hermes model` with `provider=anthropic` skips OAuth re-authentication
-when a stale ANTHROPIC_TOKEN exists in ~/.hermes/.env but no valid
+Bug 3: `eir model` with `provider=anthropic` skips OAuth re-authentication
+when a stale ANTHROPIC_TOKEN exists in ~/.eir/.env but no valid
 Claude Code credentials are available. The fast-path silently proceeds to
 model selection with a broken token instead of offering re-auth.
 """
 
-from hermes_cli.config import save_env_value
+from eir_cli.config import save_env_value
 
 class TestStaleOAuthTokenDetection:
     """Bug 3: stale OAuth token must trigger needs_auth=True in _model_flow_anthropic."""
@@ -17,7 +17,7 @@ class TestStaleOAuthTokenDetection:
         valid Claude Code credentials anywhere. The flow MUST offer re-auth
         instead of silently skipping to model selection.
         """
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("EIR_HOME", str(tmp_path))
 
         # Pre-load .env with an expired OAuth token (sk-ant- prefix = OAuth)
         save_env_value("ANTHROPIC_TOKEN", "sk-ant-oat-ExpiredToken00000")
@@ -49,9 +49,9 @@ class TestStaleOAuthTokenDetection:
 
         # Simulate user types "3" (Cancel) when prompted for re-auth
         monkeypatch.setattr("builtins.input", lambda _: "3")
-        monkeypatch.setattr("hermes_cli.secret_prompt.masked_secret_prompt", lambda _: "")
+        monkeypatch.setattr("eir_cli.secret_prompt.masked_secret_prompt", lambda _: "")
 
-        from hermes_cli.model_setup_flows import _model_flow_anthropic
+        from eir_cli.model_setup_flows import _model_flow_anthropic
         cfg = {}
 
         _model_flow_anthropic(cfg)

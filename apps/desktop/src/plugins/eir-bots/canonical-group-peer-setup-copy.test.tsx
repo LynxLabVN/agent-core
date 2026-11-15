@@ -1,5 +1,5 @@
-import { host } from '@hermes/plugin-sdk'
-import type * as HermesSdk from '@hermes/plugin-sdk'
+import { host } from '@eir/plugin-sdk'
+import type * as EirSdk from '@eir/plugin-sdk'
 import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
@@ -17,8 +17,8 @@ import { translateBots } from './i18n-test-helper'
 import type { RosterRow } from './types'
 
 const { request } = vi.hoisted(() => ({ request: vi.fn() }))
-vi.mock('@hermes/plugin-sdk', async importOriginal => (await import('./canonical-group-contract-test-utils'))
-  .localGatewaySdkMock(await importOriginal<typeof HermesSdk>(), request, () => translateBots))
+vi.mock('@eir/plugin-sdk', async importOriginal => (await import('./canonical-group-contract-test-utils'))
+  .localGatewaySdkMock(await importOriginal<typeof EirSdk>(), request, () => translateBots))
 vi.mock('./group-chat-parts', async importOriginal => ({ ...await importOriginal<typeof GroupChatParts>(), GroupImageControls: () => null }))
 
 const roster: RosterRow[] = [{ name: 'default', connectionId: 'local' }, peerRosterRow('mini', 'Mac Mini')]
@@ -48,7 +48,7 @@ const CODES = [...new Set([...REFUSALS.map(([code]) => code), 'canonical_driver_
 const rawCode = new RegExp(CODES.join('|'))
 
 beforeEach(() => {
-  ;(host.state.gateway as ReturnType<typeof HermesSdk.atom<string>>).set('open')
+  ;(host.state.gateway as ReturnType<typeof EirSdk.atom<string>>).set('open')
   $canonicalGroupBindings.set({})
   $botMeta.set({})
   $groupChats.set({})
@@ -96,7 +96,7 @@ it.each(Object.keys(CANONICAL_GROUP_LOCALES) as Array<keyof typeof CANONICAL_GRO
       const joined = code === 'peer_target_unsupported' ? words.peerJoinChanged : words.peerJoinFailed.replace('{reason}', words[key])
 
       if (key !== 'peerSetupGeneric') {
-        expect(peerJoinText(new PeerJoinError(code), 'Hermes · Mac Mini', words), `${locale} ${code}`).toBe(joined.replace('{name}', 'Hermes · Mac Mini'))
+        expect(peerJoinText(new PeerJoinError(code), 'Eir · Mac Mini', words), `${locale} ${code}`).toBe(joined.replace('{name}', 'Eir · Mac Mini'))
       }
     }
 

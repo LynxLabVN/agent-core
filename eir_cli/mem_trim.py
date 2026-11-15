@@ -1,4 +1,4 @@
-"""Rate-limited heap release for long-lived Hermes gateway processes.
+"""Rate-limited heap release for long-lived Eir gateway processes.
 
 On Linux/glibc, ``malloc_trim(0)`` can return pages from freed Python/C allocations to the OS. Every
 platform runs the rate-limited ``gc.collect()``; only the page release is glibc-only. Behavior is configured
@@ -45,7 +45,7 @@ def _config_settings() -> tuple[bool, float, int, float]:
         # Read-only, no-deepcopy variant: this runs on EVERY trim attempt (before the
         # cooldown check), and a full-config deepcopy per attempt is exactly the
         # allocator garbage this module exists to release.
-        from hermes_cli.config import load_config_readonly
+        from eir_cli.config import load_config_readonly
         config = load_config_readonly() or {}
         context = config.get("context") if isinstance(config, dict) else None
         settings = context.get("memory_trim") if isinstance(context, dict) else None

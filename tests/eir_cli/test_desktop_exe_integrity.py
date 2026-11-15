@@ -1,8 +1,8 @@
 """Behavior tests for the Windows desktop-exe integrity gate (#69179).
 
-The desktop self-update chain (Desktop → hermes-setup --update →
-``hermes update`` → ``hermes desktop --build-only`` → relaunch) rebuilds
-Hermes.exe on the end user's machine. Before this gate, "build succeeded" was
+The desktop self-update chain (Desktop → eir-setup --update →
+``eir update`` → ``eir desktop --build-only`` → relaunch) rebuilds
+Eir.exe on the end user's machine. Before this gate, "build succeeded" was
 just "the file exists", so a truncated PE (corrupt cached Electron zip), a
 non-PE file, or a wrong-architecture tree shipped as the new app — Windows
 then refuses to launch it with "This app can't run on your computer"
@@ -24,9 +24,9 @@ from unittest.mock import patch
 
 import pytest
 
-from hermes_cli import main as cli_main
-from hermes_cli import main_desktop
-from hermes_platform.host import facts
+from eir_cli import main as cli_main
+from eir_cli import main_desktop
+from eir_platform.host import facts
 
 PE_AMD64 = 0x8664
 PE_ARM64 = 0xAA64
@@ -77,7 +77,7 @@ def make_pe(path: Path, machine: int = PE_AMD64, *, truncate_to: int | None = No
 
 # ─── _windows_native_machine ────────────────────────────────────────────────
 
-# MACHINE_ATTRIBUTES.UserEnabled — mirrors hermes_cli.main.
+# MACHINE_ATTRIBUTES.UserEnabled — mirrors eir_cli.main.
 _USER_ENABLED = 0x00000001
 
 
@@ -216,20 +216,20 @@ def test_expected_machines_prefers_user_runnable_api_over_arch_name(monkeypatch)
 def test_corrupt_staged_app_keeps_live_bytes_without_backup_recovery(tmp_path, monkeypatch, capsys):
     """Exercise publication and PE parsing, not Windows host/architecture discovery."""
     desktop_dir = tmp_path / "apps" / "desktop"
-    live_exe = desktop_dir / "release" / "linux-unpacked" / "hermes"
+    live_exe = desktop_dir / "release" / "linux-unpacked" / "eir"
     make_pe(live_exe)
     live_bytes = live_exe.read_bytes()
     assert main_desktop._parse_pe_machine(live_exe) == PE_AMD64
     # The host-native layout makes discovery/swap real; PE is just fixture data.
     staging = main_desktop._desktop_staging_dir(desktop_dir)
-    staged_exe = make_pe(staging / "linux-unpacked" / "hermes", truncate_to=0x300)
+    staged_exe = make_pe(staging / "linux-unpacked" / "eir", truncate_to=0x300)
     staged_bytes = staged_exe.read_bytes()
-    backup_exe = make_pe(staging / "linux-unpacked.bak" / "hermes")
+    backup_exe = make_pe(staging / "linux-unpacked.bak" / "eir")
     old_diagnostic = staging / "linux-unpacked.corrupt" / "diagnostic"
     old_diagnostic.parent.mkdir()
     old_diagnostic.write_bytes(b"previous diagnostic")
     # Raw in-place pack recovery material is not owned by this transaction.
-    live_backup = make_pe(live_exe.parent.with_name("linux-unpacked.bak") / "hermes")
+    live_backup = make_pe(live_exe.parent.with_name("linux-unpacked.bak") / "eir")
 
     checked = []
 
@@ -271,7 +271,7 @@ def test_gate_fails_clearly_without_backup(tmp_path, capsys):
     """Exercise the default Windows PE check, without injecting a validator."""
     desktop_dir = tmp_path / "apps" / "desktop"
     staging = main_desktop._desktop_staging_dir(desktop_dir)
-    exe = staging / "win-unpacked" / "Hermes.exe"
+    exe = staging / "win-unpacked" / "Eir.exe"
     exe.parent.mkdir(parents=True)
     exe.write_bytes(b"<html>proxy error</html>" + b" " * 600)
 
@@ -285,7 +285,7 @@ def test_gate_fails_clearly_without_backup(tmp_path, capsys):
     assert "missing MZ header" in out
 
 
-# ─── end-to-end: `hermes desktop --build-only` exits nonzero on corrupt exe ─
+# ─── end-to-end: `eir desktop --build-only` exits nonzero on corrupt exe ─
 
 
 def _ns(**kw):
@@ -296,7 +296,7 @@ def _ns(**kw):
         source=False,
         fake_boot=False,
         ignore_existing=False,
-        hermes_root=None,
+        eir_root=None,
         cwd=None,
     )
     defaults.update(kw)
@@ -305,8 +305,8 @@ def _ns(**kw):
 
 @pytest.mark.platforms("windows")
 def test_build_only_fails_when_pack_produces_corrupt_exe(tmp_path, monkeypatch, capsys):
-    """The updater chain's contract: a rebuild whose Hermes.exe cannot launch
-    must exit nonzero (so hermes-setup's retry-once kicks in) and must leave
+    """The updater chain's contract: a rebuild whose Eir.exe cannot launch
+    must exit nonzero (so eir-setup's retry-once kicks in) and must leave
     the previous working build in place instead of installing the corrupt one.
 
     Stage-and-swap (#86443): the pack lands in a staging dir; the integrity
@@ -317,13 +317,13 @@ def test_build_only_fails_when_pack_produces_corrupt_exe(tmp_path, monkeypatch, 
     candidate discovery in ``_desktop_packaged_executable`` and the integrity
     gate itself both short-circuit off Windows.
     """
-    root = tmp_path / "hermes-agent"
+    root = tmp_path / "eir-agent"
     desktop_dir = root / "apps" / "desktop"
     desktop_dir.mkdir(parents=True)
     (desktop_dir / "package.json").write_text("{}", encoding="utf-8")
     monkeypatch.setattr(cli_main, "PROJECT_ROOT", root)
 
-    live_exe = desktop_dir / "release" / "win-unpacked" / "Hermes.exe"
+    live_exe = desktop_dir / "release" / "win-unpacked" / "Eir.exe"
     make_pe(live_exe, PE_AMD64)  # the previous, working app
     live_bytes = live_exe.read_bytes()
 
@@ -338,21 +338,21 @@ def test_build_only_fails_when_pack_produces_corrupt_exe(tmp_path, monkeypatch, 
         out_flag = next((a for a in cmd if str(a).startswith("-c.directories.output=")), None)
         assert out_flag is not None, "pack must be redirected into a staging dir"
         staging = Path(str(out_flag).split("=", 1)[1])
-        make_pe(staging / "win-unpacked" / "Hermes.exe", PE_AMD64, truncate_to=0x300)
+        make_pe(staging / "win-unpacked" / "Eir.exe", PE_AMD64, truncate_to=0x300)
         return subprocess.CompletedProcess(list(cmd), 0)
 
     def pinned_git(name, *, base_env):
         assert name == "git"
         return SimpleNamespace(env={**base_env, "PATH": "C:\\pm-pinned-git\\cmd;" + base_env["PATH"]})
 
-    with patch("hermes_cli.main_desktop.shutil.which", return_value="/usr/bin/pnpm"), \
-         patch("hermes_cli.source_build.source_build_env", return_value={"PATH": "/usr/bin"}), \
-         patch("hermes_cli.source_build.prepare_source_dependencies"), \
+    with patch("eir_cli.main_desktop.shutil.which", return_value="/usr/bin/pnpm"), \
+         patch("eir_cli.source_build.source_build_env", return_value={"PATH": "/usr/bin"}), \
+         patch("eir_cli.source_build.prepare_source_dependencies"), \
          patch("pm.ensure", side_effect=pinned_git), \
-         patch("hermes_cli.main_desktop._desktop_build_needed", return_value=True), \
-         patch("hermes_cli.main_desktop._stop_desktop_processes_locking_build", return_value=[]), \
-         patch("hermes_cli.main_desktop._windows_native_machine", return_value="AMD64"), \
-         patch("hermes_cli.main_desktop.subprocess.run", side_effect=pack_into_staging), \
+         patch("eir_cli.main_desktop._desktop_build_needed", return_value=True), \
+         patch("eir_cli.main_desktop._stop_desktop_processes_locking_build", return_value=[]), \
+         patch("eir_cli.main_desktop._windows_native_machine", return_value="AMD64"), \
+         patch("eir_cli.main_desktop.subprocess.run", side_effect=pack_into_staging), \
          pytest.raises(SystemExit) as exc:
         cli_main.cmd_gui(_ns())
 

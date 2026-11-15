@@ -1,6 +1,6 @@
-"""Git plumbing for ``hermes update``: fork/upstream sync, trampoline-git detection, lockfile/EOL churn cleanup, orphan rescue refs, parked-branch assessment, fetch-failure classification.
+"""Git plumbing for ``eir update``: fork/upstream sync, trampoline-git detection, lockfile/EOL churn cleanup, orphan rescue refs, parked-branch assessment, fetch-failure classification.
 
-Split out of ``update_cmd.py``, which re-imports every name so ``hermes_cli.update_cmd.<name>``
+Split out of ``update_cmd.py``, which re-imports every name so ``eir_cli.update_cmd.<name>``
 still resolves/monkeypatches. Origin helpers are imported lazily per function (no cycle;
 test patches on ``update_cmd`` stay effective).
 """
@@ -15,10 +15,10 @@ from datetime import datetime, timedelta, timezone, UTC
 from pathlib import Path
 from typing import Optional
 
-from hermes_cli._subprocess_compat import NO_LAZY_FETCH_ENV, noninteractive_git_env, windows_hide_flags
-from hermes_cli.update_cmd_common import _record_stop
+from eir_cli._subprocess_compat import NO_LAZY_FETCH_ENV, noninteractive_git_env, windows_hide_flags
+from eir_cli.update_cmd_common import _record_stop
 
-logger = logging.getLogger("hermes_cli.update_cmd")  # log-record parity with the origin module
+logger = logging.getLogger("eir_cli.update_cmd")  # log-record parity with the origin module
 
 _ORPHAN_RESCUE_REFS_TO_KEEP = 10
 _ORPHAN_RESCUE_REF_MAX_AGE_DAYS = 30
@@ -44,7 +44,7 @@ def _git_run(git_cmd, args, cwd=None, *, check=False, env=None):
     Windows ANSI code page (#52649). ``check=True`` raises on non-zero exit. The spawn
     always hides its console window (#117781). ``env`` replaces the child's environment.
     """
-    from hermes_cli.update_custody import run_git
+    from eir_cli.update_custody import run_git
 
     # THE custody policy (R2): stash push / reset --hard keep the update's lock fd, fetch does not.
     return run_git(
@@ -60,7 +60,7 @@ def _git_run(git_cmd, args, cwd=None, *, check=False, env=None):
 
 def _git_stdout(git_cmd, args, cwd, **kw) -> Optional[str]:
     """Stripped stdout of a successful ``_git_run``; ``None`` on non-zero exit or any exception."""
-    from hermes_cli.update_cmd import _git_run
+    from eir_cli.update_cmd import _git_run
     with suppress(Exception):
         result = _git_run(git_cmd, args, cwd, **kw)
         if result.returncode == 0:
@@ -71,7 +71,7 @@ def _git_stdout(git_cmd, args, cwd, **kw) -> Optional[str]:
 def _prune_orphan_rescue_refs(
     git_cmd, cwd, branch, keep=_ORPHAN_RESCUE_REFS_TO_KEEP, max_age_days=_ORPHAN_RESCUE_REF_MAX_AGE_DAYS
 ) -> None:
-    """Expire old rescue refs (``refs/hermes-update-backups/<kind>-<branch>-<ts>-<sha>``).
+    """Expire old rescue refs (``refs/eir-update-backups/<kind>-<branch>-<ts>-<sha>``).
 
     ``<kind>`` is ``orphan`` (no common ancestor), ``diverged`` (local commits on the target
     branch) or ``detached`` (commits made on a detached HEAD the update moved off). All are written
@@ -87,11 +87,11 @@ def _prune_orphan_rescue_refs(
     those objects include a full working-tree snapshot (the autostash orphan commit), which can be multi-GB
     when the tree holds large stray files. See #87694.
     """
-    from hermes_cli.update_cmd_git import _git_run
+    from eir_cli.update_cmd_git import _git_run
     with suppress(OSError):
         stale: set[str] = set()
         for kind in ("orphan", "diverged", "detached"):
-            prefix = f"refs/hermes-update-backups/{kind}-{branch}-"
+            prefix = f"refs/eir-update-backups/{kind}-{branch}-"
             list_result = _git_run(
                 git_cmd, ["for-each-ref", "--format=%(refname)", "--sort=refname", f"{prefix}*"], cwd)
             if list_result.returncode != 0:
@@ -115,11 +115,11 @@ def _park_detached_head(git_cmd, cwd, branch) -> None:
     Such commits belong to no branch: once HEAD moves, only the expiring reflog still reaches them,
     and nothing in the output would name them. When HEAD is detached at a commit no ref contains
     (the autostash's ``refs/stash`` does not count: it is dropped after the update), write
-    ``refs/hermes-update-backups/detached-<branch>-<ts>-<sha12>`` (the divergence rescue refs'
+    ``refs/eir-update-backups/detached-<branch>-<ts>-<sha12>`` (the divergence rescue refs'
     scheme and expiry) and name it. When that write fails, refuse (``sys.exit(1)``) rather than
     orphan the work. Attached HEADs and already-reachable commits are left alone.
     """
-    from hermes_cli.update_cmd import _git_run
+    from eir_cli.update_cmd import _git_run
     if _git_run(git_cmd, ["symbolic-ref", "-q", "HEAD"], cwd).returncode == 0:
         return  # on a branch
     head = _git_run(git_cmd, ["rev-parse", "--verify", "--quiet", "HEAD^{commit}"], cwd)
@@ -131,7 +131,7 @@ def _park_detached_head(git_cmd, cwd, branch) -> None:
     if contains.returncode == 0 and holders:
         return  # already reachable from a branch, tag, remote or backup ref
     stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
-    rescue_ref = f"refs/hermes-update-backups/detached-{branch}-{stamp}-{sha[:12]}"
+    rescue_ref = f"refs/eir-update-backups/detached-{branch}-{stamp}-{sha[:12]}"
     if _git_run(git_cmd, ["update-ref", rescue_ref, sha], cwd).returncode != 0:
         print(f"✗ HEAD is detached at {sha[:12]}, which no branch or tag contains, and backing it up "
               f"to {rescue_ref} failed.")
@@ -151,8 +151,8 @@ def _branch_head_label(git_cmd=None, cwd=None) -> str | None:
     """``"<branch> @ <short-sha>"`` for the checkout (``detached`` when not on a branch), or None. Never raises.
 
     Appended to summary lines so a checkout parked on a stale branch is visible."""
-    from hermes_cli.update_cmd import _m
-    from hermes_cli.update_custody import run_git
+    from eir_cli.update_cmd import _m
+    from eir_cli.update_custody import run_git
     try:
         cmd = list(git_cmd) if git_cmd else ["git"]
         root = cwd if cwd is not None else _m().PROJECT_ROOT
@@ -185,9 +185,9 @@ def _assess_parked_branch_switch(git_cmd: list[str], cwd: Path, current_branch: 
     - (False, "disabled"|"dirty"|"unverifiable") — caller must NOT touch the branch. Dirty is the
       genuinely unsafe case: uncommitted work riding an autostash across branches.
     A config read failure must not disable the safety checks: fall through with the default."""
-    from hermes_cli.update_cmd_git import _git_run
+    from eir_cli.update_cmd_git import _git_run
     try:
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
         _update_cfg = (load_config() or {}).get("updates", {})
         if isinstance(_update_cfg, dict) and not bool(_update_cfg.get("auto_switch_parked_branch", True)):
             return False, "disabled"
@@ -251,7 +251,7 @@ def _print_parked_branch_skip_warning(git_cmd: list[str], cwd: Path, current_bra
     print(
         f"\n  To resolve, inspect the branch and switch back yourself:\n"
         f"    git -C {cwd} status\n"
-        f"    git -C {cwd} checkout {target_branch} && hermes update\n"
+        f"    git -C {cwd} checkout {target_branch} && eir update\n"
         f"  (commit or stash your work on the branch first if you want to keep it)\n{_BAR}"
     )
 
@@ -273,9 +273,9 @@ def _print_parked_branch_kept_notice(current_branch: str, target_branch: str, un
 
 OFFICIAL_REPO_URLS = {
     "https://github.com/NousResearch/hermes-agent.git",
-    "git@github.com:NousResearch/hermes-agent.git",
+    "git@github.com:NousResearch/eir-agent.git",
     "https://github.com/NousResearch/hermes-agent",
-    "git@github.com:NousResearch/hermes-agent",
+    "git@github.com:NousResearch/eir-agent",
 }
 OFFICIAL_REPO_URL = "https://github.com/NousResearch/hermes-agent.git"
 SKIP_UPSTREAM_PROMPT_FILE = ".skip_upstream_prompt"
@@ -319,15 +319,15 @@ def _count_commits_between(git_cmd: list[str], cwd: Path, base: str, head: str) 
 
 def _should_skip_upstream_prompt() -> bool:
     """Check if user previously declined to add upstream."""
-    from hermes_constants import get_hermes_home
-    return (get_hermes_home() / SKIP_UPSTREAM_PROMPT_FILE).exists()
+    from eir_constants import get_eir_home
+    return (get_eir_home() / SKIP_UPSTREAM_PROMPT_FILE).exists()
 
 
 def _mark_skip_upstream_prompt():
     """Create marker file to skip future upstream prompts."""
     with suppress(Exception):
-        from hermes_constants import get_hermes_home
-        (get_hermes_home() / SKIP_UPSTREAM_PROMPT_FILE).touch()
+        from eir_constants import get_eir_home
+        (get_eir_home() / SKIP_UPSTREAM_PROMPT_FILE).touch()
 
 
 def _sync_fork_with_upstream(git_cmd: list[str], cwd: Path) -> bool:
@@ -339,10 +339,10 @@ def _offer_upstream_remote(git_cmd: list[str], cwd: Path, *, assume_yes: bool, i
     """Prompt to add ``upstream`` and add it; False when the user declined, the run is non-interactive, or add failed.
 
     ``--yes`` means "don't block", not "mutate my remotes", so a non-interactive skip is NOT persisted."""
-    from hermes_cli.update_cmd import _add_upstream_remote, _mark_skip_upstream_prompt
+    from eir_cli.update_cmd import _add_upstream_remote, _mark_skip_upstream_prompt
     print(
-        "\nℹ Your fork is not tracking the official Hermes repository.\n"
-        "  This means you may miss updates from NousResearch/hermes-agent.\n"
+        "\nℹ Your fork is not tracking the official Eir repository.\n"
+        "  This means you may miss updates from NousResearch/eir-agent.\n"
     )
     if assume_yes or (input_fn is None and not (sys.stdin.isatty() and sys.stdout.isatty())):
         print(f"  Skipping upstream setup (non-interactive run).\n  Add it later with: {_UPSTREAM_ADD_CMD}")
@@ -389,9 +389,9 @@ def _sync_with_upstream_if_needed(git_cmd: list[str], cwd: Path, *, assume_yes: 
 
     See #97052.
     """
-    from hermes_cli.update_cmd import _count_commits_between, _has_upstream_remote, _no_prompt_git_kwargs, _should_skip_upstream_prompt
-    from hermes_cli.update_cmd_check import tracking_refspec
-    from hermes_cli.update_custody import run_git
+    from eir_cli.update_cmd import _count_commits_between, _has_upstream_remote, _no_prompt_git_kwargs, _should_skip_upstream_prompt
+    from eir_cli.update_cmd_check import tracking_refspec
+    from eir_cli.update_custody import run_git
     if not _has_upstream_remote(git_cmd, cwd) and (
         _should_skip_upstream_prompt() or not _offer_upstream_remote(git_cmd, cwd, assume_yes=assume_yes, input_fn=input_fn)
     ):
@@ -423,8 +423,8 @@ def _sync_with_upstream_if_needed(git_cmd: list[str], cwd: Path, *, assume_yes: 
     print(f"\n→ Fork is {upstream_ahead} commit(s) behind upstream\n→ Pulling from upstream...")
     # A tree move like the pull itself: the marker and the owed tail are armed before git writes,
     # and the just-fetched ref is merged (a second `git pull` fetch could move past the marker's target).
-    from hermes_cli import update_cmd_commit as _commit
-    from hermes_cli._early_recovery import interrupted_pull_marker, is_object_id
+    from eir_cli import update_cmd_commit as _commit
+    from eir_cli._early_recovery import interrupted_pull_marker, is_object_id
     pre = _git_stdout(git_cmd, ["rev-parse", "HEAD"], cwd)
     if not is_object_id(pre):
         # The marker's ``pre`` is what a killed move is restored to: never arm ``pre=``.
@@ -433,7 +433,7 @@ def _sync_with_upstream_if_needed(git_cmd: list[str], cwd: Path, *, assume_yes: 
     target = upstream  # the counted commit is the marker's target and the merge's (m2)
     # Judged BEFORE the move, like the origin target's preflight: the marker goes on git's exit 0,
     # so a broken target must never land on the strength of the caller's later guard (review G1).
-    from hermes_cli.update_cmd import _UPDATE_CRITICAL_FILES
+    from eir_cli.update_cmd import _UPDATE_CRITICAL_FILES
     if broken := _commit.target_syntax_error(git_cmd, cwd, target, _UPDATE_CRITICAL_FILES):
         raise UpstreamTargetBroken(target, *broken)
     refused = _commit.arm_commit_point(git_cmd, cwd, _commit.debt_sha_for_move(pre, target), pre=pre,
@@ -507,7 +507,7 @@ def _damaged_checkout_message(root: Path) -> str:
                   f" -InstallDir {quoted}")
     else:
         repair = f"curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --dir {shlex.quote(str(root))}"
-    return (f"✗ This Hermes checkout's git data is damaged (git no longer recognizes {root / '.git'}),"
+    return (f"✗ This Eir checkout's git data is damaged (git no longer recognizes {root / '.git'}),"
             " so it cannot be updated in place.\n"
             "  Run the installer again to repair it; it moves the damaged checkout aside and keeps"
             f" your config and chats:\n    {repair}")
@@ -591,7 +591,7 @@ def _print_fetch_failure(stderr: str, *, git_cmd=None, root: Optional[Path] = No
 def _probe_fork_bomb(argv: list) -> Optional[bool]:
     """Run ``<argv> --version``; True/False = guard message seen/absent, None = probe itself failed."""
     try:
-        from hermes_cli.update_custody import run_git
+        from eir_cli.update_custody import run_git
 
         result = run_git(argv, ["--version"], timeout=15, **_GIT_TEXT_KW)
     except Exception:
@@ -616,14 +616,14 @@ def _portable_git_candidates() -> list:
     """PortableGit candidates: legacy ``<root>/git`` trees (shared root first, then profile home), then
     the pm store entries ``<store>/git-<version>-<target>/`` newest first, each under every MSYS2 prefix.
 
-    Pre-pm trees lived under the SHARED root (``<root>/git/...``), not the profile-scoped HERMES_HOME
-    (``<root>/profiles/<name>``), so a profile-scoped ``hermes update`` must look there (monerostar
+    Pre-pm trees lived under the SHARED root (``<root>/git/...``), not the profile-scoped EIR_HOME
+    (``<root>/profiles/<name>``), so a profile-scoped ``eir update`` must look there (monerostar
     review, #87876). install.ps1 (``Get-PinnedGit``) and pm stage the managed tree in the store.
     """
-    from hermes_constants import get_default_hermes_root, get_hermes_home
+    from eir_constants import get_default_eir_root, get_eir_home
     trees = []
     with suppress(Exception):
-        trees += [root / "git" for root in (get_default_hermes_root(), Path(get_hermes_home()))]
+        trees += [root / "git" for root in (get_default_eir_root(), Path(get_eir_home()))]
     with suppress(Exception):  # install.ps1 and pm stage it at <store>/git-<version>-<target>/
         import re
         from pm.paths import store_root
@@ -660,7 +660,7 @@ def _ensure_non_trampoline_git(git_cmd: list) -> list:
     """Swap a broken Git-for-Windows trampoline for a real git binary so fetch/pull/checkout keep working;
     if none is found leave the command untouched (fetch-failure handler falls back to ZIP). No-op off
     Windows and when git is healthy."""
-    from hermes_cli.update_cmd import _locate_real_git
+    from eir_cli.update_cmd import _locate_real_git
     if sys.platform != "win32" or not _git_is_trampoline(git_cmd):
         return git_cmd
     real_git = _locate_real_git()
@@ -682,7 +682,7 @@ def _discard_lockfile_churn(git_cmd, repo_root, *, checkout_move=None):
     kept when its sibling ``package.json`` is dirty: reverting it alone desyncs spec and lock and every
     later ``npm ci`` fails (#112378). ``pnpm-lock.yaml`` is never touched: pnpm's frozen installs do not
     rewrite it, so a change there is the user's own. Best-effort."""
-    from hermes_cli.update_cmd_git import _git_run
+    from eir_cli.update_cmd_git import _git_run
     with suppress(Exception):
         diff = _git_run(git_cmd, ["diff", "--name-only"], repo_root)
         if diff.returncode != 0:
@@ -702,18 +702,18 @@ def _normalize_managed_eol(git_cmd, repo_root, *, checkout_move=None):
     """Take a managed checkout off ``core.autocrlf=true`` without leaving it dirty.
 
     Git for Windows sets ``autocrlf=true`` system-wide, turning LF files CRLF and breaking ``git checkout``
-    on update; install.ps1 pins ``false`` but older checkouts never got it and only ``hermes update`` can
+    on update; install.ps1 pins ``false`` but older checkouts never got it and only ``eir update`` can
     fix them. Pin and cleanup are one operation: under ``autocrlf=true`` a CRLF tree reads clean, so pinning
     alone would expose every file as modified (whole-tree autostash). Pin only after the tree verifies clean
     under it; a checkout we can't fully normalize is left as-is. Only ``true`` rewrites LF->CRLF
     (unset/false/input leave the tree alone). Best-effort.
 
     Checkouts created before that landed never got the pin and cannot receive it — the bootstrap installer
-    reuses its build-pinned ``install.ps1`` forever — so ``hermes update``, which ships with the checkout
+    reuses its build-pinned ``install.ps1`` forever — so ``eir update``, which ships with the checkout
     itself, is the only path left that can fix them. See #67730.
     """
-    from hermes_cli.update_cmd_git import _git_run
-    from hermes_cli.update_custody import run_git
+    from eir_cli.update_cmd_git import _git_run
+    from eir_cli.update_custody import run_git
     # -c, not config: evaluate the tree as it WOULD look pinned, persisting nothing.
     probe = git_cmd + ["-c", "core.autocrlf=false"]
 

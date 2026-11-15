@@ -1,4 +1,4 @@
-"""Slash-command handlers for the interactive CLI (``HermesCLI`` inherits ``CLICommandsMixin``).
+"""Slash-command handlers for the interactive CLI (``EirCLI`` inherits ``CLICommandsMixin``).
 
 cli.py-internal symbols (``_cprint``/``_ACCENT``/``save_config_value``…) are imported LAZILY inside
 the helpers/handlers via ``from cli import ...`` — cli.py imports this module (cycle otherwise).
@@ -26,21 +26,21 @@ from rich import box as rich_box
 from rich.markup import escape as _escape
 from rich.panel import Panel
 
-from hermes_constants import display_hermes_home
-from hermes_state_ids import new_session_id as mint_session_id
+from eir_constants import display_eir_home
+from eir_state_ids import new_session_id as mint_session_id
 from agent.i18n import t
 from agent.message_metadata import message_identity
 from agent.turn_context import extract_api_content_sidecar
-from hermes_cli.cli_agent_setup_mixin import _gateway_open, _retire_agent
-from hermes_cli.cli_commands_session_tools import (
+from eir_cli.cli_agent_setup_mixin import _gateway_open, _retire_agent
+from eir_cli.cli_commands_session_tools import (
     CLICommandsSessionToolsMixin, _TTYBuf, _accent, _accent_line, _command_arg, _cp, _dim,
     _dim_line, _gt, _lines, _pr, _probe, _rollback_kept, _save, _say_block, _shlex_args, _t, _tn)
-from hermes_cli.cli_session_switch import (
+from eir_cli.cli_session_switch import (
     _end_current_session, _sync_agent_to_session)
-from hermes_cli.browser_connect import (
+from eir_cli.browser_connect import (
     DEFAULT_BROWSER_CDP_URL, discover_local_cdp_url, find_free_debug_port, is_browser_debug_ready,
     launch_chrome_debug, local_port_in_use, manual_chrome_debug_command)
-from hermes_cli.cli_browser_gateway import _normalize_cdp_url
+from eir_cli.cli_browser_gateway import _normalize_cdp_url
 
 
 # Output helpers. Slash-command text is user-visible: every literal below is load-bearing.
@@ -85,7 +85,7 @@ def _ellipsize(text: str, limit: int) -> str:
 _ON_WORDS = {"on", "enable", "true", "1"}
 _OFF_WORDS = {"off", "disable", "false", "0"}
 
-# /busy modes; what Enter does while Hermes is working lives in the catalog as
+# /busy modes; what Enter does while Eir is working lives in the catalog as
 # ``cli.commands.busy.short_<mode>`` (status line) / ``long_<mode>`` (post-set explanation).
 _BUSY_MODES = ("queue", "steer", "interrupt")
 
@@ -104,7 +104,7 @@ _REASONING_TOGGLES = {
     **dict.fromkeys(("clamp", "collapse", "short"), ("reasoning_full", False, "headline_clamped", None)),
 }
 
-# /bg AIAgent provider-routing kwargs -> HermesCLI attribute carrying the value.
+# /bg AIAgent provider-routing kwargs -> EirCLI attribute carrying the value.
 _BG_PROVIDER_KWARGS = {
     "providers_allowed": "_providers_only", "providers_ignored": "_providers_ignore",
     "providers_order": "_providers_order", "provider_sort": "_provider_sort",
@@ -177,7 +177,7 @@ def _cron_api(**kwargs) -> dict:
     return json.loads(cronjob_tool(**kwargs))
 
 
-# Session-switch plumbing (end, repoint) lives in ``hermes_cli/cli_session_switch.py``.
+# Session-switch plumbing (end, repoint) lives in ``eir_cli/cli_session_switch.py``.
 
 
 def _without_session_meta(messages) -> list:
@@ -185,7 +185,7 @@ def _without_session_meta(messages) -> list:
 
 
 def _db_unavailable_line() -> str:
-    from hermes_state import format_session_db_unavailable
+    from eir_state import format_session_db_unavailable
     return f"  {format_session_db_unavailable(details=True)}"
 
 
@@ -206,13 +206,13 @@ def _print_side_result_panel(cli, *, header_lines, body, title_suffix, empty_not
     if not body:
         return _cp(empty_note) if console is None else console.print(empty_note)
     try:
-        from hermes_cli.skin_engine import get_active_skin
+        from eir_cli.skin_engine import get_active_skin
         _skin = get_active_skin()
-        label = _skin.get_branding("response_label", "☤ Hermes")
+        label = _skin.get_branding("response_label", "☤ Eir")
         _resp_color = _maybe_remap_for_light_mode(_skin.get_color("response_border", "#CD7F32"))
         _resp_text = _maybe_remap_for_light_mode(_skin.get_color("banner_text", "#FFF8DC"))
     except Exception:
-        label, _resp_color, _resp_text = "☤ Hermes", "#CD7F32", "#FFF8DC"
+        label, _resp_color, _resp_text = "☤ Eir", "#CD7F32", "#FFF8DC"
     rich_console.print(Panel(
         _render_final_assistant_content(body, mode=cli.final_response_markdown),
         title=f"[{_resp_color} bold]{label} {title_suffix}[/]", title_align="left",
@@ -319,7 +319,7 @@ def _browser_connect(cli, cdp_url: str) -> None:
             "Your browser tools (browser_exec, browser_cdp) now "
             "control that CDP browser. The command itself is a signal that using browser tools for "
             "their current browser-related request is expected; do not wait for separate permission "
-            "just because CDP is connected. This is typically a Hermes-managed isolated debug "
+            "just because CDP is connected. This is typically a Eir-managed isolated debug "
             "profile, not the user's main everyday browser. It is still user-visible and may contain "
             "pages, logged-in sessions, or cookies in that debug profile, so avoid destructive actions, "
             "closing tabs, or navigating away unless the user's task calls for it.]")
@@ -407,10 +407,10 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
         """Handle /rollback [diff] <N> [<file>|--all] — list, diff, or restore checkpoints.
         A restore also undoes the last chat turn; ``--all`` overwrites user hand-edits too."""
         from tools.checkpoint_manager import format_checkpoint_list
-        from hermes_cli.gateway_side import connection_for
+        from eir_cli.gateway_side import connection_for
         if (connection := connection_for(self)) is not None:
             # Checkpoints are taken by the gateway's tools: list/diff/restore are the owner's.
-            from hermes_cli.gateway_rollback import rollback
+            from eir_cli.gateway_rollback import rollback
             return rollback(self, connection, command)
         mgr = self._checkpoint_manager(_lines(_t("rollback.not_enabled")))
         if mgr is None:
@@ -490,7 +490,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
     # ---- /diff ----------------------------------------------------------------------------
     def _handle_diff_command(self, command: str):
         """Handle /diff [working|staged|all|session] [--stat] [<path>...] — git changes in the
-        cwd; ``session`` is everything Hermes changed since the checkpoint baseline."""
+        cwd; ``session`` is everything Eir changed since the checkpoint baseline."""
         stat_only = False
         mode = "working"
         paths: list[str] = []
@@ -540,7 +540,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
             return
         if reason := mgr.unsupported_backend_reason():  # host baseline is not this session's tree
             return print(f"  {reason}")
-        from hermes_cli.cli_commands_session_tools import print_session_diff
+        from eir_cli.cli_commands_session_tools import print_session_diff
         print_session_diff(self, mgr.session_diff(cwd), stat_only)
 
     def _print_diff_text(self, text: str) -> None:
@@ -571,11 +571,11 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
         handler(parts)
 
     def _snapshot_list(self, parts) -> None:
-        from hermes_cli.backup import list_quick_snapshots
+        from eir_cli.backup import list_quick_snapshots
         snaps = list_quick_snapshots()
         if not snaps:
             return _pr(f"  {_t('snapshot.none_yet')}", f"  {_t('snapshot.create_hint')}")
-        print(f"  {_t('snapshot.list_header', dir=display_hermes_home())}\n")
+        print(f"  {_t('snapshot.list_header', dir=display_eir_home())}\n")
         # Column labels are translated values re-padded here (never padded in the catalog).
         _pr(f"  {_t('snapshot.col_num'):>3}  {_t('snapshot.col_id'):<35} {_t('snapshot.col_files'):>5} "
             f"{_t('snapshot.col_size'):>10} {_t('snapshot.col_label')}",
@@ -588,17 +588,17 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
             print(f"  {i:3}  {s['id']:<35} {s.get('file_count', 0):>5} {size_str:>10} {label}")
 
     def _snapshot_create(self, parts) -> None:
-        from hermes_cli.backup import create_quick_snapshot
+        from eir_cli.backup import create_quick_snapshot
         snap_id = create_quick_snapshot(label=" ".join(parts[2:]) if len(parts) > 2 else None)
         print(f"  {_t('snapshot.created', snapshot_id=snap_id)}" if snap_id
               else f"  {_t('snapshot.nothing_to_snapshot')}")
 
     def _snapshot_restore(self, parts) -> None:
-        from hermes_cli.cli_snapshot import restore_snapshot_command
+        from eir_cli.cli_snapshot import restore_snapshot_command
         restore_snapshot_command(self, parts)
 
     def _snapshot_prune(self, parts) -> None:
-        from hermes_cli.backup import prune_quick_snapshots
+        from eir_cli.backup import prune_quick_snapshots
         keep = 20
         if len(parts) > 2:
             # isdecimal() also rejects "-1": a negative keep would slice away the
@@ -612,7 +612,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
     # ---- /export, /import -----------------------------------------------------------------
     def _handle_export_command(self, command: str):
         """Handle /export [profile] [-o path] — export a profile to a shareable .tar.gz archive."""
-        from hermes_cli.profiles import export_profile, get_active_profile_name, get_profile_export_path
+        from eir_cli.profiles import export_profile, get_active_profile_name, get_profile_export_path
         parts, output, ok = _take_flag(command.split()[1:], "-o")
         if not ok:
             return print(f"  {_t('export.usage')}")
@@ -626,7 +626,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
     def _handle_import_command(self, command: str):
         """Handle /import <archive.tar.gz> [--name <name>] — import a shared profile archive as a
         new profile."""
-        from hermes_cli.profiles import check_alias_collision, create_wrapper_script, import_profile
+        from eir_cli.profiles import check_alias_collision, create_wrapper_script, import_profile
         parts, name, ok = _take_flag(command.split()[1:], "--name")
         if not ok or not parts:
             return print(f"  {_t('import.usage')}")
@@ -700,7 +700,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
             return _cp(f"  {_t('shared.agent_busy', command='/handoff')}")
         if not self._session_db:
             with suppress(Exception):
-                from hermes_state_registry import acquire
+                from eir_state_registry import acquire
                 self._session_db = acquire()
         if not self._session_db:
             return _cp(_db_unavailable_line())
@@ -823,7 +823,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
         # (#68779): the resumed conversation would be a writer the Kanban board cannot
         # observe, and unblocking the card could dispatch a competing worker. Keep the
         # CURRENT session instead of switching.
-        from hermes_cli.kanban_resume_guard import kanban_resume_refusal
+        from eir_cli.kanban_resume_guard import kanban_resume_refusal
         if (kanban_refusal := kanban_resume_refusal(self._session_db, target_id)):
             return _cp(f"  {kanban_refusal}")
         # One session.resume, before anything changes: it subscribes the target and names its receipt
@@ -860,7 +860,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
         # Same contract as startup --resume: retarget the tool cwd, restore the persisted YOLO
         # bypass (approval session key changed) and the model/provider (else config default).
         # Retarget the process + tool cwd to where the session was started, so a mid-chat /resume (and
-        # /sessions <id>, which delegates here) lands in the same directory as a startup `hermes
+        # /sessions <id>, which delegates here) lands in the same directory as a startup `eir
         # -c`/`--resume`. The startup resume paths already call this; without it, the terminal/code-exec
         # tools and relative-path resolution keep operating in the wrong repo. Idempotent and a no-op when
         # the session recorded no cwd. See #38562.
@@ -878,7 +878,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
                 return _cp(*_lines(_gt("resume.out_of_range", index=index)))
             target_id = sessions[index - 1]["id"]
         else:
-            from hermes_cli.main import _resolve_session_by_name_or_id
+            from eir_cli.main import _resolve_session_by_name_or_id
             target_id = _resolve_session_by_name_or_id(target) or target
         session_meta = self._session_db.get_session(target_id)
         if not session_meta:
@@ -940,7 +940,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
                 with suppress(Exception):
                     parent_prompt = (self._session_db.get_session(parent_session_id) or {}).get("system_prompt")
             self._session_db.create_session(
-                session_id=new_session_id, source=os.environ.get("HERMES_SESSION_SOURCE", "cli"),
+                session_id=new_session_id, source=os.environ.get("EIR_SESSION_SOURCE", "cli"),
                 model=self.model, parent_session_id=parent_session_id, system_prompt=parent_prompt or None,
                 model_config=with_session_yolo({"max_iterations": self.max_turns, "reasoning_config":
                                                 self.reasoning_config, "_branched_from": parent_session_id}, parent_session_id))
@@ -973,7 +973,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
     # ---- /worktree ------------------------------------------------------------------------
     def _handle_worktree_command(self, cmd_original: str) -> None:
         """Handle /worktree [new [name]|list|prune [--dry-run]] — isolated git worktrees.
-        ``new`` moves this session into the tree (as ``hermes -w``: kept on exit only with
+        ``new`` moves this session into the tree (as ``eir -w``: kept on exit only with
         unpushed commits); ``prune`` never deletes tracked changes, unique commits, or in-use trees."""
         import cli as _cli
         parts = cmd_original.split(None, 2)
@@ -1003,7 +1003,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
 
     def _worktree_prune(self, repo_root: str, rest: str) -> None:
         import cli as _cli
-        from hermes_cli import worktree_gc
+        from eir_cli import worktree_gc
         rest = rest.lower()
         dry_run = "--dry-run" in rest or "-n" in rest.split()
         active = _cli._active_worktree
@@ -1037,7 +1037,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
 
     def _worktree_new(self, repo_root: str, rest: str) -> None:
         import cli as _cli
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
         try:
             sync_base = bool(load_config().get("worktree_sync", True))
         except Exception:
@@ -1045,10 +1045,10 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
         wt_info = _cli._setup_worktree(repo_root=repo_root, sync_base=sync_base, name=rest or None)
         if not wt_info:
             return  # _setup_worktree already printed the failure
-        # Same keep-if-unpushed cleanup as `hermes -w`. Only one tree is "active" per process;
+        # Same keep-if-unpushed cleanup as `eir -w`. Only one tree is "active" per process;
         # an earlier one keeps its own atexit registration (explicit info arg).
         atexit.register(_cli._cleanup_worktree, wt_info)
-        from hermes_cli.cli_commands_worktree import enter_new_worktree
+        from eir_cli.cli_commands_worktree import enter_new_worktree
         if not enter_new_worktree(self, wt_info):
             return
         _cli._active_worktree = wt_info
@@ -1058,14 +1058,14 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
     # ---- /personality, /pet, /hatch -------------------------------------------------------
     def _handle_personality_command(self, cmd: str):
         """Handle /personality [name] — list or set a predefined personality. All resolution and
-        persistence goes through hermes_cli.personality, the single owner of personality state."""
-        from hermes_cli.personality import (
+        persistence goes through eir_cli.personality, the single owner of personality state."""
+        from eir_cli.personality import (
             describe_personality, normalize_personality_name, persist_personality, prompt_text,
             resolve_personality)
         personality_name = _command_arg(cmd)
         if not personality_name:
             try:
-                from hermes_cli.config import read_raw_config
+                from eir_cli.config import read_raw_config
                 current = normalize_personality_name(
                     (read_raw_config().get("display") or {}).get("personality", ""))
             except Exception:
@@ -1088,7 +1088,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
         if not name:
             # Neutral reset — fall back to the user-owned manual prompt.
             try:
-                from hermes_cli.config import cfg_get, read_raw_config
+                from eir_cli.config import cfg_get, read_raw_config
                 self.system_prompt = prompt_text(
                     cfg_get(read_raw_config(), "agent", "system_prompt", default=""))
             except Exception:
@@ -1106,7 +1106,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
         ``display.pet.*`` to config; pet surfaces pick it up on their next poll."""
         from agent.pet import store
         from agent.pet.manifest import ManifestError
-        from hermes_cli.pets import (
+        from eir_cli.pets import (
             _set_active, _set_enabled, print_pet_gallery, set_pet_scale, toggle_pet_display)
         arg = _command_arg(cmd)
         low = arg.lower()
@@ -1141,7 +1141,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
         from agent.pet import store
         from agent.pet.generate import orchestrate
         from agent.pet.generate.imagegen import GenerationError
-        from hermes_cli.pets import _set_active
+        from eir_cli.pets import _set_active
         concept = _command_arg(cmd)
         if not concept:
             # prompt_toolkit owns stdin on this daemon thread — raw input() never renders and eats
@@ -1188,8 +1188,8 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
     # ---- /cron ----------------------------------------------------------------------------
     def _handle_cron_command(self, cmd: str):
         """Handle the /cron command to manage scheduled tasks. Only without a gateway session: on the shared
-        gateway every /cron form runs there (hermes_cli/gateway_setting_commands.py)."""
-        from hermes_cli.cli_cron_lines import cron_command_lines
+        gateway every /cron form runs there (eir_cli/gateway_setting_commands.py)."""
+        from eir_cli.cli_cron_lines import cron_command_lines
         _pr(*cron_command_lines(_command_arg(cmd)))
 
     # ---- delegating handlers: /suggestions, /blueprint, /curator, /kanban, /skills, /memory --
@@ -1198,7 +1198,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
         CLI origin is the local platform so an accepted job's "origin" delivery resolves to a home channel."""
         args = " ".join(_shlex_args(cmd))
         try:
-            from hermes_cli.suggestions_cmd import handle_suggestions_command
+            from eir_cli.suggestions_cmd import handle_suggestions_command
             output = handle_suggestions_command(args)
         except Exception as e:
             output = _t("suggestions.failed", error=e)
@@ -1210,7 +1210,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
         (``agent_seed``, run as the next turn); ``<name> slot=val …`` creates the job directly."""
         args = " ".join(shlex.quote(part) for part in _shlex_args(cmd))
         try:
-            from hermes_cli.blueprint_cmd import handle_blueprint_command
+            from eir_cli.blueprint_cmd import handle_blueprint_command
             result = handle_blueprint_command(args)
         except Exception as e:
             self._console_print(_t("blueprint.failed", error=e))
@@ -1223,11 +1223,11 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
             self._pending_agent_seed = seed
 
     def _handle_curator_command(self, cmd: str):
-        """Handle /curator — delegates to hermes_cli.curator so the CLI and the `hermes curator`
+        """Handle /curator — delegates to eir_cli.curator so the CLI and the `eir curator`
         subcommand share the same handler set."""
         tokens = shlex.split(cmd)[1:] if cmd else []
         try:
-            from hermes_cli.curator import cli_main
+            from eir_cli.curator import cli_main
             cli_main(tokens or ["status"])
         except SystemExit:
             pass  # argparse exits on --help/errors; don't kill the interactive session
@@ -1236,7 +1236,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
 
     def _handle_kanban_command(self, cmd: str):
         """Handle /kanban — strip the leading ``/kanban`` and hand the rest to ``kanban.run_slash``."""
-        from hermes_cli.kanban import run_slash
+        from eir_cli.kanban import run_slash
         rest = cmd.strip().lstrip("/")
         if rest.startswith("kanban"):
             rest = rest[len("kanban"):].lstrip()
@@ -1248,25 +1248,25 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
             print(output)
 
     def _handle_skills_command(self, cmd: str):
-        """Handle /skills slash command — delegates to hermes_cli.skills_hub, after intercepting the
+        """Handle /skills slash command — delegates to eir_cli.skills_hub, after intercepting the
         write-approval review subcommands (pending/approve/reject/diff/mode)."""
         from cli import ChatConsole
         args = cmd.strip().split()[1:]
         review_words = {"pending", "approve", "apply", "reject", "deny", "drop", "diff", "approval", "mode"}
         if args and args[0].lower() in review_words:
-            from hermes_cli.write_approval_commands import handle_pending_subcommand
+            from eir_cli.write_approval_commands import handle_pending_subcommand
             from tools import write_approval as wa
             out = handle_pending_subcommand(
                 wa.SKILLS, args, set_mode_fn=lambda enabled: self._save_write_approval("skills", enabled),
             )
             if out is not None:
                 return print(out)
-        from hermes_cli.gateway_tools import handle_skills_slash  # + the gateway's rescan
+        from eir_cli.gateway_tools import handle_skills_slash  # + the gateway's rescan
         handle_skills_slash(cmd, ChatConsole(), cli=self)
 
     def _handle_memory_command(self, cmd: str):
         """Handle /memory slash command — pending review + approval-gate toggle."""
-        from hermes_cli.write_approval_commands import handle_pending_subcommand
+        from eir_cli.write_approval_commands import handle_pending_subcommand
         from tools import write_approval as wa
         args = cmd.strip().split()[1:]
         store = getattr(self.agent, "_memory_store", None) if getattr(self, "agent", None) else None
@@ -1310,7 +1310,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
 
     def _handle_plan_command(self, cmd: str):
         """Handle /plan — write a markdown implementation plan, no execution. The live agent
-        inspects the workspace read-only and saves the plan under ``.hermes/plans/``."""
+        inspects the workspace read-only and saves the plan under ``.eir/plans/``."""
         from agent.plan_prompt import build_plan_prompt
         task = _command_arg(cmd)  # optional — empty infers the task from conversation context
         self._queue_prompt_turn(build_plan_prompt(task), "/plan", _t("plan.planning", task=_ellipsize(task, 80)) if task else _t("plan.from_conversation"))
@@ -1318,7 +1318,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
     def _handle_init_command(self, cmd: str):
         """Handle /init — generate or update AGENTS.md from a project scan performed by the
         live agent with its own read-only tools."""
-        from hermes_cli.init_command import build_init_prompt_for_cwd
+        from eir_cli.init_command import build_init_prompt_for_cwd
         # session_key="" targets the single-session CLI's "default" cwd record, which tracks
         # `cd` and workspace switches, so /init follows the directory the user works in.
         msg = build_init_prompt_for_cwd(extra=_command_arg(cmd), session_key="")  # optional user emphasis
@@ -1334,7 +1334,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
         self._background_task_counter += 1
         task_num = self._background_task_counter
         preview = _ellipsize(prompt, 60)
-        from hermes_cli import gateway_side
+        from eir_cli import gateway_side
         connection = gateway_side.connection_for(self)
         if connection is not None:
             # The gateway runs the side agent on this session's route (prompt.background); this
@@ -1458,7 +1458,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
 
     def _handle_login_command(self, cmd_original: str) -> None:
         """Start an in-chat sign-in without blocking the input loop while approval is pending."""
-        from hermes_cli import anon_auth
+        from eir_cli import anon_auth
         # Pin the output target now. Under the live TUI ``self.console`` writes straight to
         # patch_stdout's StdoutProxy, which mangles Rich's escapes — there ``None`` keeps the
         # panel on the ``_cprint`` path. Only the slash worker (``_app`` is None) swaps the console.
@@ -1506,7 +1506,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
         question = _command_arg(cmd)
         if not question:
             return _cp(*_lines(_t("btw.usage")))
-        from hermes_cli import gateway_side
+        from eir_cli import gateway_side
         connection = gateway_side.connection_for(self)
         if connection is not None:
             # The gateway answers from its own copy of the conversation (prompt.btw): the live
@@ -1548,10 +1548,10 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
 
     # ---- /bundles, /browser ---------------------------------------------------------------
     def _handle_bundles_command(self, cmd: str) -> None:
-        """In-session ``/bundles`` — show installed skill bundles (``hermes bundles list`` rendered
+        """In-session ``/bundles`` — show installed skill bundles (``eir bundles list`` rendered
         inside the running CLI). Bundles are loaded via ``/<bundle-name>``."""
         from cli import ChatConsole, _BOLD, _RST, _accent_hex
-        from hermes_cli.slash_exec import CommandContext, execute_command
+        from eir_cli.slash_exec import CommandContext, execute_command
         reply = execute_command("bundles", CommandContext(surface="cli"))
         if "error" in reply.data:
             return _cp(f"\033[1;31m{_t('bundles.unavailable', error=reply.data['error'])}{_RST}")
@@ -1583,9 +1583,9 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
                 _t("browser.usage"), "",
                 *(f"   {_t(f'browser.usage_{sub}')}" for sub in ("connect", "disconnect", "status")))
             return
-        from hermes_cli.gateway_side import connection_for
+        from eir_cli.gateway_side import connection_for
         if (connection := connection_for(self)) is not None:
-            from hermes_cli.cli_browser_gateway import gateway_browser
+            from eir_cli.cli_browser_gateway import gateway_browser
             return gateway_browser(self, connection, word, rest.strip())
         handler(self, rest.strip())
 
@@ -1601,8 +1601,8 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
     def _handle_heartbeat_command(self, cmd: str) -> None:
         """Dispatch /heartbeat: set / status / pause / resume / clear. ``/heartbeat every 10m <prompt>``
         sets the session's one recurring instruction, injected as a normal user turn when due.
-        Session-scoped and in-process — use `hermes cron` for durable schedules."""
-        from hermes_cli.heartbeat import format_interval
+        Session-scoped and in-process — use `eir cron` for durable schedules."""
+        from eir_cli.heartbeat import format_interval
         arg = _command_arg(cmd)
         lower = arg.lower()
         mgr = self._session_manager(self._get_heartbeat_manager, _t("heartbeat.label"))
@@ -1628,7 +1628,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
 
     def _heartbeat_set(self, mgr, arg: str) -> None:
         """Set: ``/heartbeat every 10m <prompt>`` (also accepts ``10m <prompt>``)."""
-        from hermes_cli.heartbeat import parse_interval, format_interval
+        from eir_cli.heartbeat import parse_interval, format_interval
         tokens = arg.split(None, 2)
         interval = None
         prompt = ""
@@ -1641,7 +1641,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
         if interval is None:
             return _cp(f"  {_t('heartbeat.usage')}", _dim_line(_t("heartbeat.usage_also")))
         if interval < 0:
-            from hermes_cli.heartbeat import MIN_INTERVAL_SECONDS
+            from eir_cli.heartbeat import MIN_INTERVAL_SECONDS
             return _cp(f"  {_t('heartbeat.interval_too_small', min_seconds=MIN_INTERVAL_SECONDS)}")
         if not prompt.strip():
             return _cp(f"  {_t('heartbeat.prompt_required')}")
@@ -1693,8 +1693,8 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
 
     # ---- /goal, /loop, /subgoal -----------------------------------------------------------
     def _handle_goal_command(self, cmd: str) -> None:
-        from hermes_cli.gateway_automation import dispatch_goal_command  # /goal draft drafts on the gateway
-        from hermes_cli.goals import last_user_message_content
+        from eir_cli.gateway_automation import dispatch_goal_command  # /goal draft drafts on the gateway
+        from eir_cli.goals import last_user_message_content
 
         mgr = self._session_manager(self._get_goal_manager, _t("goal.label"))
         if mgr is None:
@@ -1726,13 +1726,13 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
         mgr = self._session_manager(self._get_loop_manager, _t("loop.label"))
         if mgr is None:
             return
-        from hermes_cli.loops import dispatch_loop_command
+        from eir_cli.loops import dispatch_loop_command
         result = dispatch_loop_command(mgr, arg)
         for line in (result.get("output") or "").splitlines():
             _cp(f"  {line}")
         if result.get("created"):
             with suppress(Exception):
-                from hermes_cli.cli_loops_mixin import _goal_blocks_loop_tick
+                from eir_cli.cli_loops_mixin import _goal_blocks_loop_tick
                 if _goal_blocks_loop_tick(mgr):
                     _cp(_dim_line(_t("loop.goal_defers_note")))
 
@@ -1777,7 +1777,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
         """Handle /skin [name] — show or change the display skin."""
         from cli import _ACCENT
         try:
-            from hermes_cli.skin_engine import list_skins, set_active_skin, get_active_skin_name
+            from eir_cli.skin_engine import list_skins, set_active_skin, get_active_skin_name
         except ImportError:
             return print(_t("skin.unavailable"))
         new_skin = _command_arg(cmd).lower()
@@ -1789,7 +1789,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
                 source = f" ({s['source']})" if s["source"] == "user" else ""
                 print(f"   {marker} {s['name']}{source} — {s['description']}")
             return _pr(f"\n  {_t('skin.usage')}",
-                       f"  {_t('skin.custom_hint', dir=display_hermes_home())}\n")
+                       f"  {_t('skin.custom_hint', dir=display_eir_home())}\n")
         available = {s["name"] for s in list_skins()}
         if new_skin not in available:
             return _pr(f"  {_t('skin.unknown', name=new_skin)}",
@@ -1807,7 +1807,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
         Factored out so the read-back/strip logic is unit-testable."""
         editor = (os.environ.get("VISUAL") or os.environ.get("EDITOR")
                   or ("notepad" if os.name == "nt" else "nano"))
-        fd, path = tempfile.mkstemp(suffix=".md", prefix="hermes_prompt_")
+        fd, path = tempfile.mkstemp(suffix=".md", prefix="eir_prompt_")
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as fh:
                 fh.write(_t("prompt_compose.editor_header") + "\n\n")
@@ -1851,8 +1851,8 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
         suppression path: on stashes tool_progress_mode and snaps it to "off" (what
         ``agent/tool_executor.py`` gates on); off restores the stash verbatim. Never touches
         history, system prompt, or request payloads."""
-        from hermes_cli.colors import Colors as _Colors
-        from hermes_cli.focus_view import (
+        from eir_cli.colors import Colors as _Colors
+        from eir_cli.focus_view import (
             FOCUS_CONFIG_KEY, FOCUS_TOOL_PROGRESS_MODE, format_focus_status,
             format_focus_toggle_message, normalize_tool_progress_mode, resolve_focus_arg)
         current = bool(getattr(self, "_focus_view_enabled", False))
@@ -1894,7 +1894,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
     def _set_tool_progress_mode(self, mode: str) -> None:
         """Set the live tool-progress mode on both the CLI and the agent (one write path for
         /focus and /verbose — the agent copy is what ``agent/tool_executor.py`` gates on)."""
-        from hermes_cli.focus_view import normalize_tool_progress_mode
+        from eir_cli.focus_view import normalize_tool_progress_mode
         normalized = normalize_tool_progress_mode(mode)
         self.tool_progress_mode = normalized
         agent = getattr(self, "agent", None)
@@ -1907,7 +1907,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
         BEFORE focus snapped to "off", so a prior ``/verbose off`` user is never told focus hid lines."""
         if not getattr(self, "_focus_view_enabled", False):
             return
-        from hermes_cli.focus_view import would_display_tool_line
+        from eir_cli.focus_view import would_display_tool_line
         saved = getattr(self, "_focus_saved_tool_progress", None)
         last = getattr(self, "_focus_last_counted_tool", None)
         if not would_display_tool_line(saved, function_name, last):
@@ -1922,7 +1922,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
         self._focus_last_counted_tool = None
         if not getattr(self, "_focus_view_enabled", False):
             return
-        from hermes_cli.focus_view import format_hidden_line
+        from eir_cli.focus_view import format_hidden_line
         line = format_hidden_line(count)
         if line:
             with suppress(Exception):
@@ -1931,7 +1931,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
     # ---- persisted display toggles: /approvals, /footer, /timestamps ----------------------
     def _handle_approvals_command(self, cmd_original: str) -> None:
         """Show or persist the profile-wide dangerous-command approval mode."""
-        from hermes_cli.approval_mode import run_approval_mode_command
+        from eir_cli.approval_mode import run_approval_mode_command
         parts = (cmd_original or "").strip().split(None, 1)
         result = run_approval_mode_command(parts[1] if len(parts) > 1 else None)
         _cp(f"  {result.message}")
@@ -1940,7 +1940,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
                         config_key: str, label: str, failed: str):
         """Shared /footer + /timestamps flow: status query, usage error, or save + report.
         Returns the new bool state when it was saved (None otherwise)."""
-        from hermes_cli.colors import Colors as _Colors
+        from eir_cli.colors import Colors as _Colors
         new_state = _toggle_target(arg, current)
         if new_state == "status":
             state = _t("shared.state_on") if current else _t("shared.state_off")
@@ -1957,7 +1957,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
 
     def _handle_footer_command(self, cmd_original: str) -> None:
         """Toggle or inspect ``display.runtime_footer.enabled`` (``/footer [on|off|status]``)."""
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
         footer_cfg = (((load_config() or {}).get("display") or {}).get("runtime_footer") or {})
         fields = footer_cfg.get("fields") or ["model", "context_pct", "cwd"]
         self._toggle_setting(
@@ -1985,7 +1985,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
         from cli import CLI_CONFIG, _parse_reasoning_config
         from agent.reasoning_effort import effort_display_label
         raw = _command_arg(cmd)
-        from hermes_cli.codex_runtime_switch import get_current_runtime
+        from eir_cli.codex_runtime_switch import get_current_runtime
         # The live agent's api_mode, else the configured runtime: ``ultra`` is verbatim on the Codex app-server.
         _route = (getattr(self, "provider", None), getattr(self, "model", None),
                   getattr(getattr(self, "agent", None), "api_mode", None) or get_current_runtime(CLI_CONFIG))
@@ -2031,7 +2031,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
                             scope=_scope_outcome(explicit_global, saved))))
 
     def _handle_busy_command(self, cmd: str):
-        """Handle /busy [status|queue|steer|interrupt] — what Enter does while Hermes is working."""
+        """Handle /busy [status|queue|steer|interrupt] — what Enter does while Eir is working."""
         arg = _command_arg(cmd, lower=True)
         usage = _dim_line(_t("busy.usage"))
         if not arg or arg == "status":
@@ -2046,7 +2046,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
     def _handle_indicator_command(self, cmd: str):
         """Handle /indicator [status|kaomoji|emoji|unicode|ascii] — pick the TUI busy-indicator style.
         Persists to ``display.tui_status_indicator`` (the key the TUI reads) for its next render."""
-        from hermes_constants import DEFAULT_INDICATOR_STYLE, INDICATOR_STYLES
+        from eir_constants import DEFAULT_INDICATOR_STYLE, INDICATOR_STYLES
         current = (self.config.get("display") or {}).get("tui_status_indicator", DEFAULT_INDICATOR_STYLE)
         arg = _command_arg(cmd, lower=True)
         usage = _dim_line(_t("indicator.usage", styles="|".join(INDICATOR_STYLES)))
@@ -2065,7 +2065,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
             return _cp(f"  {_t('fast.not_supported')}")
         # Determine the branding for the current model
         model = getattr(getattr(self, "agent", None), "model", None) or getattr(self, "model", None)
-        anthropic = _probe("hermes_cli.models", "_is_anthropic_fast_model", None, model)
+        anthropic = _probe("eir_cli.models", "_is_anthropic_fast_model", None, model)
         feature_name = _t("fast.feature_generic" if anthropic is None
                           else "fast.feature_anthropic" if anthropic else "fast.feature_openai")
         raw = _command_arg(cmd)
@@ -2089,15 +2089,15 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
 
     # ---- /debug, /update, /voice, /wake ---------------------------------------------------
     def _handle_debug_command(self, cmd_original: str = ""):
-        """Handle /debug [upload|nous upload|local] (see ``hermes_cli.debug.run_debug_slash``)."""
-        from hermes_cli.debug import run_debug_slash
+        """Handle /debug [upload|nous upload|local] (see ``eir_cli.debug.run_debug_slash``)."""
+        from eir_cli.debug import run_debug_slash
         run_debug_slash(cmd_original)
 
     def _handle_update_command(self) -> bool:
-        """Handle /update — exit the session and relaunch as ``hermes update``. Returns True when
+        """Handle /update — exit the session and relaunch as ``eir update``. Returns True when
         confirmed (the caller exits the app; the relaunch runs on the main thread after
         prompt_toolkit restores terminal modes), False when cancelled."""
-        from hermes_cli.config import is_managed, format_managed_message
+        from eir_cli.config import is_managed, format_managed_message
         if is_managed():
             print(f"  ✗ {format_managed_message(_t('update.managed_action'))}")
             return False
@@ -2126,7 +2126,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
             _cp(_t("voice.unknown_subcommand", subcommand=subcommand), _t("voice.usage"))
 
     def _handle_wake_command(self, command: str):
-        """Handle /wake [on|off|status] — the 'Hey Hermes' hotword listener. The toggle IS the
+        """Handle /wake [on|off|status] — the 'Hey Eir' hotword listener. The toggle IS the
         config: on/off also writes ``wake_word.enabled`` so the choice persists; startup
         auto-arm only reads it."""
         subcommand = _command_arg(command, lower=True) or (

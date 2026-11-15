@@ -17,12 +17,12 @@ import urllib.request
 import psutil
 import pytest
 
-from hermes_cli import isolated_scope
+from eir_cli import isolated_scope
 
 
 @pytest.fixture(autouse=True)
 def _reset_scope(monkeypatch):
-    from hermes_cli.web_routers import profiles as profiles_routes
+    from eir_cli.web_routers import profiles as profiles_routes
 
     monkeypatch.setattr(profiles_routes, "_SIDEBAR_CACHE_TTL_SECONDS", 0.0)
     yield
@@ -30,10 +30,10 @@ def _reset_scope(monkeypatch):
 
 
 @pytest.fixture
-def homes(monkeypatch, _isolate_hermes_home):
-    from hermes_constants import get_hermes_home
+def homes(monkeypatch, _isolate_eir_home):
+    from eir_constants import get_eir_home
 
-    root = get_hermes_home()
+    root = get_eir_home()
     worker = root / "profiles" / "worker"
     for home in (root, worker):
         home.mkdir(parents=True, exist_ok=True)
@@ -42,7 +42,7 @@ def homes(monkeypatch, _isolate_hermes_home):
 
 
 def _seed(home, session_id):
-    from hermes_state import SessionDB
+    from eir_state import SessionDB
 
     db = SessionDB(db_path=home / "state.db")
     try:
@@ -64,7 +64,7 @@ def _cron_ids(client):
 
 
 def _launch_in(monkeypatch, home, *, isolated=True, desktop_owned=False):
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     return isolated_scope.record_launch_scope(isolated=isolated, desktop_owned=desktop_owned)
 
 
@@ -72,7 +72,7 @@ def _launch_in(monkeypatch, home, *, isolated=True, desktop_owned=False):
 def client(homes):
     from starlette.testclient import TestClient
 
-    from hermes_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
+    from eir_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
 
     c = TestClient(app)
     c.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
@@ -122,7 +122,7 @@ def test_unscoped_backends_still_list_every_profile(client, homes, monkeypatch, 
     assert _sidebar_ids(client) == {"default-chat", "worker-chat"}
     assert _cron_ids(client) == {"default-job", "worker-job"}
     from tui_gateway.methods_complete import _profile_mention_items
-    assert {item["text"] for item in _profile_mention_items("")} == {"@default", "@worker", "@hermes"}
+    assert {item["text"] for item in _profile_mention_items("")} == {"@default", "@worker", "@eir"}
 
 
 def test_isolated_root_home_stays_unscoped(homes, monkeypatch):
@@ -140,7 +140,7 @@ def _free_port():
 def _get_profiles(port, token, proc, log, timeout=60):
     deadline = time.monotonic() + timeout
     request = urllib.request.Request(f"http://127.0.0.1:{port}/api/profiles",
-                                     headers={"X-Hermes-Session-Token": token})
+                                     headers={"X-Eir-Session-Token": token})
     while time.monotonic() < deadline:
         if proc.poll() is not None:
             break
@@ -153,19 +153,19 @@ def _get_profiles(port, token, proc, log, timeout=60):
 
 
 def test_real_profile_flag_isolated_serve_lists_only_its_profile(tmp_path):
-    root = tmp_path / "hermes"
+    root = tmp_path / "eir"
     for home in (root, root / "profiles" / "worker"):
         home.mkdir(parents=True)
         (home / "config.yaml").write_text("{}\n", encoding="utf-8")
-    env = {**os.environ, "HERMES_HOME": str(root), "HERMES_GATEWAY_LOCK_DIR": str(tmp_path / "locks"),
-           "HERMES_DASHBOARD_SESSION_TOKEN": "isolated-scope-test-token"}
-    for key in ("HERMES_DESKTOP", "HERMES_PARENT_PID", "HERMES_PARENT_START_MARKER", "HERMES_SPAWN"):
+    env = {**os.environ, "EIR_HOME": str(root), "EIR_GATEWAY_LOCK_DIR": str(tmp_path / "locks"),
+           "EIR_DASHBOARD_SESSION_TOKEN": "isolated-scope-test-token"}
+    for key in ("EIR_DESKTOP", "EIR_PARENT_PID", "EIR_PARENT_START_MARKER", "EIR_SPAWN"):
         env.pop(key, None)
     port = _free_port()
     log = tmp_path / "serve.log"
     with log.open("w", encoding="utf-8") as out:
         proc = subprocess.Popen(
-            [sys.executable, "-m", "hermes_cli.main", "-p", "worker", "serve", "--isolated",
+            [sys.executable, "-m", "eir_cli.main", "-p", "worker", "serve", "--isolated",
              "--host", "127.0.0.1", "--port", str(port)],
             env=env, stdout=out, stderr=subprocess.STDOUT)
     try:

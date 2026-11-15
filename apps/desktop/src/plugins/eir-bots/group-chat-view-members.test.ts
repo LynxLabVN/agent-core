@@ -16,7 +16,7 @@ import type { RosterRow } from './types'
 
 const { host } = vi.hoisted(() => ({ host: {} as Record<string, unknown> }))
 
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@eir/plugin-sdk', async () => {
   const { pluginSdkMock } = await import('./group-test-utils')
 
   return pluginSdkMock(host)
@@ -261,7 +261,7 @@ describe('a room that spans machines', () => {
 
     // Reconnect: that machine's ui_meta still names the room, and now agrees with this Desktop.
     const { mergeServerMeta } = await import('./profile-ops')
-    mergeServerMeta([{ ...remote, sourceReachable: true, ui_meta: { 'hermes-bots': { groups: ['Core'] } } }], Date.now() + 120_000)
+    mergeServerMeta([{ ...remote, sourceReachable: true, ui_meta: { 'eir-bots': { groups: ['Core'] } } }], Date.now() + 120_000)
 
     expect(seatedNames(room)).toEqual(['programmer', 'reviewer', 'scout'])
   })
@@ -294,7 +294,7 @@ describe('a room that spans machines', () => {
     await expect(room.members.setGroupMembership(remote, 'Core', false)).rejects.toThrow(/Scout/)
     expect(room.data.$botMeta.get()[room.data.botMetaKey(remote)].groups).toEqual(['Core'])
     expect(room.chat.$groupChats.get().Core.members?.map(member => member.name)).toEqual(['programmer', 'reviewer', 'scout'])
-    mergeServerMeta([{ ...remote, sourceReachable: true, ui_meta: { 'hermes-bots': { groups: ['Core'] } } }], Date.now() + 120_000)
+    mergeServerMeta([{ ...remote, sourceReachable: true, ui_meta: { 'eir-bots': { groups: ['Core'] } } }], Date.now() + 120_000)
     expect(seatedNames(room)).toEqual(['programmer', 'reviewer', 'scout'])
 
     // Its machine has no rooms; joining one while it does not answer is refused too.
@@ -305,7 +305,7 @@ describe('a room that spans machines', () => {
     await expect(room.members.setGroupMembership(remote, 'Core', true)).rejects.toThrow(/Scout/)
     expect(room.data.$botMeta.get()[room.data.botMetaKey(remote)].groups).toEqual([])
     expect(room.chat.$groupChats.get().Core.members?.map(member => member.name)).toEqual(['programmer', 'reviewer'])
-    mergeServerMeta([{ ...remote, sourceReachable: true, ui_meta: { 'hermes-bots': { groups: [] } } }], Date.now() + 240_000)
+    mergeServerMeta([{ ...remote, sourceReachable: true, ui_meta: { 'eir-bots': { groups: [] } } }], Date.now() + 240_000)
     expect(seatedNames(room)).toEqual(['programmer', 'reviewer'])
   })
 

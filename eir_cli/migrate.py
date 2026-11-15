@@ -1,7 +1,7 @@
-"""CLI handlers for ``hermes migrate ...``.
+"""CLI handlers for ``eir migrate ...``.
 
-``hermes migrate`` (bare) and ``hermes migrate <agent>`` move a user over from another agent through
-the agent-importers plugin; ``hermes migrate xai`` diagnoses and (with --apply) rewrites references to
+``eir migrate`` (bare) and ``eir migrate <agent>`` move a user over from another agent through
+the agent-importers plugin; ``eir migrate xai`` diagnoses and (with --apply) rewrites references to
 xAI models retired on May 15, 2026.
 """
 from __future__ import annotations
@@ -10,39 +10,39 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from hermes_cli.colors import Colors, color
-from hermes_cli.config import load_config
+from eir_cli.colors import Colors, color
+from eir_cli.config import load_config
 
 
 def cmd_migrate(args: Any) -> int:
-    """Dispatcher for ``hermes migrate <subtype>``."""
+    """Dispatcher for ``eir migrate <subtype>``."""
     if getattr(args, "migrate_type", None) == "xai":
         return cmd_migrate_xai(args)
     if getattr(args, "migrate_type", None) is None:
-        from hermes_cli.config import get_hermes_home
-        from hermes_cli.setup_agent_import import migrate_from_agents
-        return migrate_from_agents(get_hermes_home())
+        from eir_cli.config import get_eir_home
+        from eir_cli.setup_agent_import import migrate_from_agents
+        return migrate_from_agents(get_eir_home())
 
-    print("usage: hermes migrate [<agent> | xai [--apply] [--no-backup]]", file=sys.stderr)
+    print("usage: eir migrate [<agent> | xai [--apply] [--no-backup]]", file=sys.stderr)
     return 2
 
 
-# ``hermes migrate <agent>`` flags forwarded to ``hermes import-agent <agent>``, as (dest, flag).
+# ``eir migrate <agent>`` flags forwarded to ``eir import-agent <agent>``, as (dest, flag).
 _AGENT_IMPORT_FLAGS = (("dry_run", "--dry-run"), ("overwrite", "--overwrite"), ("yes", "--yes"),
                        ("activate_routines", "--activate-routines"), ("migrate_secrets", "--migrate-secrets"))
 
 
 def cmd_migrate_agent(args: Any) -> int:
-    """``hermes migrate <agent>``: install the agent-importers plugin when missing, then run its
+    """``eir migrate <agent>``: install the agent-importers plugin when missing, then run its
     import for that agent with the flags given here."""
-    from hermes_cli.config import get_hermes_home
-    from hermes_cli.setup_agent_import import migrate_from_agents
+    from eir_cli.config import get_eir_home
+    from eir_cli.setup_agent_import import migrate_from_agents
     extra = [flag for dest, flag in _AGENT_IMPORT_FLAGS if getattr(args, dest, False)]
     if getattr(args, "source", None):
         extra += ["--source", str(Path(args.source).expanduser())]
     for name in getattr(args, "bot", None) or ():
         extra += ["--bot", name]
-    return migrate_from_agents(get_hermes_home(), args.migrate_agent, tuple(extra))
+    return migrate_from_agents(get_eir_home(), args.migrate_agent, tuple(extra))
 
 
 def _fail(message: str) -> int:
@@ -52,8 +52,8 @@ def _fail(message: str) -> int:
 
 def cmd_migrate_xai(args: Any) -> int:
     """Run xAI May-15 model migration in dry-run or apply mode."""
-    from hermes_cli.config_backend import config_exists
-    from hermes_cli.xai_retirement import (
+    from eir_cli.config_backend import config_exists
+    from eir_cli.xai_retirement import (
         MIGRATION_GUIDE_URL, RETIREMENT_DATE, apply_migration, find_retired_xai_refs, format_issue)
 
     apply = bool(getattr(args, "apply", False))
@@ -81,7 +81,7 @@ def cmd_migrate_xai(args: Any) -> int:
     if not apply:
         print(color("Dry-run mode — no changes written.", Colors.DIM))
         print(color(
-            "Re-run with `hermes migrate xai --apply` to rewrite "
+            "Re-run with `eir migrate xai --apply` to rewrite "
             f"{config_path} in-place (backup created automatically).",
             Colors.DIM))
         return 0
@@ -104,11 +104,11 @@ def cmd_migrate_xai(args: Any) -> int:
         f"  {color('✓', Colors.GREEN)} Updated {len(result.issues_resolved)} "
         f"slot(s) in {result.file_path}")
     print()
-    print(color("Run `hermes doctor` to confirm no retired xAI models remain.", Colors.DIM))
+    print(color("Run `eir doctor` to confirm no retired xAI models remain.", Colors.DIM))
     return 0
 
 
 def _resolve_config_path() -> Path:
     """Best-effort: locate the active config.yaml on disk."""
-    from hermes_cli.config import get_hermes_home
-    return get_hermes_home() / "config.yaml"
+    from eir_cli.config import get_eir_home
+    return get_eir_home() / "config.yaml"

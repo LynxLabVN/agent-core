@@ -1,5 +1,5 @@
-"""Unified self-relaunch for Hermes CLI: preserves inherited flags (--tui, --dev, --profile, --model…)
-across process replacement so ``hermes sessions browse`` / post-setup relaunch keep the user's mode."""
+"""Unified self-relaunch for Eir CLI: preserves inherited flags (--tui, --dev, --profile, --model…)
+across process replacement so ``eir sessions browse`` / post-setup relaunch keep the user's mode."""
 
 import os
 import pathlib
@@ -7,7 +7,7 @@ import shutil
 import sys
 from typing import Optional, Sequence
 
-from hermes_cli._parser import (
+from eir_cli._parser import (
     PRE_ARGPARSE_INHERITED_FLAGS, build_top_level_parser
 )
 
@@ -38,7 +38,7 @@ _INHERITED_FLAGS_TABLE = _build_inherited_flag_table()
 
 
 def _extract_inherited_flags(argv: Sequence[str]) -> list[str]:
-    """Pull out flags that should carry over into a self-relaunched hermes."""
+    """Pull out flags that should carry over into a self-relaunched eir."""
     flags: list[str] = []
     i = 0
     while i < len(argv):
@@ -59,14 +59,14 @@ def _extract_inherited_flags(argv: Sequence[str]) -> list[str]:
     return flags
 
 
-def resolve_hermes_bin() -> Optional[str]:
-    """Hermes entry point: ``sys.argv[0]`` if a real executable, else ``which hermes``, else ``None``
-    (caller falls back to ``python -m hermes_cli.main``).
+def resolve_eir_bin() -> Optional[str]:
+    """Eir entry point: ``sys.argv[0]`` if a real executable, else ``which eir``, else ``None``
+    (caller falls back to ``python -m eir_cli.main``).
 
     Python launchers are never returned: on Windows a ``.py`` can't be exec'd directly, and on
     POSIX the git installer runs the extensionless source launcher under the managed venv
     interpreter while its ``#!/usr/bin/env python3`` shebang would pick the system Python and
-    lose the venv. Falling through to ``sys.executable -m hermes_cli.main`` keeps the venv.
+    lose the venv. Falling through to ``sys.executable -m eir_cli.main`` keeps the venv.
     """
     argv0 = sys.argv[0]
     _is_windows = sys.platform == "win32"
@@ -79,7 +79,7 @@ def resolve_hermes_bin() -> Optional[str]:
             return _is_python_script(p)
         # A console script pinned to the running venv (``#!<venv>/bin/python``) keeps the venv and
         # stays exec-able; a shebang that resolves elsewhere (``env python3``) loses it.
-        from hermes_cli.linux_desktop_entry import _needs_interpreter
+        from eir_cli.linux_desktop_entry import _needs_interpreter
 
         return _needs_interpreter(pathlib.Path(p))
 
@@ -93,7 +93,7 @@ def resolve_hermes_bin() -> Optional[str]:
         abs_path = os.path.abspath(argv0)
         if os.access(abs_path, os.X_OK) and not _is_unsafe_python_launcher(abs_path):
             return abs_path
-    path_bin = shutil.which("hermes")
+    path_bin = shutil.which("eir")
     if path_bin and not _is_unsafe_python_launcher(path_bin):
         return path_bin
     return None
@@ -102,9 +102,9 @@ def resolve_hermes_bin() -> Optional[str]:
 def build_relaunch_argv(
     extra_args: Sequence[str], *, preserve_inherited: bool = True, original_argv: Optional[Sequence[str]] = None
 ) -> list[str]:
-    """Construct an argv list for replacing the current process with hermes."""
-    bin_path = resolve_hermes_bin()
-    argv = [bin_path] if bin_path else [sys.executable, "-m", "hermes_cli.main"]
+    """Construct an argv list for replacing the current process with eir."""
+    bin_path = resolve_eir_bin()
+    argv = [bin_path] if bin_path else [sys.executable, "-m", "eir_cli.main"]
     src = list(original_argv) if original_argv is not None else list(sys.argv[1:])
     if preserve_inherited:
         argv.extend(_extract_inherited_flags(src))
@@ -115,7 +115,7 @@ def build_relaunch_argv(
 def relaunch(
     extra_args: Sequence[str], *, preserve_inherited: bool = True, original_argv: Optional[Sequence[str]] = None
 ) -> None:
-    """Replace the current process with a fresh hermes invocation.
+    """Replace the current process with a fresh eir invocation.
 
     POSIX: ``os.execvp`` in place (same PID, no double-fork). Windows has no real exec — its
     ``execvp`` emulation only works for a real Win32 executable, so spawn + exit instead.
@@ -129,18 +129,18 @@ def relaunch(
         except KeyboardInterrupt:
             sys.exit(130)
         except OSError as exc:
-            # Raw ``[Errno 8] Exec format error`` is cryptic; usual causes are ``hermes`` not on
+            # Raw ``[Errno 8] Exec format error`` is cryptic; usual causes are ``eir`` not on
             # PATH yet (install hasn't propagated User PATH into this shell) or a stale shim.
             print(
-                f"\nHermes relaunch failed: {exc}\n"
+                f"\nEir relaunch failed: {exc}\n"
                 f"Command: {' '.join(new_argv)}\n"
-                f"Fix: open a new terminal so PATH picks up, then re-run hermes.",
+                f"Fix: open a new terminal so PATH picks up, then re-run eir.",
                 file=sys.stderr,
             )
             sys.exit(1)
     else:
-        from hermes_cli.cpu_profile import write_cpu_profile
-        from hermes_cli.observability.shared_metrics_startup import mark_in_place_relaunch
+        from eir_cli.cpu_profile import write_cpu_profile
+        from eir_cli.observability.shared_metrics_startup import mark_in_place_relaunch
 
         mark_in_place_relaunch()
         write_cpu_profile()  # exec skips atexit

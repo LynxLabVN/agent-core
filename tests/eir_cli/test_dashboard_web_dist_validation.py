@@ -1,6 +1,6 @@
-"""Regression tests: `hermes dashboard` validates HERMES_WEB_DIST before serving.
+"""Regression tests: `eir dashboard` validates EIR_WEB_DIST before serving.
 
-A custom HERMES_WEB_DIST without --skip-build previously skipped BOTH the
+A custom EIR_WEB_DIST without --skip-build previously skipped BOTH the
 build and any validation, so the server started and served 404s with no
 obvious cause (same failure mode as issue #23817, reached via the env-var
 path instead of --skip-build). The env-var branch must now fail fast when
@@ -18,7 +18,7 @@ import pytest
 
 @pytest.fixture()
 def main_mod():
-    from hermes_cli import main
+    from eir_cli import main
     return main
 
 
@@ -38,44 +38,44 @@ def _args(**over):
 
 def _wire_common(main_mod, monkeypatch):
     monkeypatch.setattr(
-        "hermes_cli.profiles.get_active_profile_name", lambda: "default"
+        "eir_cli.profiles.get_active_profile_name", lambda: "default"
     )
     monkeypatch.setattr(main_mod, "_sync_bundled_skills_quietly", lambda: None)
     monkeypatch.setitem(sys.modules, "fastapi", types.SimpleNamespace())
     monkeypatch.setitem(sys.modules, "uvicorn", types.SimpleNamespace())
     monkeypatch.setitem(
         sys.modules,
-        "hermes_logging",
+        "eir_logging",
         types.SimpleNamespace(setup_logging=lambda **_k: None),
     )
     monkeypatch.setitem(
         sys.modules,
-        "hermes_cli.plugins",
+        "eir_cli.plugins",
         types.SimpleNamespace(discover_plugins=lambda: None),
     )
     monkeypatch.setattr(
-        "hermes_cli.mcp_startup.start_background_mcp_discovery",
+        "eir_cli.mcp_startup.start_background_mcp_discovery",
         lambda **_k: None,
     )
 
 
 def test_env_dist_without_index_exits(main_mod, monkeypatch, tmp_path, capsys):
-    """HERMES_WEB_DIST pointing at a dist with no index.html must exit 1,
+    """EIR_WEB_DIST pointing at a dist with no index.html must exit 1,
     not start a server that 404s."""
     _wire_common(main_mod, monkeypatch)
     empty_dist = tmp_path / "empty_dist"
     empty_dist.mkdir()
-    monkeypatch.setenv("HERMES_WEB_DIST", str(empty_dist))
+    monkeypatch.setenv("EIR_WEB_DIST", str(empty_dist))
 
     started = []
     monkeypatch.setitem(
         sys.modules,
-        "hermes_cli.web_server",
+        "eir_cli.web_server",
         types.SimpleNamespace(start_server=lambda **k: started.append(k)),
     )
     builds = []
     monkeypatch.setattr(
-        "hermes_cli.main_web_build._build_web_ui", lambda *a, **k: builds.append(a) or True
+        "eir_cli.main_web_build._build_web_ui", lambda *a, **k: builds.append(a) or True
     )
 
     with pytest.raises(SystemExit) as exc:
@@ -85,7 +85,7 @@ def test_env_dist_without_index_exits(main_mod, monkeypatch, tmp_path, capsys):
     assert started == []
     assert builds == []  # env var set -> build skipped, validation is the gate
     out = capsys.readouterr().out
-    assert "HERMES_WEB_DIST" in out and str(empty_dist) in out
+    assert "EIR_WEB_DIST" in out and str(empty_dist) in out
 
 
 
@@ -103,16 +103,16 @@ def test_skip_build_missing_dist_attempts_one_recovery_build(
     """--skip-build + missing index.html triggers exactly one recovery build;
     when the build produces a dist, the server starts."""
     _wire_common(main_mod, monkeypatch)
-    monkeypatch.delenv("HERMES_WEB_DIST", raising=False)
+    monkeypatch.delenv("EIR_WEB_DIST", raising=False)
     project_root = tmp_path / "proj"
-    dist = project_root / "hermes_cli" / "web_dist"
+    dist = project_root / "eir_cli" / "web_dist"
     dist.mkdir(parents=True)
     monkeypatch.setattr(main_mod, "PROJECT_ROOT", project_root)
 
     started = []
     monkeypatch.setitem(
         sys.modules,
-        "hermes_cli.web_server",
+        "eir_cli.web_server",
         types.SimpleNamespace(start_server=lambda **k: started.append(k)),
     )
 
@@ -123,7 +123,7 @@ def test_skip_build_missing_dist_attempts_one_recovery_build(
         (dist / "index.html").write_text("<html></html>", encoding="utf-8")
         return True
 
-    monkeypatch.setattr("hermes_cli.main_web_build._build_web_ui", fake_build)
+    monkeypatch.setattr("eir_cli.main_web_build._build_web_ui", fake_build)
 
     main_mod.cmd_dashboard(_args(skip_build=True))
 
@@ -142,40 +142,40 @@ def test_skip_build_missing_dist_attempts_one_recovery_build(
 
 
 def test_desktop_child_dashboard_drops_packaged_renderer(main_mod, monkeypatch):
-    """#116107: every desktop-spawned process inherits HERMES_DESKTOP=1 with the
-    packaged dist; a browser `hermes dashboard` from it must not keep serving the
+    """#116107: every desktop-spawned process inherits EIR_DESKTOP=1 with the
+    packaged dist; a browser `eir dashboard` from it must not keep serving the
     IPC-only desktop renderer."""
-    packaged = "/Applications/Hermes.app/Contents/Resources/app.asar.unpacked/dist"
-    monkeypatch.setenv("HERMES_DESKTOP", "1")
-    monkeypatch.setenv("HERMES_WEB_DIST", packaged)
-    monkeypatch.setenv("HERMES_SERVE_HEADLESS", "1")
+    packaged = "/Applications/Eir.app/Contents/Resources/app.asar.unpacked/dist"
+    monkeypatch.setenv("EIR_DESKTOP", "1")
+    monkeypatch.setenv("EIR_WEB_DIST", packaged)
+    monkeypatch.setenv("EIR_SERVE_HEADLESS", "1")
 
     main_mod._dashboard_sanitize_desktop_env(headless_backend=False)
 
-    assert "HERMES_WEB_DIST" not in os.environ
-    assert "HERMES_SERVE_HEADLESS" not in os.environ
+    assert "EIR_WEB_DIST" not in os.environ
+    assert "EIR_SERVE_HEADLESS" not in os.environ
 
 
 def test_desktop_headless_serve_keeps_packaged_renderer(main_mod, monkeypatch):
     """The real Desktop backend remains distinguished by the `serve` entry path."""
-    packaged = "/Applications/Hermes.app/Contents/Resources/app.asar.unpacked/dist"
-    monkeypatch.setenv("HERMES_DESKTOP", "1")
-    monkeypatch.setenv("HERMES_WEB_DIST", packaged)
+    packaged = "/Applications/Eir.app/Contents/Resources/app.asar.unpacked/dist"
+    monkeypatch.setenv("EIR_DESKTOP", "1")
+    monkeypatch.setenv("EIR_WEB_DIST", packaged)
 
     main_mod._dashboard_sanitize_desktop_env(headless_backend=True)
 
-    assert os.environ["HERMES_WEB_DIST"] == packaged
+    assert os.environ["EIR_WEB_DIST"] == packaged
 
 
 def test_desktop_owned_fallback_dashboard_keeps_packaged_renderer(main_mod, monkeypatch):
     """The Desktop's own legacy `dashboard --no-open` fallback spawn (serve probe
     timed out) is not headless but carries the per-spawn session token; stripping
     its dist would send a packaged install into `_build_web_ui(fatal=True)`."""
-    packaged = "/Applications/Hermes.app/Contents/Resources/app.asar.unpacked/dist"
-    monkeypatch.setenv("HERMES_DESKTOP", "1")
-    monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", "desktop-spawn-token")
-    monkeypatch.setenv("HERMES_WEB_DIST", packaged)
+    packaged = "/Applications/Eir.app/Contents/Resources/app.asar.unpacked/dist"
+    monkeypatch.setenv("EIR_DESKTOP", "1")
+    monkeypatch.setenv("EIR_DASHBOARD_SESSION_TOKEN", "desktop-spawn-token")
+    monkeypatch.setenv("EIR_WEB_DIST", packaged)
 
     main_mod._dashboard_sanitize_desktop_env(headless_backend=False)
 
-    assert os.environ["HERMES_WEB_DIST"] == packaged
+    assert os.environ["EIR_WEB_DIST"] == packaged

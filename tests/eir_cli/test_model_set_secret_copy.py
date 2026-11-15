@@ -22,13 +22,13 @@ SECRET = "sk-SUPERSECRET-e2e-12345"
 
 @pytest.fixture()
 def isolated_home(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     monkeypatch.setenv("MY_SECRET_KEY", SECRET)
     # Config caches are keyed per-path, but reload the config module state so
-    # nothing from a previous test's HERMES_HOME bleeds in.
-    for mod in ("hermes_cli.config",):
+    # nothing from a previous test's EIR_HOME bleeds in.
+    for mod in ("eir_cli.config",):
         if mod in sys.modules:
             importlib.reload(sys.modules[mod])
     return home
@@ -39,7 +39,7 @@ def _write_config(home, body: str) -> None:
 
 
 def _apply(provider="myprov", model="test-model"):
-    from hermes_cli.web_server_config import _apply_model_assignment_sync
+    from eir_cli.web_server_config import _apply_model_assignment_sync
 
     return _apply_model_assignment_sync("main", provider, model, "", "")
 

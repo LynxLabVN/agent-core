@@ -2,7 +2,7 @@
 
 import pytest
 
-from hermes_cli.auth import (
+from eir_cli.auth import (
     resolve_provider,
     resolve_api_key_provider_credentials,
 )
@@ -29,7 +29,7 @@ class TestXiaomiAliases:
         assert resolve_provider(alias) == "xiaomi"
 
     def test_normalize_provider_models_py(self):
-        from hermes_cli.models import normalize_provider
+        from eir_cli.models import normalize_provider
         assert normalize_provider("mimo") == "xiaomi"
         assert normalize_provider("xiaomi-mimo") == "xiaomi"
 
@@ -73,11 +73,11 @@ class TestXiaomiCredentials:
     ):
         """BWS-injected keys belong in the profile scope that loaded them."""
         from agent import secret_scope as ss
-        from hermes_cli import config as config_module
-        from hermes_cli import env_loader
-        from hermes_constants import hermes_home_key
+        from eir_cli import config as config_module
+        from eir_cli import env_loader
+        from eir_constants import eir_home_key
 
-        home = tmp_path / "hermes"
+        home = tmp_path / "eir"
         home.mkdir()
         (home / ".env").write_text("", encoding="utf-8")
         monkeypatch.setattr(config_module, "get_env_path", lambda: home / ".env")
@@ -86,7 +86,7 @@ class TestXiaomiCredentials:
         monkeypatch.delenv("XIAOMI_BASE_URL", raising=False)
         monkeypatch.setitem(
             env_loader._SECRET_SOURCE_VALUES_BY_HOME,
-            hermes_home_key(home),
+            eir_home_key(home),
             {"XIAOMI_API_KEY": "sk-bws-xiaomi-12345678"},
         )
 
@@ -115,7 +115,7 @@ class TestXiaomiModelCatalog:
         names are data that changes with upstream releases and doesn't
         belong in tests.
         """
-        from hermes_cli.models import _PROVIDER_MODELS
+        from eir_cli.models import _PROVIDER_MODELS
         assert "xiaomi" in _PROVIDER_MODELS
         assert len(_PROVIDER_MODELS["xiaomi"]) >= 1
 
@@ -163,7 +163,7 @@ class TestXiaomiNormalization:
         Otherwise the .lower() code path is unreachable dead code — the
         provider check at line 422 gates entry to the block.
         """
-        from hermes_cli.model_normalize import (
+        from eir_cli.model_normalize import (
             _LOWERCASE_MODEL_PROVIDERS,
             _MATCHING_PREFIX_STRIP_PROVIDERS,
         )
@@ -178,7 +178,7 @@ class TestXiaomiNormalization:
     ])
     def test_normalize_lowercases_mixed_case(self, input_name, expected):
         """Xiaomi's API requires lowercase model IDs — mixed case from docs must be lowered."""
-        from hermes_cli.model_normalize import normalize_model_for_provider
+        from eir_cli.model_normalize import normalize_model_for_provider
         result = normalize_model_for_provider(input_name, "xiaomi")
         assert result == expected
 

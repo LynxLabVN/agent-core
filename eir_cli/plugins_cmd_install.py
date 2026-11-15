@@ -1,7 +1,7 @@
-"""``hermes plugins install``: dependency/env consent, the atomic clone-scan-publish installer core, and
+"""``eir plugins install``: dependency/env consent, the atomic clone-scan-publish installer core, and
 the dashboard/TUI non-interactive install.
 
-Sibling of :mod:`hermes_cli.plugins_cmd` (the facade re-exports the names other modules use and is
+Sibling of :mod:`eir_cli.plugins_cmd` (the facade re-exports the names other modules use and is
 imported late here, never at module level).
 """
 
@@ -16,13 +16,13 @@ from contextvars import ContextVar
 from pathlib import Path
 from typing import Any, Callable, Optional
 
-from hermes_cli.cli_output import line_input
-from hermes_cli.plugin_install_phase import InstallPhase
+from eir_cli.cli_output import line_input
+from eir_cli.plugin_install_phase import InstallPhase
 
 logger = logging.getLogger(__name__)
 
 # Answers to the dependency questions, reused while one plugin is installed into several profile
-# homes that share one environment (memory-provider migration on ``hermes update``, #125794).
+# homes that share one environment (memory-provider migration on ``eir update``, #125794).
 _shared_answers: ContextVar[Optional[dict]] = ContextVar("plugin_dependency_answers", default=None)
 
 
@@ -52,7 +52,7 @@ def _ask_yes_no(key: tuple, prompt: str, console) -> bool:
 
 def _pc():
     """The facade, read at call time: tests patch ``plugins_cmd.<name>`` and sibling calls must see it."""
-    from hermes_cli import plugins_cmd
+    from eir_cli import plugins_cmd
     return plugins_cmd
 
 
@@ -110,7 +110,7 @@ def _install_plugin_python_deps(
             if node_reason:
                 console.print(f"[yellow]⚠[/yellow] Node deps: {node_reason}")
         else:
-            console.print("[dim]Skipped Node deps — run `hermes plugins install` again to retry.[/dim]\n")
+            console.print("[dim]Skipped Node deps — run `eir plugins install` again to retry.[/dim]\n")
 
     if not has_python:
         return True, None
@@ -145,12 +145,12 @@ def _consent_python_deps(
     if not (sys.stdin.isatty() and sys.stdout.isatty()):
         console.print(
             "[dim]Non-interactive install — skipping dependency install. "
-            "Run `hermes plugins enable` when ready to prepare them.[/dim]\n"
+            "Run `eir plugins enable` when ready to prepare them.[/dim]\n"
         )
         return False, _ConsentRefusal("dependency install skipped (non-interactive)", "non_interactive")
-    if not _ask_yes_no(("python", plugin_name, deps), "  Prepare these with Hermes through PM now? [y/N]: ", console):
+    if not _ask_yes_no(("python", plugin_name, deps), "  Prepare these with Eir through PM now? [y/N]: ", console):
         console.print(
-            "[dim]Skipped — run `hermes plugins enable` when ready "
+            "[dim]Skipped — run `eir plugins enable` when ready "
             "to prepare them.[/dim]\n"
         )
         return False, _ConsentRefusal("dependency install declined", "deps_declined")
@@ -177,8 +177,8 @@ def _prompt_plugin_env_vars(manifest: dict, console) -> None:
     missing = _pc()._missing_env_specs(manifest)
     if not missing:
         return
-    from hermes_cli.config import save_env_value
-    from hermes_constants import display_hermes_home
+    from eir_cli.config import save_env_value
+    from eir_constants import display_eir_home
     plugin_name = manifest.get("name", "this plugin")
     console.print(f"\n[bold]{plugin_name}[/bold] requires the following environment variables:\n")
     for spec in missing:
@@ -191,15 +191,15 @@ def _prompt_plugin_env_vars(manifest: dict, console) -> None:
         try:
             value = (_pc().masked_secret_prompt if spec.get("secret", False) else line_input)(f"  {name}: ").strip()
         except (EOFError, KeyboardInterrupt):
-            console.print(f"\n[dim]  Skipped (you can set these later in {display_hermes_home()}/.env)[/dim]")
+            console.print(f"\n[dim]  Skipped (you can set these later in {display_eir_home()}/.env)[/dim]")
             return
 
         if value:
             save_env_value(name, value)
             os.environ[name] = value
-            console.print(f"  [green]✓[/green] Saved to {display_hermes_home()}/.env")
+            console.print(f"  [green]✓[/green] Saved to {display_eir_home()}/.env")
         else:
-            console.print(f"  [dim]  Skipped (set {name} in {display_hermes_home()}/.env later)[/dim]")
+            console.print(f"  [dim]  Skipped (set {name} in {display_eir_home()}/.env later)[/dim]")
 
     console.print()
 
@@ -228,8 +228,8 @@ def _check_manifest_version(manifest: dict, plugin_name: str) -> None:
 
     reason = manifest_version_error(manifest, plugin_name)
     if reason:
-        from hermes_cli.config import recommended_update_command
-        raise _pc().PluginOperationError(f"{reason} Run {recommended_update_command()} to update Hermes.",
+        from eir_cli.config import recommended_update_command
+        raise _pc().PluginOperationError(f"{reason} Run {recommended_update_command()} to update Eir.",
                                          failure_class="incompatible")
 
 
@@ -249,7 +249,7 @@ def _read_manifest_for_install(plugin_dir: Path) -> dict:
     if not _pc()._has_portable_manifest(plugin_dir):
         return {}
     try:
-        from hermes_cli.agent_plugins import read_agent_plugin_manifest
+        from eir_cli.agent_plugins import read_agent_plugin_manifest
         manifest, diagnostics = read_agent_plugin_manifest(plugin_dir)
     except Exception as exc:
         raise _pc().PluginOperationError(f"Portable plugin manifest validation failed: {exc}",
@@ -269,7 +269,7 @@ def _probe_readable(path: Path) -> None:
 
 
 def _ensure_tree_readable(root: Path, plugins_dir: Path) -> None:
-    """Refuse to ship a tree Hermes cannot read back. A clone can land unreadable (Windows ACL
+    """Refuse to ship a tree Eir cannot read back. A clone can land unreadable (Windows ACL
     inheritance -> WinError 5, a mode-000 file) and discovery would then skip the plugin forever
     (#111804); repair ``u+rX`` where the OS supports it, otherwise fail before anything moves."""
     paths = [root]
@@ -303,12 +303,12 @@ def _refuse_unavailable_portable_plugin(plugin_name: str, tree: Path, app_title:
     *app_title* is the catalog's human name for the app ("Blender"); without it the server name stands in."""
     if not (tree / "plugin.json").is_file():
         return
-    from hermes_cli.agent_plugins import load_agent_plugin
-    from hermes_platform.resolver.availability import availability
+    from eir_cli.agent_plugins import load_agent_plugin
+    from eir_platform.resolver.availability import availability
     from tools.mcp_liveness import availability_problem, describe
 
     try:
-        package = load_agent_plugin(tree, tree.parent / ".hermes-install-data")
+        package = load_agent_plugin(tree, tree.parent / ".eir-install-data")
     except ValueError as exc:
         raise _pc().PluginOperationError(f"Plugin '{plugin_name}' is unavailable: {exc}.",
                                          failure_class="manifest_invalid") from exc
@@ -448,12 +448,12 @@ def _install_plugin_core(
         plugin_name = manifest.get("name") or (
             subdir.rstrip("/").rsplit("/", 1)[-1] if subdir else _pc()._repo_name_from_url(git_url))
         if not allow_removed:  # every install surface lands here, before any dependency is resolved
-            from hermes_cli.plugins_cmd_catalog import raise_if_removed
+            from eir_cli.plugins_cmd_catalog import raise_if_removed
             raise_if_removed(identifier, git_url, str(plugin_name), *((catalog["name"],) if catalog else ()))
         link = plugins_dir / str(plugin_name)
         from pm.filesystem import is_junction
         if "/" not in str(plugin_name) and (link.is_symlink() or is_junction(link)):
-            # A provider's own installer (e.g. `mnemosyne-hermes install`) links its package here; the
+            # A provider's own installer (e.g. `mnemosyne-eir install`) links its package here; the
             # name is fine, the slot is taken. Say so instead of blaming the manifest.
             raise _pc().PluginOperationError(
                 f"Plugin '{plugin_name}' is already installed outside the catalog: {link} is a link to "
@@ -466,7 +466,7 @@ def _install_plugin_core(
         _check_manifest_version(manifest, plugin_name)
         # One owner per plugin: an `install --ref` publishing between an unattended updater's hold
         # check and its publication would be overwritten (the updater holds this lock across both).
-        from hermes_cli.plugins_auto_update import plugin_update_lock
+        from eir_cli.plugins_auto_update import plugin_update_lock
         owner.enter_context(plugin_update_lock(target))
         old_metadata = _pc()._read_install_metadata()
         prior = old_metadata.get(plugin_name)
@@ -475,7 +475,7 @@ def _install_plugin_core(
         tracked_edits: list[str] = []
         if (before_swap is None and force and target.is_dir() and not target.is_symlink()
                 and isinstance(prior, dict) and prior.get("source") == source):
-            from hermes_cli.plugins_cmd_catalog import _carry_user_files, _local_changes
+            from eir_cli.plugins_cmd_catalog import _carry_user_files, _local_changes
             local, tracked_edits = _local_changes(target)
 
             def _carry(_manifest, tree):
@@ -517,9 +517,9 @@ def _install_plugin_core(
         # Saved update_url tag (settled: claims vs provenance): the
         # manifest's update_url is COPIED into the row at install. Check
         # time compares manifest vs tag; a mismatch is needs-fixing and
-        # only `hermes plugins trust-update-url` moves the tag.
+        # only `eir plugins trust-update-url` moves the tag.
         if manifest.get("update_url"):
-            from hermes_cli.plugins_updates import https_update_url
+            from eir_cli.plugins_updates import https_update_url
             try:
                 record["update_url"] = https_update_url(manifest["update_url"])
             except ValueError as exc:
@@ -532,15 +532,15 @@ def _install_plugin_core(
                 "sha": installed_revision,
                 "pin": reviewed_pin if at_reviewed_pin else "",
             }
-            from hermes_cli.plugins_cmd_catalog import write_catalog_sidecar_record
+            from eir_cli.plugins_cmd_catalog import write_catalog_sidecar_record
             write_catalog_sidecar_record(tmp_target, catalog, installed_revision)
         if allow_removed:
             record["allow_removed"] = True
         new_metadata = {**old_metadata, plugin_name: record}
-        from hermes_cli.plugins_transaction import publish_plugin
+        from eir_cli.plugins_transaction import publish_plugin
 
         if tracked_edits:
-            from hermes_cli.plugins_cmd_catalog import _stash_local_files
+            from eir_cli.plugins_cmd_catalog import _stash_local_files
             # Outside the plugins dir: the discovery scanners recurse into every subdirectory there.
             backup = plugins_dir.parent / "plugins-backup" / f"{target.name}-{str(prior.get('revision') or 'old')[:8]}"
             _stash_local_files(target, tracked_edits, backup)
@@ -568,7 +568,7 @@ def _publish_failure_class(exc: BaseException) -> str:
     keeps the class plugins_transaction tagged, a filesystem error keeps its kind, and everything
     else PM raised (InstallError, ResolutionConflict, AdmissionRefused, a worker error) is a
     dependency failure."""
-    from hermes_cli.observability.shared_metrics_fields import tagged_failure_class
+    from eir_cli.observability.shared_metrics_fields import tagged_failure_class
 
     tagged = tagged_failure_class(exc) if isinstance(exc, _pc().PluginOperationError) else None
     if tagged and tagged != "other":
@@ -585,7 +585,7 @@ def recorded_install(install: Callable[[], tuple], *, catalog_name: Optional[str
     """Run one plugin install attempt (a core ``(target, manifest, installed_name)`` call) and record
     it as a shared-metrics extension install: failed when it raises, success unless it replaced an
     already-installed plugin (a reinstall is not an install)."""
-    from hermes_cli.observability.shared_metrics_events import record_extension_install
+    from eir_cli.observability.shared_metrics_events import record_extension_install
 
     source = "catalog" if catalog_name else ("local" if identifier.startswith("file://") else "url")
     before = set(_pc()._read_install_metadata())
@@ -602,9 +602,9 @@ def recorded_install(install: Callable[[], tuple], *, catalog_name: Optional[str
 def _announce_source(identifier: str, console, *, brief: bool) -> tuple[Optional[Any], str]:
     """``(catalog entry or None, install identifier)``, printing where the install comes from: the
     catalog pin (plus the entry's description unless *brief*) or the custom-source warning."""
-    from hermes_cli import plugins_cmd_catalog as catalog
+    from eir_cli import plugins_cmd_catalog as catalog
     if not catalog.looks_like_catalog_name(identifier):
-        console.print("[yellow]Warning:[/yellow] custom (unreviewed) source — not from the Hermes catalog.")
+        console.print("[yellow]Warning:[/yellow] custom (unreviewed) source — not from the Eir catalog.")
         return None, identifier
     entry = catalog.resolve_catalog_name(identifier, console)
     console.print(f"[bold]{entry.name}[/bold] [cyan]\\[{entry.tier}][/cyan] [dim]pinned @ {entry.sha[:8]}[/dim]")
@@ -638,7 +638,7 @@ def cmd_install(
     setup): the catalog line, questions, warnings, errors and the outcome print, the catalog
     description, clone line and default "Installed" panel do not.
     """
-    from hermes_cli import plugins_cmd_catalog as catalog
+    from eir_cli import plugins_cmd_catalog as catalog
     console = _pc()._console()
     entry, identifier = _announce_source(identifier, console, brief=brief)
     if allow_removed:
@@ -678,7 +678,7 @@ def cmd_install(
     if not _pc()._looks_like_plugin_dir(target):
         console.print(
             f"[yellow]Warning:[/yellow] {installed_name} doesn't contain plugin.yaml, "
-            f"plugin.json, or __init__.py. It may not be a valid Hermes plugin.")
+            f"plugin.json, or __init__.py. It may not be a valid Eir plugin.")
     _prompt_plugin_env_vars(installed_manifest, console)
 
     from pm.workspace import enabled_plugin_dirs
@@ -730,7 +730,7 @@ def cmd_install(
     elif is_memory_provider:
         _select_memory_provider(target.name, console, select=should_enable)
     elif should_enable:
-        from hermes_cli.plugins_admission import AdmissionRefused
+        from eir_cli.plugins_admission import AdmissionRefused
 
         try:
             _pc()._set_plugin_enabled(installed_name, enable=True, console=console)
@@ -747,9 +747,9 @@ def cmd_install(
     else:
         console.print(
             f"[dim]Plugin installed but not enabled. "
-            f"Run `hermes plugins enable {installed_name}` to activate.[/dim]")
+            f"Run `eir plugins enable {installed_name}` to activate.[/dim]")
 
-    from hermes_cli.plugin_provider_requests import requires_auth_notice
+    from eir_cli.plugin_provider_requests import requires_auth_notice
     if notice := requires_auth_notice(installed_manifest):
         console.print(f"[yellow]{notice}[/yellow]")
     # Non-interactive installs and declines leave declared capabilities ungranted (fail closed).
@@ -760,20 +760,20 @@ def cmd_install(
         # Loads it into the running gateway now (handlers live) or says what needs a restart (#87770).
         # A "y" at the Enable-now prompt counts: without the nudge the gateway never loads the plugin
         # (its MCP servers stay absent from every session) and nothing tells the user to restart.
-        from hermes_cli.plugins_activation import report_activation
+        from eir_cli.plugins_activation import report_activation
         report_activation(console, installed_name)
     console.print()
 
 
 def _select_memory_provider(name: str, console, *, select: bool) -> None:
-    """Make *name* the live memory provider (deps prepared through PM first, as ``hermes memory setup``
+    """Make *name* the live memory provider (deps prepared through PM first, as ``eir memory setup``
     does), or say how to; ``plugins enable`` cannot activate one (#119909)."""
     if not select:
         console.print(
-            f"[dim]Memory provider installed but not active. Run `hermes memory setup` "
+            f"[dim]Memory provider installed but not active. Run `eir memory setup` "
             f"(or set memory.provider: {name}) to use it.[/dim]")
         return
-    from hermes_cli.memory_setup import prepare_memory_provider_dependencies
+    from eir_cli.memory_setup import prepare_memory_provider_dependencies
     from plugins.memory import find_provider_dir
     if find_provider_dir(name) is None:  # never save a provider name the loader cannot resolve
         console.print(f"[red]✗[/red] {name} does not resolve as a memory provider; memory.provider is unchanged.")
@@ -783,10 +783,10 @@ def _select_memory_provider(name: str, console, *, select: bool) -> None:
     except Exception as exc:  # resolver conflict, network, PM refusal: report, leave the selection alone
         logger.debug("memory provider %s dependency preparation failed", name, exc_info=True)
         console.print(f"[red]✗[/red] Could not prepare {name}'s dependencies: {exc}")
-        console.print("[dim]memory.provider is unchanged; run `hermes memory setup` after resolving it.[/dim]")
+        console.print("[dim]memory.provider is unchanged; run `eir memory setup` after resolving it.[/dim]")
         return
     # The loader refuses a provider parked in plugins.disabled; lift that through the same admission transaction.
-    from hermes_cli.plugins_admission import AdmissionRefused
+    from eir_cli.plugins_admission import AdmissionRefused
     expected_config = _pc()._plugin_selection_version()
     disabled, aliases = _pc()._get_disabled_set(), _pc()._plugin_aliases(name)
     if disabled & aliases:
@@ -802,7 +802,7 @@ def _select_memory_provider(name: str, console, *, select: bool) -> None:
     console.print(
         f"[green]✓[/green] [bold]{name}[/bold] set as memory.provider"
         f"{f' (replacing {previous})' if previous and previous != name else ''}. "
-        f"Run `hermes memory setup {name}` to configure it; new sessions use it.")
+        f"Run `eir memory setup {name}` to configure it; new sessions use it.")
 
 
 def _catalog_install_on_disk(catalog_name: str, ref: Optional[str],
@@ -811,11 +811,11 @@ def _catalog_install_on_disk(catalog_name: str, ref: Optional[str],
     names catalog entry *catalog_name*, else None. A refused enable leaves the published clone in
     place (there is no rollback), so the card's Try again, or the model asking again, stopped at
     "already exists" on a second clone and the plugin could never be turned on from the card.
-    Like ``hermes plugins enable``, the tree is used at the commit it has; an explicit *ref*, or the
+    Like ``eir plugins enable``, the tree is used at the commit it has; an explicit *ref*, or the
     commit an install dialog reviewed (*inspected_sha*), only matches a tree checked out at that commit.
     Any other tree is not reused: the fresh install then answers "already exists" instead of enabling
     code nobody reviewed."""
-    from hermes_cli.plugins_cmd_catalog import catalog_install_record
+    from eir_cli.plugins_cmd_catalog import catalog_install_record
     target = _pc()._catalog_installed_dir(catalog_name)
     if target is None:
         return None
@@ -834,17 +834,17 @@ def _catalog_install_on_disk(catalog_name: str, ref: Optional[str],
 def _resolve_source(identifier: str, catalog_name: Optional[str]) -> tuple:
     """``(entry, identifier, warnings, error)``: the catalog entry (None for a custom source), the
     identifier to clone, the warnings so far, and the refusal result when there is one."""
-    from hermes_cli import plugins_cmd_catalog as catalog
+    from eir_cli import plugins_cmd_catalog as catalog
     warnings: list[str] = []
     entry = None
     if catalog_name:
         entry = catalog.get_live_catalog_entry(catalog_name)
         if entry is None:
-            return None, identifier, warnings, {"ok": False, "error": f"'{catalog_name}' is not in the Hermes plugin catalog."}
+            return None, identifier, warnings, {"ok": False, "error": f"'{catalog_name}' is not in the Eir plugin catalog."}
         warnings.extend(_known_issue_warnings(entry))
         identifier = entry.install_identifier
     else:
-        warnings.append("Custom (unreviewed) source — not from the Hermes catalog.")
+        warnings.append("Custom (unreviewed) source — not from the Eir catalog.")
     try:
         git_url = _pc()._resolve_git_url(identifier)[0]
         if git_url.startswith(("http://", "file://")):
@@ -864,7 +864,7 @@ def _place_tree(entry, identifier: str, *, force: bool, ref: Optional[str], assu
     an approved *ref* names another commit; a fresh install clones at *ref* when set, else the pin.
     With no *ref*, either source is held to *inspected_sha* when given: a catalog entry re-pinned since
     the dialog read it is refused like a moved branch, and only a tree on disk at that commit is reused."""
-    from hermes_cli import plugins_cmd_catalog as catalog
+    from eir_cli import plugins_cmd_catalog as catalog
     ref = (ref or "").strip() or None
     inspected_sha = None if ref else inspected_sha
     on_disk = _catalog_install_on_disk(entry.name, ref, inspected_sha) if entry is not None and not force else None
@@ -891,7 +891,7 @@ def _place_tree(entry, identifier: str, *, force: bool, ref: Optional[str], assu
 def _enable_placed(installed_name: str, deps, step: Callable[[InstallPhase], None]) -> Optional[dict]:
     """None once enabled, else the refusal result. Enabling admits the plugin, and admission resolves
     its Python dependencies."""
-    from hermes_cli.plugins_admission import AdmissionRefused
+    from eir_cli.plugins_admission import AdmissionRefused
 
     if deps:
         step(InstallPhase.python_packages)
@@ -923,7 +923,7 @@ def dashboard_install_plugin(
     step = on_step or (lambda _phase: None)
     if inspected_sha:
         # The dialog's inspection is spent either way; re-opening it must read the source again.
-        from hermes_cli.plugins_cmd_inspect import forget_inspection
+        from eir_cli.plugins_cmd_inspect import forget_inspection
         forget_inspection(identifier, catalog_name=catalog_name)
     entry, identifier, warnings, error = _resolve_source(identifier, catalog_name)
     if error is not None:
@@ -939,7 +939,7 @@ def dashboard_install_plugin(
     ap = target / "after-install.md"
     # Deps first, then load: the plugin activates in this process (TUI/Desktop server subscribers see it)
     # and in the running gateway; ``activation`` says what is live now vs next session (#87770).
-    from hermes_cli.plugins_activation import activate_plugin_now
+    from eir_cli.plugins_activation import activate_plugin_now
     if enable:
         step(InstallPhase.loading_tools)
     activated = activate_plugin_now(installed_name) if enable else {

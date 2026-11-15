@@ -2,12 +2,12 @@ name: hermes-design-studio
 repo: https://github.com/1lpredest1nato/hermes-design-studio
 sha: 9354ba4e1b62b46ac656f6c3fa29c8740feaa16c
 subdir: ""
-title: Hermes Design Studio
-description: "Non-destructive shader image editing inside Hermes Desktop, manually or with an agent. Human-approved shader tools, recipes, numerical previews and PNG export."
+title: Eir Design Studio
+description: "Non-destructive shader image editing inside Eir Desktop, manually or with an agent. Human-approved shader tools, recipes, numerical previews and PNG export."
 maintainer: 1lpredest1nato
 tier: community
 category: desktop
-requires_hermes: ">=0.22.5"
+requires_eir: ">=0.22.5"
 docs_url: https://github.com/1lpredest1nato/hermes-design-studio#readme
 version: "0.1.0"
 readme: true

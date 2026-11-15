@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from hermes_state import SessionDB
+from eir_state import SessionDB
 from tools.session_search_tool import session_search
 
 SECRET_BODY = "ABCDEFGHIJKLMNOPQRSTUVWXYZ123456"

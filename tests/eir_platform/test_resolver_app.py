@@ -12,8 +12,8 @@ from urllib.parse import urlsplit
 
 import pytest
 
-from hermes_platform.resolver import CheckState, Effort
-from hermes_platform.resolver.app import AppDef, AppLocation, AppResolver, Endpoint
+from eir_platform.resolver import CheckState, Effort
+from eir_platform.resolver.app import AppDef, AppLocation, AppResolver, Endpoint
 
 TOKEN = "tok-3e1f9c-unique-fixture-value"
 
@@ -201,7 +201,7 @@ def test_regex_admitted_endpoint_paths_stay_on_loopback(tmp_path, epath):
 def test_mcp_initialize_belt_refuses_non_loopback_url_directly(tmp_path, monkeypatch, endpoint):
     """The dial-site re-check is a second layer under _endpoint_observation: probe() can never
     reach it with a bad URL, so call it directly or the belt could silently rot."""
-    from hermes_platform.resolver.app import _Session, _mcp_initialize
+    from eir_platform.resolver.app import _Session, _mcp_initialize
     monkeypatch.setattr(socket, "create_connection", lambda *a, **k: pytest.fail("no socket allowed"))
     obs = _mcp_initialize(_Session(pid=os.getpid(), url="", token=TOKEN), endpoint, 1.0)
     assert obs.state is CheckState.UNAVAILABLE  # policy refusal, not "server did not answer"

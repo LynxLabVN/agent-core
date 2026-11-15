@@ -11,7 +11,7 @@ description: "Rich, evidence-backed answer cards — tables, charts, metrics, ti
 maintainer: jacobhausler
 tier: community
 category: desktop                       # README vocabulary: desktop|memory|platform|web|tools|voice|automation|models|general
-requires_hermes: ">=0.21.5"
+requires_eir: ">=0.21.5"
 version: "0.1.10"                        # cosmetic label; quoted per README
 image: "https://raw.githubusercontent.com/jacobhausler/hermes-rich-ui/041fcb136617524b0c6897a9dad3944f031375c1/assets/screenshot-1.png"
 screenshots:

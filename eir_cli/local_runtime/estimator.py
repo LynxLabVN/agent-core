@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 from enum import Enum
 
-from hermes_cli.local_runtime.gguf import GGUFHeader
+from eir_cli.local_runtime.gguf import GGUFHeader
 
 # q8_0: 34-byte blocks of 32 f16-equivalent elements (exact).
 _Q8_BYTES_PER_ELEM = 34 / 32
@@ -122,7 +122,7 @@ class HardwareBudget:
     platform: str = ""          # sys.platform of the machine being priced
     gpu_pci_id: int | None = None  # nvidia-smi's packed PCI device/vendor ID
     # The engine reads lazy tensors from disk here. llama.cpp's own default does so everywhere
-    # except integrated GPUs (b11370 #28160); Hermes passes --lazy-mode on to NVIDIA's, so only
+    # except integrated GPUs (b11370 #28160); Eir passes --lazy-mode on to NVIDIA's, so only
     # AMD/Intel integrated GPUs load them up front.
     lazy_reads: bool = True
     # Windows unified memory, live budgets only: commit the server may take for the models and

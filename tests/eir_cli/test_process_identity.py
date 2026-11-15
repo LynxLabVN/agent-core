@@ -1,11 +1,11 @@
-"""Tests for hermes_cli.process_identity — spawn tags, the machine spawn
+"""Tests for eir_cli.process_identity — spawn tags, the machine spawn
 ledger, and the updater's ledger-identified reap rung.
 
 Layer context (Aug 2026, after the 12-minute Windows update hang): reapers
 previously inferred process lineage from PPIDs and cmdline shape. These
 primitives make identity positive instead: spawners stamp children
-(HERMES_SPAWN), long-lived processes self-register (pid, create_time,
-purpose, spawner) in spawn-ledger.json, and `hermes update` reaps holders the
+(EIR_SPAWN), long-lived processes self-register (pid, create_time,
+purpose, spawner) in spawn-ledger.json, and `eir update` reaps holders the
 ledger PROVES are orphaned backends — in any update context, no hand-off
 contract needed.
 
@@ -26,7 +26,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from hermes_cli import process_identity as pi
+from eir_cli import process_identity as pi
 
 
 class _FakeNoSuchProcess(Exception):
@@ -95,19 +95,19 @@ def test_desktop_style_tag_parses():
 
 
 def test_install_id_stable_and_path_scoped():
-    a = pi.install_id(Path("/opt/hermes"))
-    assert a == pi.install_id(Path("/opt/hermes"))
+    a = pi.install_id(Path("/opt/eir"))
+    assert a == pi.install_id(Path("/opt/eir"))
     assert a != pi.install_id(Path("/opt/other"))
     assert len(a) == 12
 
 
 def test_install_id_hashes_the_install_root_the_cli_resolves(monkeypatch):
-    from hermes_cli import _startup_fast
+    from eir_cli import _startup_fast
 
     repo = Path(__file__).resolve().parents[2]
     assert pi.install_id() == pi.install_id(repo)  # an existing install keeps its id
-    monkeypatch.setattr(_startup_fast, "project_root_str", lambda: "/opt/relocated-hermes")
-    assert pi.install_id() == pi.install_id(Path("/opt/relocated-hermes"))
+    monkeypatch.setattr(_startup_fast, "project_root_str", lambda: "/opt/relocated-eir")
+    assert pi.install_id() == pi.install_id(Path("/opt/relocated-eir"))
 
 
 # ---------------------------------------------------------------------------
@@ -147,7 +147,7 @@ def test_register_self_writes_and_prunes_dead(tmp_path):
 def test_register_self_survives_non_utf8_argv(tmp_path):
     ledger = tmp_path / "spawn-ledger.json"
     fake = _fake_psutil({999: 50.0})
-    bad_argv = ["hermes", "serve", os.fsdecode(b"/tmp/project-\xff")]  # surrogate-escaped path
+    bad_argv = ["eir", "serve", os.fsdecode(b"/tmp/project-\xff")]  # surrogate-escaped path
     with patch.dict(sys.modules, {"psutil": fake}), \
          patch.object(pi, "_ledger_path", return_value=ledger), \
          patch.object(pi.os, "getpid", return_value=999), \
@@ -188,12 +188,12 @@ def test_register_self_inherits_spawn_tag_lineage(tmp_path):
 
 
 def test_register_self_falls_back_to_desktop_parent_env(tmp_path):
-    # Legacy Desktop: no HERMES_SPAWN, but HERMES_PARENT_PID + winms marker.
+    # Legacy Desktop: no EIR_SPAWN, but EIR_PARENT_PID + winms marker.
     ledger = tmp_path / "spawn-ledger.json"
     fake = _fake_psutil({999: 50.0})
     env = {
-        "HERMES_PARENT_PID": "888",
-        "HERMES_PARENT_START_MARKER": "winms:1755689000123",
+        "EIR_PARENT_PID": "888",
+        "EIR_PARENT_START_MARKER": "winms:1755689000123",
     }
     with patch.dict(sys.modules, {"psutil": fake}), \
          patch.dict(pi.os.environ, env, clear=False), \
@@ -241,7 +241,7 @@ def test_ledger_entries_filters_dead_reused_and_foreign(tmp_path):
 
 @pytest.mark.platforms("posix")
 def test_ledger_entries_excludes_a_killed_but_unreaped_process(tmp_path):
-    """A zombie is dead even though it keeps its create_time until reaped: ``hermes update``
+    """A zombie is dead even though it keeps its create_time until reaped: ``eir update``
     books the stopped dashboard gone, then must not find it again as a pre-update survivor."""
     import psutil
 
@@ -320,11 +320,11 @@ class TestStrictBranchStatusRead:
 # ---------------------------------------------------------------------------
 
 def _holders(*pids):
-    return [(p, "python.exe", f"python.exe -m hermes_cli.main --profile p{p} serve") for p in pids]
+    return [(p, "python.exe", f"python.exe -m eir_cli.main --profile p{p} serve") for p in pids]
 
 
 def test_updater_reaps_ledger_proven_orphans():
-    from hermes_cli import update_cmd_windows
+    from eir_cli import update_cmd_windows
 
     entries = [
         _entry(200, 2.0, spawner_pid=700, spawner_create=7.0),   # spawner dead → reap
@@ -341,25 +341,25 @@ def test_updater_reaps_ledger_proven_orphans():
 
 
 def test_updater_ledger_rung_never_raises():
-    from hermes_cli import update_cmd_windows
+    from eir_cli import update_cmd_windows
 
     with patch.object(pi, "ledger_entries", side_effect=RuntimeError("boom")):
         assert update_cmd_windows._ledger_reapable_backend_pids(_holders(200)) == []
 
 
 def test_desktop_ssh_backend_spawn_shape_is_desktop_owned(monkeypatch):
-    """Desktop's SSH spawn is ``env HERMES_DESKTOP=1 hermes serve --isolated ... --ssh-session-token-file F``
+    """Desktop's SSH spawn is ``env EIR_DESKTOP=1 eir serve --isolated ... --ssh-session-token-file F``
     with NO token env var (its tests assert the var name never appears on the wire). Missing that
     shape made the SSH child claim ROLE_SERVE on the remote host (the #119824 shape there)."""
-    monkeypatch.setenv("HERMES_DESKTOP", "1")
-    monkeypatch.delenv("HERMES_DASHBOARD_SESSION_TOKEN", raising=False)
+    monkeypatch.setenv("EIR_DESKTOP", "1")
+    monkeypatch.delenv("EIR_DASHBOARD_SESSION_TOKEN", raising=False)
     ssh_argv = ["serve", "--isolated", "--host", "127.0.0.1", "--port", "0",
-                "--ssh-session-token-file", "/home/u/.hermes/desktop-ssh/abc.token"]
+                "--ssh-session-token-file", "/home/u/.eir/desktop-ssh/abc.token"]
 
     assert pi.is_desktop_owned_backend(ssh_argv) is True
-    monkeypatch.setattr(sys, "argv", ["hermes", *ssh_argv])
+    monkeypatch.setattr(sys, "argv", ["eir", *ssh_argv])
     assert pi.is_desktop_owned_backend() is True
-    # The bare inherited flag (a Desktop terminal pane running `hermes serve`) is still not ownership.
+    # The bare inherited flag (a Desktop terminal pane running `eir serve`) is still not ownership.
     assert pi.is_desktop_owned_backend(["serve", "--host", "127.0.0.1", "--port", "0"]) is False
 
 
@@ -412,7 +412,7 @@ def test_reclaim_spares_unprovable_spawner():
 
 
 def test_reclaim_reaps_null_spawner_orphan_to_init():
-    from hermes_cli import dashboard_procs
+    from eir_cli import dashboard_procs
 
     with patch.object(dashboard_procs, "_process_ppid", return_value=1), \
          patch.object(dashboard_procs, "_lock_owned_serve_pids", return_value=set()):
@@ -423,7 +423,7 @@ def test_reclaim_reaps_null_spawner_orphan_to_init():
 
 
 def test_reclaim_spares_null_spawner_with_live_parent():
-    from hermes_cli import dashboard_procs
+    from eir_cli import dashboard_procs
 
     with patch.object(dashboard_procs, "_process_ppid", return_value=1234):
         result, kills = _reap(procs={555: 55.0})
@@ -433,7 +433,7 @@ def test_reclaim_spares_null_spawner_with_live_parent():
 
 def test_reclaim_spares_lock_claimed_orphan():
     """A valid backend.lock.json claims the PID: another session owns it, never kill."""
-    from hermes_cli import dashboard_procs
+    from eir_cli import dashboard_procs
 
     with patch.object(dashboard_procs, "_process_ppid", return_value=1), \
          patch.object(dashboard_procs, "_lock_owned_serve_pids", return_value={555}):
@@ -462,7 +462,7 @@ def test_reclaim_ignores_unknown_pid_and_never_raises():
 _CONCURRENT_WRITER = r"""
 import os, subprocess, sys, time
 sys.path.insert(0, sys.argv[1])
-from hermes_cli.process_identity import register_child
+from eir_cli.process_identity import register_child
 start_at, n = float(sys.argv[2]), int(sys.argv[3])
 kids = [subprocess.Popen([sys.executable, "-c", "import time; time.sleep(120)"], stdin=subprocess.DEVNULL)
         for _ in range(n)]
@@ -485,7 +485,7 @@ def test_concurrent_processes_never_drop_each_others_ledger_rows(tmp_path):
     from pathlib import Path
 
     repo = str(Path(__file__).resolve().parents[2])
-    env = {**os.environ, "HERMES_HOME": str(tmp_path / "home")}
+    env = {**os.environ, "EIR_HOME": str(tmp_path / "home")}
     start_at = time.time() + 2.0
     writers = [subprocess.Popen([sys.executable, "-c", _CONCURRENT_WRITER, repo, str(start_at), "15"],
                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, env=env)
@@ -511,7 +511,7 @@ def test_a_stalled_ledger_lock_holder_never_blocks_register_child(tmp_path, monk
     import logging
     import threading
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path / "home"))
     monkeypatch.setattr(pi, "_LEDGER_LOCK_TIMEOUT_S", 0.3)
     monkeypatch.setattr(pi, "_ledger_lock_warned", False)
     caplog.set_level(logging.DEBUG, logger=pi.logger.name)

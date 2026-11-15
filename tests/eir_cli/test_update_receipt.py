@@ -1,4 +1,4 @@
-"""Tests for hermes_cli.update_receipt — Phase 1 of the fleet-update plan (#91277).
+"""Tests for eir_cli.update_receipt — Phase 1 of the fleet-update plan (#91277).
 
 Covers:
 - receipt lifecycle (begin → record → finalize → read back)
@@ -16,18 +16,18 @@ from types import SimpleNamespace
 
 import pytest
 
-import hermes_cli.update_receipt as ur
-from hermes_cli import update_cmd, update_cmd_maint
+import eir_cli.update_receipt as ur
+from eir_cli import update_cmd, update_cmd_maint
 
 
 @pytest.fixture()
 def receipt_home(tmp_path, monkeypatch):
-    """Isolated HERMES_HOME for receipt writes."""
-    home = tmp_path / ".hermes"
+    """Isolated EIR_HOME for receipt writes."""
+    home = tmp_path / ".eir"
     home.mkdir()
-    # ``_receipt_dir`` resolves through ``hermes_constants.get_hermes_home`` (env var), not
-    # ``hermes_cli.config`` — patch where production reads.
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    # ``_receipt_dir`` resolves through ``eir_constants.get_eir_home`` (env var), not
+    # ``eir_cli.config`` — patch where production reads.
+    monkeypatch.setenv("EIR_HOME", str(home))
     # The open receipt is per-context; the scope isolates it from any enclosing receipt.
     with ur.update_receipt_scope():
         yield home
@@ -43,7 +43,7 @@ class TestReceiptLifecycle:
         ur.record_step("pre_update_backup", True, "snapshot=abc123")
         ur.record_skip("gateway_restart", "no gateways running")
         ur.record_gateway_restart(
-            restarted_services=["hermes-gateway"],
+            restarted_services=["eir-gateway"],
             relaunched_profiles=["work"],
             killed_pids=[123],
             failed_units=[],
@@ -60,7 +60,7 @@ class TestReceiptLifecycle:
         assert payload["steps"][0]["ok"] is True
         assert payload["skips"][0]["reason"] == "no gateways running"
         gr = payload["gateway_restart"]
-        assert gr["restarted_services"] == ["hermes-gateway"]
+        assert gr["restarted_services"] == ["eir-gateway"]
         assert gr["relaunched_profiles"] == ["work"]
         assert gr["killed_pids"] == [123]
         assert gr["incomplete"] is False
@@ -150,7 +150,7 @@ class TestCommandBoundaryFinalization:
 
     def test_pending_receipt_persisted_on_exit_2_refusal(self, receipt_home):
         ur.begin_update_receipt()
-        ur.record_step("windows_preflight", False, "another hermes.exe running")
+        ur.record_step("windows_preflight", False, "another eir.exe running")
         path = ur.finalize_pending_update_receipt(2, "sys.exit(2)")
         assert path is not None and path.is_file()
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -190,25 +190,25 @@ class TestCommandBoundaryFinalization:
         singleton."""
         from types import SimpleNamespace
 
-        from hermes_cli import main as hermes_main
+        from eir_cli import main as eir_main
 
         def _fake_impl(args, gateway_mode):
             ur.begin_update_receipt()
-            ur.record_step("windows_preflight", False, "hermes.exe holds venv")
+            ur.record_step("windows_preflight", False, "eir.exe holds venv")
             sys.exit(2)
 
         monkeypatch.setattr(update_cmd, "_cmd_update_impl", _fake_impl)
         monkeypatch.setattr(
-            hermes_main, "detect_install_method", lambda *a, **k: "git", raising=False
+            eir_main, "detect_install_method", lambda *a, **k: "git", raising=False
         )
         monkeypatch.setattr(
-            hermes_main,
+            eir_main,
             "_install_hangup_protection",
             lambda gateway_mode: None,
             raising=False,
         )
         monkeypatch.setattr(
-            hermes_main, "_finalize_update_output", lambda state: None, raising=False
+            eir_main, "_finalize_update_output", lambda state: None, raising=False
         )
 
         class _FakeLock:
@@ -223,7 +223,7 @@ class TestCommandBoundaryFinalization:
             def release(self):
                 pass
 
-        import hermes_cli.update_lock as update_lock_mod
+        import eir_cli.update_lock as update_lock_mod
 
         monkeypatch.setattr(update_lock_mod, "UpdateLock", _FakeLock)
 
@@ -232,7 +232,7 @@ class TestCommandBoundaryFinalization:
             force=False, force_venv=False,
         )
         with pytest.raises(SystemExit) as exc_info:
-            hermes_main.cmd_update(args)
+            eir_main.cmd_update(args)
 
         assert exc_info.value.code == 2  # exit code preserved
         latest = ur.read_latest_receipt()
@@ -261,12 +261,12 @@ def _desktop_correlated_receipt(home, correlation):
 
 
 class TestLauncherCorrelation:
-    """Desktop matches the remote receipt by HERMES_UPDATE_CORRELATION_ID (#101516)."""
+    """Desktop matches the remote receipt by EIR_UPDATE_CORRELATION_ID (#101516)."""
 
     CORRELATION = "1e7cb007-a6f8-4f6c-badb-d80e204942bf"
 
     def test_receipt_carries_launcher_correlation(self, receipt_home, monkeypatch):
-        monkeypatch.setenv("HERMES_UPDATE_CORRELATION_ID", self.CORRELATION)
+        monkeypatch.setenv("EIR_UPDATE_CORRELATION_ID", self.CORRELATION)
         ur.begin_update_receipt()
         update_id = ur.current_correlation_id()
         _finalize("success")
@@ -278,25 +278,25 @@ class TestLauncherCorrelation:
         assert payload["update_id"] == update_id != self.CORRELATION
 
     def test_handoff_receipt_keeps_correlation(self, receipt_home, monkeypatch):
-        monkeypatch.setenv("HERMES_UPDATE_CORRELATION_ID", self.CORRELATION)
+        monkeypatch.setenv("EIR_UPDATE_CORRELATION_ID", self.CORRELATION)
         ur.begin_update_receipt()
         pre_swap = dict(ur._current.get().data)
         with ur.update_receipt_scope():
             # The post-swap interpreter need not inherit the env var.
-            monkeypatch.delenv("HERMES_UPDATE_CORRELATION_ID")
+            monkeypatch.delenv("EIR_UPDATE_CORRELATION_ID")
             ur.begin_update_receipt(previous=pre_swap, correlation_id=pre_swap["update_id"])
             _finalize("success")
         assert _desktop_correlated_receipt(receipt_home, self.CORRELATION) is not None
 
     def test_legacy_handoff_receipt_gains_correlation(self, receipt_home, monkeypatch):
         # A pre-swap receipt from an older updater has no correlation_id field.
-        monkeypatch.setenv("HERMES_UPDATE_CORRELATION_ID", self.CORRELATION)
+        monkeypatch.setenv("EIR_UPDATE_CORRELATION_ID", self.CORRELATION)
         ur.begin_update_receipt(previous={"update_id": "abc123", "steps": []}, correlation_id="abc123")
         _finalize("success")
         assert _desktop_correlated_receipt(receipt_home, self.CORRELATION)["update_id"] == "abc123"
 
     def test_no_launcher_correlation_is_null(self, receipt_home, monkeypatch):
-        monkeypatch.delenv("HERMES_UPDATE_CORRELATION_ID", raising=False)
+        monkeypatch.delenv("EIR_UPDATE_CORRELATION_ID", raising=False)
         ur.begin_update_receipt()
         _finalize("success")
         assert ur.read_latest_receipt()["correlation_id"] is None
@@ -309,23 +309,23 @@ class TestFleetClassification:
         home.mkdir()
         gateway_record = {
             "gateway_state": "running",
-            "kind": "hermes-gateway",
-            "argv": ["hermes", "gateway", "run"],
+            "kind": "eir-gateway",
+            "argv": ["eir", "gateway", "run"],
             **record,
         }
         (home / "gateway_state.json").write_text(
             json.dumps(gateway_record), encoding="utf-8"
         )
         monkeypatch.setattr(
-            "hermes_cli.version_info.get_code_identity",
+            "eir_cli.version_info.get_code_identity",
             lambda refresh=False: {"sha": expected_sha, "short_sha": expected_sha[:8],
                                    "version": "1.0", "source": "git"},
         )
         monkeypatch.setattr(
-            "hermes_cli.profiles._get_default_hermes_home", lambda: home
+            "eir_cli.profiles._get_default_eir_home", lambda: home
         )
         monkeypatch.setattr(
-            "hermes_cli.profiles._get_profiles_root",
+            "eir_cli.profiles._get_profiles_root",
             lambda: tmp_path / "nonexistent_profiles_root",
         )
         monkeypatch.setattr(ur, "_socket_identity", lambda home: None)
@@ -341,17 +341,17 @@ class TestFleetClassification:
 
         home = tmp_path / "fleet_home"
         home.mkdir()
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("EIR_HOME", str(home))
         monkeypatch.setattr(
-            "hermes_cli.version_info.get_code_identity",
+            "eir_cli.version_info.get_code_identity",
             lambda refresh=False: {"sha": "a" * 40, "short_sha": "a" * 8,
                                    "version": "1.0", "source": "git"},
         )
         monkeypatch.setattr(
-            "hermes_cli.profiles._get_default_hermes_home", lambda: home
+            "eir_cli.profiles._get_default_eir_home", lambda: home
         )
         monkeypatch.setattr(
-            "hermes_cli.profiles._get_profiles_root",
+            "eir_cli.profiles._get_profiles_root",
             lambda: tmp_path / "nonexistent_profiles_root",
         )
 
@@ -415,10 +415,10 @@ class TestFleetClassification:
             json.dumps({"pid": 999999, "code_sha": "a" * 40}), encoding="utf-8"
         )
         monkeypatch.setattr(
-            "hermes_cli.profiles._get_default_hermes_home", lambda: home
+            "eir_cli.profiles._get_default_eir_home", lambda: home
         )
         monkeypatch.setattr(
-            "hermes_cli.profiles._get_profiles_root",
+            "eir_cli.profiles._get_profiles_root",
             lambda: tmp_path / "nope",
         )
         monkeypatch.setattr("gateway.status._pid_exists", lambda pid: False)
@@ -438,8 +438,8 @@ class TestFleetClassification:
         record = {
             "pid": 4242,
             "gateway_state": "running",
-            "kind": "hermes-gateway",
-            "argv": ["hermes", "gateway", "run"],
+            "kind": "eir-gateway",
+            "argv": ["eir", "gateway", "run"],
             "code_sha": "a" * 40,
             "code_version": "1.0",
         }
@@ -482,7 +482,7 @@ class TestGatewayStatusStamping:
         import gateway.status as gs
 
         monkeypatch.setattr(
-            "hermes_cli.version_info.get_code_identity",
+            "eir_cli.version_info.get_code_identity",
             lambda refresh=False: {"sha": "c" * 40, "short_sha": "c" * 8,
                                    "version": "2.0", "source": "git"},
         )
@@ -496,7 +496,7 @@ class TestGatewayStatusStamping:
         def _boom(refresh=False):
             raise RuntimeError("no build info")
 
-        monkeypatch.setattr("hermes_cli.version_info.get_code_identity", _boom)
+        monkeypatch.setattr("eir_cli.version_info.get_code_identity", _boom)
         record = gs._build_runtime_status_record()
         # Must not raise, and must not stamp bogus values.
         assert "code_sha" not in record
@@ -506,7 +506,7 @@ class TestGatewayStatusStamping:
 class TestCodeIdentity:
 
     def test_get_code_identity_cached(self):
-        from hermes_cli.build_info import get_code_identity
+        from eir_cli.build_info import get_code_identity
 
         first = get_code_identity(refresh=True)
         second = get_code_identity()

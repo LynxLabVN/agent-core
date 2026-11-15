@@ -13,8 +13,8 @@ from datetime import datetime, timedelta, timezone, UTC
 
 import pytest
 
-from hermes_cli.observability.shared_metrics import SharedMetricsStore
-from hermes_cli.observability.shared_metrics_sender import (
+from eir_cli.observability.shared_metrics import SharedMetricsStore
+from eir_cli.observability.shared_metrics_sender import (
     MAX_ATTEMPTS,
     MAX_PACKAGES_PER_PASS,
     MAX_SEND_ATTEMPTS,
@@ -22,7 +22,7 @@ from hermes_cli.observability.shared_metrics_sender import (
     SharedMetricsSender,
     reconcile_send_consent,
 )
-from hermes_cli.sqlite_util import write_txn
+from eir_cli.sqlite_util import write_txn
 
 INSTALL_ID = "12a73e97-4de9-4766-830d-9ca1192c0420"
 NOW = datetime(2026, 8, 26, 12, 0, tzinfo=UTC)
@@ -102,12 +102,12 @@ def _clear_consent(store):
 
 def _add_package(store, package_id, period_day, *, exported=True, install_id=INSTALL_ID):
     payload = {
-        "schema_version": "hermes.shared_metrics.v2",
+        "schema_version": "eir.shared_metrics.v2",
         "package_id": package_id,
         "install_id": install_id,
         "period_start": f"{period_day}T00:00:00Z",
         "period_end": f"{period_day}T23:59:59Z",
-        "metrics": [{"name": "hermes.client.active", "type": "counter", "value": 1}],
+        "metrics": [{"name": "eir.client.active", "type": "counter", "value": 1}],
     }
     with store._connection() as connection:
         connection.execute(
@@ -466,7 +466,7 @@ class TestClaimingAndBounds:
         assert outcome.sent == MAX_PACKAGES_PER_PASS
 
     def test_two_concurrent_passes_do_not_double_send(self, store):
-        """Claiming is what stops two Hermes processes duplicating work.
+        """Claiming is what stops two Eir processes duplicating work.
 
         The second pass must RECORD what it saw rather than raise: _send_one
         catches every exception as a retryable transport failure, so an
@@ -952,7 +952,7 @@ class TestCompression:
     def _captured_request(self, payload: bytes):
         import urllib.request
 
-        from hermes_cli.observability import shared_metrics_sender as mod
+        from eir_cli.observability import shared_metrics_sender as mod
 
         captured = {}
 

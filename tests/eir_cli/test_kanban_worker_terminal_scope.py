@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from hermes_cli import kanban_db_dispatch
+from eir_cli import kanban_db_dispatch
 from tools.terminal_scope import get_terminal_scope
 
 
@@ -22,15 +22,15 @@ class _StopSpawn(Exception):
 
 @pytest.fixture
 def profile_b(tmp_path, monkeypatch):
-    """A fake HOME so ``profiles/`` never resolves to the live install (see hermes-agent-dev)."""
-    launch = tmp_path / "fakehome" / ".hermes"
+    """A fake HOME so ``profiles/`` never resolves to the live install (see eir-agent-dev)."""
+    launch = tmp_path / "fakehome" / ".eir"
     served = launch / "profiles" / "b"
     served.mkdir(parents=True)
     (served / "config.yaml").write_text(
         "terminal:\n  backend: docker\n  docker_image: b-image\n  home_mode: profile\n",
         encoding="utf-8")
     monkeypatch.setenv("HOME", str(tmp_path / "fakehome"))
-    monkeypatch.setenv("HERMES_HOME", str(launch))
+    monkeypatch.setenv("EIR_HOME", str(launch))
     monkeypatch.setenv("TERMINAL_ENV", "local")  # ambient launch-profile policy
     monkeypatch.setenv("TERMINAL_DOCKER_IMAGE", "launch-image")
     return served
@@ -47,7 +47,7 @@ def test_worker_profile_scope_installs_the_assigned_profiles_terminal_policy(pro
 
 def _spawn_env_for_profile_b(monkeypatch, tmp_path):
     """Run ``_default_spawn`` far enough to capture the worker env, never spawning anything."""
-    from hermes_cli.kanban_db import Task
+    from eir_cli.kanban_db import Task
     from tools import process_registry
 
     captured: list[dict] = []
@@ -80,13 +80,13 @@ def test_worker_for_another_profile_never_inherits_the_dispatchers_credentials(
 
 def test_launch_profiles_own_worker_keeps_its_credentials(tmp_path, monkeypatch):
     """Control: a worker for the LAUNCH profile is not acting for another tenant."""
-    launch = tmp_path / "fakehome" / ".hermes"
+    launch = tmp_path / "fakehome" / ".eir"
     (launch / "profiles").mkdir(parents=True)
     monkeypatch.setenv("HOME", str(tmp_path / "fakehome"))
-    monkeypatch.setenv("HERMES_HOME", str(launch))
+    monkeypatch.setenv("EIR_HOME", str(launch))
     monkeypatch.setenv("OPENAI_API_KEY", "dispatcher-launch-key")
 
-    from hermes_cli.kanban_db import Task
+    from eir_cli.kanban_db import Task
     from tools import process_registry
 
     captured: list[dict] = []
@@ -107,10 +107,10 @@ def test_launch_profiles_own_worker_keeps_its_credentials(tmp_path, monkeypatch)
     assert captured and captured[0].get("OPENAI_API_KEY") == "dispatcher-launch-key"
 
 
-def test_worker_for_another_profile_can_still_import_hermes(profile_b, tmp_path, monkeypatch):
-    """The routed-profile scrub strips Hermes-owned PYTHONPATH entries, but the worker IS Hermes
-    (`-m hermes_cli.kanban_worker_client`): a PYTHONPATH-launched dispatcher must hand it a tree
-    it can import, or it dies on `No module named 'hermes_cli'` before reaching the owner."""
+def test_worker_for_another_profile_can_still_import_eir(profile_b, tmp_path, monkeypatch):
+    """The routed-profile scrub strips Eir-owned PYTHONPATH entries, but the worker IS Eir
+    (`-m eir_cli.kanban_worker_client`): a PYTHONPATH-launched dispatcher must hand it a tree
+    it can import, or it dies on `No module named 'eir_cli'` before reaching the owner."""
     repo_root = Path(kanban_db_dispatch.__file__).resolve().parent.parent
     monkeypatch.setenv("PYTHONPATH", str(repo_root))
     env = _spawn_env_for_profile_b(monkeypatch, tmp_path)
@@ -124,9 +124,9 @@ def test_worker_for_another_profile_keeps_the_instance_config_deployment(profile
     cold-start for B) keeps it; anything else from that ``.env`` does not reach B. The selected
     backend names the deployment (``deployment_env_names``); the file backend names none, so a
     stand-in backend names one here, through the real dispatch path."""
-    from hermes_cli import config_backend
+    from eir_cli import config_backend
 
-    launch = Path(os.environ["HERMES_HOME"])
+    launch = Path(os.environ["EIR_HOME"])
     (launch / ".env").write_text("FIXTURE_CONFIG_PLANE=plane-1\nFIXTURE_PLANE_TOKEN=secret\n", encoding="utf-8")
     monkeypatch.setenv("FIXTURE_CONFIG_PLANE", "plane-1")
     monkeypatch.setenv("FIXTURE_PLANE_TOKEN", "secret")
@@ -139,7 +139,7 @@ def test_worker_for_another_profile_keeps_the_instance_config_deployment(profile
 def test_worker_profile_scope_reports_the_assigned_profiles_home_mode(profile_b):
     """``terminal.home_mode`` must survive the profile projection as a terminal policy value.
 
-    ``TERMINAL_HOME_MODE`` is the variable ``hermes_constants.get_subprocess_home`` reads, so a
+    ``TERMINAL_HOME_MODE`` is the variable ``eir_constants.get_subprocess_home`` reads, so a
     mode the profile pins in its own ``config.yaml`` has to reach the bound scope the dispatcher
     reads through; otherwise the profile's isolation silently is not policy at all (#146103).
     """
@@ -150,7 +150,7 @@ def test_worker_profile_scope_reports_the_assigned_profiles_home_mode(profile_b)
 
 
 def test_served_child_env_for_another_profile_drops_the_launch_home_mode(profile_b, monkeypatch):
-    """A child acting for B (``hermes -p b`` workers, ``key_cmd`` helpers, browser drivers) must not
+    """A child acting for B (``eir -p b`` workers, ``key_cmd`` helpers, browser drivers) must not
     inherit the LAUNCH profile's bridged ``TERMINAL_HOME_MODE``: B's child bridges its own
     ``terminal.home_mode``, and an inherited one wins wherever B's config leaves it unset (#146103)."""
     from tools.environments.local import served_profile_child_env

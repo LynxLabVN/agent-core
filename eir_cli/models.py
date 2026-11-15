@@ -1,7 +1,7 @@
 """Provider/model catalogs: discovery, caching, and identity helpers.
 
 Origin module; cohesive clusters live in siblings and are re-imported here so
-``hermes_cli.models.<name>`` stays the stable import/monkeypatch surface:
+``eir_cli.models.<name>`` stays the stable import/monkeypatch surface:
 ``models_catalog_static`` (curated tables, provider registry, aliases), ``models_reasoning_caps``,
 ``models_local`` (Ollama / LM Studio), ``models_pricing``, ``models_validate``.
 """
@@ -29,10 +29,10 @@ if TYPE_CHECKING:
 
 from agent.proxy_bypass import is_loopback_host
 from agent.bedrock_service_tiers import BEDROCK_ULTRAFAST_ROUTES, bedrock_fast_mode_overrides
-from hermes_cli.route_identity import normalize_route_base_url
-from hermes_cli.urllib_security import open_credentialed_url
-from hermes_cli.version_info import hermes_user_agent
-from hermes_cli.models_catalog_static import (
+from eir_cli.route_identity import normalize_route_base_url
+from eir_cli.urllib_security import open_credentialed_url
+from eir_cli.version_info import eir_user_agent
+from eir_cli.models_catalog_static import (
     CuratedFallbackModels,
     CANONICAL_PROVIDERS,
     OPENROUTER_MODELS,
@@ -51,10 +51,10 @@ from hermes_cli.models_catalog_static import (
     _PROVIDER_RETIRED_ALIASES,
     _SILENT_DEFAULT_PROVIDERS,
     _xai_finalize_catalog)
-from hermes_cli.models_reasoning_caps import (
+from eir_cli.models_reasoning_caps import (
     _OPENROUTER_CATALOG_URL,
     _seed_reasoning_caps)
-from hermes_cli.models_local import (
+from eir_cli.models_local import (
     _OLLAMA_LOCAL_MODELS_CACHE,
     _OLLAMA_LOCAL_MODELS_CACHE_TTL,
     _OLLAMA_LOCAL_PROBE_FAILURE_CACHE,
@@ -102,9 +102,9 @@ def _write_json_cache(path: Path, data: Any, **dump_kwargs: Any) -> None:
     """Atomically persist a cache file (creating parents). Raises on failure — callers decide
     whether a failed cache write is worth logging."""
     from utils import atomic_json_write
-    from hermes_constants import mkdir_under_hermes_home
+    from eir_constants import mkdir_under_eir_home
 
-    mkdir_under_hermes_home(path.parent)
+    mkdir_under_eir_home(path.parent)
     atomic_json_write(path, data, **dump_kwargs)
 
 
@@ -147,15 +147,15 @@ _openrouter_catalog_cache: list[tuple[str, str]] | None = None
 
 def _openrouter_catalog_disk_ttl() -> float:
     """Same TTL as the catalog manifest this list is filtered from (honours ``model_catalog.ttl_minutes``)."""
-    from hermes_cli.model_catalog import refresh_interval_seconds
+    from eir_cli.model_catalog import refresh_interval_seconds
 
     return refresh_interval_seconds()
 
 
 def _openrouter_catalog_disk_path() -> Path:
-    from hermes_constants import get_hermes_home
+    from eir_constants import get_eir_home
 
-    return get_hermes_home() / "cache" / "openrouter_curated_catalog.json"
+    return get_eir_home() / "cache" / "openrouter_curated_catalog.json"
 
 
 def _read_openrouter_catalog_disk(*, allow_stale: bool = False) -> list[tuple[str, str]] | None:
@@ -277,11 +277,11 @@ def union_with_nous_on_sale_models(curated_ids: list[str], pricing: dict[str, di
     discount first. A sale lives only in ``/v1/models`` ``pricing.original``, so without this the
     picker badges discounts on curated rows but never shows a discounted model the curated list and
     Portal recommendations omit. Free rows stay with ``freeRecommendedModels``; rows the gateway
-    marks tool-less (``"tools": False``) are skipped because Hermes is tool-calling-first, and
+    marks tool-less (``"tools": False``) are skipped because Eir is tool-calling-first, and
     image/video generation rows are skipped because they are not chat models."""
     from math import isfinite
 
-    from hermes_cli.models_pricing import _price_float, compute_sale_discount
+    from eir_cli.models_pricing import _price_float, compute_sale_discount
 
     seen = set(curated_ids)
     on_sale: list[tuple[int, str]] = []
@@ -306,9 +306,9 @@ _free_tier_cache: dict[str, tuple[bool, float]] = {}  # profile key -> (result, 
 
 def _pricing_profile_key() -> str:
     """Stable profile identity for process-local pricing caches."""
-    from hermes_constants import hermes_home_key
+    from eir_constants import eir_home_key
 
-    return hermes_home_key()
+    return eir_home_key()
 
 
 def get_cached_nous_free_tier() -> Optional[bool]:
@@ -332,7 +332,7 @@ def check_nous_free_tier(*, force_fresh: bool = False, cached_only: bool = False
     if cached_only:
         return False
     try:
-        from hermes_cli.nous_account import get_nous_portal_account_info
+        from eir_cli.nous_account import get_nous_portal_account_info
 
         result = get_nous_portal_account_info(force_fresh=force_fresh).is_free_tier
     except Exception:
@@ -355,8 +355,8 @@ _nous_recommended_cache: dict[tuple[str, str], tuple[dict[str, Any], float]] = {
 
 
 def _nous_recommended_disk_path() -> Path:
-    from hermes_constants import get_hermes_home
-    return get_hermes_home() / "cache" / "nous_recommended_cache.json"
+    from eir_constants import get_eir_home
+    return get_eir_home() / "cache" / "nous_recommended_cache.json"
 
 
 def _read_nous_recommended_disk(base: str) -> tuple[dict[str, Any], float] | None:
@@ -425,7 +425,7 @@ def fetch_nous_recommended_models(
 def _resolve_nous_portal_url() -> str:
     """Best-effort lookup of the Portal base URL the user is authed against."""
     try:
-        from hermes_cli.auth import DEFAULT_NOUS_PORTAL_URL, get_provider_auth_state
+        from eir_cli.auth import DEFAULT_NOUS_PORTAL_URL, get_provider_auth_state
 
         state = get_provider_auth_state("nous") or {}
         portal = str(state.get("portal_base_url") or "").strip()
@@ -463,7 +463,7 @@ def get_preferred_silent_default_model(provider: str = "openrouter") -> str:
     """Silent-default model id: the cached remote catalog's ``"default": true`` label (never hits the
     network — safe on hot paths), else :data:`PREFERRED_SILENT_DEFAULT_MODEL`."""
     try:
-        from hermes_cli.model_catalog import get_default_model_from_cache
+        from eir_cli.model_catalog import get_default_model_from_cache
         labeled = get_default_model_from_cache(provider)
         if labeled:
             return labeled
@@ -539,10 +539,10 @@ def recommended_nous_default_model() -> dict[str, Any]:
     Contacts the Portal for a fresh tier read, so never call it on a hot path. Returns
     ``{"provider": "nous", "model": str, "free_tier": bool}``; ``model`` may be ``""`` when nothing
     is selectable (callers degrade). Shared by ``GET /api/model/recommended-default`` and the
-    sign-in completion in ``hermes_cli.anon_auth`` so both land on the same model.
+    sign-in completion in ``eir_cli.anon_auth`` so both land on the same model.
     """
-    from hermes_cli import model_picker_usage, models_pricing as mp
-    from hermes_cli.auth import get_provider_auth_state
+    from eir_cli import model_picker_usage, models_pricing as mp
+    from eir_cli.auth import get_provider_auth_state
     model_ids = get_curated_nous_model_ids()
     pricing = mp.get_pricing_for_provider("nous") or {}
     free_tier = check_nous_free_tier(force_fresh=True)
@@ -600,7 +600,7 @@ def _openrouter_model_is_free(pricing: Any) -> bool:
 
 
 def _openrouter_model_supports_tools(item: Any) -> bool:
-    """True when ``supported_parameters`` advertises ``tools`` (hermes-agent is tool-calling-first).
+    """True when ``supported_parameters`` advertises ``tools`` (eir-agent is tool-calling-first).
     Permissive when the field is absent/malformed: some OpenRouter-compatible gateways (Nous Portal,
     private mirrors) don't populate it, and the picker must not silently empty for them.
 
@@ -658,7 +658,7 @@ def fetch_openrouter_models(
     ``cache_only`` never opens a socket: memory, then disk (stale accepted), then the in-repo snapshot."""
     # The curated list is filtered from this profile's manifest (``model_catalog.*`` config, its
     # ``<home>/cache`` copy), so a routed profile keeps its own slot instead of the module one.
-    from hermes_cli.models_profile_cache import profile_slot_get, profile_slot_set
+    from eir_cli.models_profile_cache import profile_slot_get, profile_slot_set
     _me = sys.modules[__name__]
     cached = profile_slot_get(_me, "_openrouter_catalog_cache")
 
@@ -679,7 +679,7 @@ def fetch_openrouter_models(
     # Remote catalog manifest first, in-repo snapshot when unreachable; the live /v1/models filter
     # (tool support, free pricing) is applied on top either way.
     try:
-        from hermes_cli.model_catalog import get_curated_openrouter_models
+        from eir_cli.model_catalog import get_curated_openrouter_models
         remote = get_curated_openrouter_models()
     except Exception:
         remote = None
@@ -703,7 +703,7 @@ def fetch_openrouter_models(
         # Hide models without tool-calling support — selecting one fails at the first tool call.
         if live_item is None or not _openrouter_model_supports_tools(live_item):
             continue
-        # Hide models that don't advertise tool-calling support — hermes-agent requires it and surfacing
+        # Hide models that don't advertise tool-calling support — eir-agent requires it and surfacing
         # them leads to immediate runtime failures when the user selects them. Ported from
         # Kilo-Org/kilocode#9068.
         if preferred_id == silent_default:
@@ -730,7 +730,7 @@ def get_curated_nous_model_ids() -> list[str]:
     """Curated Nous Portal model ids: the remote catalog manifest, else the in-repo
     ``_PROVIDER_MODELS["nous"]`` snapshot. Always a list."""
     try:
-        from hermes_cli.model_catalog import get_curated_nous_models
+        from eir_cli.model_catalog import get_curated_nous_models
         remote = get_curated_nous_models()
     except Exception:
         remote = None
@@ -749,7 +749,7 @@ def fetch_ai_gateway_models(
     if _ai_gateway_catalog_cache is not None and not force_refresh:
         return list(_ai_gateway_catalog_cache)
 
-    from hermes_constants import AI_GATEWAY_BASE_URL
+    from eir_constants import AI_GATEWAY_BASE_URL
 
     fallback = list(VERCEL_AI_GATEWAY_MODELS)
     live = _fetch_live_catalog_index(f"{AI_GATEWAY_BASE_URL.rstrip('/')}/models", timeout, _urlopen_model_catalog_request)
@@ -796,8 +796,8 @@ def _configured_custom_provider_ids() -> set[str]:
     """Return routable custom-provider IDs configured by the user."""
     ids = {"custom"}
     try:
-        from hermes_cli.config import load_config
-        from hermes_cli.providers import custom_provider_slug
+        from eir_cli.config import load_config
+        from eir_cli.providers import custom_provider_slug
 
         config = load_config()
         providers = config.get("providers", {})
@@ -815,12 +815,12 @@ def _configured_custom_provider_ids() -> set[str]:
 
 def _provider_has_credentials(pid: str) -> bool:
     try:
-        from hermes_cli.auth import get_auth_status, has_usable_secret
+        from eir_cli.auth import get_auth_status, has_usable_secret
 
         if pid == "custom":
             return bool((_get_custom_base_url() or "").strip())
         if pid == "openrouter":
-            from hermes_cli.model_switch import _scoped_key_env
+            from eir_cli.model_switch import _scoped_key_env
             return has_usable_secret(_scoped_key_env("OPENROUTER_API_KEY"))
         status = get_auth_status(pid)
         return bool(status.get("logged_in") or status.get("configured"))
@@ -829,8 +829,8 @@ def _provider_has_credentials(pid: str) -> bool:
 
 
 def list_available_providers() -> list[dict[str, str]]:
-    """``{id, label, aliases, authenticated}`` per listed provider (shared with ``hermes model`` / ``/model``)."""
-    from hermes_cli.models_catalog_static import listed_canonical_providers
+    """``{id, label, aliases, authenticated}`` per listed provider (shared with ``eir model`` / ``/model``)."""
+    from eir_cli.models_catalog_static import listed_canonical_providers
     aliases_for: dict[str, list[str]] = {}
     for alias, canonical in _PROVIDER_ALIASES.items():
         aliases_for.setdefault(canonical, []).append(alias)
@@ -885,7 +885,7 @@ def _get_provider_config_dict(provider: str) -> dict[str, Any]:
     if not key:
         return {}
     try:
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
         providers_cfg = load_config().get("providers", {})
         if isinstance(providers_cfg, dict):
             entry = providers_cfg.get(key) or providers_cfg.get(key.lower())
@@ -899,7 +899,7 @@ def _get_provider_config_dict(provider: str) -> dict[str, Any]:
 def _get_model_config_dict() -> dict[str, Any]:
     """Return the main model config mapping, or an empty dict."""
     try:
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
         model_cfg = load_config().get("model", {})
         if isinstance(model_cfg, dict):
             return model_cfg
@@ -991,7 +991,7 @@ def _resolve_static_model_alias(
     name_lower: str, current_keys: set[str]) -> Optional[tuple[str, str]]:
     """Resolve short aliases (e.g. sonnet/opus) using static catalogs only."""
     try:
-        from hermes_cli.model_switch import MODEL_ALIASES
+        from eir_cli.model_switch import MODEL_ALIASES
     except Exception:
         return None
 
@@ -1078,7 +1078,7 @@ def _configured_provider_ids() -> set[str]:
     """Provider ids (incl. ``custom:*``) from the user's ``providers:`` config block; empty when config
     is unreadable (callers fall through to built-in catalogs)."""
     try:
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
 
         providers = (load_config() or {}).get("providers")
         if not isinstance(providers, dict):
@@ -1120,7 +1120,7 @@ def detect_provider_for_model(
     skipped and the ladder continues (``None`` = stay on the current provider). Exceptions: the user
     NAMED the provider (``/model nous``), or there is no current provider yet (``auto``) — then the
     first guess is returned so the credential step fails loudly instead of silently ignoring input."""
-    from hermes_cli.models_detect import (
+    from eir_cli.models_detect import (
         current_provider_catalog_match, current_provider_owns_vendor, provider_has_credentials)
 
     name = (model_name or "").strip()
@@ -1200,7 +1200,7 @@ def _find_openrouter_slug(model_name: str) -> Optional[str]:
 
 def normalize_provider(provider: Optional[str]) -> str:
     """Normalize provider aliases to canonical ids. ``"auto"`` passes through — use
-    ``hermes_cli.auth.resolve_provider()`` to resolve it from credentials."""
+    ``eir_cli.auth.resolve_provider()`` to resolve it from credentials."""
     normalized = (provider or "openrouter").strip().lower()
     return _PROVIDER_ALIASES.get(normalized, normalized)
 
@@ -1259,7 +1259,7 @@ def _fast_mode_route_supported(
     elif is_grok_46_family(str(model_id or "")):
         allowed = {"xai": "api.x.ai"}
     else:
-        from hermes_cli.models_fast_regions import openai_fast_region_allows
+        from eir_cli.models_fast_regions import openai_fast_region_allows
         if openai_fast_region_allows(base_url, model_id):
             base_url = "https://api.openai.com"  # Eligibility only; the runtime URL stays regional.
         allowed = {"openai": "api.openai.com", "openai-api": "api.openai.com", "openai-codex": "chatgpt.com"}
@@ -1299,7 +1299,7 @@ def _model_dedup_key(model_id: str) -> str:
     id and its curated public slug (Kimi ``k3`` / ``kimi-k3``) don't both survive a merge."""
     key = str(model_id).strip().lower()
     try:
-        from hermes_cli.model_search import model_alias_canonical
+        from eir_cli.model_search import model_alias_canonical
         return model_alias_canonical(key)
     except Exception:
         return key
@@ -1339,7 +1339,7 @@ def _openai_discovery_base_url(provider: str) -> str:
 
 
 def _codex_catalog(normalized: str, force_refresh: bool) -> list[str]:
-    from hermes_cli.codex_models import get_codex_model_ids
+    from eir_cli.codex_models import get_codex_model_ids
 
     # Live OAuth token so the picker matches what ChatGPT lists for this account; hardcoded
     # catalog without a token / when unreachable. Read-only (#68004): a picker never imports,
@@ -1349,7 +1349,7 @@ def _codex_catalog(normalized: str, force_refresh: bool) -> list[str]:
     # gateway key is only ever sent to that gateway, never to the chatgpt.com default.
     base_url = None
     try:
-        from hermes_cli.auth import _codex_access_token_is_expiring, resolve_codex_runtime_credentials
+        from eir_cli.auth import _codex_access_token_is_expiring, resolve_codex_runtime_credentials
 
         creds = resolve_codex_runtime_credentials(read_only=True)
         access_token, base_url = creds.get("api_key"), creds.get("base_url")
@@ -1362,8 +1362,8 @@ def _codex_catalog(normalized: str, force_refresh: bool) -> list[str]:
 
 def _nous_catalog(normalized: str, force_refresh: bool) -> Optional[list[str]]:
     try:
-        from hermes_cli.anon_challenge import background_caller
-        from hermes_cli.auth import fetch_nous_models, resolve_nous_runtime_credentials
+        from eir_cli.anon_challenge import background_caller
+        from eir_cli.auth import fetch_nous_models, resolve_nous_runtime_credentials
         with background_caller():  # never waits on or opens a challenge
             creds = resolve_nous_runtime_credentials()
         if creds:
@@ -1379,7 +1379,7 @@ def _nous_catalog(normalized: str, force_refresh: bool) -> Optional[list[str]]:
 def _api_key_credentials(normalized: str) -> tuple[str, str]:
     """``(api_key, base_url)`` from ``resolve_api_key_provider_credentials``; empty strings on any miss."""
     try:
-        from hermes_cli.auth import resolve_api_key_provider_credentials
+        from eir_cli.auth import resolve_api_key_provider_credentials
 
         creds = resolve_api_key_provider_credentials(normalized)
         return str(creds.get("api_key") or "").strip(), str(creds.get("base_url") or "").strip()
@@ -1439,14 +1439,14 @@ def _openai_catalog(normalized: str, force_refresh: bool) -> Optional[list[str]]
     base = _openai_discovery_base_url(normalized)
     # Custom OpenAI-compatible endpoints serve a small curated catalog — use it verbatim. Official
     # OpenAI hosts (canonical and data-residency regional) return 120+ embeddings/whisper/tts/…
-    # entries, so intersect with the curated agentic catalog so ``/model`` matches ``hermes model``.
+    # entries, so intersect with the curated agentic catalog so ``/model`` matches ``eir model``.
     # Model not in live /v1/models — check the curated catalog before rejecting. Providers may omit models
     # from their live listing that are still valid (stale cache, partial rollout, gated previews). Use the
-    # pure-catalog helper (no extra live fetch) so we only accept models Hermes actually ships. (#46850)
+    # pure-catalog helper (no extra live fetch) so we only accept models Eir actually ships. (#46850)
     # Their /v1/models listing is access-scoped and authoritative — a model absent from it is one this key
     # CANNOT serve, so the curated soft-accept would manufacture a selection that 400s at first use. Custom
     # OpenAI-compatible proxies keep the fallback (incomplete listings are common there).
-    from hermes_cli.providers import is_official_openai_host
+    from eir_cli.providers import is_official_openai_host
 
     try:
         live = fetch_api_models(api_key, base)
@@ -1472,7 +1472,7 @@ def _custom_catalog(normalized: str, force_refresh: bool) -> Optional[list[str]]
     if not base_url:
         return None
     model_cfg = _get_model_config_dict()
-    from hermes_cli.auth_declared_providers import custom_catalog_probe_api_key
+    from eir_cli.auth_declared_providers import custom_catalog_probe_api_key
     api_key = custom_catalog_probe_api_key(model_cfg, base_url)
     api_mode = "anthropic_messages" if _base_url_looks_like_anthropic_messages(base_url) else None
     return fetch_api_models(api_key, base_url, api_mode=api_mode) or None
@@ -1499,8 +1499,8 @@ def _azure_foundry_catalog(normalized: str, force_refresh: bool) -> Optional[lis
     ``/anthropic`` routes serve no ``/models``; the probe never raises, so any miss keeps ``[]``.
     """
     try:
-        from hermes_cli.azure_detect import _probe_openai_models
-        from hermes_cli.runtime_provider import _resolve_azure_foundry_runtime
+        from eir_cli.azure_detect import _probe_openai_models
+        from eir_cli.runtime_provider import _resolve_azure_foundry_runtime
 
         runtime = _resolve_azure_foundry_runtime(requested_provider=normalized, model_cfg=_get_model_config_dict())
         base_url = str(runtime.get("base_url") or "").strip().rstrip("/")
@@ -1582,7 +1582,7 @@ def _profile_live_catalog(normalized: str) -> Optional[list[str]]:
             logger.debug("external_process catalog fetch failed for %s: %s", normalized, exc)
             live = None
         # Same merge as setup (`_model_flow_plugin_provider`) so /model, the Desktop picker and
-        # `hermes model` offer one list: live ids plus any pinned id the probe omitted.
+        # `eir model` offer one list: live ids plus any pinned id the probe omitted.
         return merge_profile_catalog(normalized, profile, list(live) if live else None)
     if not (profile.auth_type == "api_key" and profile.base_url):
         return list(profile.fallback_models) or None
@@ -1630,7 +1630,7 @@ def _drop_delisted_opencode_models(normalized: str, rows: Optional[list[str]]) -
 
 def _chat_catalog_rows(models):
     """Drop generation ids from a chat-catalog list, keeping its list subclass."""
-    from hermes_cli.chat_catalog import without_generation_models
+    from eir_cli.chat_catalog import without_generation_models
     return without_generation_models(models)
 
 
@@ -1662,7 +1662,7 @@ def _configured_relay_base_url(provider: str) -> str:
     # profile leaves it empty; OpenRouter has no registry row) is not a relay: setup persists
     # canonical URLs, and OAuth providers (Codex) need native discovery.
     try:
-        from hermes_cli.auth import PROVIDER_REGISTRY
+        from eir_cli.auth import PROVIDER_REGISTRY
         from providers import get_provider_profile
 
         profile_url = getattr(get_provider_profile(normalized), "base_url", "")
@@ -1685,7 +1685,7 @@ def _relay_model_catalog(normalized: str, relay: str) -> Optional[list[str]]:
         profile = get_provider_profile(normalized)
         if profile is None or getattr(profile, "auth_type", "") != "api_key":
             return None
-        from hermes_cli.auth_declared_providers import relay_probe_api_key
+        from eir_cli.auth_declared_providers import relay_probe_api_key
         api_key = relay_probe_api_key(normalized, relay, *_api_key_credentials(normalized))
         live = profile.fetch_models(api_key=api_key, base_url=relay)
         return [str(m) for m in (live or []) if m] or None
@@ -1764,7 +1764,7 @@ def provider_model_ids(provider: Optional[str], *, force_refresh: bool = False) 
 
 # ---------------------------------------------------------------------------
 # Disk cache for provider_model_ids() — keeps /model picker fast (otherwise every open re-fetches
-# every authed provider's /v1/models). One JSON file at $HERMES_HOME/provider_models_cache.json;
+# every authed provider's /v1/models). One JSON file at $EIR_HOME/provider_models_cache.json;
 # entries keyed by credential fingerprint (rotate OPENAI_API_KEY → entry invalidates); 1h TTL;
 # only NON-EMPTY results are cached so a transient failure is never pinned; any read/write error
 # degrades silently to a live fetch.
@@ -1817,8 +1817,8 @@ def _spawn_swr_refresh(cache_key: str, refresh_fn=None) -> None:
     # Under a routed profile the inflight key includes the home: the same provider slug names a
     # different disk cache and credential set per profile, so one profile's refresh must not
     # suppress another's. Unscoped keeps the bare key (tests inspect the set by slug).
-    from hermes_constants import get_hermes_home_override, hermes_home_key
-    inflight_key = cache_key if get_hermes_home_override() is None else (hermes_home_key(), cache_key)
+    from eir_constants import get_eir_home_override, eir_home_key
+    inflight_key = cache_key if get_eir_home_override() is None else (eir_home_key(), cache_key)
     with _swr_refresh_lock:
         if inflight_key in _swr_refresh_inflight:
             return
@@ -1850,8 +1850,8 @@ def _spawn_swr_refresh(cache_key: str, refresh_fn=None) -> None:
 
 
 def _provider_models_cache_path() -> Path:
-    from hermes_constants import get_hermes_home
-    return get_hermes_home() / "provider_models_cache.json"
+    from eir_constants import get_eir_home
+    return get_eir_home() / "provider_models_cache.json"
 
 
 def _credential_fingerprint(provider: str) -> str:
@@ -1865,7 +1865,7 @@ def _credential_fingerprint(provider: str) -> str:
 
     parts: list[str] = []
     try:
-        from hermes_cli.auth import PROVIDER_REGISTRY
+        from eir_cli.auth import PROVIDER_REGISTRY
         pcfg = PROVIDER_REGISTRY.get(provider)
         if pcfg is not None:
             for ev in getattr(pcfg, "api_key_env_vars", ()) or ():
@@ -1876,7 +1876,7 @@ def _credential_fingerprint(provider: str) -> str:
     except Exception:
         pass
 
-    from hermes_cli.models_process_fingerprint import process_catalog_identity
+    from eir_cli.models_process_fingerprint import process_catalog_identity
     process_profile, process_parts = process_catalog_identity(provider)
     parts += process_parts
 
@@ -1892,7 +1892,7 @@ def _credential_fingerprint(provider: str) -> str:
     # resource switch under the same key must not serve the previous resource's catalog (#27989).
     if provider == "azure-foundry":
         try:
-            from hermes_cli.runtime_provider import _config_base_url_for_provider
+            from eir_cli.runtime_provider import _config_base_url_for_provider
             parts.append(f"effective_base={_config_base_url_for_provider(_get_model_config_dict(), 'azure-foundry')}")
         except Exception:
             pass
@@ -1926,7 +1926,7 @@ def _credential_fingerprint(provider: str) -> str:
             pass
 
     if provider == "openai-codex":
-        from hermes_cli.codex_models import codex_catalog_credential_identity
+        from eir_cli.codex_models import codex_catalog_credential_identity
         parts.append(f"codex_identity={codex_catalog_credential_identity()}")
     elif process_profile is not None:
         # Only the profile's own files: the vendor CLI rewrites its token file on every refresh (#129094).
@@ -1935,9 +1935,9 @@ def _credential_fingerprint(provider: str) -> str:
             _mtime_part(path, path)
     else:
         try:
-            from hermes_constants import get_hermes_home
+            from eir_constants import get_eir_home
             for rel in ("auth.json", "credentials.json"):
-                _mtime_part(rel, get_hermes_home() / rel)
+                _mtime_part(rel, get_eir_home() / rel)
         except Exception:
             pass
         from providers import list_providers
@@ -1971,7 +1971,7 @@ def _save_provider_models_cache(data: dict) -> None:
 def _store_cache_entry(cache_key: str, entry: dict) -> None:
     """Write one row into the disk cache, re-reading it under the thread + cross-process locks: a slow
     fetch worker or another process must never write back the snapshot it loaded before fetching."""
-    from hermes_cli.models_cache_lock import write_under_cache_lock
+    from eir_cli.models_cache_lock import write_under_cache_lock
 
     def write_row() -> None:
         cache = _load_provider_models_cache()
@@ -2060,9 +2060,9 @@ def cached_provider_model_ids(
 
 def clear_provider_models_cache(provider: Optional[str] = None) -> None:
     """Drop one provider's cache entry, or wipe the whole cache (``provider=None``). Used by
-    ``/model --refresh`` and ``hermes model --refresh``."""
+    ``/model --refresh`` and ``eir model --refresh``."""
     try:
-        from hermes_cli.model_catalog import clear_fetch_backoff
+        from eir_cli.model_catalog import clear_fetch_backoff
         clear_fetch_backoff()  # a recovered catalog is fetched now, not after the offline backoff
         # Native Ollama tags are keyed by root URL, not provider slug: clear them on every refresh.
         _OLLAMA_LOCAL_MODELS_CACHE.clear()
@@ -2073,7 +2073,7 @@ def clear_provider_models_cache(provider: Optional[str] = None) -> None:
         from providers import list_providers
         for profile in list_providers():
             profile.invalidate_catalog_cache()
-        from hermes_cli.models_cache_lock import write_under_cache_lock
+        from eir_cli.models_cache_lock import write_under_cache_lock
         path = _provider_models_cache_path()
 
         # Under the cache lock like every other writer: a locked writer that loaded the cache
@@ -2099,7 +2099,7 @@ def _resolve_anthropic_pool_catalog_credentials() -> tuple[str, str]:
     ``api_key`` pool entries — its runtime contract is OAuth-oriented)."""
     try:
         from agent.credential_pool import AUTH_TYPE_API_KEY
-        from hermes_cli.auth import read_credential_pool
+        from eir_cli.auth import read_credential_pool
 
         for entry in read_credential_pool("anthropic"):
             if not isinstance(entry, dict) or entry.get("auth_type") != AUTH_TYPE_API_KEY:
@@ -2123,7 +2123,7 @@ def _fetch_anthropic_models(
     except ImportError:
         return None
 
-    from hermes_cli.runtime_provider import anthropic_discovery_token  # Foundry: never the OAuth token (#154242)
+    from eir_cli.runtime_provider import anthropic_discovery_token  # Foundry: never the OAuth token (#154242)
     resolved_base_url, token = base_url, anthropic_discovery_token(api_key, base_url)
     if token == "":
         # A pool credential and its endpoint are one security boundary — never pair the pool key
@@ -2333,9 +2333,9 @@ def probe_api_models(
             return _probe_result(
                 None, normalized.rstrip("/") + "/models", normalized,
                 alternate_base if alternate_base != normalized else None)
-    headers: dict[str, str] = {"User-Agent": hermes_user_agent()}
+    headers: dict[str, str] = {"User-Agent": eir_user_agent()}
     if urllib.parse.urlparse(normalized).hostname == "generativelanguage.googleapis.com":
-        headers["X-Goog-Api-Client"] = hermes_user_agent("hermes-agent")
+        headers["X-Goog-Api-Client"] = eir_user_agent("eir-agent")
     if api_key and api_mode == "anthropic_messages":
         headers["x-api-key"] = api_key
         headers["anthropic-version"] = "2023-06-01"
@@ -2343,7 +2343,7 @@ def probe_api_models(
         headers["Authorization"] = f"Bearer {api_key}"
     if isinstance(request_headers, dict):
         # Per-provider custom headers can contain secrets: merge last so endpoint config wins; never log.
-        from hermes_cli.config import normalize_extra_headers
+        from eir_cli.config import normalize_extra_headers
 
         headers.update(normalize_extra_headers(request_headers))
 
@@ -2366,7 +2366,7 @@ def probe_api_models(
             continue
         if _neg_key is not None:
             _probe_neg_cache.pop(_neg_key, None)
-        from hermes_cli.chat_catalog import note_catalog_item
+        from eir_cli.chat_catalog import note_catalog_item
 
         probed = []
         for item in data.get("data", []):
@@ -2396,7 +2396,7 @@ _DEEPINFRA_SURFACE_TAGS: frozenset[str] = frozenset({
     "chat", "embed", "image-gen", "tts", "stt", "video-gen"})
 
 _DEEPINFRA_DEFAULT_BASE_URL = "https://api.deepinfra.com/v1/openai"
-_DEEPINFRA_MODELS_QUERY = "filter=true&sort_by=hermes"
+_DEEPINFRA_MODELS_QUERY = "filter=true&sort_by=eir"
 
 # Full tagged catalog keyed by base URL; every surface filter reads it so one round-trip serves all.
 _deepinfra_catalog_cache: dict[str, list[dict]] = {}
@@ -2409,7 +2409,7 @@ _DEEPINFRA_CATALOG_NEG_TTL = 60.0  # seconds
 
 def _deepinfra_env(key: str) -> str:
     """Profile-scoped ``.env``/environ read: under a multiplexed turn the launch env is not this profile's."""
-    from hermes_cli.config import get_env_value_prefer_dotenv
+    from eir_cli.config import get_env_value_prefer_dotenv
     return (get_env_value_prefer_dotenv(key) or "").strip()
 
 
@@ -2435,7 +2435,7 @@ def _fetch_deepinfra_catalog(
         if last_fail is not None and (time.monotonic() - last_fail) < _DEEPINFRA_CATALOG_NEG_TTL:
             return None
 
-    headers: dict[str, str] = {"User-Agent": hermes_user_agent()}
+    headers: dict[str, str] = {"User-Agent": eir_user_agent()}
     api_key = _deepinfra_env("DEEPINFRA_API_KEY")
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
@@ -2507,10 +2507,10 @@ def _fetch_ai_gateway_models(timeout: float = 5.0) -> Optional[list[str]]:
         return None
     base_url = os.getenv("AI_GATEWAY_BASE_URL", "").strip()
     if not base_url:
-        from hermes_constants import AI_GATEWAY_BASE_URL
+        from eir_constants import AI_GATEWAY_BASE_URL
         base_url = AI_GATEWAY_BASE_URL
 
-    headers = {"Authorization": f"Bearer {api_key}", "User-Agent": hermes_user_agent()}
+    headers = {"Authorization": f"Bearer {api_key}", "User-Agent": eir_user_agent()}
     try:
         url = base_url.rstrip("/") + "/models"
         data = _get_json(url, timeout=timeout, headers=headers)
@@ -2588,7 +2588,7 @@ def cached_fetch_api_models(
     opens that must not block on a stopped local endpoint) still get a warm catalog instead of
     collapsing to the config-declared subset. ``fetch_models`` supplies native-aware discovery
     without minting a command token before cache admission."""
-    from hermes_cli.model_switch_providers import _NativePickerModelList
+    from eir_cli.model_switch_providers import _NativePickerModelList
 
     def _catalog(entry):
         rows = (_NativePickerModelList if entry.get("native_catalog") else list)(entry["models"])

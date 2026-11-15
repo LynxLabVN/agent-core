@@ -1,6 +1,6 @@
 """Pure identity derivations the canonical store and the gateway both need.
 
-stdlib-only on purpose: ``hermes_state_*`` modules must not import ``gateway/`` to compute a
+stdlib-only on purpose: ``eir_state_*`` modules must not import ``gateway/`` to compute a
 digest or parse a key (the gateway imports the store, so the reverse edge is a latent cycle).
 The gateway modules that historically defined these re-export them from here.
 """

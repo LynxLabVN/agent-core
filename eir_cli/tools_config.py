@@ -1,4 +1,4 @@
-"""Unified tool configuration for Hermes Agent."""
+"""Unified tool configuration for Eir Agent."""
 
 import json as _json
 import logging
@@ -6,23 +6,23 @@ import os
 from pathlib import Path
 from typing import Dict, List, NoReturn, Optional, Set
 
-from hermes_cli.cli_output import print_info as _print_info
-from hermes_cli.colors import Colors, color
-from hermes_cli.config import cfg_get, load_config, save_config, get_env_value
-from hermes_cli.nous_subscription import (
+from eir_cli.cli_output import print_info as _print_info
+from eir_cli.colors import Colors, color
+from eir_cli.config import cfg_get, load_config, save_config, get_env_value
+from eir_cli.nous_subscription import (
     NousSubscriptionFeatures, apply_nous_managed_defaults, get_nous_subscription_features)
-from hermes_cli.platforms import PLATFORMS as _PLATFORMS_REGISTRY
-from hermes_cli.toolset_scope import (
+from eir_cli.platforms import PLATFORMS as _PLATFORMS_REGISTRY
+from eir_cli.toolset_scope import (
     _TOOLSET_PLATFORM_RESTRICTIONS, toolset_allowed_for_platform as _toolset_allowed_for_platform)
-from hermes_cli.toolset_validation import parse_platform_toolsets_value
-# Re-exports: keep ``hermes_cli.tools_config.X`` callers and test patch targets resolving.
-from hermes_cli.tools_config_cua import (
+from eir_cli.toolset_validation import parse_platform_toolsets_value
+# Re-exports: keep ``eir_cli.tools_config.X`` callers and test patch targets resolving.
+from eir_cli.tools_config_cua import (
     _post_setup_no_window_flags, _cua_driver_cmd, _cua_version_summary, _resolved_cua_driver_cmd, _cua_driver_env,
     _cua_driver_contract_status, _cua_driver_install_ready)
-from hermes_cli.tools_config_post_setup import (
+from eir_cli.tools_config_post_setup import (
     _ensure_browser_use_cli, _run_post_setup, valid_post_setup_keys, run_post_setup_command, _POST_SETUP_INSTALLED,
     _post_setup_already_installed, _module_installed, _POST_SETUP_READY)
-from hermes_cli.tools_config_providers import (
+from eir_cli.tools_config_providers import (
     _plugin_image_gen_providers, _plugin_video_gen_providers, _plugin_web_search_providers, _plugin_browser_providers,
     _plugin_tts_providers, web_provider_capabilities, _visible_providers, provider_readiness_status,
     _toolset_needs_configuration_prompt, _configure_tool_category, _web_tier_matches, _is_provider_active,
@@ -31,7 +31,7 @@ from hermes_cli.tools_config_providers import (
     _select_plugin_image_gen_provider, _select_plugin_video_gen_provider, STT_MODEL_CATALOG, _configure_stt_model,
     _write_provider_config, apply_provider_selection, _configure_provider, _reconfigure_provider,
     _configure_vision_backend, _configure_vision_provider_model, _configure_simple_requirements)
-from hermes_cli.tools_config_mcp import (
+from eir_cli.tools_config_mcp import (
     _configure_mcp_tools_interactive, _apply_toolset_change, _apply_mcp_change, tools_disable_enable_command)
 
 
@@ -39,9 +39,9 @@ def _pip_install(
     args: list[str], *, timeout: int = 300, capture_output: bool = True
 ) -> NoReturn:
     # Shim to suppress old updater work until relaunch, not install or report success.
-    from hermes_cli._old_updater import stop_historical_updater
+    from eir_cli._old_updater import stop_historical_updater
 
-    stop_historical_updater("hermes_cli.tools_config._pip_install", ImportError)
+    stop_historical_updater("eir_cli.tools_config._pip_install", ImportError)
 
 
 logger = logging.getLogger(__name__)
@@ -50,14 +50,14 @@ logger = logging.getLogger(__name__)
 def install_cua_driver(*args, **kwargs) -> NoReturn:
     # A running pre-PM updater can still import the vendor installer here.
     # Stop it before any old retry or completion branch can run.
-    from hermes_cli._old_updater import stop_historical_updater
+    from eir_cli._old_updater import stop_historical_updater
 
-    stop_historical_updater("hermes_cli.tools_config.install_cua_driver", ImportError)
+    stop_historical_updater("eir_cli.tools_config.install_cua_driver", ImportError)
 
 # Platforms already warned about an all-invalid platform_toolsets list (warn once, not per resolution).
 _warned_invalid_platform_toolsets: set[str] = set()
 
-from hermes_cli._startup_fast import project_root_str
+from eir_cli._startup_fast import project_root_str
 
 PROJECT_ROOT = Path(project_root_str())
 
@@ -105,12 +105,12 @@ def gui_toolset_label(label: str) -> str:
     return text
 
 
-# OFF by default for new installs (still in _HERMES_CORE_TOOLS; the checklist won't pre-select them). x_search
+# OFF by default for new installs (still in _EIR_CORE_TOOLS; the checklist won't pre-select them). x_search
 # auto-enables when xAI creds exist; its check_fn still gates the schema. ``spotify`` and ``a2a`` are plugin
 # toolsets (catalog / bundled plugin) that stay opt-in once installed.
 _DEFAULT_OFF_TOOLSETS = {"spotify", "discord", "discord_admin", "video", "video_gen", "x_search", "a2a", "kanban"}
 
-# Config-only capabilities: provider setup in `hermes tools` (TOOL_CATEGORIES) but not model toolsets — zero
+# Config-only capabilities: provider setup in `eir tools` (TOOL_CATEGORIES) but not model toolsets — zero
 # schemas, own switch (``stt.enabled``), never in ``platform_toolsets`` or the per-platform checklist.
 _CONFIG_ONLY_TOOLSETS = {"stt"}
 
@@ -119,7 +119,7 @@ def _xai_credentials_present() -> bool:
     """Cheap offline check for xAI credentials (auth store + env only); the runtime ``check_fn`` still gates
     schema registration if creds expire. Also used by ``provider_readiness_status`` for ``xai_grok`` rows."""
     try:
-        from hermes_cli.auth import _read_xai_oauth_tokens
+        from eir_cli.auth import _read_xai_oauth_tokens
         _read_xai_oauth_tokens()
         return True
     except Exception:
@@ -158,7 +158,7 @@ def _get_effective_configurable_toolsets():
     try:
         projected = _projected_plugin_toolsets()
         if projected is None:
-            from hermes_cli.plugins import discover_plugins, get_plugin_toolsets
+            from eir_cli.plugins import discover_plugins, get_plugin_toolsets
             discover_plugins()  # idempotent — ensures plugins are loaded
         for entry in projected[0] if projected is not None else get_plugin_toolsets():
             if entry[0] not in seen:
@@ -176,14 +176,14 @@ def _get_plugin_toolset_keys() -> set:
             return {key for key, _, _ in projected[0]}
         # Non-blocking on CLI startup: while background discovery is still importing, serve last
         # launch's persisted key set instead of joining the discovery thread.
-        from hermes_cli.plugins import get_plugin_toolset_keys_nowait
+        from eir_cli.plugins import get_plugin_toolset_keys_nowait
         return get_plugin_toolset_keys_nowait()
     except Exception:
         return set()
 
 
 def _checklist_toolset_keys(platform: str) -> set[str]:
-    """Toolset keys the ``hermes tools`` checklist offers for ``platform`` (mirrors ``_prompt_toolset_checklist``);
+    """Toolset keys the ``eir tools`` checklist offers for ``platform`` (mirrors ``_prompt_toolset_checklist``);
     read-time-resolved toolsets (recovered composites, MCP names) are NOT here."""
     return {
         ts_key for ts_key, _, _ in _get_effective_configurable_toolsets()
@@ -191,8 +191,8 @@ def _checklist_toolset_keys(platform: str) -> set[str]:
 
 
 def _platform_default_toolset(platform: str) -> str:
-    """Composite toolset a platform falls back to (plugin platforms derive ``hermes-<platform>``)."""
-    return PLATFORMS[platform]["default_toolset"] if platform in PLATFORMS else f"hermes-{platform}"
+    """Composite toolset a platform falls back to (plugin platforms derive ``eir-<platform>``)."""
+    return PLATFORMS[platform]["default_toolset"] if platform in PLATFORMS else f"eir-{platform}"
 
 
 def _cfg_section(config: dict, key: str) -> dict:
@@ -320,7 +320,7 @@ TOOL_CATEGORIES = {
     "x_search": {
         "name": "X (Twitter) Search", "setup_title": "Select xAI Credential Source",
         "setup_note": (
-            "Hermes routes X searches through xAI's built-in x_search Responses tool for read-only public X "
+            "Eir routes X searches through xAI's built-in x_search Responses tool for read-only public X "
             "discovery. Use the xurl skill for authenticated X API reads and account actions. Both credential "
             "sources hit the same https://api.x.ai/v1/responses endpoint — pick whichever you already have. "
             "SuperGrok OAuth is preferred when both are set (uses your subscription quota instead of API spend)."
@@ -343,7 +343,7 @@ TOOL_CATEGORIES = {
         "providers": [
             _row("Local Browser", "★ recommended · free", "Headless Chromium, no API key needed", browser_provider="local",
                  browser_engine="auto", post_setup="chromium"),
-            _row("Lightpanda", "free · local · no Chromium", "Zig headless browser spawned by Hermes, text-only (no screenshots)",
+            _row("Lightpanda", "free · local · no Chromium", "Zig headless browser spawned by Eir, text-only (no screenshots)",
                  browser_provider="local", browser_engine="lightpanda", post_setup="lightpanda"),
             # Browser Use hosts its own Chromium, so the local-Chromium install and readiness gate must not
             # apply (with "chromium" this row read "needs setup" forever on machines without a local build).
@@ -356,7 +356,7 @@ TOOL_CATEGORIES = {
         "name": "Computer Use (macOS/Windows/Linux)", "icon": "🖱️",
         # Runtime backends ship for macOS, Windows, Linux (X11; Wayland via XWayland). Gaps surface via `computer-use doctor`.
         "platform_gate": ["darwin", "win32", "linux"],
-        # cua-driver reads HOME/TMPDIR from the process env; HERMES_CUA_DRIVER_CMD selects a specific
+        # cua-driver reads HOME/TMPDIR from the process env; EIR_CUA_DRIVER_CMD selects a specific
         # binary (e.g. a local build). There is no version-pin env var.
         "providers": [
             _row("cua-driver (background)", "★ recommended · free · local",
@@ -414,7 +414,7 @@ def enabled_mcp_server_names(config: dict) -> set[str]:
     try:
         projected = _projected_plugin_toolsets()
         if projected is None:
-            from hermes_cli.plugins import get_portable_mcp_server_names_nowait
+            from eir_cli.plugins import get_portable_mcp_server_names_nowait
         portable = projected[1] if projected is not None else get_portable_mcp_server_names_nowait()
         names |= portable - set(mcp_servers)  # native config wins on a name collision (mirrors _load_mcp_config)
     except Exception:
@@ -423,8 +423,8 @@ def enabled_mcp_server_names(config: dict) -> set[str]:
 
 
 #: Toolsets young enough that absence from a saved ``platform_toolsets`` list means "never offered", not
-#: "declined": saving ``hermes tools`` freezes a platform's composite into an explicit list nothing adds to, so
-#: a later toolset stays off forever for picker users while ``[hermes-cli]`` users inherit it.
+#: "declined": saving ``eir tools`` freezes a platform's composite into an explicit list nothing adds to, so
+#: a later toolset stays off forever for picker users while ``[eir-cli]`` users inherit it.
 #: MUST ship in the same release as the toolset and be emptied in the next: once a released build has put the
 #: toolset on a checklist, an unchecking user's config is byte-identical to one saved before it existed and this
 #: rule would turn the opt-out back on (stuck checkbox). ``check_fn``-gated toolsets cost nothing here; never
@@ -446,7 +446,7 @@ def _enable_recently_shipped_toolsets(enabled_toolsets: set[str], config: dict, 
         if ts_key in enabled_toolsets or ts_key in declined or not _toolset_allowed_for_platform(ts_key, platform):
             continue
         # Only enable where staying on the composite would have enabled it anyway; deliberately narrow
-        # composites (hermes-acp, hermes-webhook) stay narrow.
+        # composites (eir-acp, eir-webhook) stay narrow.
         ts_tools = set(resolve_toolset(ts_key, include_registry=False))
         if composite_tools is None:
             composite_tools = set(resolve_toolset(default_ts))
@@ -490,7 +490,7 @@ def _explicit_toolsets(
     toolset_names: list[str], explicit_known_keys: set[str], config: dict, platform: str,
     explicitly_configured: bool) -> set[str]:
     """Enabled set when the saved list names configurable/plugin keys directly (subset inference over
-    ``hermes-cli`` would re-enable disabled toolsets). A mixed list (``[hermes-cli, discord]``) still expands the
+    ``eir-cli`` would re-enable disabled toolsets). A mixed list (``[eir-cli, discord]``) still expands the
     composite; _DEFAULT_OFF_TOOLSETS applies to that implicit expansion only."""
     from toolsets import resolve_toolset, TOOLSETS
 
@@ -537,7 +537,7 @@ def _context_engine_active(config: dict) -> bool:
 def _coerce_platform_toolsets_value(value, platform: str):
     """Read a list-literal string saved for ``platform_toolsets.<platform>`` as the list it encodes.
 
-    The parser is shared with ``hermes doctor`` and ``hermes plugins`` (``toolset_validation``
+    The parser is shared with ``eir doctor`` and ``eir plugins`` (``toolset_validation``
     ``parse_platform_toolsets_value``) so every surface agrees on the user's selection (#115866).
     Any other non-list value is warned about once (naming the expected shape) and left as-is, so
     the default fallback below is loud rather than silent.
@@ -552,7 +552,7 @@ def _coerce_platform_toolsets_value(value, platform: str):
         logger.warning(
             "platform_toolsets.%s is %r, expected a YAML list of toolset names "
             "(e.g. [terminal, file, web]) - falling back to the platform default. "
-            "Run `hermes tools` to reconfigure.", platform, value)
+            "Run `eir tools` to reconfigure.", platform, value)
     return value
 
 
@@ -573,7 +573,7 @@ def _get_platform_tools(config: dict, platform: str, *, include_default_mcp_serv
     """Resolve which individual toolset names are enabled for a platform."""
     platform_toolsets = config.get("platform_toolsets") or {}
     toolset_names = _coerce_platform_toolsets_value(platform_toolsets.get(platform), platform)
-    # An explicitly saved list (even a composite like ``hermes-discord``) is an opt-in to the platform's
+    # An explicitly saved list (even a composite like ``eir-discord``) is an opt-in to the platform's
     # native default-off toolsets — see _default_off_toolsets.
     # Track whether the user explicitly saved a toolset list for this platform (vs. falling back to the
     # platform default). See #35527.
@@ -583,15 +583,15 @@ def _get_platform_tools(config: dict, platform: str, *, include_default_mcp_serv
     # YAML may parse bare numeric names (``12306:``) as int; normalise so sorted() never mixes types.
     toolset_names = [str(ts) for ts in toolset_names]
 
-    # Expand legacy toolset aliases.  Older Hermes versions and clients used
-    # bare ``"hermes"`` as a composite toolset covering both the CLI and the
-    # API-server surface.  Modern code expects ``"hermes-cli"`` (and
-    # ``"hermes-api-server"`` for the HTTP endpoint), so configs persisted
+    # Expand legacy toolset aliases.  Older Eir versions and clients used
+    # bare ``"eir"`` as a composite toolset covering both the CLI and the
+    # API-server surface.  Modern code expects ``"eir-cli"`` (and
+    # ``"eir-api-server"`` for the HTTP endpoint), so configs persisted
     # by those older versions still carry the legacy name; without expansion
-    # ``resolve_toolset("hermes")`` returns ``[]`` — all tools silently
+    # ``resolve_toolset("eir")`` returns ``[]`` — all tools silently
     # disappear.
     _LEGACY_TOOLSET_ALIASES: dict = {
-        "hermes": ("hermes-cli", "hermes-api-server"),
+        "eir": ("eir-cli", "eir-api-server"),
     }
     expanded: list = []
     for name in toolset_names:
@@ -605,9 +605,9 @@ def _get_platform_tools(config: dict, platform: str, *, include_default_mcp_serv
     configurable_keys = _configurable_keys()
     plugin_ts_keys = _get_plugin_toolset_keys()
     platform_default_keys = _platform_default_keys()
-    # Plugin toolsets are first-class on a saved list: ``[hermes-cli, a2a]`` must survive filtering.
+    # Plugin toolsets are first-class on a saved list: ``[eir-cli, a2a]`` must survive filtering.
     # Plugin-provided toolsets are first-class on a platform-toolsets list — explicit config like
-    # ``[hermes-cli, a2a]`` must survive filtering just like a built-in configurable toolset would. See
+    # ``[eir-cli, a2a]`` must survive filtering just like a built-in configurable toolset would. See
     # issue #81163.
     explicit_known_keys = configurable_keys | plugin_ts_keys
 
@@ -638,7 +638,7 @@ def _get_platform_tools(config: dict, platform: str, *, include_default_mcp_serv
         enabled_toolsets.add("kanban")
 
     # agent.disabled_toolsets is a global suppression list (#86661) and runs LAST so it overrides everything
-    # above. It may arrive as a JSON-array string ("['memory']") from `hermes config set` or a JSON-mode editor.
+    # above. It may arrive as a JSON-array string ("['memory']") from `eir config set` or a JSON-mode editor.
     disabled_toolsets = (config.get("agent") or {}).get("disabled_toolsets")
     if disabled_toolsets:
         from agent.skill_utils import parse_config_string_list
@@ -655,7 +655,7 @@ def _prune_toolsets_stripped_by_disabled(enabled_toolsets: set[str], disabled_na
 
     The agent subtracts ``agent.disabled_toolsets`` at TOOL granularity (``model_tools._select_tool_names``),
     so disabling a composite like ``debugging`` removes the terminal/web/file tools even though those names
-    never appear in the list. A name-only subtraction here left inspection surfaces (``hermes tools
+    never appear in the list. A name-only subtraction here left inspection surfaces (``eir tools
     --summary``, banner, ``/tools``) showing toolsets as enabled that no session could call (#97015).
     Passthrough entries (MCP server names) and toolsets with no static tools (``context_engine``) are kept.
     """
@@ -686,7 +686,7 @@ def toolsets_partially_stripped(config: dict, enabled_toolsets: set[str]) -> dic
     that ``agent.disabled_toolsets`` cuts down without removing (``web`` minus ``web_search`` via ``search``,
     #134593). ``_prune_toolsets_stripped_by_disabled`` keeps such a toolset "enabled" because some of its
     tools survive, so inspection surfaces need this to say which ones did not. The hint offers
-    ``hermes tools enable`` only when that save clears every entry (``_save_platform_tools`` coverage)."""
+    ``eir tools enable`` only when that save clears every entry (``_save_platform_tools`` coverage)."""
     from agent.skill_utils import parse_config_string_list
     from model_tools import _apply_toolset_selection
     from toolsets import resolve_toolset, validate_toolset
@@ -704,7 +704,7 @@ def toolsets_partially_stripped(config: dict, enabled_toolsets: set[str]) -> dic
         if by:
             entries = sorted(by)
             clears = all(_disabled_entry_tools(e) <= tools for e in entries)
-            hint = (f"run `hermes tools enable {name}` to restore" if clears
+            hint = (f"run `eir tools enable {name}` to restore" if clears
                     else f"remove {', '.join(entries)} from agent.disabled_toolsets to restore")
             report[name] = (sorted(set().union(*by.values())), entries, hint)
     return report
@@ -718,7 +718,7 @@ def _recover_platform_native_toolsets(enabled_toolsets: set[str], platform: str,
     platform_tool_universe = set(resolve_toolset(_platform_default_toolset(platform)))
     configurable_tool_universe = {t for ts_key, _, _ in CONFIGURABLE_TOOLSETS for t in resolve_toolset(ts_key)}
     claimed = {t for ts_key in enabled_toolsets for t in resolve_toolset(ts_key)}
-    skip = skip | {k for k in TOOLSETS if k.startswith("hermes-")} | (set(_DEFAULT_OFF_TOOLSETS) - {platform})
+    skip = skip | {k for k in TOOLSETS if k.startswith("eir-")} | (set(_DEFAULT_OFF_TOOLSETS) - {platform})
     for ts_key, ts_def in TOOLSETS.items():
         # Posture toolsets (``coding``) are session-level selections made by agent/coding_context.py, not
         # per-platform capabilities to recover.
@@ -758,15 +758,15 @@ def _merge_mcp_servers(
 
 
 def _warn_all_invalid_platform_toolsets(platform: str, explicit: list, config: dict) -> None:
-    """Warn once when an explicit platform list has only invalid names (``hermes`` for ``hermes-cli`` → no
+    """Warn once when an explicit platform list has only invalid names (``eir`` for ``eir-cli`` → no
     native tools), at session tool resolution rather than only in update/doctor. Names are judged the way
-    ``hermes config check`` judges them, and a known platform's own ``hermes-<platform>`` bundle always
+    ``eir config check`` judges them, and a known platform's own ``eir-<platform>`` bundle always
     counts (``is_known_platform_bundle``): a plugin platform has no sessions to leave toolless until its
     plugin loads, and once it loads the registry resolves the bundle.
     The own-bundle and registered-toolset checks run first because this is reached on every schema build
     (the kanban gate resolves every saved platform row) and on bypass launches that must not read profile
     plugin state; the resolver's manifest scan and plugin lookup run only for names those cannot place."""
-    from hermes_cli.toolset_validation import is_known_platform_bundle, saved_toolset_resolver
+    from eir_cli.toolset_validation import is_known_platform_bundle, saved_toolset_resolver
     from toolsets import validate_toolset
 
     if platform in _warned_invalid_platform_toolsets:
@@ -779,7 +779,7 @@ def _warn_all_invalid_platform_toolsets(platform: str, explicit: list, config: d
         _warned_invalid_platform_toolsets.add(platform)
         logger.warning(
             "platform '%s' has no valid toolsets configured (unknown "
-            "name(s): %s) - tools will be unavailable. Run `hermes tools` "
+            "name(s): %s) - tools will be unavailable. Run `eir tools` "
             "to reconfigure. See issue #38798.",
             platform, ", ".join(named))
 
@@ -792,7 +792,7 @@ def _save_platform_tools(config: dict, platform: str, enabled_toolset_keys: set[
     enabled_toolset_keys = {ts for ts in enabled_toolset_keys if _toolset_allowed_for_platform(ts, platform)}
     plugin_keys = _get_plugin_toolset_keys()
     # Preserve only existing entries that are neither configurable nor platform defaults (i.e. MCP server
-    # names): platform defaults (hermes-cli, ...) resolve to ALL tools and would silently override the user's
+    # names): platform defaults (eir-cli, ...) resolve to ALL tools and would silently override the user's
     # unchecked selections on the next read. Saving from the picker is consent to clear the "no_mcp" sentinel
     # (no checkbox for it; users who once set it by hand could otherwise never re-enable MCP via the UI).
     drop = _configurable_keys() | plugin_keys | _platform_default_keys() | {"no_mcp"}
@@ -869,7 +869,7 @@ def _toolset_has_keys(
 
 def _prompt_choice(question: str, choices: list, default: int = 0) -> int:
     """Single-select menu (arrow keys). Delegates to curses_radiolist."""
-    from hermes_cli.curses_ui import curses_radiolist
+    from eir_cli.curses_ui import curses_radiolist
     return curses_radiolist(question, choices, selected=default, cancel_returns=default)
 
 
@@ -882,9 +882,9 @@ def _estimate_tool_tokens() -> dict[str, int]:
     """tiktoken (cl100k_base) tokens per tool name from the serialised OpenAI schema; cached per process and
     registry generation, {} if tiktoken/registry unavailable."""
     global _tool_token_cache
-    from hermes_constants import hermes_home_key
+    from eir_constants import eir_home_key
 
-    scope = hermes_home_key()
+    scope = eir_home_key()
     _tool_token_cache = _tool_token_cache or {}
     try:
         import model_tools
@@ -911,7 +911,7 @@ def _estimate_tool_tokens() -> dict[str, int]:
 
 def _prompt_toolset_checklist(platform_label: str, enabled: set[str], platform: str = "cli", *, force_fresh: bool = True) -> set[str]:
     """Multi-select checklist of toolsets. Returns set of selected toolset keys."""
-    from hermes_cli.curses_ui import curses_checklist
+    from eir_cli.curses_ui import curses_checklist
     from toolsets import resolve_toolset
 
     tool_tokens = _estimate_tool_tokens()
@@ -1002,7 +1002,7 @@ def _shared_metrics_menu_label(config: dict) -> str:
 
 def _configure_shared_metrics_interactive(config: dict) -> None:
     """Toggle shared-metrics collection/sending via the setup wizard prompt (single home for the consent rules)."""
-    from hermes_cli.setup import setup_telemetry
+    from eir_cli.setup import setup_telemetry
 
     before = _shared_metrics_state(config)
     setup_telemetry(config)
@@ -1039,7 +1039,7 @@ def _platform_menu_label(config: dict, pkey: str) -> str:
 
 
 def _print_tools_summary(config: dict, enabled_platforms: list[str]) -> None:
-    """``hermes tools --summary``: enabled toolsets per platform, non-interactive."""
+    """``eir tools --summary``: enabled toolsets per platform, non-interactive."""
     total = len(_get_effective_configurable_toolsets())
     print(color("☤ Tool Summary", Colors.CYAN, Colors.BOLD))
     print()
@@ -1138,7 +1138,7 @@ def _configure_platforms(config: dict, platform_keys: list[str], *, all_platform
 
 
 def tools_command(args=None, first_install: bool = False, config: dict | None = None):
-    """Entry point for `hermes tools` / `hermes setup tools`. ``first_install`` skips the menu (checklist + key
+    """Entry point for `eir tools` / `eir setup tools`. ``first_install`` skips the menu (checklist + key
     prompts); a wizard-passed ``config`` receives platform_toolsets so its final save_config() keeps them."""
     if config is None:
         config = load_config()
@@ -1148,7 +1148,7 @@ def tools_command(args=None, first_install: bool = False, config: dict | None = 
     if getattr(args, "summary", False):
         _print_tools_summary(config, enabled_platforms)
         return
-    print(color("☤ Hermes Tool Configuration", Colors.CYAN, Colors.BOLD))
+    print(color("☤ Eir Tool Configuration", Colors.CYAN, Colors.BOLD))
     print(color("  Enable or disable tools per platform.", Colors.DIM))
     print(color("  Tools that need API keys will be configured when enabled.", Colors.DIM))
     print(color("  Guide: https://hermes-agent.nousresearch.com/docs/user-guide/features/tools", Colors.DIM))
@@ -1194,7 +1194,7 @@ def tools_command(args=None, first_install: bool = False, config: dict | None = 
         print()
 
     print()
-    from hermes_constants import display_hermes_home
-    print(color(f"  Tool configuration saved to {display_hermes_home()}/config.yaml", Colors.DIM))
-    print(color("  Changes take effect on next 'hermes' or gateway restart.", Colors.DIM))
+    from eir_constants import display_eir_home
+    print(color(f"  Tool configuration saved to {display_eir_home()}/config.yaml", Colors.DIM))
+    print(color("  Changes take effect on next 'eir' or gateway restart.", Colors.DIM))
     print()

@@ -12,25 +12,25 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 
-from hermes_cli.web_deps import late
-from hermes_cli.web_server_profiles import _hub_action_name, _installed_hub_identifiers
-from hermes_cli.web_models import (
+from eir_cli.web_deps import late
+from eir_cli.web_server_profiles import _hub_action_name, _installed_hub_identifiers
+from eir_cli.web_models import (
     SkillContentUpdate, SkillCreate, SkillInstallRequest, SkillLock, SkillToggle,
     SkillUninstallRequest, SkillsUpdateRequest)
-from hermes_cli.web_routers._common import (
+from eir_cli.web_routers._common import (
     _profile_scope, config_write_scope, http_failure, log as _log, require, scoped_to_thread,
     spawn_profile_action)
 
 hub_router = APIRouter()
 router = APIRouter()
 
-_config_profile_scope = late("_config_profile_scope", "hermes_cli.web_server_profiles")
-load_config = late("load_config", "hermes_cli.config")
-# Labels per hub source id (matches `hermes skills search` provenance); keep in
+_config_profile_scope = late("_config_profile_scope", "eir_cli.web_server_profiles")
+load_config = late("load_config", "eir_cli.config")
+# Labels per hub source id (matches `eir skills search` provenance); keep in
 # sync with create_source_router()'s source list.
 _SKILL_HUB_SOURCE_LABELS = {
     "official": "Official catalog",
-    "hermes-index": "Hermes Index",
+    "eir-index": "Eir Index",
     "skills-sh": "skills.sh",
     "well-known": "Well-Known",
     "url": "Direct URL",
@@ -51,7 +51,7 @@ def _hub_sources(profile: Optional[str]):
 
 def _resolve_hub_skill(ident: str, profile: Optional[str]):
     """``(meta, bundle, source)`` for a hub identifier, resolved under ``profile``'s scope."""
-    from hermes_cli.skills_hub import _resolve_source_meta_and_bundle
+    from eir_cli.skills_hub import _resolve_source_meta_and_bundle
     from tools.skills_hub_search import create_source_router
 
     with _config_profile_scope(profile):
@@ -59,7 +59,7 @@ def _resolve_hub_skill(ident: str, profile: Optional[str]):
         return _resolve_source_meta_and_bundle(ident, sources)
 
 
-# Sources subsumed by an available hermes-index (progressive per-source fan-out
+# Sources subsumed by an available eir-index (progressive per-source fan-out
 # skips them: ~70 GitHub calls per keystroke saved). Keep in sync with
 # parallel_search_sources' _api_source_ids.
 _API_SOURCE_IDS = frozenset({"github", "skills-sh", "clawhub", "lobehub", "well-known"})
@@ -124,7 +124,7 @@ async def update_skills_hub(
 @hub_router.get("/api/skills/hub/updates")
 async def list_skill_hub_updates(profile: Optional[str] = None):
     """Hub-installed skills with an upstream update, scoped to ``profile`` (the
-    ``hermes skills check`` pass; fetches from each skill's recorded source)."""
+    ``eir skills check`` pass; fetches from each skill's recorded source)."""
 
     def _run():
         from tools.skills_hub_install import check_for_skill_updates
@@ -178,7 +178,7 @@ async def list_skills_hub_sources(profile: Optional[str] = None):
             # GitHub exposes a rate-limit flag; the index an availability flag.
             if sid == "github":
                 entry["rate_limited"] = _flag(src, "is_rate_limited")
-            if sid == "hermes-index":
+            if sid == "eir-index":
                 index_available = _flag(src, "is_available")
                 entry["available"] = index_available
                 # Empty-query search on the index returns featured/popular skills.
@@ -291,9 +291,9 @@ async def scan_skill_hub(identifier: str = "", profile: Optional[str] = None):
         from tools.skills_hub_install import discard_quarantine, quarantine_bundle
         from tools.skills_guard import scan_skill, should_allow_install
 
-        from hermes_cli.skills_hub import _scan_source_for_install
+        from eir_cli.skills_hub import _scan_source_for_install
 
-        # Config scope, not _profile_scope: quarantine + scan resolve through get_hermes_home(),
+        # Config scope, not _profile_scope: quarantine + scan resolve through get_eir_home(),
         # and holding _SKILLS_PROFILE_LOCK across the fetch would stall every dashboard request.
         with _config_profile_scope(profile):
             meta, bundle, matched_source = _resolve_hub_skill(ident, profile)
@@ -360,7 +360,7 @@ async def scan_skill_hub(identifier: str = "", profile: Optional[str] = None):
 @router.get("/api/skills")
 async def get_skills(profile: Optional[str] = None):
     from tools.skills_tool import find_all_skills
-    from hermes_cli.skills_config import get_disabled_skills
+    from eir_cli.skills_config import get_disabled_skills
     from tools.skill_usage import (
         _external_skill_names, _read_bundled_names, _read_hub_installed_names, activity_count, load_usage)
 
@@ -411,7 +411,7 @@ def _locked_index() -> tuple[set, dict]:
 
 @router.put("/api/skills/lock")
 async def lock_skill(body: SkillLock, profile: Optional[str] = None):
-    """Lock/unlock a skill against AGENT edits (same record as ``hermes curator lock``).
+    """Lock/unlock a skill against AGENT edits (same record as ``eir curator lock``).
     The user's own edits (this dashboard's editor, their editor) stay allowed."""
     from tools import skill_usage
     from tools.skill_manager_tool import _find_skill
@@ -434,7 +434,7 @@ async def lock_skill(body: SkillLock, profile: Optional[str] = None):
 
 @router.put("/api/skills/toggle")
 async def toggle_skill(body: SkillToggle, profile: Optional[str] = None):
-    from hermes_cli.skills_config import get_disabled_skills, save_disabled_skills
+    from eir_cli.skills_config import get_disabled_skills, save_disabled_skills
 
     def _run():
         with config_write_scope(body.profile or profile):

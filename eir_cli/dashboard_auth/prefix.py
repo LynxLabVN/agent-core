@@ -1,8 +1,8 @@
 """X-Forwarded-Prefix and public-URL resolution for reverse-proxied deploys.
 
-Proxies mounting the dashboard at a path inject ``X-Forwarded-Prefix: /hermes``
+Proxies mounting the dashboard at a path inject ``X-Forwarded-Prefix: /eir``
 so the backend can build prefixed URLs (Location headers, OAuth redirect_uri,
-cookie Path, SPA asset URLs). An operator-declared ``HERMES_DASHBOARD_PUBLIC_URL``
+cookie Path, SPA asset URLs). An operator-declared ``EIR_DASHBOARD_PUBLIC_URL``
 / ``dashboard.public_url`` is used verbatim for the OAuth redirect_uri instead
 (relief valve for unreliable proxy header chains). Single source of truth so
 the gate, routes, cookies and SPA mount agree on validation.
@@ -46,7 +46,7 @@ def _warn_if_malformed(source: str, raw: str) -> None:
         "(e.g. https://%s). Falling back to reconstructing the OAuth "
         "redirect URI from request headers, which may produce the wrong "
         "scheme behind a reverse proxy.",
-        source, cleaned, cleaned.split("://")[-1] or "hermes.example.com")
+        source, cleaned, cleaned.split("://")[-1] or "eir.example.com")
 
 
 def _warn_if_malformed_prefix(raw: Optional[str], reason: str) -> None:
@@ -59,7 +59,7 @@ def _warn_if_malformed_prefix(raw: Optional[str], reason: str) -> None:
 
 
 def normalise_prefix(raw: Optional[str]) -> str:
-    """``"/hermes"`` form (no trailing slash) or ``""`` when unset/malformed. ``..``, ``//`` and
+    """``"/eir"`` form (no trailing slash) or ``""`` when unset/malformed. ``..``, ``//`` and
     injection characters are rejected so a hostile proxy cannot smuggle HTML or traversal."""
     p = raw.strip() if raw else ""
     if not p:
@@ -81,7 +81,7 @@ def prefix_from_request(request) -> str:
     return normalise_prefix(request.headers.get("x-forwarded-prefix"))
 
 
-# --- HERMES_DASHBOARD_PUBLIC_URL / dashboard.public_url --------------------
+# --- EIR_DASHBOARD_PUBLIC_URL / dashboard.public_url --------------------
 
 def _normalise_public_url(raw: Optional[str]) -> str:
     """Cleaned ``scheme://netloc[/path]`` (trailing slash stripped) or ``""`` when
@@ -101,7 +101,7 @@ def _normalise_public_url(raw: Optional[str]) -> str:
 def _load_dashboard_section() -> dict:
     """``dashboard`` block of config.yaml as a dict, or ``{}`` when unloadable/absent/non-dict."""
     try:
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
     except Exception:
         return {}
     try:
@@ -116,7 +116,7 @@ def _load_dashboard_section() -> dict:
 
 def resolve_public_url(state=None) -> str:
     """Operator-declared dashboard public URL, or ``""`` (reconstruct from request). Precedence:
-    ``HERMES_DASHBOARD_PUBLIC_URL`` env (blank counts as unset so a provisioned-but-blank secret
+    ``EIR_DASHBOARD_PUBLIC_URL`` env (blank counts as unset so a provisioned-but-blank secret
     cannot shadow config.yaml), then ``dashboard.public_url``; malformed warns and falls through.
 
     *state* is the serving app's state. A listener that declares its own public URL there
@@ -125,11 +125,11 @@ def resolve_public_url(state=None) -> str:
     own = getattr(state, "listener_public_url", None)
     if own is not None:
         return own
-    env_raw = os.environ.get("HERMES_DASHBOARD_PUBLIC_URL", "")
+    env_raw = os.environ.get("EIR_DASHBOARD_PUBLIC_URL", "")
     env_clean = _normalise_public_url(env_raw)
     if env_clean:
         return env_clean
-    _warn_if_malformed("HERMES_DASHBOARD_PUBLIC_URL env var", env_raw)
+    _warn_if_malformed("EIR_DASHBOARD_PUBLIC_URL env var", env_raw)
     cfg_raw = str(_load_dashboard_section().get("public_url", ""))
     cfg_clean = _normalise_public_url(cfg_raw)
     if not cfg_clean:

@@ -1,7 +1,7 @@
 """LIVE Windows E2E for retained lifecycle holder discovery (fleet-update #91277).
 
 Runs ONLY on a real Windows host (the on-demand ``windows-venv-e2e.yml``
-lane). Spawns REAL processes with realistic Hermes argv shapes and drives
+lane). Spawns REAL processes with realistic Eir argv shapes and drives
 the actual detection code against the live
 process table — no mocked psutil, no faked cmdlines.
 
@@ -57,7 +57,7 @@ def _spawn(args: list[str], cwd: Path | None = None, python: str | None = None) 
 
 
 def _detect() -> list[tuple[int, str, str]]:
-    from hermes_cli.update_cmd import _detect_venv_python_processes
+    from eir_cli.update_cmd import _detect_venv_python_processes
 
     return _detect_venv_python_processes()
 
@@ -72,22 +72,22 @@ def _kill(*procs: subprocess.Popen) -> None:
 
 
 class TestDetection:
-    def test_detects_hermes_argv_process(self):
-        """Baseline: a live process running `-m hermes_cli.main serve` with
+    def test_detects_eir_argv_process(self):
+        """Baseline: a live process running `-m eir_cli.main serve` with
         cwd under the install root is detected as a venv holder."""
-        proc = _spawn(["-m", "hermes_cli.main", "serve"])
+        proc = _spawn(["-m", "eir_cli.main", "serve"])
         try:
             matches = _detect()
             pids = [pid for pid, _, _ in matches]
             assert proc.pid in pids, f"holder scan missed live process: {matches}"
             cmdline = next(c for p, _, c in matches if p == proc.pid)
             # Full cmdline, not a 120-char prefix (#78089 regression guard).
-            assert "hermes_cli.main" in cmdline
+            assert "eir_cli.main" in cmdline
         finally:
             _kill(proc)
 
     def test_foreign_python_not_detected(self):
-        """A python process with no Hermes argv, cwd OUTSIDE the install AND an
+        """A python process with no Eir argv, cwd OUTSIDE the install AND an
         interpreter outside the project venv must not be reported as a holder.
 
         ``sys.executable`` is the wrong sleeper here: the runner's ``uv run`` interpreter
@@ -95,7 +95,7 @@ class TestDetection:
         7a94b1fbf77, so a ``sys.executable`` child IS a venv holder by design. The base
         interpreter the venv was created from is the foreign python."""
         
-        from hermes_constants import project_venv_dir
+        from eir_constants import project_venv_dir
 
         base = getattr(sys, "_base_executable", None) or sys.executable
         venv_dir = project_venv_dir(PROJECT_ROOT)
@@ -117,8 +117,8 @@ class TestDetection:
         path must surface with its FULL argv so the pausable exemption can
         see `gateway run` past the 120-char mark."""
         # Pad the argv front so `gateway run` sits beyond 120 chars.
-        padding = os.path.join("C:\\", "Users", "x" * 90, ".hermes-runtime")
-        proc = _spawn([padding, "-m", "hermes_cli.main", "gateway", "run"])
+        padding = os.path.join("C:\\", "Users", "x" * 90, ".eir-runtime")
+        proc = _spawn([padding, "-m", "eir_cli.main", "gateway", "run"])
         try:
             matches = _detect()
             cmdline = next((c for p, _, c in matches if p == proc.pid), None)
@@ -140,12 +140,12 @@ class TestAncestorExclusion:
         # a child python that runs the REAL detection and reports whether it
         # can see its gateway parent. The child's code lives in a FILE so the
         # parent's cmdline stays realistic (a real gateway's argv is clean
-        # `... -m hermes_cli.main gateway run`, not a multi-line -c blob).
+        # `... -m eir_cli.main gateway run`, not a multi-line -c blob).
         child_file = tmp_path / "child_scan.py"
         child_file.write_text(
             "import json, os, sys\n"
             f"sys.path.insert(0, {str(PROJECT_ROOT)!r})\n"
-            "from hermes_cli.update_cmd import _detect_venv_python_processes\n"
+            "from eir_cli.update_cmd import _detect_venv_python_processes\n"
             "import psutil\n"
             "from gateway.status import looks_like_gateway_command_line\n"
             "# The venv shim makes every spawn a launcher/worker CHAIN, so the\n"
@@ -159,7 +159,7 @@ class TestAncestorExclusion:
             encoding="utf-8",
         )
         # The parent's code lives in a FILE too: a ``python -c <src>`` command line is an
-        # interpreter running inline source and carries no readable Hermes identity (#107002),
+        # interpreter running inline source and carries no readable Eir identity (#107002),
         # so a ``-c`` parent would not be a gateway to any classifier.
         parent_file = tmp_path / "parent_gateway.py"
         parent_file.write_text(
@@ -177,7 +177,7 @@ class TestAncestorExclusion:
                 sys.executable,
                 str(parent_file),
                 "-m",
-                "hermes_cli.main",
+                "eir_cli.main",
                 "gateway",
                 "run",
             ],

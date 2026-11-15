@@ -1,6 +1,6 @@
 """Plugin hook / middleware / event-bus / system-prompt-section dispatch.
 
-Mixed into :class:`hermes_cli.plugins.PluginManager`. ``_resolve_hook_callback_timeout`` stays on
+Mixed into :class:`eir_cli.plugins.PluginManager`. ``_resolve_hook_callback_timeout`` stays on
 the origin (tests patch it there) and is looked up lazily.
 """
 
@@ -19,9 +19,9 @@ import types
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Mapping, Optional, Set, Union
 
-from hermes_cli.middleware import OBSERVER_SCHEMA_VERSION
+from eir_cli.middleware import OBSERVER_SCHEMA_VERSION
 
-logger = logging.getLogger("hermes_cli.plugins")
+logger = logging.getLogger("eir_cli.plugins")
 
 # Allowlist of agent-turn hot-path hooks bounded by plugins.hook_callback_timeout (fail-open:
 # abandon without join — joining reintroduced a shutdown hang). Unlisted hooks run synchronously.
@@ -74,14 +74,14 @@ def stream_held() -> bool:
     """True when a plugin loaded in the active profile registered ``transform_llm_output`` with
     ``hold_stream=True``: that profile's replies reach the user only as the rewritten final.
     Lazy-discovers first, like ``has_hook``."""
-    from hermes_cli.plugins import _delivery_manager
+    from eir_cli.plugins import _delivery_manager
 
     return _delivery_manager().holds_stream()
 
 
 def held_stream_transforms() -> tuple[Callable, ...]:
     """:meth:`PluginDispatchMixin.held_transforms` of the active profile's manager (lazy-discovers)."""
-    from hermes_cli.plugins import _delivery_manager
+    from eir_cli.plugins import _delivery_manager
 
     return _delivery_manager().held_transforms()
 
@@ -102,8 +102,8 @@ MAX_SYSTEM_PROMPT_SECTIONS = 32
 MAX_SYSTEM_PROMPT_SECTIONS_TOTAL_CHARS = 8_000
 _SYSTEM_PROMPT_SECTION_ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,127}$")
 _SYSTEM_PROMPT_SECTION_HEADING_PREFIX = "## Plugin Context: "
-PLUGIN_SECTIONS_START = "<!-- hermes-plugin-sections:start -->"
-PLUGIN_SECTIONS_END = "<!-- hermes-plugin-sections:end -->"
+PLUGIN_SECTIONS_START = "<!-- eir-plugin-sections:start -->"
+PLUGIN_SECTIONS_END = "<!-- eir-plugin-sections:end -->"
 
 
 def is_valid_system_prompt_section_id(value: Any) -> bool:
@@ -115,7 +115,7 @@ def format_system_prompt_section(section_id: str, content: str) -> str:
     """Render an auditable, length-framed block recoverable from the full prompt."""
     return (
         f"{_SYSTEM_PROMPT_SECTION_HEADING_PREFIX}{section_id}\n"
-        f"<!-- hermes-plugin-section-chars:{len(content)} -->\n\n{content}")
+        f"<!-- eir-plugin-section-chars:{len(content)} -->\n\n{content}")
 
 
 def format_system_prompt_sections(sections: list) -> str:
@@ -126,8 +126,8 @@ def format_system_prompt_sections(sections: list) -> str:
     return f"{PLUGIN_SECTIONS_START}\n" + "\n\n".join(blocks) + f"\n{PLUGIN_SECTIONS_END}"
 
 
-# Reserved event namespace prefix — only core may publish ``hermes:<event>``.
-HERMES_EVENT_NAMESPACE = "hermes"
+# Reserved event namespace prefix — only core may publish ``eir:<event>``.
+EIR_EVENT_NAMESPACE = "eir"
 # Event recursion depth cap (subscribers may emit); over-deep emits are dropped with a warning.
 _EVENT_EMIT_DEPTH_CAP = 8
 # Max queued + running events per manager generation; emit never waits — a full budget drops.
@@ -234,9 +234,9 @@ def resolve_plugin_command_result(result: Any) -> Any:
             done.set()
 
     # copy_context: the helper thread must see the caller's profile/secret scope, else an
-    # async hook under a running loop reads the default HERMES_HOME and get_secret raises.
+    # async hook under a running loop reads the default EIR_HOME and get_secret raises.
     threading.Thread(target=contextvars.copy_context().run, args=(_runner,),
-                     name="hermes-plugin-command-await", daemon=True).start()
+                     name="eir-plugin-command-await", daemon=True).start()
     if not done.wait(timeout=_PLUGIN_COMMAND_AWAIT_TIMEOUT_SECS):
         raise TimeoutError("Plugin command async handler did not complete within "
                            f"{_PLUGIN_COMMAND_AWAIT_TIMEOUT_SECS:.0f}s")
@@ -296,7 +296,7 @@ class PluginDispatchMixin:
                             failed: Optional[list] = None) -> list[Any]:
         """:meth:`invoke_hook`'s loop over ``callbacks``; each one that raised or timed out is
         appended to ``failed`` when given."""
-        from hermes_cli.plugins import _resolve_hook_callback_timeout
+        from eir_cli.plugins import _resolve_hook_callback_timeout
         results: list[Any] = []
         timeout = _resolve_hook_callback_timeout()
         use_timeout = _hook_uses_callback_timeout(hook_name, timeout)
@@ -409,7 +409,7 @@ class PluginDispatchMixin:
                 _release_token()
                 done.set()
 
-        thread = threading.Thread(target=_runner, name=f"hermes-hook-{callback_name}"[:40], daemon=True)
+        thread = threading.Thread(target=_runner, name=f"eir-hook-{callback_name}"[:40], daemon=True)
         try:
             thread.start()
         except RuntimeError as exc:
@@ -467,7 +467,7 @@ class PluginDispatchMixin:
         if worker is not None and worker.is_alive():
             return
         worker = threading.Thread(
-            target=self._event_worker_loop, args=(self._event_queue,), name="hermes-plugin-events",
+            target=self._event_worker_loop, args=(self._event_queue,), name="eir-plugin-events",
             daemon=True,
         )
         self._event_worker = worker
@@ -568,7 +568,7 @@ class PluginDispatchMixin:
         """Register ``callback`` for ``hook_name`` on behalf of ``context`` (unknown names warn but are
         still stored). ``hold_stream=True`` on ``transform_llm_output`` declares the rewrite must reach
         the user first, so this profile's replies are not streamed (:meth:`holds_stream`)."""
-        from hermes_cli.plugins import VALID_HOOKS
+        from eir_cli.plugins import VALID_HOOKS
 
         handle = context._track_callback("hook", hook_name, callback, self._hooks, VALID_HOOKS)
         if hold_stream and hook_name != STREAM_HOLDING_HOOK:
@@ -621,7 +621,7 @@ class PluginDispatchMixin:
         run inline. Bounded hooks keep ``plugins.hook_callback_timeout`` via ``asyncio.wait_for``
         (the coroutine is cancelled, not abandoned); a timed-out ``pre_tool_call`` fails closed.
         """
-        from hermes_cli.plugins import _resolve_hook_callback_timeout
+        from eir_cli.plugins import _resolve_hook_callback_timeout
         if hook_name != "gateway_platform_event":
             kwargs.setdefault("telemetry_schema_version", OBSERVER_SCHEMA_VERSION)
         results: list[Any] = []
@@ -740,7 +740,7 @@ class PluginDispatchMixin:
         of ``original_<key>`` so an in-place edit cannot leak.
         """
         from agent.safe_worker_policy import safe_worker_enabled
-        from hermes_cli.middleware import _safe_copy
+        from eir_cli.middleware import _safe_copy
 
         if safe_worker_enabled():
             return []

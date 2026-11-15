@@ -21,7 +21,7 @@ from __future__ import annotations
 
 class TestStripOptionalSystemdDirectives:
     def test_removes_restart_max_delay_sec(self):
-        from hermes_cli.gateway import _strip_optional_systemd_directives
+        from eir_cli.gateway import _strip_optional_systemd_directives
         text = """[Service]
 Restart=always
 RestartSec=5
@@ -49,7 +49,7 @@ class TestSystemdUnitIsCurrent:
     def test_unit_without_fatal_config_restart_policy_is_not_current(
         self, tmp_path, monkeypatch,
     ):
-        from hermes_cli import gateway as gw
+        from eir_cli import gateway as gw
 
         expected = """[Service]
 Restart=always
@@ -57,7 +57,7 @@ RestartForceExitStatus=75
 RestartPreventExitStatus=78
 """
         installed = expected.replace("RestartPreventExitStatus=78\n", "")
-        unit_file = tmp_path / "hermes-gateway.service"
+        unit_file = tmp_path / "eir-gateway.service"
         unit_file.write_text(installed)
 
         monkeypatch.setattr(gw, "get_systemd_unit_path", lambda system=False: unit_file)
@@ -72,10 +72,10 @@ RestartPreventExitStatus=78
     def test_unit_without_optional_directives_is_current(self, tmp_path, monkeypatch):
         """Installed unit missing RestartMaxDelaySec/RestartSteps should be
         considered current when the generated unit includes them."""
-        from hermes_cli import gateway as gw
+        from eir_cli import gateway as gw
 
         installed = """[Unit]
-Description=Hermes Gateway
+Description=Eir Gateway
 
 [Service]
 Type=simple
@@ -86,7 +86,7 @@ RestartSec=5
 [Install]
 WantedBy=default.target
 """
-        unit_file = tmp_path / "hermes-gateway.service"
+        unit_file = tmp_path / "eir-gateway.service"
         unit_file.write_text(installed)
 
         monkeypatch.setattr(gw, "get_systemd_unit_path", lambda system=False: unit_file)
@@ -100,7 +100,7 @@ WantedBy=default.target
 
 
     def test_nonexistent_unit_is_not_current(self, tmp_path, monkeypatch):
-        from hermes_cli import gateway as gw
+        from eir_cli import gateway as gw
         unit_file = tmp_path / "nonexistent.service"
         monkeypatch.setattr(gw, "get_systemd_unit_path", lambda system=False: unit_file)
         assert gw.systemd_unit_is_current(system=False) is False

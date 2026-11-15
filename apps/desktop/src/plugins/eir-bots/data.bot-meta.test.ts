@@ -38,7 +38,7 @@ const { hostMock, storageMock } = vi.hoisted(() => ({
   storageMock: { get: vi.fn(), remove: vi.fn(), set: vi.fn() }
 }))
 
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@eir/plugin-sdk', async () => {
   const { atom } = await import('nanostores')
 
   return {
@@ -51,7 +51,7 @@ vi.mock('@hermes/plugin-sdk', async () => {
   }
 })
 
-vi.mock('./shared', () => ({ getPluginCtx: () => ({ storage: storageMock }), ID: 'hermes-bots' }))
+vi.mock('./shared', () => ({ getPluginCtx: () => ({ storage: storageMock }), ID: 'eir-bots' }))
 
 // profile-ops pulls in the roster surfaces for delete/duplicate; the overlay
 // under test needs none of them.
@@ -205,7 +205,7 @@ describe('avatar asset sync fires only on a real change', () => {
     await saveBotMeta('ops', { image: 'data:image/png;base64,CCCC', pet: 'pet-cat', title: 'Ops' })
 
     const configure = calls.find(call => call.method === 'profiles.configure')
-    const uiMeta = (configure?.params.ui_meta as Record<string, Record<string, unknown>>)['hermes-bots']
+    const uiMeta = (configure?.params.ui_meta as Record<string, Record<string, unknown>>)['eir-bots']
 
     expect(uiMeta).toEqual({ title: 'Ops' })
   })
@@ -271,7 +271,7 @@ describe('the disk load never clobbers a write from this session', () => {
 
 describe('server metadata reconciliation', () => {
   const serverRow = (name: string, meta: Record<string, unknown>) =>
-    ({ name, ui_meta: { 'hermes-bots': meta } }) as unknown as RosterRow
+    ({ name, ui_meta: { 'eir-bots': meta } }) as unknown as RosterRow
 
   it('removes a stale local canonical-chat pointer on sight', () => {
     // Identity is the profile's "Bot Chat" registry row, resolved by name.
@@ -389,8 +389,8 @@ describe("a bot is named by its own backend, never by another bot's cached recor
             profiles: [
               {
                 name: 'default',
-                ui_meta: { 'hermes-bots': { color: '#0000ff', groups: [] } },
-                ui_meta_revisions: { 'hermes-bots': revision }
+                ui_meta: { 'eir-bots': { color: '#0000ff', groups: [] } },
+                ui_meta_revisions: { 'eir-bots': revision }
               }
             ]
           }
@@ -403,7 +403,7 @@ describe("a bot is named by its own backend, never by another bot's cached recor
           if (configures.length === 1) {
             revision = 4
 
-            return { applied: { ui_meta: false, ui_meta_conflicts: { 'hermes-bots': { actual: 4, expected: 3 } } } }
+            return { applied: { ui_meta: false, ui_meta_conflicts: { 'eir-bots': { actual: 4, expected: 3 } } } }
           }
 
           return { applied: { ui_meta: true } }
@@ -416,11 +416,11 @@ describe("a bot is named by its own backend, never by another bot's cached recor
     await expect(saveBotMeta(vps, { groups: ['room'] })).resolves.toMatchObject({ serverOutcome: 'persisted' })
 
     expect(configures.map(params => params.ui_meta_expected_revisions)).toEqual([
-      { 'hermes-bots': 3 },
-      { 'hermes-bots': 4 }
+      { 'eir-bots': 3 },
+      { 'eir-bots': 4 }
     ])
     // The local cache's stale title and color never travel: only the patch rides the server's copy.
-    expect(configures.at(-1)?.ui_meta).toEqual({ 'hermes-bots': { color: '#0000ff', groups: ['room'] } })
+    expect(configures.at(-1)?.ui_meta).toEqual({ 'eir-bots': { color: '#0000ff', groups: ['room'] } })
   })
 
   it("reports a save its machine never answered as unreachable, not as an older gateway's fallback", async () => {
@@ -502,7 +502,7 @@ describe("a bot is named by its own backend, never by another bot's cached recor
 
     try {
       $botMeta.set({ 'vps::kody': { color: '#00ff00', image: 'data:image/png;base64,AA' } })
-      mergeServerMeta([{ ...vps, ui_meta: { 'hermes-bots': { sectionId: 's1', sectionName: 'S1' } } } as RosterRow])
+      mergeServerMeta([{ ...vps, ui_meta: { 'eir-bots': { sectionId: 's1', sectionName: 'S1' } } } as RosterRow])
 
       expect(botRosterMeta(vps, $botMeta.get())).toMatchObject({
         color: '#00ff00',

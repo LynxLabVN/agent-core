@@ -45,8 +45,8 @@ def _bind_and_resume(proc: subprocess.Popen, request: dict, request_path: Path) 
     silently: the refusal is printed and recorded as a failed ``update_custody`` step in this
     run's receipt and, before the child runs (it has not read its request yet), in the receipt it
     resumes, so the terminal receipt carries it."""
-    from hermes_cli import update_receipt
-    from hermes_cli.update_lock import bind_child_to_update_tree, resume_suspended_child
+    from eir_cli import update_receipt
+    from eir_cli.update_lock import bind_child_to_update_tree, resume_suspended_child
 
     refusal = bind_child_to_update_tree(proc)
     if refusal is not None:
@@ -73,19 +73,19 @@ def run_completion(request: dict) -> dict:
                         "import sys; sys.path.insert(0, sys.argv[1]); "
                         "from pm.libatomic import install_before_lock; install_before_lock()", str(root)],
                        cwd=root, stdout=None, stderr=subprocess.DEVNULL, check=False)
-    env = dict(os.environ, HERMES_HOME=request["home"], PYTHONUNBUFFERED="1")
+    env = dict(os.environ, EIR_HOME=request["home"], PYTHONUNBUFFERED="1")
     for key in ("PYTHONPATH", "PYTHONHOME", "VIRTUAL_ENV"):
         env.pop(key, None)
-    with tempfile.TemporaryDirectory(prefix="hermes-completion-") as directory:
+    with tempfile.TemporaryDirectory(prefix="eir-completion-") as directory:
         request_path = Path(directory) / "request.json"
         result_path = Path(directory) / "result.json"
         request = {**request, "stdout_isatty": sys.stdout.isatty()}
         request["bytecode_cache"] = str(Path(directory) / "bytecode")
         _write_json(request_path, request)
         command = [sys.executable, "-I", "-S", "-u", "-X", "utf8", "-X", f"pycache_prefix={request['bytecode_cache']}",
-                   str(root / "hermes_cli/update_completion.py"),
+                   str(root / "eir_cli/update_completion.py"),
                    str(request_path), str(result_path)]
-        from hermes_cli.update_lock import CREATE_SUSPENDED, checkout_lock_fds
+        from eir_cli.update_lock import CREATE_SUSPENDED, checkout_lock_fds
 
         # The child joins the update tree's checkout lock: it inherits the locked fd (POSIX)
         # or dies with us (Windows job: created suspended, bound, then resumed, so nothing it
@@ -158,7 +158,7 @@ def run_completion(request: dict) -> dict:
 
 
 def _resume_receipt(data: dict) -> None:
-    from hermes_cli import update_receipt
+    from eir_cli import update_receipt
 
     # Hydrate the existing run, not a new receipt with a new identity/pre-update probe.
     receipt = object.__new__(update_receipt.UpdateReceipt)
@@ -168,7 +168,7 @@ def _resume_receipt(data: dict) -> None:
 
 
 def _read_terminal_receipt(request: dict) -> dict | None:
-    from hermes_cli import update_receipt
+    from eir_cli import update_receipt
 
     update_id = request["receipt"]["update_id"]
     found = update_receipt.read_run_record(update_id)
@@ -180,7 +180,7 @@ def _read_terminal_receipt(request: dict) -> dict | None:
 
 
 def _running_record(request: dict) -> dict | None:
-    from hermes_cli.update_receipt import read_run_record
+    from eir_cli.update_receipt import read_run_record
 
     found = read_run_record(request["receipt"]["update_id"])
     if found is None or found[1].get("outcome") != "running":
@@ -201,7 +201,7 @@ def _owed_user_action(request: dict) -> str | None:
 
 def _record_owed_user_action(request: dict) -> bool:
     """Land the parked local changes on the receipt; True when nothing is owed to the user."""
-    from hermes_cli.update_receipt import record_user_action
+    from eir_cli.update_receipt import record_user_action
 
     notice = _owed_user_action(request)
     if notice:
@@ -259,20 +259,20 @@ def settle_lost_completion(request: dict, reason: str) -> dict:
     the user's local changes are still parked (#122557: ``partial``, exit 1). Runs in the parent
     (pre-swap) interpreter: everything it uses is already imported there.
     """
-    from hermes_cli import update_receipt
+    from eir_cli import update_receipt
 
     print(f"  ⚠ Source update completion did not finish: {reason}", flush=True)
     receipt = _read_terminal_receipt(request)  # the child finalized the run, then died
     if receipt is None:
         try:
-            from hermes_cli.venv_sync import arm_completion
+            from eir_cli.venv_sync import arm_completion
 
             arm_completion(Path(request["source"]))
         except Exception as exc:  # health: allow BLE001 -- post-commit boundary: stale dependencies still make the next launch sync
             print(f"  ⚠ Could not record the owed source-update tail: {exc}")
         _report_desktop_build_owed(request, _running_record(request), "the update completion did not finish")
         update_receipt.resume_run_record()  # the child's persisted stages, never this stale snapshot
-        update_receipt.record_followup("completion", reason, retry="the next launch or `hermes update` finishes it")
+        update_receipt.record_followup("completion", reason, retry="the next launch or `eir update` finishes it")
         parked = not _record_owed_user_action(request)
         if parked:
             print(_owed_user_action(request))  # the completion child that prints it may never have run
@@ -293,8 +293,8 @@ def _settle_after_commit(request: dict, result_path: Path, step: str, reason: st
     syncs the dependencies and finishes the tail; the run's receipt is a success that names the
     follow-up, so nothing reports "still on the previous version" while the tree is new.
     """
-    from hermes_cli import update_receipt
-    from hermes_cli.venv_sync import arm_completion
+    from eir_cli import update_receipt
+    from eir_cli.venv_sync import arm_completion
 
     try:
         arm_completion(Path(request["source"]))
@@ -308,7 +308,7 @@ def _settle_after_commit(request: dict, result_path: Path, step: str, reason: st
         _resume_receipt(record)
         update_receipt.record_stage("deps" if step == "dependencies" else "build", "failed")
         update_receipt.record_followup(step, reason, retry="dependencies not installed yet — the next launch retries"
-                                       if step == "dependencies" else "the next launch or `hermes update` retries it")
+                                       if step == "dependencies" else "the next launch or `eir update` retries it")
         if not _record_owed_user_action(request):
             print(_owed_user_action(request))  # the completion child that would print it never ran
         update_receipt.finalize_pending_update_receipt(0, f"{step} owed after the code was updated")
@@ -334,18 +334,18 @@ def _prepare(request: dict, request_path: Path, result_path: Path) -> int:
         # writes the checkout (uv's sync children, the generation collector): the join takes a
         # lease byte of its own (R5b, as the --prepared child does in complete_source_checkout).
         # Held until this bootstrap exits, after the --prepared child; the kernel drops it.
-        from hermes_cli.update_lock import _acquire_checkout
+        from eir_cli.update_lock import _acquire_checkout
 
         refused = _acquire_checkout(root)
         if refused is not None:
             raise RuntimeError("could not join the update's checkout lock "
                                f"({refused.reason or f'held by process {refused.pid}'})")
-    from hermes_cli.venv_sync import arm_completion, collect_superseded_generations
+    from eir_cli.venv_sync import arm_completion, collect_superseded_generations
 
     # The foreign-owned-venv refusal runs in the parent BEFORE the swap (update_cmd_commit
     # .preflight_refusal); the tail was armed there too, so this re-arm is an idempotent backstop.
     arm_completion(root)
-    from hermes_cli.gitlock import convert_treeless_checkout_first
+    from eir_cli.gitlock import convert_treeless_checkout_first
     convert_treeless_checkout_first(root)
     with receipt.worker_context(update_id):
         try:
@@ -364,11 +364,11 @@ def _prepare(request: dict, request_path: Path, result_path: Path) -> int:
     # (the follow-up protocol) into the parent's pipe, whatever the console code page.
     command = [str(project_python(root)),
                "-I", "-S", "-u", "-X", "utf8", "-X", f"pycache_prefix={request['bytecode_cache']}",
-               str(root / "hermes_cli/update_completion.py"),
+               str(root / "eir_cli/update_completion.py"),
                str(request_path), str(result_path), "--prepared"]
     # A second interpreter is mandatory: PM may have selected a different Python
     # and dependency graph. No application maintenance runs in this bootstrap.
-    from hermes_cli.update_lock import checkout_lock_fds
+    from eir_cli.update_lock import checkout_lock_fds
 
     # health: allow HX006 -- the prepared completion child is the update's build; it runs to the end
     code = _exit_status(subprocess.call(command, cwd=root, env=activation_environment(root),
@@ -384,15 +384,15 @@ def _complete_selected(request: dict) -> bool:
 
     Each step is independent; a failed one prints ``⚠``, lands on the receipt as a follow-up
     and keeps its own obligation armed (``source-completion-pending`` for the tail, the fleet
-    restart obligation for gateways), so the next launch or ``hermes update`` retries it.
+    restart obligation for gateways), so the next launch or ``eir update`` retries it.
     Returns False only when the user's local changes were left parked in the stash: nothing
     retries that, so the run is ``partial`` and exits 1 (#122557), never "Update complete".
     """
-    from hermes_cli import main, update_cmd, update_cmd_config
-    from hermes_cli.source_completion import complete_source_checkout
-    from hermes_cli.update_inventory import RuntimeRecord, UpdatePlan
-    from hermes_cli.update_launch_files import refresh_launch_files
-    from hermes_cli.update_receipt import (
+    from eir_cli import main, update_cmd, update_cmd_config
+    from eir_cli.source_completion import complete_source_checkout
+    from eir_cli.update_inventory import RuntimeRecord, UpdatePlan
+    from eir_cli.update_launch_files import refresh_launch_files
+    from eir_cli.update_receipt import (
         TAIL_FOLLOWUPS, record_build_stage, record_followup, record_skip, record_stage)
 
     root = Path(request["source"])
@@ -437,7 +437,7 @@ def _complete_selected(request: dict) -> bool:
     tail_owed = any(step in TAIL_FOLLOWUPS for step, _ in followups)
     record_build_stage(followups)
     if not tail_owed:
-        from hermes_cli.venv_sync import clear_completion
+        from eir_cli.venv_sync import clear_completion
         clear_completion(root)
     # systemctl's KillMode=mixed fallback can kill this whole cgroup. Publish the
     # gateway watcher's status BEFORE that operation: the code is committed, so it is 0 unless
@@ -462,7 +462,7 @@ def _complete_selected(request: dict) -> bool:
         return complete
     # This is a fresh interpreter: the gateways the pause left running with their restart pending ride
     # the request's token, so the fleet restart does not wait the full drain on them a second time.
-    from hermes_cli.update_cmd_posix_pause import adopt_left_pending
+    from eir_cli.update_cmd_posix_pause import adopt_left_pending
     adopt_left_pending(request["windows_resume"])
     restart = update_cmd._restart_gateway_fleet_after_update(plan, request["gateway_mode"])
     record_stage("restart", "failed" if getattr(restart, "incomplete", False) else "success")
@@ -484,7 +484,7 @@ def _resume_paused_before_build(request: dict) -> None:
     token = request.get("windows_resume")
     if not token or not token.get("resume_needed") or token.get("platform") != "posix":
         return
-    from hermes_cli.update_cmd import _m
+    from eir_cli.update_cmd import _m
     try:
         _m()._resume_windows_gateways_after_update(token)
     except Exception as exc:  # health: allow BLE001 -- retried (and recorded) after the build
@@ -506,7 +506,7 @@ class _ForwardedOutput:
 
 def _report_unbuilt_desktop(request: dict) -> None:
     """The tail raised out of ``_complete_selected``: before the build stage, the build never ran."""
-    from hermes_cli import update_receipt
+    from eir_cli import update_receipt
 
     current = update_receipt._current.get()
     if current is not None:  # a finalized run got past the build (verification finalizes it)
@@ -514,7 +514,7 @@ def _report_unbuilt_desktop(request: dict) -> None:
 
 
 def _finish(request: dict, result_path: Path) -> int:
-    from hermes_cli import update_receipt
+    from eir_cli import update_receipt
     from pm.receipt import accept_worker_receipt
 
     _resume_receipt(request["receipt"])
@@ -537,14 +537,14 @@ def _finish(request: dict, result_path: Path) -> int:
         _report_unbuilt_desktop(request)
         update_receipt.record_followup("completion", f"{type(exc).__name__}: {exc}")
     finally:
-        custody = sys.modules.get("hermes_cli.update_custody")
+        custody = sys.modules.get("eir_cli.update_custody")
         refusal = custody.refusal_notice() if code and custody is not None else None
         if refusal:  # m2: what stopped it, whatever error the refusal turned into downstream
             print(refusal)
         # The new interpreter owns recovery too. The original parent's atexit
         # token is updated from the response; it acts only if this process dies.
         try:
-            from hermes_cli.update_cmd import _resume_windows_gateways_after_update
+            from eir_cli.update_cmd import _resume_windows_gateways_after_update
             _resume_windows_gateways_after_update(request["windows_resume"])
         except Exception as exc:
             update_receipt.owe_followup(request["receipt"]["update_id"], "windows_resume",
@@ -554,7 +554,7 @@ def _finish(request: dict, result_path: Path) -> int:
         if terminal_receipt and terminal_receipt.get("outcome") == "success":
             code = 0  # an interrupt that landed after verification closed the run (review regression 3)
         if code and request["gateway_mode"]:
-            from hermes_cli.update_cmd import _write_gateway_update_exit_code
+            from eir_cli.update_cmd import _write_gateway_update_exit_code
             _write_gateway_update_exit_code(False)
         if not terminal_receipt:
             code = code or 1  # the parent settles a lost result (settle_lost_completion)
@@ -576,7 +576,7 @@ def main() -> int:
         raise ValueError("completion checkout does not match request")
     # -I deliberately ignores inherited PYTHONPATH during PM preparation.
     sys.path.insert(0, str(root))
-    from hermes_agent.compat import install
+    from eir_agent.compat import install
 
     install()
     sys.stdout = _ForwardedOutput(sys.stdout, request.get("stdout_isatty", False))
@@ -595,7 +595,7 @@ def _bootstrap(request: dict, request_path: Path, result_path: Path) -> int:
         return _prepare(request, request_path, result_path)
     except KeyboardInterrupt:
         _resume_receipt(request["receipt"])
-        from hermes_cli import update_receipt
+        from eir_cli import update_receipt
         update_receipt.finalize_interrupted_update_receipt(
             "KeyboardInterrupt: interrupted while installing dependencies", exit_code=130)
         return _write_bootstrap_result(request, result_path, 130, _read_terminal_receipt(request))

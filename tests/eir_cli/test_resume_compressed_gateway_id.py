@@ -60,10 +60,10 @@ def _gateway_store(loop, authority, tmp_path):
     """A ``GatewaySessionStore`` whose verbs run on the real authority (no socket) and whose reads use
     the real read-only state.db reader, as the classic CLI's does."""
     from gateway.session_controls import AuthorityConnection
-    from hermes_cli.gateway_client import GatewayClientError
-    from hermes_cli.gateway_connection import GatewayConnection, SessionState
-    from hermes_cli.gateway_session_store import GatewaySessionStore
-    from hermes_state import SessionDB
+    from eir_cli.gateway_client import GatewayClientError
+    from eir_cli.gateway_connection import GatewayConnection, SessionState
+    from eir_cli.gateway_session_store import GatewaySessionStore
+    from eir_state import SessionDB
     states = {}
     connection = types.SimpleNamespace(final=False, launch_api_key=None, launch_api_key_typed=False,
                                        state=lambda sid: states.setdefault(sid, SessionState(sid)))
@@ -87,8 +87,8 @@ def _gateway_store(loop, authority, tmp_path):
 
 
 def _cli(store, session_id):
-    from cli import HermesCLI
-    cli = HermesCLI.__new__(HermesCLI)
+    from cli import EirCLI
+    cli = EirCLI.__new__(EirCLI)
     cli._resumed, cli._session_db, cli.session_id = True, store, session_id
     cli.session_start = None
     cli.conversation_history = []
@@ -102,7 +102,7 @@ def _cli(store, session_id):
 def rig(tmp_path, monkeypatch):
     from gateway import run
     monkeypatch.setattr(run, '_load_gateway_config', lambda: {'platform_toolsets': {'cli': []}})
-    monkeypatch.setenv('HERMES_HOME', str(tmp_path))
+    monkeypatch.setenv('EIR_HOME', str(tmp_path))
     loop = asyncio.new_event_loop()
     try:
         authority, owner = loop.run_until_complete(_compressed(tmp_path))
@@ -137,7 +137,7 @@ def test_resume_of_a_compressed_root_addresses_the_receipt_owner(rig, path, monk
 
 def test_the_tip_segment_alone_still_has_no_receipt(rig):
     """The receipt check is not weakened: addressing the physical segment is still refused by name."""
-    from hermes_state_runtime import RuntimeStoreError
+    from eir_state_runtime import RuntimeStoreError
     with pytest.raises(RuntimeStoreError) as refused:
         _gateway_accepts(rig, 'seg-3')
     assert refused.value.reason == 'storage_unavailable'

@@ -16,23 +16,23 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 
 from agent.interrupt_scope import InterruptScope, bind_interrupt_scope
-from hermes_cli.active_sessions import ActiveSessionRegistryError, active_session_registry_snapshot
-from hermes_cli.pty_session import RegistryFull
-from hermes_cli.web_deps import LateState, late
-from hermes_cli.web_server_chat import (
+from eir_cli.active_sessions import ActiveSessionRegistryError, active_session_registry_snapshot
+from eir_cli.pty_session import RegistryFull
+from eir_cli.web_deps import LateState, late
+from eir_cli.web_server_chat import (
     _build_sidecar_url, _close_stalled_pty_input, _get_console_executor, _legacy_pump, _pty_fail, _ws_auth_ok,
     _ws_close_reason, _ws_gate, _ws_request_is_allowed,
 )
-from hermes_cli.web_session_sockets import GATEWAY_SOCKET
+from eir_cli.web_session_sockets import GATEWAY_SOCKET
 
-_log = logging.getLogger("hermes_cli.web_server")
+_log = logging.getLogger("eir_cli.web_server")
 router = APIRouter()
 
 # Late-bound so a test's monkeypatch on the owning module wins at call time.
-_active_session_file_for_channel = late("_active_session_file_for_channel", "hermes_cli.web_server_chat")
-_profile_scope = late("_profile_scope", "hermes_cli.web_server_profiles")
-_resolve_chat_argv_async = late("_resolve_chat_argv_async", "hermes_cli.web_server_chat")
-_resolve_profile_dir = late("_resolve_profile_dir", "hermes_cli.web_server_profiles")
+_active_session_file_for_channel = late("_active_session_file_for_channel", "eir_cli.web_server_chat")
+_profile_scope = late("_profile_scope", "eir_cli.web_server_profiles")
+_resolve_chat_argv_async = late("_resolve_chat_argv_async", "eir_cli.web_server_chat")
+_resolve_profile_dir = late("_resolve_profile_dir", "eir_cli.web_server_profiles")
 _DASHBOARD_EMBEDDED_CHAT_ENABLED = LateState("_DASHBOARD_EMBEDDED_CHAT_ENABLED")
 
 
@@ -64,7 +64,7 @@ def _discard_active_session_file(app: FastAPI, channel: Optional[str], path: Opt
     if not channel or path is None:
         return
     try:
-        from hermes_cli.web_server import _get_pty_active_session_files
+        from eir_cli.web_server import _get_pty_active_session_files
         files = _get_pty_active_session_files(app)
         if files.get(channel) == path:
             files.pop(channel, None)
@@ -118,7 +118,7 @@ async def _close_unless_sidecar_allowed(ws: WebSocket, *, allow_internal: bool =
 # --- /api/console: the curated console engine, in-process, exchanging JSON
 # frames with the dashboard xterm overlay. Never spawns a PTY, shell or CLI.
 
-_CONSOLE_PROMPT = "hermes> "
+_CONSOLE_PROMPT = "eir> "
 _CONSOLE_COMMAND_TIMEOUT_SECONDS = 60.0
 # Cancel/timeout interrupt the worker cooperatively; this bounds how long the prompt waits for it to exit.
 _CONSOLE_UNWIND_TIMEOUT_SECONDS = 10.0
@@ -250,9 +250,9 @@ async def console_ws(ws: WebSocket) -> None:
     out = _ConsoleSender(ws)
 
     try:
-        from hermes_cli.console_engine import HermesConsoleEngine
+        from eir_cli.console_engine import EirConsoleEngine
 
-        engine = HermesConsoleEngine(output_limit=_CONSOLE_OUTPUT_LIMIT)
+        engine = EirConsoleEngine(output_limit=_CONSOLE_OUTPUT_LIMIT)
         if profile and profile.lower() != "current":
             _resolve_profile_dir(profile)
     except HTTPException as exc:
@@ -288,7 +288,7 @@ async def console_ws(ws: WebSocket) -> None:
             if command_id == command_generation:
                 pending_confirmation = None
                 await out.error_then_complete(
-                    "Command timed out. Hermes Console returned to the prompt.", line, command_id, "timeout",
+                    "Command timed out. Eir Console returned to the prompt.", line, command_id, "timeout",
                 )
         except Exception as exc:
             if command_id == command_generation:
@@ -417,7 +417,7 @@ async def _pump_keepalive_input(ws: WebSocket, session: Any) -> None:
     """Writer loop for a keep-alive /api/pty socket: forward client input to the
     session's bridge, consuming resize escapes locally. On child EOF the drain
     task closes the attached socket with 4410, which unparks ws.receive()."""
-    from hermes_cli.web_server_chat import _RESIZE_RE
+    from eir_cli.web_server_chat import _RESIZE_RE
     while True:
         try:
             msg = await ws.receive()
@@ -455,7 +455,7 @@ async def _pty_channel_marker_state(
     channel = _channel_or_close_code(ws)
     if not channel:
         return None, False, resume
-    from hermes_cli.web_server import _get_pty_active_session_files
+    from eir_cli.web_server import _get_pty_active_session_files
     marker_files = _get_pty_active_session_files(ws.app)
     marker_preexisting = channel in marker_files
 
@@ -474,7 +474,7 @@ async def _pty_channel_marker_state(
 
 @router.websocket("/api/pty")
 async def pty_ws(ws: WebSocket) -> None:
-    from hermes_cli.web_server_chat import PTY_REGISTRY, PtyBridge, PtyUnavailableError, _PTY_BRIDGE_AVAILABLE, _RESIZE_RE
+    from eir_cli.web_server_chat import PTY_REGISTRY, PtyBridge, PtyUnavailableError, _PTY_BRIDGE_AVAILABLE, _RESIZE_RE
     from pm.package import InstallError
     gate = await _ws_gate(ws, "pty")
     if gate is None:
@@ -488,7 +488,7 @@ async def pty_ws(ws: WebSocket) -> None:
         await ws.send_text(
             "\r\n\x1b[31mChat unavailable: the embedded terminal requires a "
             "POSIX PTY, which native Windows Python doesn't provide.\x1b[0m\r\n"
-            "\x1b[33mInstall Hermes inside WSL2 to use the dashboard's /chat "
+            "\x1b[33mInstall Eir inside WSL2 to use the dashboard's /chat "
             "tab — the rest of the dashboard works here.\x1b[0m\r\n"
         )
         await ws.close(code=1011)
@@ -514,7 +514,7 @@ async def pty_ws(ws: WebSocket) -> None:
         resolve_kwargs["active_session_file"] = str(active_session_file)
     # A picked workspace only applies to a FRESH chat; a resumed session keeps its own cwd.
     if not resume:
-        from hermes_cli.web_routers.chat_workspaces import resolve_chat_cwd
+        from eir_cli.web_routers.chat_workspaces import resolve_chat_cwd
         try:
             workspace_cwd = resolve_chat_cwd(ws.query_params.get("cwd"))
         except HTTPException as exc:  # dead/relative path: fail closed, never the launch dir
@@ -543,7 +543,7 @@ async def pty_ws(ws: WebSocket) -> None:
     attach_token = raw_attach_token
     registry_resume = raw_resume
     if raw_resume and env:
-        registry_resume = env.get("HERMES_TUI_RESUME") or raw_resume
+        registry_resume = env.get("EIR_TUI_RESUME") or raw_resume
     if attach_token is not None and (registry_resume or profile):
         # Key explicit resumes on their canonical target, never the active-session fallback.
         attach_token = f"{attach_token}\0{profile or ''}\0{registry_resume or ''}"
@@ -580,7 +580,7 @@ async def pty_ws(ws: WebSocket) -> None:
     # Keep-alive path: the PTY outlives this socket; reattach by token.
     try:
         await PTY_REGISTRY.close_other_sessions(raw_attach_token, keep_key=attach_token)
-        holder_pid = _lease_holder_pid(registry_resume, registry_home=(env or {}).get("HERMES_HOME"))
+        holder_pid = _lease_holder_pid(registry_resume, registry_home=(env or {}).get("EIR_HOME"))
         await PTY_REGISTRY.close_orphaned_sessions(registry_resume, keep_key=attach_token, holder_pid=holder_pid)
         session, _created = await PTY_REGISTRY.attach_or_spawn(
             attach_token,
@@ -651,7 +651,7 @@ def _authority_for_ticket_home(authority, home: str):
 async def gateway_ws(ws: WebSocket) -> None:
     if not await _close_unless_sidecar_allowed(ws, allow_internal=True, socket=GATEWAY_SOCKET):
         return
-    from hermes_cli.mcp_startup import start_deferred_mcp_discovery_now
+    from eir_cli.mcp_startup import start_deferred_mcp_discovery_now
     from tui_gateway.ws import handle_ws
 
     # First chat client of a standalone dashboard: fire the discovery armed at boot (no-op
@@ -661,7 +661,7 @@ async def gateway_ws(ws: WebSocket) -> None:
     # The authenticated identity (ticket / internal credential) stamped by
     # _ws_auth_reason becomes the identity authority for session ownership and
     # relay authorship. None on the legacy token path.
-    identity = getattr(ws, "_hermes_auth_identity", None)
+    identity = getattr(ws, "_eir_auth_identity", None)
     authority = getattr(ws.app.state, "session_authority", None)
     if authority is not None and identity is None:
         # The upgrade gate above has already verified the legacy token. Do not
@@ -674,7 +674,7 @@ async def gateway_ws(ws: WebSocket) -> None:
         # The dashboard gate authorizes the whole host (its REST routes take ``?profile=`` for
         # every profile), so its socket may select any served sibling too.
         identity = {**identity, 'profile_scope': 'host'}
-    ticket_home = getattr(ws, "_hermes_ticket_profile_home", None)
+    ticket_home = getattr(ws, "_eir_ticket_profile_home", None)
     served = authority
     if ticket_home and authority is None:
         # Only the gateway mints a profile-bound ticket, and it unbinds its authority while the
@@ -689,7 +689,7 @@ async def gateway_ws(ws: WebSocket) -> None:
         if served is None:
             await ws.close(code=4403)
             return
-        ws.scope['hermes.session_authority'] = served
+        ws.scope['eir.session_authority'] = served
         identity = {**identity, 'profile_id': served.profile_id, 'instance_id': served.instance_id}
     # The socket runs in the served profile's scope, as a native ticket's does (``gateway/run_api.py``):
     # legacy handlers (billing, usage, subscription) read that profile's secrets with no scope of
@@ -703,12 +703,12 @@ async def gateway_ws(ws: WebSocket) -> None:
             ws,
             auth_identity=identity,
             operator=True,  # The dashboard upgrade gate above has verified this operator.
-            subprotocol=getattr(ws, "_hermes_ws_subprotocol", None),
+            subprotocol=getattr(ws, "_eir_ws_subprotocol", None),
         )
 
 
 # --- /api/pub + /api/events: the PTY-side tui_gateway.entry opens /api/pub
-# (HERMES_TUI_SIDECAR_URL from /api/pty's env) and writes every dispatcher emit
+# (EIR_TUI_SIDECAR_URL from /api/pty's env) and writes every dispatcher emit
 # through it; the dashboard fans frames out to /api/events subscribers on the
 # same channel — the React sidebar's tool-call feed without touching the PTY
 # child's stdio handshake with Ink.

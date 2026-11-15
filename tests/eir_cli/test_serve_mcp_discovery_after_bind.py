@@ -1,5 +1,5 @@
 """Desktop `serve` starts background MCP discovery only after the socket binds; a standalone
-`hermes dashboard` arms it at boot and the first /api/ws client (or agent build) fires it (#58733).
+`eir dashboard` arms it at boot and the first /api/ws client (or agent build) fires it (#58733).
 
 The MCP SDK import (~350ms) used to run on a thread started BEFORE
 web_server was imported, holding the GIL against the main thread's own
@@ -13,10 +13,10 @@ import sys
 import threading
 import types
 
-from hermes_cli import mcp_startup
-from hermes_cli import web_server
-from hermes_cli import web_server_lifecycle
-from tests.hermes_cli.test_dashboard_auth_gate import _stub_uvicorn_run
+from eir_cli import mcp_startup
+from eir_cli import web_server
+from eir_cli import web_server_lifecycle
+from tests.eir_cli.test_dashboard_auth_gate import _stub_uvicorn_run
 
 
 def _reset_discovery_state(monkeypatch):
@@ -80,21 +80,21 @@ def test_deferred_discovery_fires_once_and_is_idempotent(monkeypatch):
 
 
 def _stub_dashboard_runtime(monkeypatch):
-    import hermes_cli.main as main_mod
+    import eir_cli.main as main_mod
 
     monkeypatch.setattr(main_mod, "_resolve_dashboard_web_dist", lambda *a, **k: None)
     monkeypatch.setattr(main_mod, "_sync_bundled_skills_quietly", lambda: None)
     monkeypatch.setitem(sys.modules, "fastapi", types.SimpleNamespace())
     monkeypatch.setitem(sys.modules, "uvicorn", types.SimpleNamespace())
-    monkeypatch.setitem(sys.modules, "hermes_logging", types.SimpleNamespace(setup_logging=lambda **_k: None))
-    monkeypatch.setitem(sys.modules, "hermes_cli.plugins", types.SimpleNamespace(discover_plugins=lambda: None))
+    monkeypatch.setitem(sys.modules, "eir_logging", types.SimpleNamespace(setup_logging=lambda **_k: None))
+    monkeypatch.setitem(sys.modules, "eir_cli.plugins", types.SimpleNamespace(discover_plugins=lambda: None))
     return main_mod
 
 
 def test_standalone_dashboard_boot_arms_discovery_without_starting_it(monkeypatch):
-    """#58733: an idle, unvisited `hermes dashboard` must not spawn the configured MCP servers."""
+    """#58733: an idle, unvisited `eir dashboard` must not spawn the configured MCP servers."""
     _reset_discovery_state(monkeypatch)
-    monkeypatch.delenv("HERMES_DESKTOP", raising=False)
+    monkeypatch.delenv("EIR_DESKTOP", raising=False)
     main_mod = _stub_dashboard_runtime(monkeypatch)
     calls: list[str] = []
     monkeypatch.setattr(
@@ -112,8 +112,8 @@ def test_standalone_dashboard_boot_arms_discovery_without_starting_it(monkeypatc
 def test_first_gateway_ws_client_starts_the_armed_discovery_once(monkeypatch):
     import asyncio
 
-    from hermes_cli.web_routers import chat_ws
-    from hermes_cli.web_session_sockets import GATEWAY_SOCKET
+    from eir_cli.web_routers import chat_ws
+    from eir_cli.web_session_sockets import GATEWAY_SOCKET
 
     _reset_discovery_state(monkeypatch)
     calls: list[str] = []

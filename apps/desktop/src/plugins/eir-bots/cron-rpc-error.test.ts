@@ -10,13 +10,13 @@
  * the private helper behind it.
  */
 
-import type * as HermesSdk from '@hermes/plugin-sdk'
+import type * as EirSdk from '@eir/plugin-sdk'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const request = vi.fn()
 
-vi.mock('@hermes/plugin-sdk', async importOriginal => {
-  const sdk = await importOriginal<typeof HermesSdk>()
+vi.mock('@eir/plugin-sdk', async importOriginal => {
+  const sdk = await importOriginal<typeof EirSdk>()
 
   return { ...sdk, host: { ...sdk.host, request } }
 })

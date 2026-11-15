@@ -27,7 +27,7 @@ __all__ = [
     "noninteractive_git_env",
     "noninteractive_repo_git_env",
     "pid_exists_stdlib",
-    "pid_is_hermes",
+    "pid_is_eir",
     "resolve_node_command",
     "restore_ambient_pythonpath",
     "selected_git_env",
@@ -59,9 +59,9 @@ _GIT_VALUE_OPTS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exe
 
 def run(cmd, **kwargs) -> NoReturn:
     # Shim to suppress old updater work until relaunch. Do not start its installer.
-    from hermes_cli._old_updater import stop_historical_updater
+    from eir_cli._old_updater import stop_historical_updater
 
-    stop_historical_updater("hermes_cli._subprocess_compat.run")
+    stop_historical_updater("eir_cli._subprocess_compat.run")
 
 
 def harden_git_argv(args: Sequence[str]) -> list[str]:
@@ -90,7 +90,7 @@ def harden_git_argv(args: Sequence[str]) -> list[str]:
 IS_WINDOWS = sys.platform == "win32"
 
 # Private launcher-to-child metadata. This is diagnostic state, not user config.
-_WINDOWS_GATEWAY_BREAKAWAY_ENV = "_HERMES_GATEWAY_BREAKAWAY"
+_WINDOWS_GATEWAY_BREAKAWAY_ENV = "_EIR_GATEWAY_BREAKAWAY"
 
 
 def split_command_line(line: str) -> list[str]:
@@ -128,10 +128,10 @@ def restore_ambient_pythonpath(env: Mapping[str, str]) -> dict:
 
     No-boot-through-venv: the boot interpreter is the pm STORE python, whose
     imports arrive via ``PYTHONPATH=<repo>;<venv>/site-packages`` (it has no
-    editable install). The subprocess-env factories strip Hermes-owned
+    editable install). The subprocess-env factories strip Eir-owned
     PYTHONPATH entries so agent-run children on DIFFERENT interpreter
     versions never load the backend's C extensions — but a child that
-    re-execs THIS interpreter (``sys.executable -m hermes_cli.main``) runs
+    re-execs THIS interpreter (``sys.executable -m eir_cli.main``) runs
     on the same version and needs those entries back. Prepending keeps the
     launcher's repo-first ordering intact.
     """
@@ -407,7 +407,7 @@ def expose_pm_git(project_root: Path) -> None:
 
     install.ps1 stages the pinned Git for Windows into PM's store for its own
     process only, and PM's facts never record it, so every later bare ``git``
-    (``hermes update``, the source-completion stamp, plugin installs, doctor)
+    (``eir update``, the source-completion stamp, plugin installs, doctor)
     died with ``[WinError 2]``. A git found under PM's store is that unrecorded
     copy inherited from the installer, so it is recorded too. Callers are
     explicit user actions (like ``ensure_tools_for_sync``), so acquire PM's git
@@ -417,7 +417,7 @@ def expose_pm_git(project_root: Path) -> None:
     """
     if sys.platform != "win32" or not (Path(project_root) / ".git").exists():
         return
-    from hermes_platform.resolver import locate_command
+    from eir_platform.resolver import locate_command
     from pm.paths import store_root
 
     found = locate_command("git").command
@@ -438,7 +438,7 @@ def noninteractive_git_env(base: Mapping[str, str] | None = None) -> dict[str, s
     prompting), ``GCM_INTERACTIVE=Never`` (no Git Credential Manager dialog), and isolated git
     config: inherited ``GIT_CONFIG_*`` injection, global/system config, pagers, editors, fsmonitor,
     external diff and hooks are all disabled so a user's repo/global config cannot hang or mutate
-    Hermes's plumbing calls. ``core.sshCommand`` is pinned to ``ssh -o BatchMode=yes`` so the ssh
+    Eir's plumbing calls. ``core.sshCommand`` is pinned to ``ssh -o BatchMode=yes`` so the ssh
     child of a fetch/ls-remote fails instead of prompting — ssh bypasses ``stdin=DEVNULL`` and
     opens ``/dev/tty`` directly (#104591); an agent-authenticated ssh still succeeds, and an
     explicit user ``GIT_SSH_COMMAND`` env var still takes precedence over this config-layer pin.
@@ -448,7 +448,7 @@ def noninteractive_git_env(base: Mapping[str, str] | None = None) -> dict[str, s
     ``stdin=subprocess.DEVNULL``. Internal plumbing only — the agent-facing terminal tool has its
     own policy layer and visible PTY.
 
-    Hermes shells out to git from many non-interactive contexts — MCP catalog installs, plugin
+    Eir shells out to git from many non-interactive contexts — MCP catalog installs, plugin
     install/update, profile distribution staging, worktree base fetches, desktop review-pane fetch/push.
     When the remote is private, misconfigured, or requires auth, git's default behavior is to prompt on the
     inherited terminal (or via an askpass helper), which silently hangs the operation until its timeout — or
@@ -705,33 +705,33 @@ def _process_start_time(pid: int) -> int | None:
         return None
 
 
-def _text_names_hermes(text: str) -> bool:
-    r"""True when *text* names Hermes at a path-segment / token boundary.
+def _text_names_eir(text: str) -> bool:
+    r"""True when *text* names Eir at a path-segment / token boundary.
 
-    A bare ``"hermes" in text`` substring test would also match unrelated processes whose paths
-    merely contain the letters (``...\shermesa\...``) — the false-positive class this prevents.
+    A bare ``"eir" in text`` substring test would also match unrelated processes whose paths
+    merely contain the letters (``...\seira\...``) — the false-positive class this prevents.
     """
-    return any(token.startswith(("hermes", ".hermes"))
+    return any(token.startswith(("eir", ".eir"))
                for token in re.split(r"[\\/\s=,;\"']+", text.lower()))
 
 
-def _process_command_is_hermes(pid: int) -> bool:
-    """Best-effort check that *pid* currently runs Hermes code."""
+def _process_command_is_eir(pid: int) -> bool:
+    """Best-effort check that *pid* currently runs Eir code."""
     try:
         import psutil
 
         process = psutil.Process(pid)
         command = " ".join(process.cmdline() or [])
         executable = process.exe() or ""
-        return _text_names_hermes(f"{command} {executable}")
+        return _text_names_eir(f"{command} {executable}")
     except Exception:
         return False
 
 
-def pid_is_hermes(pid: int, *, expected_start_time: int | None = None) -> bool:
+def pid_is_eir(pid: int, *, expected_start_time: int | None = None) -> bool:
     """Whether it is safe to use ``taskkill`` for *pid*.
 
-    The PID must be valid, currently exist, and identify a Hermes process. When the caller captured
+    The PID must be valid, currently exist, and identify a Eir process. When the caller captured
     a start-time fingerprint before the destructive action, the live process must still have the
     same ``(pid, start_time)`` identity. Any ambiguity fails closed.
     """
@@ -753,7 +753,7 @@ def pid_is_hermes(pid: int, *, expected_start_time: int | None = None) -> bool:
     if expected_start_time is not None and current_start_time != expected_start_time:
         return False
     try:
-        return _process_command_is_hermes(pid)
+        return _process_command_is_eir(pid)
     except Exception:
         return False
 
@@ -833,7 +833,7 @@ def _legacy_kill_process_tree(proc: subprocess.Popen) -> None:
         pass
     if IS_WINDOWS:
         # No identity guard on purpose: *proc* is our own retained Popen handle, so the PID cannot
-        # be recycled while we hold it. The fail-closed ``pid_is_hermes`` guard is for BARE pids.
+        # be recycled while we hold it. The fail-closed ``pid_is_eir`` guard is for BARE pids.
         try:
             subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)],
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
@@ -861,7 +861,7 @@ def bounded_probe_run(
     ``communicate()`` after killing the direct child. Killing it can leave a descendant (``git.exe`` under a
     launcher shim, ``conhost.exe`` under wmic/powershell) holding duplicates of the captured stdout/stderr
     handles, so the pipes never reach EOF and the reader-thread join blocks forever. The wmic /
-    ``Get-CimInstance Win32_Process`` gateway scan hit exactly this during ``hermes update`` on slow-WMI
+    ``Get-CimInstance Win32_Process`` gateway scan hit exactly this during ``eir update`` on slow-WMI
     machines (#87134); the git probes hit it first (#68609 / #66037).
     """
     # detached-spawn: ok — awaited probe; a timeout or failure tree-kills its group (kill_and_drain)
@@ -872,7 +872,7 @@ def bounded_probe_run(
         # Cygwin/MSYS `exec` lets the forked stub exit once the new image runs, so a Git Bash grandchild
         # (`sleep`, `cat`) has a dead parent and survives the tree-kill holding our pipes (#73403, proven
         # on windows-latest). KILL_ON_JOB_CLOSE reaches it regardless of ancestry.
-        from hermes_cli.local_runtime.processes import spawn_server
+        from eir_cli.local_runtime.processes import spawn_server
 
         proc, job = spawn_server(
             list(argv), stdout=subprocess.PIPE, stderr=subprocess.PIPE,

@@ -7,9 +7,9 @@ import os
 
 import pytest
 
-from hermes_cli import kanban_db as kb
-from hermes_cli import kanban_db_connect as kbc
-from hermes_cli import projects_db as pdb
+from eir_cli import kanban_db as kb
+from eir_cli import kanban_db_connect as kbc
+from eir_cli import projects_db as pdb
 
 
 @pytest.fixture

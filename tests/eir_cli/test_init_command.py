@@ -1,6 +1,6 @@
 """Tests for /init — generate or update AGENTS.md from a project scan.
 
-Covers the shared prompt builder (hermes_cli.init_command.build_init_prompt)
+Covers the shared prompt builder (eir_cli.init_command.build_init_prompt)
 and the slash-command registry wiring. /init has no engine and no model tool:
 it builds a guidance-laden prompt that the live agent runs as a normal turn
 (the /learn pattern), so these are the load-bearing behavior contracts.
@@ -8,7 +8,7 @@ it builds a guidance-laden prompt that the live agent runs as a normal turn
 
 import pytest
 
-from hermes_cli.init_command import (
+from eir_cli.init_command import (
     build_init_prompt,
     build_init_prompt_for_cwd,
 )
@@ -107,7 +107,7 @@ class TestSessionActiveDirectory:
     def test_ambient_session_key_used_when_none(self, tmp_path, monkeypatch):
         # Dispatch surfaces that don't pass an explicit key (e.g. a CLI
         # inheriting a bound session env) resolve the key from
-        # HERMES_SESSION_KEY.
+        # EIR_SESSION_KEY.
         from gateway.session_context import set_session_vars
         from tools.terminal_tool import clear_session_cwd, record_session_cwd
 
@@ -148,7 +148,7 @@ class TestSessionActiveDirectory:
 
 class TestInitRegistryWiring:
     def test_init_is_registered_and_resolves(self):
-        from hermes_cli.commands import resolve_command
+        from eir_cli.commands import resolve_command
 
         cmd = resolve_command("init")
         assert cmd is not None
@@ -157,7 +157,7 @@ class TestInitRegistryWiring:
 
     def test_init_works_on_the_gateway(self):
         # /init is a both-surfaces command like /learn, not CLI-only.
-        from hermes_cli.commands import GATEWAY_KNOWN_COMMANDS
+        from eir_cli.commands import GATEWAY_KNOWN_COMMANDS
 
         assert "init" in GATEWAY_KNOWN_COMMANDS
 

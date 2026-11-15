@@ -1,63 +1,63 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  normalizeHermesOpenString,
-  pathFromHermesDeepLink,
+  normalizeEirOpenString,
+  pathFromEirDeepLink,
   pathFromOpenDeepLink,
-  resolveHermesOpenPath
-} from './hermes-open-target'
+  resolveEirOpenPath
+} from './eir-open-target'
 
-describe('normalizeHermesOpenString', () => {
+describe('normalizeEirOpenString', () => {
   it('accepts hash-router paths and strips a leading hash', () => {
-    expect(normalizeHermesOpenString('/index-network/intent/1')).toBe('/index-network/intent/1')
-    expect(normalizeHermesOpenString('#/index-network/intent/1')).toBe('/index-network/intent/1')
+    expect(normalizeEirOpenString('/index-network/intent/1')).toBe('/index-network/intent/1')
+    expect(normalizeEirOpenString('#/index-network/intent/1')).toBe('/index-network/intent/1')
   })
 
-  it('maps plugin-scoped hermes:// deep links to the same path', () => {
-    expect(normalizeHermesOpenString('hermes://index-network/intent/1')).toBe('/index-network/intent/1')
-    expect(normalizeHermesOpenString('hermes://index-network/intent/1?focus=true')).toBe(
+  it('maps plugin-scoped eir:// deep links to the same path', () => {
+    expect(normalizeEirOpenString('eir://index-network/intent/1')).toBe('/index-network/intent/1')
+    expect(normalizeEirOpenString('eir://index-network/intent/1?focus=true')).toBe(
       '/index-network/intent/1?focus=true'
     )
   })
 
-  it('maps hermes://open/… deep links by stripping the open host', () => {
-    expect(normalizeHermesOpenString('hermes://open/index-network/intent/1')).toBe('/index-network/intent/1')
-    expect(normalizeHermesOpenString('hermes://open/settings/plugins')).toBe('/settings/plugins')
+  it('maps eir://open/… deep links by stripping the open host', () => {
+    expect(normalizeEirOpenString('eir://open/index-network/intent/1')).toBe('/index-network/intent/1')
+    expect(normalizeEirOpenString('eir://open/settings/plugins')).toBe('/settings/plugins')
   })
 
-  it('rejects reserved hermes kinds and unsafe paths', () => {
-    expect(normalizeHermesOpenString('hermes://blueprint/morning-brief')).toBeNull()
-    expect(normalizeHermesOpenString('hermes://plugin/install')).toBeNull()
-    expect(normalizeHermesOpenString('https://example.com/x')).toBeNull()
-    expect(normalizeHermesOpenString('/../etc/passwd')).toBeNull()
-    expect(normalizeHermesOpenString('index-network')).toBeNull()
+  it('rejects reserved eir kinds and unsafe paths', () => {
+    expect(normalizeEirOpenString('eir://blueprint/morning-brief')).toBeNull()
+    expect(normalizeEirOpenString('eir://plugin/install')).toBeNull()
+    expect(normalizeEirOpenString('https://example.com/x')).toBeNull()
+    expect(normalizeEirOpenString('/../etc/passwd')).toBeNull()
+    expect(normalizeEirOpenString('index-network')).toBeNull()
   })
 })
 
-describe('resolveHermesOpenPath', () => {
+describe('resolveEirOpenPath', () => {
   it('merges structured path + params', () => {
-    expect(resolveHermesOpenPath({ path: '/index-network/intent/1', params: { focus: 'true' } })).toBe(
+    expect(resolveEirOpenPath({ path: '/index-network/intent/1', params: { focus: 'true' } })).toBe(
       '/index-network/intent/1?focus=true'
     )
   })
 
   it('resolves href the same as a bare string', () => {
-    expect(resolveHermesOpenPath({ href: 'hermes://index-network/intent/1' })).toBe('/index-network/intent/1')
+    expect(resolveEirOpenPath({ href: 'eir://index-network/intent/1' })).toBe('/index-network/intent/1')
   })
 })
 
-describe('pathFromHermesDeepLink', () => {
+describe('pathFromEirDeepLink', () => {
   it('builds the navigate path from a plugin-scoped deep-link payload', () => {
-    expect(pathFromHermesDeepLink('index-network', 'intent/1')).toBe('/index-network/intent/1')
+    expect(pathFromEirDeepLink('index-network', 'intent/1')).toBe('/index-network/intent/1')
   })
 
-  it('builds the navigate path from hermes://open/… payloads', () => {
+  it('builds the navigate path from eir://open/… payloads', () => {
     expect(pathFromOpenDeepLink('index-network/intent/1')).toBe('/index-network/intent/1')
-    expect(pathFromHermesDeepLink('open', 'agent/42')).toBe('/agent/42')
+    expect(pathFromEirDeepLink('open', 'agent/42')).toBe('/agent/42')
   })
 
   it('ignores reserved kinds', () => {
-    expect(pathFromHermesDeepLink('blueprint', 'morning-brief')).toBeNull()
-    expect(pathFromHermesDeepLink('plugin', 'install')).toBeNull()
+    expect(pathFromEirDeepLink('blueprint', 'morning-brief')).toBeNull()
+    expect(pathFromEirDeepLink('plugin', 'install')).toBeNull()
   })
 })

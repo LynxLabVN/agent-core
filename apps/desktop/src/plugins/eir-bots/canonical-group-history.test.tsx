@@ -5,12 +5,12 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { expectDownloaded, observeDownloads } from './canonical-download-test-utils'
 
 const request = vi.hoisted(() => vi.fn())
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@eir/plugin-sdk', async () => {
   const { en } = await import('@/i18n/en')
   const { Textarea } = await import('@/components/ui/textarea')
   const { captureGroupRequests } = await import('./canonical-group-contract-test-utils')
 
-  return { ...await (await import('./group-test-utils')).pluginSdkMock({}), Textarea, atom: (await import('nanostores')).atom, host: { requestProfile: captureGroupRequests(request).request }, randomUuid: (await import('@hermes/shared')).randomUuid,
+  return { ...await (await import('./group-test-utils')).pluginSdkMock({}), Textarea, atom: (await import('nanostores')).atom, host: { requestProfile: captureGroupRequests(request).request }, randomUuid: (await import('@eir/shared')).randomUuid,
     useI18n: () => ({ locale: 'en', t: en }),
     Button: (props: ComponentProps<'button'>) => <button {...props} />,
     MessageTextContent: ({ text }: { text: string }) => <div data-testid="markdown">{text}</div>,
@@ -34,13 +34,13 @@ import { CanonicalGroupWorkspace } from './canonical-group-workspace'
 
 const binding = { connectionId: 'original-owner', profile: 'reviewer', roomId: 'room-one' }
 const manifest = { attachment_id: 'att_00000000000000000000000000000001', kind: 'file', name: 'notes.txt', mime: 'text/plain', size: 1 }
-const originalDesktop = window.hermesDesktop
-afterEach(() => { cleanup(); request.mockReset(); vi.restoreAllMocks(); vi.unstubAllGlobals(); localStorage.clear(); window.hermesDesktop = originalDesktop })
+const originalDesktop = window.eirDesktop
+afterEach(() => { cleanup(); request.mockReset(); vi.restoreAllMocks(); vi.unstubAllGlobals(); localStorage.clear(); window.eirDesktop = originalDesktop })
 
 it('keeps a committed file downloadable in history after Send clears the composer (F31)', async () => {
   const observed = observeDownloads()
   const save = vi.fn().mockResolvedValue(undefined)
-  window.hermesDesktop = { saveImageBuffer: save } as unknown as typeof window.hermesDesktop
+  window.eirDesktop = { saveImageBuffer: save } as unknown as typeof window.eirDesktop
   let sent = false
   request.mockImplementation(async (_route, method, params) => {
     if (method === 'groups.capabilities') {return CANONICAL_GROUP_CAPABILITIES}
@@ -85,7 +85,7 @@ it('keeps a committed file downloadable in history after Send clears the compose
 it('binds user/member history downloads to their real event and refuses missing or foreign room identity', async () => {
   const observed = observeDownloads()
   const save = vi.fn().mockResolvedValue(undefined)
-  window.hermesDesktop = { saveImageBuffer: save } as unknown as typeof window.hermesDesktop
+  window.eirDesktop = { saveImageBuffer: save } as unknown as typeof window.eirDesktop
 
   const events = [
     { seq: 1, room_id: binding.roomId, event_id: 'user-event', kind: 'message.user' },

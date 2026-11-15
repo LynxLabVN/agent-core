@@ -1,4 +1,4 @@
-"""Tests for kanban board export / import (``hermes_cli.kanban_transfer``).
+"""Tests for kanban board export / import (``eir_cli.kanban_transfer``).
 
 The contract these pin down is "a board survives the trip to another
 machine, and nothing that only made sense on the exporting machine comes
@@ -29,10 +29,10 @@ _WORKTREE = Path(__file__).resolve().parents[2]
 if str(_WORKTREE) not in sys.path:
     sys.path.insert(0, str(_WORKTREE))
 
-from hermes_cli import kanban_db as kb
-from hermes_cli import kanban_db_connect as kbc
-from hermes_cli import kanban_transfer as kt
-from hermes_cli.archive_safe import normalize_archive_parts, safe_extract_targz
+from eir_cli import kanban_db as kb
+from eir_cli import kanban_db_connect as kbc
+from eir_cli import kanban_transfer as kt
+from eir_cli.archive_safe import normalize_archive_parts, safe_extract_targz
 
 
 @pytest.fixture
@@ -47,10 +47,10 @@ def kanban_root(tmp_path, monkeypatch):
     def _use(name: str) -> Path:
         root = tmp_path / name
         root.mkdir(exist_ok=True)
-        monkeypatch.setenv("HERMES_HOME", str(root))
-        monkeypatch.setenv("HERMES_KANBAN_HOME", str(root))
-        for var in ("HERMES_KANBAN_DB", "HERMES_KANBAN_WORKSPACES_ROOT",
-                    "HERMES_KANBAN_ATTACHMENTS_ROOT", "HERMES_KANBAN_BOARD"):
+        monkeypatch.setenv("EIR_HOME", str(root))
+        monkeypatch.setenv("EIR_KANBAN_HOME", str(root))
+        for var in ("EIR_KANBAN_DB", "EIR_KANBAN_WORKSPACES_ROOT",
+                    "EIR_KANBAN_ATTACHMENTS_ROOT", "EIR_KANBAN_BOARD"):
             monkeypatch.delenv(var, raising=False)
         kb._INITIALIZED_PATHS.clear()
         return root
@@ -358,5 +358,5 @@ def test_import_rejects_a_future_format_version(kanban_root, tmp_path):
         tf.add(staged / "alpha", arcname="alpha")
 
     kanban_root("target")
-    with pytest.raises(ValueError, match="newer than this Hermes"):
+    with pytest.raises(ValueError, match="newer than this Eir"):
         kt.import_board(str(bumped))

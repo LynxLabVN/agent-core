@@ -1,6 +1,6 @@
 """The owner-side durable retention of a safety-refused turn (``retain_refused_turn_for_display``).
 
-Regression for the "Hermes Bot stuck sessions" report: a refusal is deterministic for the whole
+Regression for the "Eir Bot stuck sessions" report: a refusal is deterministic for the whole
 conversation, so a refused turn left in the MODEL's context re-trips the filter on every later
 message — including after a reload. CLI and ACP own a direct ``SessionDB``, so they retain the
 refused turn owner-side after the turn: the whole turn (user row + any tool rounds + the refusal)
@@ -8,8 +8,8 @@ leaves the model read, but the user's own message stays VISIBLE in the display p
 ``content_refused``, so a close+reopen still shows "you asked X → refused". This pins both halves.
 """
 from agent.turn_failure_copy import CONTENT_REFUSED_DISPLAY_KIND, CONTENT_REFUSED_METADATA_KEY
-from hermes_state import SessionDB
-from hermes_state_rewind import retain_refused_turn_for_display
+from eir_state import SessionDB
+from eir_state_rewind import retain_refused_turn_for_display
 
 _NOTICE = "This message was refused by the model's safety filter — try a different query."
 

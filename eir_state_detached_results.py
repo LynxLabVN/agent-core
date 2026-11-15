@@ -1,5 +1,5 @@
 """Results that arrive between turns, recorded once as user rows: a detached API delegation's delivery and
-an unviewed local completion's note (#134889 LC-7). Split out of ``hermes_state_messages`` and bound onto
+an unviewed local completion's note (#134889 LC-7). Split out of ``eir_state_messages`` and bound onto
 SessionDB through ``SessionMessagesMixin``; built on its _message_row_params/_execute_write primitives."""
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ class SessionDetachedResultsMixin:
         """Record a result that arrived between turns as a user row once, including replay after rotation: a row
         ``match_sql`` (a condition on ``m``) finds in the compression lineage is returned instead. Check and insert
         share the writer transaction, so independent gateway processes cannot duplicate it; a live turn refuses it."""
-        from hermes_state_messages import _INSERT_MESSAGE_SQL  # that module binds this mixin
+        from eir_state_messages import _INSERT_MESSAGE_SQL  # that module binds this mixin
         msg = {"content": content, "display_kind": display_kind, "display_metadata": metadata}
         stamp_message_uid(msg)  # a fresh occurrence: mint its durable id
         row = self._message_row_params(session_id, "user", msg, None, time.time(), keep_reasoning=True)

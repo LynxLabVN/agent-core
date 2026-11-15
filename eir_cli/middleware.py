@@ -1,4 +1,4 @@
-"""Hermes middleware contract helpers.
+"""Eir middleware contract helpers.
 
 Observer hooks report what happened. Middleware can change what happens by rewriting a request or
 wrapping the actual execution callback. Agent-loop call sites and plugins share this vocabulary.
@@ -13,8 +13,8 @@ from typing import Any, Callable, Dict, List
 
 logger = logging.getLogger(__name__)
 
-OBSERVER_SCHEMA_VERSION = "hermes.observer.v1"
-MIDDLEWARE_SCHEMA_VERSION = "hermes.middleware.v1"
+OBSERVER_SCHEMA_VERSION = "eir.observer.v1"
+MIDDLEWARE_SCHEMA_VERSION = "eir.middleware.v1"
 
 TOOL_REQUEST_MIDDLEWARE = "tool_request"
 TOOL_EXECUTION_MIDDLEWARE = "tool_execution"
@@ -64,7 +64,7 @@ def _apply_request_chain(
     kind: str, payload_key: str, trace: list[dict[str, Any]], original: Any, **kwargs: Any
 ) -> RequestMiddlewareResult:
     """Feed ``kwargs[payload_key]`` through every ``kind`` middleware; each may return ``{payload_key: {...}}``."""
-    from hermes_cli.plugins import invoke_middleware
+    from eir_cli.plugins import invoke_middleware
 
     current = kwargs[payload_key]
     for result in invoke_middleware(kind, _payload_key=payload_key, **middleware_payload(**kwargs)):
@@ -87,7 +87,7 @@ def _apply_request_chain(
 
 def apply_llm_request_middleware(request: dict[str, Any], **context: Any) -> RequestMiddlewareResult:
     """Apply registered LLM request middleware; ``{"request": {...}}`` replaces the provider kwargs."""
-    from hermes_cli.plugins import has_middleware
+    from eir_cli.plugins import has_middleware
 
     if not has_middleware(LLM_REQUEST_MIDDLEWARE):
         return RequestMiddlewareResult(payload=request, original_payload=request)
@@ -120,7 +120,7 @@ def apply_tool_request_middleware(
             current_args = _safe_copy(relay_args)
             trace.append({"source": "nemo_relay"})
 
-    from hermes_cli.plugins import has_middleware
+    from eir_cli.plugins import has_middleware
 
     if not has_middleware(TOOL_REQUEST_MIDDLEWARE):
         return RequestMiddlewareResult(
@@ -160,8 +160,8 @@ class _DownstreamExecutionError(Exception):
 
 
 def _run_execution_chain(kind: str, terminal_call: Callable[[Any], Any], **kwargs: Any) -> Any:
-    from hermes_cli.plugins import _delivery_manager
-    from hermes_cli.plugins_dispatch import PluginDispatchMixin
+    from eir_cli.plugins import _delivery_manager
+    from eir_cli.plugins_dispatch import PluginDispatchMixin
 
     payload_key = "request" if "request" in kwargs else "args"
     manager = _delivery_manager()

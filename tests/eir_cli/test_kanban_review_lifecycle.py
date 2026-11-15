@@ -27,19 +27,19 @@ from types import SimpleNamespace
 
 import pytest
 
-from hermes_cli import kanban_db as kb
-from hermes_cli import kanban_db_connect as kbc
-from hermes_cli import kanban_db_notify as kbn
-from hermes_cli import kanban_db_dispatch as kbd
-from hermes_cli import kanban_ops
+from eir_cli import kanban_db as kb
+from eir_cli import kanban_db_connect as kbc
+from eir_cli import kanban_db_notify as kbn
+from eir_cli import kanban_db_dispatch as kbd
+from eir_cli import kanban_ops
 
 
 @pytest.fixture
 def kanban_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Isolated HERMES_HOME with an empty kanban DB."""
-    home = tmp_path / ".hermes"
+    """Isolated EIR_HOME with an empty kanban DB."""
+    home = tmp_path / ".eir"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     kb.init_db()
     return home
@@ -320,7 +320,7 @@ def test_complete_task_closes_review_to_done(kanban_home: Path) -> None:
         )
         assert kb.get_task(conn, tid).status == "review"
         # The review lane has no active run — the exact state that used to
-        # make `hermes kanban complete` a no-op (#54823).
+        # make `eir kanban complete` a no-op (#54823).
         assert kb.get_task(conn, tid).current_run_id is None
 
         ok = kb.complete_task(conn, tid, summary="LGTM — merged", result="approved")
@@ -387,8 +387,8 @@ def test_review_dispatch_gate_prevents_phantom_reviewer(
     task parked in ``review`` (this deployment explicitly waits for a human).
     Flipping the knob back on proves the gate, not
     something else, is what suppressed the claim."""
-    import hermes_cli.config as cfgmod
-    import hermes_cli.profiles as profmod
+    import eir_cli.config as cfgmod
+    import eir_cli.profiles as profmod
 
     with kbc.connect() as conn:
         tid = kb.create_task(conn, title="park", assignee="worker")
@@ -433,8 +433,8 @@ def test_active_pr_guard_skipped_for_review_lane_but_defers_ready_lane(
     a ready-lane task is a duplicate-work signal and stays deferred.
     Rate-limit cooldown still applies in the review lane.
     """
-    import hermes_cli.config as cfgmod
-    import hermes_cli.profiles as profmod
+    import eir_cli.config as cfgmod
+    import eir_cli.profiles as profmod
 
     monkeypatch.setattr(profmod, "profile_exists", lambda name: True)
     monkeypatch.setattr(
@@ -504,8 +504,8 @@ def test_active_pr_guard_lifts_for_profile_handed_the_card_after_the_pr(
     The un-reassigned implementer stays guarded; a newer PR comment posted
     after the handoff (the closer's own run) guards again.
     """
-    import hermes_cli.config as cfgmod
-    import hermes_cli.profiles as profmod
+    import eir_cli.config as cfgmod
+    import eir_cli.profiles as profmod
 
     monkeypatch.setattr(profmod, "profile_exists", lambda name: True)
     monkeypatch.setattr(
@@ -545,8 +545,8 @@ def test_active_pr_guard_holds_through_same_profile_reassign_and_unassign(
     they counted as handoffs the implementer would be re-spawned against its own
     PR — the duplicate-work protection #111910 says must survive.
     """
-    import hermes_cli.config as cfgmod
-    import hermes_cli.profiles as profmod
+    import eir_cli.config as cfgmod
+    import eir_cli.profiles as profmod
 
     monkeypatch.setattr(profmod, "profile_exists", lambda name: True)
     monkeypatch.setattr(cfgmod, "load_config", lambda *a, **k: {})
@@ -636,8 +636,8 @@ def test_dispatch_json_exposes_suppression_reasons(
 def test_review_dispatch_preserves_task_skills_and_adds_reviewer_skill(
     kanban_home: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import hermes_cli.config as cfgmod
-    import hermes_cli.profiles as profmod
+    import eir_cli.config as cfgmod
+    import eir_cli.profiles as profmod
 
     monkeypatch.setattr(profmod, "profile_exists", lambda name: True)
     monkeypatch.setattr(
@@ -688,8 +688,8 @@ def test_review_dispatch_honors_global_and_per_profile_caps(
     kanban_home: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import hermes_cli.config as cfgmod
-    import hermes_cli.profiles as profmod
+    import eir_cli.config as cfgmod
+    import eir_cli.profiles as profmod
 
     monkeypatch.setattr(profmod, "profile_exists", lambda _name: True)
     monkeypatch.setattr(

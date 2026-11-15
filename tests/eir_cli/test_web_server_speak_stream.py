@@ -10,12 +10,12 @@ import pytest
 from starlette.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
-from hermes_cli import web_server
-import hermes_cli.web_server_gateway as _web_server_gateway
+from eir_cli import web_server
+import eir_cli.web_server_gateway as _web_server_gateway
 
 
 @pytest.fixture
-def stream_client(monkeypatch, _isolate_hermes_home):
+def stream_client(monkeypatch, _isolate_eir_home):
     previous_auth_required = getattr(web_server.app.state, "auth_required", None)
     web_server.app.state.auth_required = False
 

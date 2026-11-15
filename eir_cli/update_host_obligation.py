@@ -1,21 +1,21 @@
-"""Host-scoped update→restart obligation for ``hermes update``.
+"""Host-scoped update→restart obligation for ``eir update``.
 
-Multiplex-only (Teknium ruling): exactly ONE ``hermes gateway run`` per host serves every
+Multiplex-only (Teknium ruling): exactly ONE ``eir gateway run`` per host serves every
 profile, so "this pull still owes the fleet a restart" is a property of the HOST, not of one
-profile's ``HERMES_HOME``. The legacy ``$HERMES_HOME/fleet_restart_pending`` marker was
-per-home: ``hermes -p coder update`` armed and cleared coder's copy while restarting the
+profile's ``EIR_HOME``. The legacy ``$EIR_HOME/fleet_restart_pending`` marker was
+per-home: ``eir -p coder update`` armed and cleared coder's copy while restarting the
 SHARED process, and every other profile's CLI could neither see nor discharge that obligation
 — it simply armed its own and re-killed the same host process.
 
 The record therefore lives beside the host rendezvous record, in
-:func:`gateway.host_rendezvous.host_state_dir` (``$HERMES_GATEWAY_LOCK_DIR`` else
-``$XDG_STATE_HOME/hermes/gateway-locks``) — the one cross-profile, per-OS-user state root the
+:func:`gateway.host_rendezvous.host_state_dir` (``$EIR_GATEWAY_LOCK_DIR`` else
+``$XDG_STATE_HOME/eir/gateway-locks``) — the one cross-profile, per-OS-user state root the
 tree already has. It is written once per host and installation (keyed by the checkout), read by
 every profile's CLI, and cleared once.
 
 The same "one host process, not one per profile" identity is what
 :func:`collapse_units_to_host_processes` applies to enumerated systemd units: leftover
-per-profile ``hermes-gateway-<p>.service`` units on a multiplexed host all point at the same
+per-profile ``eir-gateway-<p>.service`` units on a multiplexed host all point at the same
 live ``MainPID``, so restarting each one restarts the host process N times.
 """
 
@@ -33,16 +33,16 @@ import tempfile
 import time
 from pathlib import Path
 from typing import Any, Callable, Iterable, Optional
-from hermes_dir_acl import make_user_dir
+from eir_dir_acl import make_user_dir
 
-logger = logging.getLogger("hermes_cli.update_cmd")
+logger = logging.getLogger("eir_cli.update_cmd")
 
 #: The record before it carried an install key, beside ``host-gateway.json`` / ``host-serve.json``.
 #: Still read, and cleared by a discharge that judged it, so a debt an older release armed survives
 #: the upgrade; it names no install, so it keeps its old meaning: owed by whichever install reads it.
 HOST_OBLIGATION_NAME = "host-update-restart.json"
 
-#: The per-``HERMES_HOME`` breadcrumb an unwritable host record falls back to; every reader honours it.
+#: The per-``EIR_HOME`` breadcrumb an unwritable host record falls back to; every reader honours it.
 PROFILE_MARKER_NAME = "fleet_restart_pending"
 
 _RECORD_VERSION = 1
@@ -58,7 +58,7 @@ def host_obligation_path() -> Path:
     # Not ``gateway.host_rendezvous.host_state_dir``: ``gateway.status`` imports ``utils`` -> ruamel,
     # absent from the historical interpreter an old updater's takeover arms this record in; the
     # recovery module's stdlib copy of the rule is drift-tested against the gateway resolver.
-    from hermes_cli.update_restart_recovery import _host_state_dir
+    from eir_cli.update_restart_recovery import _host_state_dir
 
     install = os.path.normcase(str(Path(__file__).resolve().parents[1]))
     key = hashlib.sha256(install.encode("utf-8")).hexdigest()[:16]
@@ -136,8 +136,8 @@ def arm_host_obligation(
 ) -> bool:
     """Arm the host record, else ``marker`` (the arming profile's per-home breadcrumb). Never raises.
 
-    The one fallback for every arm (``hermes update``'s commit point, a historical updater's
-    takeover). An unwritable host state dir (``HERMES_GATEWAY_LOCK_DIR`` on a read-only mount, a
+    The one fallback for every arm (``eir update``'s commit point, a historical updater's
+    takeover). An unwritable host state dir (``EIR_GATEWAY_LOCK_DIR`` on a read-only mount, a
     container UID that does not own ``$HOME``) must never disarm the obligation (#117275), but the
     marker is visible to the arming profile only: it settles the debt only on an install PROVEN to
     have no other profile, and an unreadable profile roster proves nothing (review S2 residual).
@@ -168,7 +168,7 @@ def arm_host_obligation(
                  host_obligation_path(), hidden)
     # ASCII: a historical updater's takeover may print through a legacy console code page.
     print("  Warning: could not record the pending gateway-restart obligation where every profile sees it "
-          "(state dir not writable) - restart gateways with `hermes gateway restart` if this update is "
+          "(state dir not writable) - restart gateways with `eir gateway restart` if this update is "
           "interrupted.", file=sys.stderr)
     return False
 
@@ -178,12 +178,12 @@ def _named_profiles_exist() -> bool:
 
     ``profiles.list_profile_names`` suppresses enumeration errors and reads an unreadable roster as
     "default only"; here any error listing the roster or reading an entry's identity raises instead.
-    Same identity rule as ``hermes_constants.named_profile_is_live`` (stdlib only: see above).
+    Same identity rule as ``eir_constants.named_profile_is_live`` (stdlib only: see above).
     """
-    from hermes_constants import _PROFILE_IDENTITY_MARKERS, PROFILE_ID_RE, get_default_hermes_root, profile_tombstone_path
+    from eir_constants import _PROFILE_IDENTITY_MARKERS, PROFILE_ID_RE, get_default_eir_root, profile_tombstone_path
 
     try:
-        entries = list((get_default_hermes_root() / "profiles").iterdir())
+        entries = list((get_default_eir_root() / "profiles").iterdir())
     except (FileNotFoundError, NotADirectoryError):
         return False
     for home in entries:
@@ -274,11 +274,11 @@ def _marker_mutex():
     import importlib.util
     import sys
 
-    from hermes_cli import update_lock
+    from eir_cli import update_lock
 
     if hasattr(update_lock, "marker_mutex"):
         return update_lock.marker_mutex
-    name = "hermes_cli._update_lock_pulled"
+    name = "eir_cli._update_lock_pulled"
     pulled = sys.modules.get(name)
     if pulled is None:
         spec = importlib.util.spec_from_file_location(name, update_lock.__file__)
@@ -438,7 +438,7 @@ def host_restart_already_completed(sha: Optional[str]) -> bool:
     """True when THIS host obligation was already restarted onto ``sha``.
 
     The guard that makes the catch-up restart idempotent per host: a second profile running
-    ``hermes update`` must attach to the first restart's outcome, never kill the shared
+    ``eir update`` must attach to the first restart's outcome, never kill the shared
     multiplexer again.
     """
     record = read_host_obligation()

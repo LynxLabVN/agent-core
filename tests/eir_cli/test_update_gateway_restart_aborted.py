@@ -1,8 +1,8 @@
 """Regression for #78574 — a crashed gateway-restart phase must not stay silent.
 
-``hermes update`` wrapped its entire gateway auto-restart phase in a blanket
+``eir update`` wrapped its entire gateway auto-restart phase in a blanket
 ``except Exception`` that only logged at debug level. When the phase raised
-early (e.g. importing ``hermes_cli.gateway`` from the freshly pulled checkout
+early (e.g. importing ``eir_cli.gateway`` from the freshly pulled checkout
 inside a process that already loaded the pre-update modules), every drain and
 restart line vanished from the update output, the update printed
 "Update complete!" and exited 0 — while the still-running default-profile
@@ -15,7 +15,7 @@ from __future__ import annotations
 import sys
 import types
 
-from hermes_cli.update_cmd import _restart_phase_failure_is_incomplete, _surviving_gateway_pids_after_failed_restart, _warn_gateway_restart_phase_aborted
+from eir_cli.update_cmd import _restart_phase_failure_is_incomplete, _surviving_gateway_pids_after_failed_restart, _warn_gateway_restart_phase_aborted
 
 
 class TestSurvivingGatewayProbe:
@@ -23,13 +23,13 @@ class TestSurvivingGatewayProbe:
 
     def test_undeterminable_when_gateway_module_is_broken(self, monkeypatch):
         """The probe must not raise — a broken gateway module is the bug's cause."""
-        fake = types.ModuleType("hermes_cli.gateway")
+        fake = types.ModuleType("eir_cli.gateway")
 
         def _boom(**_kwargs):
             raise ImportError("cannot import name 'is_trivial_prompt'")
 
         fake.find_gateway_pids = _boom
-        monkeypatch.setitem(sys.modules, "hermes_cli.gateway", fake)
+        monkeypatch.setitem(sys.modules, "eir_cli.gateway", fake)
 
         assert _surviving_gateway_pids_after_failed_restart() is None
 
@@ -76,7 +76,7 @@ class TestAbortedRestartWarning:
         assert "Update incomplete" in out
         assert "is_trivial_prompt" in out
         assert "4321" in out
-        assert "hermes gateway restart" in out
+        assert "eir gateway restart" in out
 
     def test_warns_even_when_surviving_pids_are_unknown(self, capsys):
         _warn_gateway_restart_phase_aborted(RuntimeError("systemctl exploded"), None)
@@ -84,4 +84,4 @@ class TestAbortedRestartWarning:
 
         assert "Update incomplete" in out
         assert "systemctl exploded" in out
-        assert "hermes gateway restart" in out
+        assert "eir gateway restart" in out

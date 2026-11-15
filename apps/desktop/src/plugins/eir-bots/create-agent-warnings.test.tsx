@@ -13,7 +13,7 @@ import type { RosterRow } from './types'
 
 const mocks = await vi.hoisted(async () => (await import('./create-agent-test-utils')).createMocks())
 
-vi.mock('@hermes/plugin-sdk', async importOriginal =>
+vi.mock('@eir/plugin-sdk', async importOriginal =>
   (await import('./create-agent-test-utils')).sdkMock(await importOriginal(), mocks, () => translateBots)
 )
 vi.mock('./canonical-chat', () => ({ createCanonicalChat: mocks.createCanonicalChat }))

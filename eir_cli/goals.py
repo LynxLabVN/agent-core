@@ -1,4 +1,4 @@
-"""Persistent session goals — the Ralph loop for Hermes.
+"""Persistent session goals — the Ralph loop for Eir.
 
 A goal is a free-form objective that stays active across turns; after each turn an auxiliary-model
 judge decides whether it is satisfied. The continuation prompt is a normal user message appended via
@@ -21,8 +21,8 @@ from datetime import datetime, timezone, UTC
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from hermes_cli._subprocess_compat import noninteractive_git_env
-from hermes_time import safe_strftime
+from eir_cli._subprocess_compat import noninteractive_git_env
+from eir_time import safe_strftime
 
 logger = logging.getLogger(__name__)
 
@@ -513,7 +513,7 @@ _DB_BOOTSTRAP_INFLIGHT: dict[str, threading.Event] = {}
 _DB_BOOTSTRAP_LOOP_WAIT_S = 0.25
 
 # The call that STARTS the bootstrap (cold cache) waits this long instead. A fresh state.db init
-# (schema DDL, FTS tables, first hermes_cli.config import) measures ~300ms warm and more on slow
+# (schema DDL, FTS tables, first eir_cli.config import) measures ~300ms warm and more on slow
 # CI — well past 0.25s, which used to drop the first /goal write ("Goal set" but nothing
 # persisted). Only the kick call pays this one-time stall; later calls keep the short window.
 _DB_BOOTSTRAP_INIT_WAIT_S = 1.5
@@ -537,24 +537,24 @@ def _bootstrap_session_db(home: str, done: threading.Event) -> None:
 
 
 def _get_session_db() -> Optional[Any]:
-    """Cached SessionDB per HERMES_HOME (profile switches pick the right DB); None on any failure.
+    """Cached SessionDB per EIR_HOME (profile switches pick the right DB); None on any failure.
 
     Never constructs SessionDB on an event-loop thread: a cache miss there kicks a one-shot background
     bootstrap and waits a bounded grace window (the kick call waits ``_DB_BOOTSTRAP_INIT_WAIT_S`` so a
     healthy cold init completes and the first write isn't dropped).
     """
     try:
-        from hermes_constants import get_hermes_home
+        from eir_constants import get_eir_home
 
-        home = str(get_hermes_home())
+        home = str(get_eir_home())
     except Exception as exc:  # pragma: no cover
         logger.debug("GoalManager: SessionDB bootstrap failed (%s)", exc)
         return None
 
     cached = _DB_CACHE.get(home)
     if cached is not None and _registry_tore_down(cached):
-        # ``hermes profile delete`` force-closes every handle under the profile home
-        # (``hermes_state_registry.close_all_under``) before rmtree; a same-name recreate in this
+        # ``eir profile delete`` force-closes every handle under the profile home
+        # (``eir_state_registry.close_all_under``) before rmtree; a same-name recreate in this
         # process must acquire a fresh handle, not keep writing into the torn-down one.
         with _DB_BOOTSTRAP_LOCK:
             if _DB_CACHE.get(home) is cached:
@@ -604,12 +604,12 @@ def _acquire_session_db(home: str):
     """The registry's shared handle for ``home/state.db``. A bare ``SessionDB()`` here was a SECOND
     writer per profile beside the gateway's registry handle — its own token-writer thread and
     close-time checkpoint (the #90837 corruption shape), doubled under multiplexing."""
-    from hermes_state_registry import acquire
+    from eir_state_registry import acquire
     return acquire(Path(home) / "state.db")
 
 
 def _release_session_db(db) -> None:
-    from hermes_state_registry import release_or_close
+    from eir_state_registry import release_or_close
     try:
         release_or_close(db)
     except Exception:
@@ -754,7 +754,7 @@ def _goal_judge_setting(key: str, default, cast):
     """Resolve ``auxiliary.goal_judge.<key>``; non-positive/garbage falls back to ``default``
     rather than crashing the loop. ``load_config()`` is cached on (mtime, size) so this is cheap."""
     try:
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
 
         value = cast((load_config().get("auxiliary") or {}).get("goal_judge", {}).get(key, default))
         if value > 0:
@@ -1081,7 +1081,7 @@ def _decision(status, should_continue: bool, prompt: Optional[str], verdict: str
 
 
 _JUDGE_CONFIG_HINT = (
-    "~/.hermes/config.yaml:\n  auxiliary:\n    goal_judge:\n      provider: {provider}\n      model: {model}\n"
+    "~/.eir/config.yaml:\n  auxiliary:\n    goal_judge:\n      provider: {provider}\n      model: {model}\n"
     "Then /goal resume to continue."
 )
 

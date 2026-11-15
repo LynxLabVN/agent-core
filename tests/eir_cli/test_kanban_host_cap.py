@@ -2,8 +2,8 @@
 
 Three gaps found in review of the original memory-guard PR:
 
-1. The standalone daemon path (``hermes kanban daemon --force`` /
-   :func:`hermes_cli.kanban_db_dispatch.run_daemon`) never resolved
+1. The standalone daemon path (``eir kanban daemon --force`` /
+   :func:`eir_cli.kanban_db_dispatch.run_daemon`) never resolved
    ``kanban.max_in_progress`` at all — the one shipped entry point that
    could still fan out an entire backlog in a single tick.
 2. ``max_in_progress`` was enforced per-board while the gateway dispatcher
@@ -22,17 +22,17 @@ from pathlib import Path
 
 import pytest
 
-from hermes_cli import kanban_db as kb
-from hermes_cli import kanban_db_dispatch as kbd
-from hermes_cli import kanban_db_connect as kbc
+from eir_cli import kanban_db as kb
+from eir_cli import kanban_db_dispatch as kbd
+from eir_cli import kanban_db_connect as kbc
 
 
 @pytest.fixture
 def kanban_home(tmp_path, monkeypatch):
-    """Isolated HERMES_HOME with an empty kanban DB."""
-    home = tmp_path / ".hermes"
+    """Isolated EIR_HOME with an empty kanban DB."""
+    home = tmp_path / ".eir"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     kb.init_db()
     return home
@@ -62,7 +62,7 @@ def test_run_daemon_resolves_and_passes_max_in_progress(
     Regression guard for the OOF-30 review finding: ``run_daemon`` only
     forwarded ``max_spawn`` — with no explicit ``--max`` (the shipped
     systemd shape) nothing capped the tick even though the gateway and
-    ``hermes kanban dispatch`` paths both resolved the memory-derived
+    ``eir kanban dispatch`` paths both resolved the memory-derived
     default.
     """
     captured: dict = {}
@@ -88,7 +88,7 @@ def test_run_daemon_resolves_and_passes_max_in_progress(
 
 
 def test_configured_max_in_progress_parsing(monkeypatch):
-    import hermes_cli.config as cfgmod
+    import eir_cli.config as cfgmod
 
     cases = [
         ({"kanban": {"max_in_progress": 4}}, 4),
@@ -201,7 +201,7 @@ def _park_in_review(conn: sqlite3.Connection, title: str, assignee: str) -> str:
 def test_review_lane_gets_reserved_slot_under_ready_backlog(
     kanban_home, all_assignees_spawnable, monkeypatch,
 ):
-    import hermes_cli.config as cfgmod
+    import eir_cli.config as cfgmod
     monkeypatch.setattr(
         cfgmod, "load_config",
         lambda *a, **k: {"kanban": {"review_dispatch": True}},
@@ -250,7 +250,7 @@ def test_unspawnable_review_does_not_reserve_the_only_ready_slot(
     """A review card the review loop would refuse this tick (respawn guard,
     per-profile cap) must not consume the fairness reservation — otherwise the
     ready lane starves every tick while the reserved slot goes unused."""
-    import hermes_cli.config as cfgmod
+    import eir_cli.config as cfgmod
 
     monkeypatch.setattr(
         cfgmod, "load_config",
@@ -271,7 +271,7 @@ def test_unguarded_review_reserves_the_only_ready_slot(
     kanban_home, all_assignees_spawnable, monkeypatch,
 ):
     """A dispatchable review card still receives the single shared slot."""
-    import hermes_cli.config as cfgmod
+    import eir_cli.config as cfgmod
 
     monkeypatch.setattr(
         cfgmod, "load_config",
@@ -292,7 +292,7 @@ def test_unguarded_review_reserves_the_only_ready_slot(
 def test_review_reservation_released_when_no_review_work(
     kanban_home, all_assignees_spawnable, monkeypatch,
 ):
-    import hermes_cli.config as cfgmod
+    import eir_cli.config as cfgmod
     monkeypatch.setattr(
         cfgmod, "load_config",
         lambda *a, **k: {"kanban": {"review_dispatch": True}},
@@ -314,8 +314,8 @@ def test_nonspawnable_review_does_not_tax_ready_budget(
     kanban_home, monkeypatch,
 ):
     """Review tasks parked for humans (no real profile) release the slot."""
-    import hermes_cli.config as cfgmod
-    import hermes_cli.profiles as profmod
+    import eir_cli.config as cfgmod
+    import eir_cli.profiles as profmod
 
     monkeypatch.setattr(
         cfgmod, "load_config",
@@ -343,7 +343,7 @@ def test_review_budget_still_bounded_by_shared_cap(
     kanban_home, all_assignees_spawnable, monkeypatch,
 ):
     """The reservation caps the ready lane; it grants review no extra slots."""
-    import hermes_cli.config as cfgmod
+    import eir_cli.config as cfgmod
     monkeypatch.setattr(
         cfgmod, "load_config",
         lambda *a, **k: {"kanban": {"review_dispatch": True}},

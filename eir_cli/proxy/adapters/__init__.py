@@ -2,11 +2,11 @@
 
 from typing import Dict, Type
 
-from hermes_cli.proxy.adapters.base import UpstreamAdapter
-from hermes_cli.proxy.adapters.nous_portal import NousPortalAdapter
-from hermes_cli.proxy.adapters.xai import XAIGrokAdapter
+from eir_cli.proxy.adapters.base import UpstreamAdapter
+from eir_cli.proxy.adapters.nous_portal import NousPortalAdapter
+from eir_cli.proxy.adapters.xai import XAIGrokAdapter
 
-# Keyed by the ``hermes proxy start --provider <name>`` value.
+# Keyed by the ``eir proxy start --provider <name>`` value.
 ADAPTERS: dict[str, type[UpstreamAdapter]] = {"nous": NousPortalAdapter, "xai": XAIGrokAdapter}
 
 

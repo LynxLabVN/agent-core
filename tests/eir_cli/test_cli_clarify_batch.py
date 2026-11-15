@@ -5,7 +5,7 @@ thread (the way the agent thread calls it) and simulates the keybinding
 handlers by calling the same helper methods they call
 (``_clarify_batch_set_active`` for Tab, ``_clarify_batch_enter`` for
 Enter, ``_clarify_batch_lock`` for the freetext submit path). No real
-terminal needed — mirrors tests/hermes_cli/test_cli_approval_ui.py.
+terminal needed — mirrors tests/eir_cli/test_cli_approval_ui.py.
 """
 
 import json
@@ -13,12 +13,12 @@ import threading
 import time
 from unittest.mock import MagicMock, patch
 
-from cli import HermesCLI
+from cli import EirCLI
 from agent.i18n import t
 
 
 def _make_cli_stub():
-    cli = HermesCLI.__new__(HermesCLI)
+    cli = EirCLI.__new__(EirCLI)
     cli._clarify_state = None
     cli._clarify_freetext = False
     cli._clarify_multi_base = None

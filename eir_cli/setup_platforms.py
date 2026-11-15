@@ -1,13 +1,13 @@
-"""Messaging-platform setup wizards (Telegram, webhooks) and the ``hermes setup
+"""Messaging-platform setup wizards (Telegram, webhooks) and the ``eir setup
 gateway`` flow. setup.py re-exports the public names, and tests monkeypatch prompt/print/env
-helpers on hermes_cli.setup, so those are imported lazily per function."""
+helpers on eir_cli.setup, so those are imported lazily per function."""
 
 import contextlib
 import logging
 import re
 from pathlib import Path
 
-logger = logging.getLogger("hermes_cli.setup")
+logger = logging.getLogger("eir_cli.setup")
 
 _TELEGRAM_BOT_TOKEN_RE = re.compile(r"^\d+:[A-Za-z0-9_-]{30,}$")
 _RULE = "━" * 50
@@ -17,21 +17,21 @@ def _is_valid_telegram_bot_token(token: str) -> bool:
     return bool(_TELEGRAM_BOT_TOKEN_RE.match(token))
 
 
-def _profile_name_from_hermes_home(hermes_home) -> str | None:
-    """Return the active profile name when HERMES_HOME is a profile dir."""
-    return hermes_home.name if hermes_home.parent.name == "profiles" else None
+def _profile_name_from_eir_home(eir_home) -> str | None:
+    """Return the active profile name when EIR_HOME is a profile dir."""
+    return eir_home.name if eir_home.parent.name == "profiles" else None
 
 
 def _setup_telegram_auto_result():
     """Attempt automatic Telegram bot creation via managed QR onboarding."""
-    from hermes_cli.setup import get_hermes_home
+    from eir_cli.setup import get_eir_home
     try:
-        from hermes_cli.telegram_managed_bot import auto_setup_telegram_bot_result
+        from eir_cli.telegram_managed_bot import auto_setup_telegram_bot_result
     except ImportError:
         return None
     profile_name: str | None = None
     with contextlib.suppress(Exception):
-        profile_name = _profile_name_from_hermes_home(Path(get_hermes_home()))
+        profile_name = _profile_name_from_eir_home(Path(get_eir_home()))
     return auto_setup_telegram_bot_result(profile_name=profile_name)
 
 
@@ -41,7 +41,7 @@ def declines_reconfigure(label: str, question: str, *env_vars: str) -> bool:
     Shared by the core wizards and every platform plugin's ``interactive_setup`` so the
     "already configured? Reconfigure? [y/N]" gate has one wording and one default.
     """
-    from hermes_cli.setup import get_env_value, print_info, prompt_yes_no
+    from eir_cli.setup import get_env_value, print_info, prompt_yes_no
     if not any(get_env_value(v) for v in env_vars):
         return False
     print_info(f"{label}: already configured")
@@ -54,7 +54,7 @@ def save_prompted(env_var: str, question: str, *, password: bool = False, succes
 
     ``success_msg`` may reference ``{value}``. Returns the raw answer ("" when skipped).
     """
-    from hermes_cli.setup import print_success, print_warning, prompt, save_env_value
+    from eir_cli.setup import print_success, print_warning, prompt, save_env_value
     value = prompt(question, password=password)
     if value:
         save_env_value(env_var, transform(value) if transform else value)
@@ -67,14 +67,14 @@ def save_prompted(env_var: str, question: str, *, password: bool = False, succes
 
 def _save_allowlist(env_var: str, users: str, success_msg: str) -> None:
     """Strip spaces, persist the allowlist, and confirm."""
-    from hermes_cli.setup import print_success, save_env_value
+    from eir_cli.setup import print_success, save_env_value
     save_env_value(env_var, users.replace(" ", ""))
     print_success(success_msg)
 
 
 def _prompt_allowlist(env_var: str, question: str, success_msg: str, open_msg: str, preset: str | None = None) -> str:
     """Persist ``preset`` (or the prompted answer) as an allowlist, warning when it stays open."""
-    from hermes_cli.setup import print_info, prompt
+    from eir_cli.setup import print_info, prompt
     users = prompt(question) if preset is None else preset
     if users:
         _save_allowlist(env_var, users, success_msg)
@@ -85,7 +85,7 @@ def _prompt_allowlist(env_var: str, question: str, success_msg: str, open_msg: s
 
 def _save_port(env_var: str, value: str, default: str) -> None:
     """Persist ``value`` as an int port; warn (keeping ``default``) when it isn't one."""
-    from hermes_cli.setup import print_success, print_warning, save_env_value
+    from eir_cli.setup import print_success, print_warning, save_env_value
     if not value:
         return
     try:
@@ -96,7 +96,7 @@ def _save_port(env_var: str, value: str, default: str) -> None:
 
 
 def _prompt_telegram_bot_token() -> str | None:
-    from hermes_cli.setup import print_error, print_info, prompt
+    from eir_cli.setup import print_error, print_info, prompt
     print_info("Create a bot via @BotFather on Telegram")
     while True:
         token = prompt("Telegram bot token", password=True)
@@ -108,7 +108,7 @@ def _prompt_telegram_bot_token() -> str | None:
 
 def _telegram_allowlist_nudge() -> None:
     """Existing config kept as-is: warn when it has no user allowlist."""
-    from hermes_cli.setup import get_env_value, print_info, prompt, prompt_yes_no
+    from eir_cli.setup import get_env_value, print_info, prompt, prompt_yes_no
     if get_env_value("TELEGRAM_ALLOWED_USERS"):
         return
     print_info("⚠️  Telegram has no user allowlist - anyone can use your bot!")
@@ -121,7 +121,7 @@ def _telegram_allowlist_nudge() -> None:
 
 def _obtain_telegram_token():
     """Return (token, setup_result); auto flow first when chosen, else manual paste."""
-    from hermes_cli.setup import _info, print_error, prompt
+    from eir_cli.setup import _info, print_error, prompt
     _info("How would you like to create your Telegram bot?", None,
           "  [1] Automatic (recommended)",
           "      Scan a QR code → confirm in Telegram → done.",
@@ -145,7 +145,7 @@ def _obtain_telegram_token():
 
 def _setup_telegram():
     """Configure Telegram bot credentials and allowlist."""
-    from hermes_cli.setup import _info, print_info, print_header, print_success, prompt, prompt_yes_no, save_env_value
+    from eir_cli.setup import _info, print_info, print_header, print_success, prompt, prompt_yes_no, save_env_value
     print_header("Telegram")
     if declines_reconfigure("Telegram", "Reconfigure Telegram?", "TELEGRAM_BOT_TOKEN"):
         _telegram_allowlist_nudge()
@@ -170,7 +170,7 @@ def _setup_telegram():
         "TELEGRAM_ALLOWED_USERS", "Allowed user IDs (comma-separated, leave empty for open access)",
         "Telegram allowlist configured - only listed users can use the bot",
         "⚠️  No allowlist set - anyone who finds your bot can use it!", preset=allowed_users)
-    _info(None, "📬 Home Channel: where Hermes delivers cron job results,",
+    _info(None, "📬 Home Channel: where Eir delivers cron job results,",
           "   cross-platform messages, and notifications.",
           "   For Telegram DMs, this is your user ID (same as above).")
     first_user_id = allowed_users.split(",")[0].strip() if allowed_users else ""
@@ -192,7 +192,7 @@ def _setup_telegram():
 
 def _setup_webhooks():
     """Configure webhook integration."""
-    from hermes_cli.setup import _info, print_header, print_success, print_warning, prompt, save_env_value
+    from eir_cli.setup import _info, print_header, print_success, print_warning, prompt, save_env_value
     print_header("Webhooks")
     if declines_reconfigure("Webhooks", "Reconfigure webhooks?", "WEBHOOK_ENABLED"):
         return
@@ -209,7 +209,7 @@ def _setup_webhooks():
     save_env_value("WEBHOOK_ENABLED", "true")
     print()
     print_success("Webhooks enabled! Next steps:")
-    from hermes_constants import display_hermes_home as _dhh
+    from eir_constants import display_eir_home as _dhh
     _info(f"   1. Define webhook routes in {_dhh()}/config.yaml",
           "   2. Point your service (GitHub, GitLab, etc.) at:",
           "      http://your-server:8644/webhooks/<route-name>", None,
@@ -217,8 +217,8 @@ def _setup_webhooks():
           "   https://hermes-agent.nousresearch.com/docs/user-guide/messaging/webhooks/#configuring-routes",
           None,
           # Printed twice upstream; kept verbatim for output parity.
-          "   Open config in your editor:  hermes config edit",
-          "   Open config in your editor:  hermes config edit")
+          "   Open config in your editor:  eir config edit",
+          "   Open config in your editor:  eir config edit")
 
 
 # (platform label, credential env var, home-channel env vars — any one satisfies)
@@ -237,7 +237,7 @@ def _is_progress(status: str) -> bool:
 
 def _warn_missing_home_channels() -> None:
     """Platforms with a token but no home channel."""
-    from hermes_cli.setup import get_env_value, _info, print_warning
+    from eir_cli.setup import get_env_value, _info, print_warning
     missing_home = [
         plat for plat, token_var, home_vars in _HOME_CHANNEL_CHECKS
         if get_env_value(token_var) and not any(get_env_value(v) for v in home_vars)]
@@ -248,14 +248,14 @@ def _warn_missing_home_channels() -> None:
     _info("   Without a home channel, cron jobs and cross-platform",
           "   messages can't be delivered to those platforms.",
           "   Set one later with /set-home in your chat, or:",
-          *(f"     hermes config set {plat.upper()}_HOME_CHANNEL <channel_id>" for plat in missing_home))
+          *(f"     eir config set {plat.upper()}_HOME_CHANNEL <channel_id>" for plat in missing_home))
 
 
 def _restart_running_gateway(any_messaging: bool, supports_systemd: bool) -> None:
     """Already running: offer a restart only when this pass may have changed platform config —
     a restart interrupts any active session, so it stays behind a prompt."""
-    from hermes_cli.setup import print_error, prompt_yes_no
-    from hermes_cli.gateway import (
+    from eir_cli.setup import print_error, prompt_yes_no
+    from eir_cli.gateway import (
         systemd_restart, launchd_restart, UserSystemdUnavailableError, SystemScopeRequiresRootError,
         _system_scope_wizard_would_need_root, _print_system_scope_remediation,
     )
@@ -271,7 +271,7 @@ def _restart_running_gateway(any_messaging: bool, supports_systemd: bool) -> Non
         elif _platform.system() == "Darwin":
             launchd_restart()
         elif _platform.system() == "Windows":
-            from hermes_cli import gateway_windows
+            from eir_cli import gateway_windows
             gateway_windows.restart()
     except UserSystemdUnavailableError as e:
         print_error("  Restart failed — user systemd not reachable:")
@@ -288,10 +288,10 @@ def _restart_running_gateway(any_messaging: bool, supports_systemd: bool) -> Non
 
 def setup_gateway(config: dict):
     """Configure messaging platform integrations."""
-    from hermes_cli.setup import _info, print_header, print_info, print_success, prompt_checklist
-    from hermes_cli.gateway import _all_platforms, _platform_status, _configure_platform
+    from eir_cli.setup import _info, print_header, print_info, print_success, prompt_checklist
+    from eir_cli.gateway import _all_platforms, _platform_status, _configure_platform
     print_header("Messaging Platforms")
-    _info("Connect to messaging platforms to chat with Hermes from anywhere.",
+    _info("Connect to messaging platforms to chat with Eir from anywhere.",
           "Toggle with Space, confirm with Enter.", None)
     platforms = _all_platforms()
 
@@ -301,7 +301,7 @@ def setup_gateway(config: dict):
     pre_selected = [i for i, status in enumerate(statuses) if status == "configured"]
     selected = prompt_checklist("Select platforms to configure:", items, pre_selected)
     if not selected:
-        print_info("No platforms selected. Run 'hermes setup gateway' later to configure.")
+        print_info("No platforms selected. Run 'eir setup gateway' later to configure.")
     for idx in selected or ():
         _configure_platform(platforms[idx])
 
@@ -315,8 +315,8 @@ def setup_gateway(config: dict):
         _warn_missing_home_channels()
 
     # Offer optional persistence even with no messaging platforms: cron can run alone.
-    from hermes_cli.gateway import _is_service_running, supports_systemd_services
-    from hermes_cli.gateway_setup_service import ensure_gateway_service
+    from eir_cli.gateway import _is_service_running, supports_systemd_services
+    from eir_cli.gateway_setup_service import ensure_gateway_service
     supports_systemd = supports_systemd_services()
     print()
     if _is_service_running():

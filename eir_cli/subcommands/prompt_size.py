@@ -1,10 +1,10 @@
-"""``hermes prompt-size`` subcommand parser."""
+"""``eir prompt-size`` subcommand parser."""
 
 from __future__ import annotations
 
 from typing import Callable
 
-from hermes_cli.subcommands._shared import add_json_flag
+from eir_cli.subcommands._shared import add_json_flag
 
 
 def build_prompt_size_parser(subparsers, *, cmd_prompt_size: Callable) -> None:

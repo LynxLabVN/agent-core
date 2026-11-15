@@ -1,4 +1,4 @@
-"""The ``register_<category>_provider`` table behind :class:`hermes_cli.plugins.PluginContext`.
+"""The ``register_<category>_provider`` table behind :class:`eir_cli.plugins.PluginContext`.
 
 Every ``register_<category>_provider`` shares one body (:meth:`PluginContext._register_scoped_provider`):
 type-check, register in the scope-keyed process-global registry, lease the slot so unload restores
@@ -20,7 +20,7 @@ import importlib
 import logging
 from typing import Any, Callable, Optional
 
-from hermes_cli.plugins_loader import _plugin_home_scope, _serialized_replacement
+from eir_cli.plugins_loader import _plugin_home_scope, _serialized_replacement
 
 logger = logging.getLogger(__name__)
 
@@ -32,14 +32,14 @@ _SCOPED_PROVIDER_REGISTRARS: tuple[tuple[str, str, str, str, str, str, dict[str,
      "Backend instances must read active-profile configuration lazily. Accepted only from bundled "
      "plugins and catalog installs at tier verified or official.",
      {"normalize": None, "reject_message": "Plugin '%s' login backend rejected: %s",
-      "admit": "hermes_cli.plugins_cmd_catalog:login_backend_provenance_error", "identity": "static_name"}),
+      "admit": "eir_cli.plugins_cmd_catalog:login_backend_provenance_error", "identity": "static_name"}),
     ("register_browser_page_backend", "browser_page_backend", "agent.browser_page_registry",
      "agent.browser_page_backend:BrowserPageBackend", "browser page backend",
      "Register an :class:`agent.browser_page_backend.BrowserPageBackend` so ``browser_vault`` inspects and "
      "fills the pages of a browser with no CDP endpoint (Camofox). Profile-scoped, removed on plugin "
      "unload; accepted only from bundled plugins and catalog installs at tier verified or official.",
      {"reject_message": "Plugin '%s' browser page backend rejected: %s",
-      "admit": "hermes_cli.plugins_cmd_catalog:browser_page_backend_provenance_error"}),
+      "admit": "eir_cli.plugins_cmd_catalog:browser_page_backend_provenance_error"}),
     ("register_image_gen_provider", "image_gen_provider", "agent.image_gen_registry",
      "agent.image_gen_provider:ImageGenProvider", "image_gen provider",
      "Register an :class:`agent.image_gen_provider.ImageGenProvider`; "
@@ -68,8 +68,8 @@ _SCOPED_PROVIDER_REGISTRARS: tuple[tuple[str, str, str, str, str, str, dict[str,
      {"normalize": "lower", "reject_message": "Plugin '%s' terminal environment provider rejected: %s"}),
     ("register_secret_source", "secret_source", "agent.secret_sources.registry",
      "agent.secret_sources.base:SecretSource", "secret source",
-     "Register a :class:`agent.secret_sources.base.SecretSource`, run by ``load_hermes_dotenv()`` "
-     "(after ``~/.hermes/.env``, before credentials are read) when ``secrets.<name>`` is enabled. The "
+     "Register a :class:`agent.secret_sources.base.SecretSource`, run by ``load_eir_dotenv()`` "
+     "(after ``~/.eir/.env``, before credentials are read) when ``secrets.<name>`` is enabled. The "
      "orchestrator owns ordering/precedence/provenance; the source only fetches. Since dotenv usually "
      "loads before discovery, the manager re-pulls enabled plugin sources afterwards.",
      {"normalize": None, "register": "register_source", "param": "source"}),
@@ -87,7 +87,7 @@ _SCOPED_PROVIDER_REGISTRARS: tuple[tuple[str, str, str, str, str, str, dict[str,
     ("register_delegation_provider", "delegation_provider", "agent.delegation_registry",
      "agent.delegation_provider:DelegationProvider", "delegation provider",
      "Register an :class:`agent.delegation_provider.DelegationProvider`; ``provider.name`` is matched by "
-     "``delegation.backend``. It decides each ``delegate_task`` task's route (model/provider or a Hermes "
+     "``delegation.backend``. It decides each ``delegate_task`` task's route (model/provider or a Eir "
      "profile) and may add per-task schema parameters; core keeps the subagent lifecycle.",
      {"normalize": "lower"}),
 )
@@ -147,7 +147,7 @@ def make_scoped_provider_registrar(method_name, kind, registry_mod, base_ref, la
     """Build one ``register_<category>_provider`` method from a ``_SCOPED_PROVIDER_REGISTRARS`` row.
 
     ``PluginContext`` now spells its registrars out; this stays importable (and from
-    ``hermes_cli.plugins``) for callers that build one from a row, as on main.
+    ``eir_cli.plugins``) for callers that build one from a row, as on main.
     """
     normalize_fn = _NAME_NORMALIZERS[options.get("normalize", "strip")]
 

@@ -1,6 +1,6 @@
 """Messaging dashboard routes: WhatsApp/Telegram onboarding and per-platform enable/config/test.
 
-Extracted from ``hermes_cli.web_server``; helpers/state that tests monkeypatch on
+Extracted from ``eir_cli.web_server``; helpers/state that tests monkeypatch on
 ``web_server`` stay there and are resolved late at call time (cycle-safe).
 """
 
@@ -24,45 +24,45 @@ from fastapi import APIRouter, HTTPException
 
 from gateway.config import SHARED_LISTENER_MIRROR_PLATFORMS as _LISTENER_MIRRORS
 from gateway.status import resolve_gateway_liveness, retained_gateway_state
-from hermes_cli._subprocess_compat import windows_hide_flags
-from hermes_cli.config import OPTIONAL_ENV_VARS, get_env_path
-from hermes_cli.process_identity import release_process_group_once_empty, spawn_owned
-from hermes_constants import get_process_hermes_home
-from hermes_cli.web_deps import LateState, late
-from hermes_cli.web_server_gateway import _restart_gateway_after
-from hermes_cli.web_whatsapp_session import _backup_whatsapp_session
-from hermes_cli.web_server_messaging import (
+from eir_cli._subprocess_compat import windows_hide_flags
+from eir_cli.config import OPTIONAL_ENV_VARS, get_env_path
+from eir_cli.process_identity import release_process_group_once_empty, spawn_owned
+from eir_constants import get_process_eir_home
+from eir_cli.web_deps import LateState, late
+from eir_cli.web_server_gateway import _restart_gateway_after
+from eir_cli.web_whatsapp_session import _backup_whatsapp_session
+from eir_cli.web_server_messaging import (
     _TelegramOnboardingPairing, _WhatsAppOnboardingSession, _messaging_platform_catalog, _telegram_onboarding_error_message, _telegram_onboarding_lock, _telegram_onboarding_pairings, _whatsapp_onboarding_payload, _whatsapp_onboarding_sessions,
 )
-from hermes_cli.web_routers._common import (
+from eir_cli.web_routers._common import (
     REDACTED_CREDENTIAL_WRITE_DETAIL, http_failure, is_redacted_credential_preview,
     redacted_credential_preview,
 )
-from hermes_cli.web_models import (
+from eir_cli.web_models import (
     MessagingPlatformUpdate, TelegramOnboardingApply, TelegramOnboardingStart,
     WhatsAppOnboardingApply, WhatsAppOnboardingStart,
 )
 
-_log = logging.getLogger("hermes_cli.web_server")
+_log = logging.getLogger("eir_cli.web_server")
 router = APIRouter()
 
 # Late-bound so a test's monkeypatch on the owning module wins at call time.
-_config_profile_scope = late("_config_profile_scope", "hermes_cli.web_server_profiles")
-_profile_scope = late("_profile_scope", "hermes_cli.web_server_profiles")
-_resolve_profile_dir = late("_resolve_profile_dir", "hermes_cli.web_server_profiles")
-_restart_gateway_after_whatsapp_onboarding = late("_restart_gateway_after_whatsapp_onboarding", "hermes_cli.web_server_messaging")
-_telegram_onboarding_request_sync = late("_telegram_onboarding_request_sync", "hermes_cli.web_server_messaging")
-_whatsapp_session_path = late("_whatsapp_session_path", "hermes_cli.web_server_messaging")
-_write_platform_enabled = late("_write_platform_enabled", "hermes_cli.web_server_messaging")
-load_env = late("load_env", "hermes_cli.config")
-get_secret_source_values = late("get_secret_source_values", "hermes_cli.env_loader")
+_config_profile_scope = late("_config_profile_scope", "eir_cli.web_server_profiles")
+_profile_scope = late("_profile_scope", "eir_cli.web_server_profiles")
+_resolve_profile_dir = late("_resolve_profile_dir", "eir_cli.web_server_profiles")
+_restart_gateway_after_whatsapp_onboarding = late("_restart_gateway_after_whatsapp_onboarding", "eir_cli.web_server_messaging")
+_telegram_onboarding_request_sync = late("_telegram_onboarding_request_sync", "eir_cli.web_server_messaging")
+_whatsapp_session_path = late("_whatsapp_session_path", "eir_cli.web_server_messaging")
+_write_platform_enabled = late("_write_platform_enabled", "eir_cli.web_server_messaging")
+load_env = late("load_env", "eir_cli.config")
+get_secret_source_values = late("get_secret_source_values", "eir_cli.env_loader")
 builtin_platform_status = late("builtin_platform_status", "gateway.config_env")
-load_config = late("load_config", "hermes_cli.config")
+load_config = late("load_config", "eir_cli.config")
 read_runtime_status = late("read_runtime_status", "gateway.status")
-remove_env_value = late("remove_env_value", "hermes_cli.config")
-save_env_value = late("save_env_value", "hermes_cli.config")
-_gateway_subcommand = late("_gateway_subcommand", "hermes_cli.web_server_gateway")
-_probe_gateway_health = late("_probe_gateway_health", "hermes_cli.web_server_gateway")
+remove_env_value = late("remove_env_value", "eir_cli.config")
+save_env_value = late("save_env_value", "eir_cli.config")
+_gateway_subcommand = late("_gateway_subcommand", "eir_cli.web_server_gateway")
+_probe_gateway_health = late("_probe_gateway_health", "eir_cli.web_server_gateway")
 get_running_pid_cached = late("get_running_pid_cached", "gateway.status")
 get_runtime_status_running_pid = late("get_runtime_status_running_pid", "gateway.status")
 served_profile_runtime = late("served_profile_runtime", "gateway.status_served")
@@ -92,8 +92,8 @@ _MESSAGING_ENV_FALLBACKS: dict[str, dict[str, Any]] = {
         ("WECOM_CALLBACK_AGENT_ID", "WeCom app agent ID", "WeCom Agent ID", {}),
         ("WECOM_CALLBACK_TOKEN", "WeCom callback verification token", "WeCom Token", {}),
         ("WECOM_CALLBACK_ENCODING_AES_KEY", "WeCom callback AES encoding key", "WeCom AES Key", {"password": True}),
-        ("WEIXIN_ACCOUNT_ID", "iLink Bot account ID obtained through QR login in hermes gateway setup", "iLink Bot account ID", {}),
-        ("WEIXIN_TOKEN", "iLink Bot token obtained through QR login in hermes gateway setup", "iLink Bot token", {"password": True}),
+        ("WEIXIN_ACCOUNT_ID", "iLink Bot account ID obtained through QR login in eir gateway setup", "iLink Bot account ID", {}),
+        ("WEIXIN_TOKEN", "iLink Bot token obtained through QR login in eir gateway setup", "iLink Bot token", {"password": True}),
         ("WEIXIN_BASE_URL", "iLink API base URL saved by QR login (default: https://ilinkai.weixin.qq.com)", "iLink API base URL", {}),
         ("FEISHU_APP_ID", "Feishu / Lark app ID", "App ID", {}),
         ("FEISHU_APP_SECRET", "Feishu / Lark app secret", "App secret", {"password": True}),
@@ -234,7 +234,7 @@ def _messaging_platform_payload(
     # Same shared liveness ladder /api/status uses, so the sidebar strip and the
     # Channels page can never disagree on one page load. profile_home is passed when
     # scoped to a named profile: gateway/status readers resolve process-level paths
-    # and do NOT follow the HERMES_HOME contextvar override, so without it messaging
+    # and do NOT follow the EIR_HOME contextvar override, so without it messaging
     # silently reports another profile's gateway.
     gateway_running = resolve_gateway_liveness(
         profile_dir=profile_home, runtime=runtime,
@@ -281,7 +281,7 @@ def _messaging_platform_payload(
     elif gateway_running and not state:
         state = "pending_restart"
     elif not gateway_running and not state:
-        # Same verdict /api/status gives: ``hermes gateway stop`` keeps the last failure on disk,
+        # Same verdict /api/status gives: ``eir gateway stop`` keeps the last failure on disk,
         # and a profile the operator stopped must not wear a "Start failed" badge for it.
         state = "startup_failed" if retained_gateway_state(rt) == "startup_failed" else "gateway_stopped"
 
@@ -317,7 +317,7 @@ def _messaging_platform_payload(
 
 def _platform_payloads(scoped_dir: Optional[Path], entries) -> list[dict[str, Any]]:
     """Payloads for ``entries``; call inside ``_profile_scope`` (load_env honors the
-    HERMES_HOME contextvar; the gateway status readers do not, hence the explicit path)."""
+    EIR_HOME contextvar; the gateway status readers do not, hence the explicit path)."""
     env_on_disk = load_env()
     runtime = read_runtime_status(path=scoped_dir / "gateway_state.json") if scoped_dir is not None else read_runtime_status()
     # A profile served by the multiplexer writes no live record of its own; its adapters live in the
@@ -325,8 +325,8 @@ def _platform_payloads(scoped_dir: Optional[Path], entries) -> list[dict[str, An
     # profile's standalone days outranks nothing: only a record proving a live own gateway does —
     # the same rung order ``resolve_gateway_liveness`` uses (own runtime PID before the multiplexer),
     # so the two surfaces cannot disagree. Unscoped, the profile is the process's own home (a pooled
-    # ``hermes --profile X serve``).
-    own_home = scoped_dir if scoped_dir is not None else get_process_hermes_home()
+    # ``eir --profile X serve``).
+    own_home = scoped_dir if scoped_dir is not None else get_process_eir_home()
     runtime = served_profile_runtime(own_home, runtime) or runtime
     # Credentials a secret manager supplies have no .env line; only values the profile's enabled
     # sources resolved (into its secret scope, by ``_profile_scope``) count, and an empty one is unset.
@@ -343,7 +343,7 @@ def _platform_payloads(scoped_dir: Optional[Path], entries) -> list[dict[str, An
 
 def _relay_channel_view(home: Path) -> tuple[frozenset[str], bool]:
     """The relay serves only the gateway's own (launch) profile; other profiles keep direct setup."""
-    if Path(home).resolve() != Path(get_process_hermes_home()).resolve():
+    if Path(home).resolve() != Path(get_process_eir_home()).resolve():
         return frozenset(), False
     from gateway.relay.link import relay_channel_view
 
@@ -417,14 +417,14 @@ def _ensure_whatsapp_bridge_dependencies(bridge_dir: Path) -> None:
     if (bridge_dir / "node_modules").exists():
         return
 
-    from hermes_constants import find_node_executable, with_hermes_node_path
+    from eir_constants import find_node_executable, with_eir_node_path
     from utils import env_int
     import pm
 
     npm = find_node_executable("npm")
 
     try:
-        env = with_hermes_node_path()
+        env = with_eir_node_path()
         if npm is None:
             env = pm.ensure("npm", explicit=True).env
             installed = pm.installed_package("npm")
@@ -451,7 +451,7 @@ def _ensure_whatsapp_bridge_dependencies(bridge_dir: Path) -> None:
 
 def _spawn_whatsapp_pairing_process(session_path: Path, mode: str) -> subprocess.Popen:
     from gateway.platforms.whatsapp_common import resolve_whatsapp_bridge_dir
-    from hermes_constants import ensure_private_store, find_node_executable, with_hermes_node_path
+    from eir_constants import ensure_private_store, find_node_executable, with_eir_node_path
 
     bridge_dir = resolve_whatsapp_bridge_dir()
     bridge_script = bridge_dir / "bridge.js"
@@ -472,9 +472,9 @@ def _spawn_whatsapp_pairing_process(session_path: Path, mode: str) -> subprocess
             raise HTTPException(status_code=500, detail=f"Node.js preparation failed: {exc}") from exc
     store_umask = ensure_private_store(session_path)  # pairing writes creds.json + signal keys (#80090)
 
-    from tools.environments.local import hermes_subprocess_env
-    # bridge.js and its npm deps never see Hermes' credentials; it needs only the mode and policy below.
-    env = with_hermes_node_path(hermes_subprocess_env())
+    from tools.environments.local import eir_subprocess_env
+    # bridge.js and its npm deps never see Eir' credentials; it needs only the mode and policy below.
+    env = with_eir_node_path(eir_subprocess_env())
     env["WHATSAPP_MODE"] = mode
     env["WHATSAPP_DM_POLICY"] = "pairing"
     # Owned: a SIGKILLed dashboard must not leave a pairing bridge holding the session dir.
@@ -515,7 +515,7 @@ def _fail_whatsapp_pairing(pairing_id: str, error: str, *, proc=None, unless=_WH
 # Readable text for bridge pairing error codes the dashboard displays; other codes show as the bridge sent them.
 _WHATSAPP_PAIRING_ERROR_TEXT = {
     "passkey_required": "This WhatsApp account requires passkey verification, which dashboard setup cannot do. "
-                        "In a local terminal, run hermes whatsapp --passkey-browser followed by the path to your "
+                        "In a local terminal, run eir whatsapp --passkey-browser followed by the path to your "
                         "Chrome or Edge executable.",
 }
 
@@ -876,7 +876,7 @@ async def _telegram_onboarding_request(method: str, path: str, *, body=None, bea
 
 @router.post("/api/messaging/telegram/onboarding/start")
 async def start_telegram_onboarding(body: TelegramOnboardingStart):
-    bot_name = (body.bot_name or "Hermes Agent").strip() or "Hermes Agent"
+    bot_name = (body.bot_name or "Eir Agent").strip() or "Eir Agent"
     payload = await _telegram_onboarding_request("POST", "/v1/telegram/pairings", body={"bot_name": bot_name})
 
     def field(key: str) -> str:
@@ -967,7 +967,7 @@ async def apply_telegram_onboarding(pairing_id: str, body: TelegramOnboardingApp
         _telegram_onboarding_pairings.pop(pairing_id, None)
 
     # Best-effort restart: the QR flow pulls users into Telegram on another device, so a
-    # saved token waiting on a manual restart click reads as "Hermes is broken" from the
+    # saved token waiting on a manual restart click reads as "Eir is broken" from the
     # chat side. The save stays authoritative; a failed restart is reported for the UI banner.
     restart_result = _restart_gateway_after(effective_profile, what="Telegram onboarding", label="Telegram onboarding")
     return {
@@ -991,13 +991,13 @@ async def get_messaging_platforms(profile: Optional[str] = None):
     # Profile-scoped so the global profile switcher shows the TARGET profile's channel state.
     def _run():
         # Profile-scoped so the dashboard's global profile switcher shows the TARGET profile's channel
-        # credentials/state, not the root install's. load_env() honors the HERMES_HOME contextvar override;
+        # credentials/state, not the root install's. load_env() honors the EIR_HOME contextvar override;
         # the gateway status readers do NOT (they resolve process-level paths), so the profile directory is
         # passed explicitly for those (#71211).
         with _profile_scope(profile) as scoped_dir:
             return {
                 "env_path": str(get_env_path()),
-                "gateway_start_command": " ".join(["hermes", *_gateway_subcommand(profile, "start")]),
+                "gateway_start_command": " ".join(["eir", *_gateway_subcommand(profile, "start")]),
                 "platforms": _platform_payloads(scoped_dir, _messaging_platform_catalog()),
             }
 
@@ -1020,9 +1020,9 @@ def _multiplex_port_binding_conflict(platform_id: str, requested_profile: Option
 
     requested = (requested_profile or "").strip()
     if not requested or requested.lower() == "current":
-        from hermes_cli.profiles import get_active_profile_name
+        from eir_cli.profiles import get_active_profile_name
 
-        # The dashboard's own profile. "custom" (unrecognized HERMES_HOME) is outside
+        # The dashboard's own profile. "custom" (unrecognized EIR_HOME) is outside
         # the profiles tree, so a multiplexed gateway never serves it.
         target = get_active_profile_name()
     else:
@@ -1034,7 +1034,7 @@ def _multiplex_port_binding_conflict(platform_id: str, requested_profile: Option
     # The flag that matters is the one the shared gateway settled at startup: its served record when
     # it runs, else the DEFAULT profile's explicit config (plus the process-wide
     # GATEWAY_MULTIPLEX_PROFILES override). An unset flag is decided by the gateway, not guessed here.
-    from hermes_cli.gateway_multiplex_mode import default_gateway_multiplexes
+    from eir_cli.gateway_multiplex_mode import default_gateway_multiplexes
     if not default_gateway_multiplexes():
         return None
 
@@ -1116,9 +1116,9 @@ async def update_messaging_platform(platform_id: str, body: MessagingPlatformUpd
 def _notify_multiplexer_hot_serve(profile: Optional[str]) -> bool:
     """True when a live multiplexer serves the written profile and was told to rebuild its adapters.
     Unscoped (no ``?profile=``) means THIS process's profile: Desktop routes a pooled
-    ``hermes --profile X serve`` without the query (#109088), so X must resolve here too."""
-    from hermes_cli.gateway import _current_profile_name, named_profile_served_by_running_multiplexer
-    from hermes_cli.gateway_multiplex_served import notify_multiplexer_profiles_changed
+    ``eir --profile X serve`` without the query (#109088), so X must resolve here too."""
+    from eir_cli.gateway import _current_profile_name, named_profile_served_by_running_multiplexer
+    from eir_cli.gateway_multiplex_served import notify_multiplexer_profiles_changed
     name = (profile or "").strip() or _current_profile_name()
     if not name or name == "default" or not named_profile_served_by_running_multiplexer(name):
         return False

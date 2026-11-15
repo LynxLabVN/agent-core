@@ -1,6 +1,6 @@
 """Plugin discovery: directory scanning, entry-point manifests, and the enable/disable gate.
 
-Split out of :mod:`hermes_cli.plugins`. Names that tests patch on the origin
+Split out of :mod:`eir_cli.plugins`. Names that tests patch on the origin
 (``get_bundled_plugins_dir``, ``_env_enabled``) are looked up lazily through it.
 """
 
@@ -14,20 +14,20 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
-from hermes_constants import get_hermes_home
-from hermes_cli.config import cfg_get
-from hermes_cli.plugin_capabilities import VALID_CAPABILITY_IDS
-from hermes_cli.plugin_capabilities import parse_declared_capabilities as _parse_declared_capabilities
-from hermes_cli.plugins_manifest import (
+from eir_constants import get_eir_home
+from eir_cli.config import cfg_get
+from eir_cli.plugin_capabilities import VALID_CAPABILITY_IDS
+from eir_cli.plugin_capabilities import parse_declared_capabilities as _parse_declared_capabilities
+from eir_cli.plugins_manifest import (
     PluginManifest, _detect_kind_from_source, manifest_key, _resolve_module_source,
     parse_manifest_file, portable_plugin_manifest,
 )
-from hermes_cli.relay_plugin_cutover import LEGACY_RELAY_PLUGIN_KEYS, RELAY_PLUGINS_CONFIG_ENV
+from eir_cli.relay_plugin_cutover import LEGACY_RELAY_PLUGIN_KEYS, RELAY_PLUGINS_CONFIG_ENV
 
-logger = logging.getLogger("hermes_cli.plugins")
+logger = logging.getLogger("eir_cli.plugins")
 
-ENTRY_POINTS_GROUP = "hermes_agent.plugins"
-ENTRY_POINT_CAPABILITIES_GROUP = "hermes_agent.plugin_capabilities"
+ENTRY_POINTS_GROUP = "eir_agent.plugins"
+ENTRY_POINT_CAPABILITIES_GROUP = "eir_agent.plugin_capabilities"
 
 # Per-harness manifest directories plugin repos ship for OTHER agent harnesses (e.g. obra/superpowers keeps one
 # plugin.json per harness). Their plugin.json is not an Agent Plugins v1 manifest and can never validate, so
@@ -42,7 +42,7 @@ _FOREIGN_HARNESS_MANIFEST_DIRS = frozenset({
 # ``register()`` (threads, DB handles) for a profile the operator took out of the host (#123386).
 # A contextvar, not an env flag: it must not leak to other threads or outlive the read.
 _discovery_suppressed: contextvars.ContextVar[bool] = contextvars.ContextVar(
-    "hermes_plugin_discovery_suppressed", default=False)
+    "eir_plugin_discovery_suppressed", default=False)
 
 
 @contextlib.contextmanager
@@ -72,7 +72,7 @@ def _select_entry_point_group(entry_points: Any, group: str) -> list:
 def discover_entrypoint_manifests() -> list[PluginManifest]:
     """Return metadata-only manifests for installed entry-point plugins. Kind comes from an import-free source
     scan (memory/model providers route to their own discovery). Capabilities come from the companion
-    ``hermes_agent.plugin_capabilities`` group (``<plugin-id>.<capability-id>`` entries pointing at the same
+    ``eir_agent.plugin_capabilities`` group (``<plugin-id>.<capability-id>`` entries pointing at the same
     object), so consent works without importing plugin code. Failures are isolated per entry point."""
     manifests: list[PluginManifest] = []
     try:
@@ -112,7 +112,7 @@ def _classify_entrypoint_value_kind(value: str) -> str:
 def _get_disabled_plugins() -> set:
     """Read ``plugins.disabled`` — a deny-list that wins over ``plugins.enabled``."""
     try:
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
         disabled = cfg_get(load_config(), "plugins", "disabled", default=[])
         return set(disabled) if isinstance(disabled, list) else set()
     except Exception:
@@ -124,7 +124,7 @@ def _get_enabled_plugins() -> Optional[set]:
     enabled yet"; the first ``migrate_config`` run grandfathers installed user plugins); ``set()`` = explicitly
     empty; else the allow-list."""
     try:
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
         enabled = cfg_get(load_config(), "plugins", "enabled")
         return set(enabled) if isinstance(enabled, list) else None
     except Exception:
@@ -191,7 +191,7 @@ def collect_directory_manifests() -> list[PluginManifest]:
     """Read directory manifests in full-discovery order (bundled top-level, bundled/platforms, user, opt-in
     project) without loading or mutating anything, so startup probes share the exact precedence/containment
     rules of the real discovery sweep."""
-    from hermes_cli import plugins as _origin  # patched names resolve through the origin
+    from eir_cli import plugins as _origin  # patched names resolve through the origin
     manifests: list[PluginManifest] = []
 
     def _scan(label: str, directory: Path, source: str, skip_names: Optional[set[str]] = None) -> None:
@@ -201,30 +201,30 @@ def collect_directory_manifests() -> list[PluginManifest]:
 
     # Excluded bundled top-level categories have their own discovery. ``platforms/`` is an ordinary category
     # dir: the recursion keys its adapters ``platforms/<dir>`` like every other category (``web/firecrawl``),
-    # which is the key `hermes plugins enable/disable` and the dashboard write (#27548); the manifest name
+    # which is the key `eir plugins enable/disable` and the dashboard write (#27548); the manifest name
     # (``photon-platform``) stays an accepted alias through ``gate_manifest``.
     repo_plugins = _origin.get_bundled_plugins_dir()
     logger.debug("Scanning bundled plugins: %s", repo_plugins)
     _scan("bundled (top-level)", repo_plugins, "bundled",
           {"memory", "context_engine", "model-providers", "cron_providers", "computer_use", "config_backends"})
-    user_dir = get_hermes_home() / "plugins"
+    user_dir = get_eir_home() / "plugins"
     logger.debug("Scanning user plugins: %s", user_dir)
     _scan("user", user_dir, "user")
-    if _origin._env_enabled("HERMES_ENABLE_PROJECT_PLUGINS"):
-        project_dir = Path.cwd() / ".hermes" / "plugins"
+    if _origin._env_enabled("EIR_ENABLE_PROJECT_PLUGINS"):
+        project_dir = Path.cwd() / ".eir" / "plugins"
         logger.debug("Scanning project plugins: %s", project_dir)
         _scan("project", project_dir, "project")
     else:
-        logger.debug("Project plugins disabled (set HERMES_ENABLE_PROJECT_PLUGINS=1 to enable)")
+        logger.debug("Project plugins disabled (set EIR_ENABLE_PROJECT_PLUGINS=1 to enable)")
     return manifests
 
 
 def resolve_manifest_winners(manifests: list[PluginManifest]) -> dict[str, PluginManifest]:
     """Later sources win on key collision (project > user > bundled): a same-named copy under
-    ``~/.hermes/plugins/<name>`` is the documented way to override a bundled plugin, and is logged. A flat
+    ``~/.eir/plugins/<name>`` is the documented way to override a bundled plugin, and is logged. A flat
     user/project manifest that claims a bundled key from a *differently named* directory is an impostor, not
     an override (``impostor_dir/plugin.yaml`` with ``name: kanban``): it is skipped with a warning so
-    ``hermes plugins enable kanban`` never activates unrelated code under the bundled name."""
+    ``eir plugins enable kanban`` never activates unrelated code under the bundled name."""
     winners: dict[str, PluginManifest] = {}
     for manifest in manifests:
         key = manifest_key(manifest)
@@ -273,7 +273,7 @@ def gate_manifest(
     category-owned kinds (exclusive / model-provider), bundled auto-loads (backend now, platform deferred),
     then ``plugins.enabled`` opt-in (path-derived key or legacy bare name)."""
     lookup_key = manifest_key(manifest)
-    from hermes_cli.left_core_migration import legacy_plugin_keys
+    from eir_cli.left_core_migration import legacy_plugin_keys
     # A bundled key that left core (``observability/langfuse``) keeps selecting its catalog plugin.
     names = {lookup_key, manifest.name, *legacy_plugin_keys(lookup_key)}
 
@@ -283,10 +283,10 @@ def gate_manifest(
     # Relay lifecycle is core-owned; an old plugin copy would compete for its registries.
     if names & LEGACY_RELAY_PLUGIN_KEYS:
         error = (
-            "removed — Relay lifecycle is owned by Hermes core; configure a standard user or system Relay "
+            "removed — Relay lifecycle is owned by Eir core; configure a standard user or system Relay "
             f"plugins.toml, or use {RELAY_PLUGINS_CONFIG_ENV} for an explicit user-file override"
         )
-        return _placeholder(error, logging.WARNING, "Refusing to load removed Hermes Relay plugin '%s'; %s", error)
+        return _placeholder(error, logging.WARNING, "Refusing to load removed Eir Relay plugin '%s'; %s", error)
     if names & disabled:
         if enabled and names & enabled:
             # Contradictory config (#131980): the disable wins, but a silent DEBUG skip hides the
@@ -313,22 +313,22 @@ def gate_manifest(
         # Bundled backends auto-load; selection among them is ``<category>.provider`` config.
         if manifest.kind == "backend":
             return ManifestGate("load_now")
-        # Bundled platforms register LAZILY: eagerly importing ~20 heavy SDKs added seconds to every `hermes`
+        # Bundled platforms register LAZILY: eagerly importing ~20 heavy SDKs added seconds to every `eir`
         # invocation. A deferred loader keeps every platform available on first use.
         if manifest.kind == "platform":
             return ManifestGate("defer")
     if enabled is None or not names & enabled:
         return _placeholder(
-            f"not enabled in config (run `hermes plugins enable {lookup_key}` to activate)", logging.DEBUG,
+            f"not enabled in config (run `eir plugins enable {lookup_key}` to activate)", logging.DEBUG,
             "Skipping '%s' (not in plugins.enabled)",
         )
     if manifest.source != "bundled":
         # The catalog kill list is enforced at install; a plugin recalled AFTER it was installed must not keep
         # loading. Offline check (in-tree list + cached live copy), honours an explicit install-time bypass.
-        from hermes_cli.plugins_cmd_catalog import installed_plugin_removal
+        from eir_cli.plugins_cmd_catalog import installed_plugin_removal
         removed = installed_plugin_removal(manifest.name, manifest.path)
         if removed is not None:
-            error = f"removed from the Hermes plugin catalog: {removed.reason or 'no reason recorded'}"
-            return _placeholder(error, logging.WARNING, "Refusing to load plugin '%s' — %s; run `hermes plugins remove`",
+            error = f"removed from the Eir plugin catalog: {removed.reason or 'no reason recorded'}"
+            return _placeholder(error, logging.WARNING, "Refusing to load plugin '%s' — %s; run `eir plugins remove`",
                                 error)
     return ManifestGate("load")

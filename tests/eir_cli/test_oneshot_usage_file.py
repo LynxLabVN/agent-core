@@ -1,10 +1,10 @@
-"""Tests for hermes -z --usage-file (per-run JSON usage report)."""
+"""Tests for eir -z --usage-file (per-run JSON usage report)."""
 
 import json
 
 import pytest
 
-from hermes_cli.oneshot import _write_usage_file
+from eir_cli.oneshot import _write_usage_file
 
 
 def _result(**overrides):
@@ -58,8 +58,8 @@ class TestAuxiliaryLedger:
     belongs in the pipeline ledger, additively — the main-loop keys stay main-loop-only."""
 
     def test_aux_usage_is_a_separate_breakdown_and_main_keys_unchanged(self, tmp_path):
-        from hermes_cli.oneshot import _auxiliary_usage, _attach_auxiliary_usage
-        from hermes_state import SessionDB
+        from eir_cli.oneshot import _auxiliary_usage, _attach_auxiliary_usage
+        from eir_state import SessionDB
 
         db = SessionDB(tmp_path / "state.db")
         try:
@@ -95,8 +95,8 @@ class TestAuxiliaryLedger:
         import time
 
         from agent import title_generator
-        from hermes_cli.oneshot import _attach_auxiliary_usage
-        from hermes_state import SessionDB
+        from eir_cli.oneshot import _attach_auxiliary_usage
+        from eir_state import SessionDB
 
         db = SessionDB(tmp_path / "state.db")
         try:

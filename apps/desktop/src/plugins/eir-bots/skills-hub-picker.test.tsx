@@ -1,6 +1,6 @@
 /**
  * The Skills Hub picker embeds the real hub page in an iframe; the page posts
- * `{type:'hermes-skill-pick'}` back and the plugin installs via skills.manage.
+ * `{type:'eir-skill-pick'}` back and the plugin installs via skills.manage.
  *
  * The handler used to check only `event.origin`, so ANY window on the hub
  * origin — an OAuth popup that had navigated back there, for instance — could
@@ -9,7 +9,7 @@
  * frame's contentWindow and the identifier is charset-checked.
  */
 
-import type * as HermesSdk from '@hermes/plugin-sdk'
+import type * as EirSdk from '@eir/plugin-sdk'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -25,8 +25,8 @@ const mocks = vi.hoisted(() => ({
   requestProfile: vi.fn(async (_route: unknown, _method: string, _params: Record<string, unknown>) => ({}))
 }))
 
-vi.mock('@hermes/plugin-sdk', async importOriginal => {
-  const original = await importOriginal<typeof HermesSdk>()
+vi.mock('@eir/plugin-sdk', async importOriginal => {
+  const original = await importOriginal<typeof EirSdk>()
 
   return {
     ...original,
@@ -99,7 +99,7 @@ describe('hub pick messages', () => {
     const frame = openHubBrowser()
 
     await waitFor(() =>
-      expect(frame.getAttribute('src')).toBe(`${FALLBACK_HUB_ORIGIN}/hermes-agent/docs/skills?embed=picker`)
+      expect(frame.getAttribute('src')).toBe(`${FALLBACK_HUB_ORIGIN}/eir-agent/docs/skills?embed=picker`)
     )
   })
 
@@ -109,7 +109,7 @@ describe('hub pick messages', () => {
     const frame = openHubBrowser()
 
     await waitFor(() =>
-      expect(frame.getAttribute('src')).toBe(`${FALLBACK_HUB_ORIGIN}/hermes-agent/docs/skills?embed=picker`)
+      expect(frame.getAttribute('src')).toBe(`${FALLBACK_HUB_ORIGIN}/eir-agent/docs/skills?embed=picker`)
     )
   })
 
@@ -142,7 +142,7 @@ describe('hub pick messages', () => {
         await vi.advanceTimersByTimeAsync(8_000)
       })
 
-      expect(frame.getAttribute('src')).toBe(`${FALLBACK_HUB_ORIGIN}/hermes-agent/docs/skills?embed=picker`)
+      expect(frame.getAttribute('src')).toBe(`${FALLBACK_HUB_ORIGIN}/eir-agent/docs/skills?embed=picker`)
     } finally {
       vi.restoreAllMocks()
       vi.useRealTimers()
@@ -159,7 +159,7 @@ describe('hub pick messages', () => {
     const frame = openHubBrowser()
 
     postPick(
-      { identifier: 'nous/web-research', name: 'Web Research', type: 'hermes-skill-pick' },
+      { identifier: 'nous/web-research', name: 'Web Research', type: 'eir-skill-pick' },
       { origin: FALLBACK_HUB_ORIGIN, source: frame.contentWindow }
     )
 
@@ -184,7 +184,7 @@ describe('hub pick messages', () => {
     const frame = openHubBrowser()
 
     postPick(
-      { identifier: 'nous/web-research', name: 'Web Research', type: 'hermes-skill-pick' },
+      { identifier: 'nous/web-research', name: 'Web Research', type: 'eir-skill-pick' },
       {
         source: frame.contentWindow
       }
@@ -214,7 +214,7 @@ describe('hub pick messages', () => {
     const frame = container.querySelector('iframe') as HTMLIFrameElement
 
     postPick(
-      { identifier: 'nous/web-research', name: 'Web Research', type: 'hermes-skill-pick' },
+      { identifier: 'nous/web-research', name: 'Web Research', type: 'eir-skill-pick' },
       { source: frame.contentWindow }
     )
 
@@ -243,7 +243,7 @@ describe('hub pick messages', () => {
 
     // Same origin, different window — the OAuth-popup shape of the hole.
     postPick(
-      { identifier: 'nous/web-research', name: 'Web Research', type: 'hermes-skill-pick' },
+      { identifier: 'nous/web-research', name: 'Web Research', type: 'eir-skill-pick' },
       {
         source: window
       }
@@ -256,7 +256,7 @@ describe('hub pick messages', () => {
     const frame = openHubBrowser()
 
     postPick(
-      { identifier: 'nous/web-research', name: 'Web Research', type: 'hermes-skill-pick' },
+      { identifier: 'nous/web-research', name: 'Web Research', type: 'eir-skill-pick' },
       {
         origin: 'https://evil.example',
         source: frame.contentWindow
@@ -270,7 +270,7 @@ describe('hub pick messages', () => {
     const frame = openHubBrowser()
 
     for (const identifier of ['../../etc/passwd', 'skill; rm -rf /', '-flag', 'name with spaces', '']) {
-      postPick({ identifier, name: 'Web Research', type: 'hermes-skill-pick' }, { source: frame.contentWindow })
+      postPick({ identifier, name: 'Web Research', type: 'eir-skill-pick' }, { source: frame.contentWindow })
     }
 
     // The empty identifier falls back to `name`, which is also off-charset.
@@ -281,7 +281,7 @@ describe('hub pick messages', () => {
     const frame = openHubBrowser()
 
     postPick({ identifier: 'nous/web-research', type: 'oauth-callback' }, { source: frame.contentWindow })
-    postPick({ identifier: 'nous/web-research', type: 'hermes-skill-pick' }, { source: frame.contentWindow })
+    postPick({ identifier: 'nous/web-research', type: 'eir-skill-pick' }, { source: frame.contentWindow })
 
     // The second has no `name`, so it is not a complete pick either.
     expect(installCalls()).toEqual([])
@@ -292,7 +292,7 @@ describe('hub pick messages', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /hide the hub browser/i }))
     postPick(
-      { identifier: 'nous/web-research', name: 'Web Research', type: 'hermes-skill-pick' },
+      { identifier: 'nous/web-research', name: 'Web Research', type: 'eir-skill-pick' },
       {
         source: frame.contentWindow
       }

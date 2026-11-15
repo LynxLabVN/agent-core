@@ -10,13 +10,13 @@ from unittest.mock import MagicMock
 
 
 def _make_cli():
-    """Bare HermesCLI suitable for process_command() tests.
+    """Bare EirCLI suitable for process_command() tests.
 
     Uses ``__new__`` to skip the heavy __init__; only sets the attributes
     the /exit branch touches.
     """
-    from cli import HermesCLI
-    cli = HermesCLI.__new__(HermesCLI)
+    from cli import EirCLI
+    cli = EirCLI.__new__(EirCLI)
     cli.config = {}
     cli.console = MagicMock()
     cli.agent = None
@@ -71,7 +71,7 @@ class TestExitDeleteFlag:
 class TestCommandRegistry:
 
     def test_exit_alias_resolves_to_quit_with_hint(self):
-        from hermes_cli.commands import resolve_command
+        from eir_cli.commands import resolve_command
         cmd = resolve_command("exit")
         assert cmd is not None
         assert cmd.name == "quit"

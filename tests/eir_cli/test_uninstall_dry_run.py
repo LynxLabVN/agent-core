@@ -1,18 +1,18 @@
 from pathlib import Path
 from types import SimpleNamespace
 
-from hermes_cli import uninstall
+from eir_cli import uninstall
 
 
 def test_dry_run_prints_plan_without_mutating(monkeypatch, tmp_path, capsys):
-    project_root = tmp_path / "hermes-agent"
-    hermes_home = tmp_path / ".hermes"
+    project_root = tmp_path / "eir-agent"
+    eir_home = tmp_path / ".eir"
     project_root.mkdir()
     # A .git dir marks the tree as a removable git checkout — without it the
     # install-kind gate refuses before the dry-run plan prints.
     (project_root / ".git").mkdir()
-    hermes_home.mkdir()
-    (hermes_home / "config.yaml").write_text("model: {}\n", encoding="utf-8")
+    eir_home.mkdir()
+    (eir_home / "config.yaml").write_text("model: {}\n", encoding="utf-8")
 
     called = False
 
@@ -21,8 +21,8 @@ def test_dry_run_prints_plan_without_mutating(monkeypatch, tmp_path, capsys):
         called = True
 
     monkeypatch.setattr(uninstall, "get_project_root", lambda: project_root)
-    monkeypatch.setattr(uninstall, "get_hermes_home", lambda: hermes_home)
-    monkeypatch.setattr(uninstall, "_is_default_hermes_home", lambda home: False)
+    monkeypatch.setattr(uninstall, "get_eir_home", lambda: eir_home)
+    monkeypatch.setattr(uninstall, "_is_default_eir_home", lambda home: False)
     monkeypatch.setattr(uninstall, "_discover_named_profiles", list)
     monkeypatch.setattr(uninstall, "_perform_uninstall", _fail_if_called)
 
@@ -32,23 +32,23 @@ def test_dry_run_prints_plan_without_mutating(monkeypatch, tmp_path, capsys):
     assert called is False
     assert "Dry run" in output
     assert str(project_root) in output
-    assert str(hermes_home) in output
+    assert str(eir_home) in output
     assert project_root.exists()
-    assert hermes_home.exists()
+    assert eir_home.exists()
 
 
 def test_dry_run_lists_named_profiles_without_desktop_userdata(monkeypatch, tmp_path, capsys):
     """Full-uninstall dry-run lists named profiles even on a machine with no desktop
     userData dir — the profiles section must not depend on the desktop install."""
     profile = SimpleNamespace(name="work", path=tmp_path / "profiles" / "work")
-    monkeypatch.setattr(uninstall, "_is_default_hermes_home", lambda home: True)
+    monkeypatch.setattr(uninstall, "_is_default_eir_home", lambda home: True)
     monkeypatch.setattr(uninstall, "_discover_named_profiles", lambda: [profile])
     monkeypatch.setattr(
-        "hermes_cli.gui_uninstall.desktop_userdata_dir", lambda: tmp_path / "absent-userdata"
+        "eir_cli.gui_uninstall.desktop_userdata_dir", lambda: tmp_path / "absent-userdata"
     )
 
     uninstall._print_uninstall_dry_run(
-        project_root=tmp_path, hermes_home=tmp_path / ".hermes", full_uninstall=True
+        project_root=tmp_path, eir_home=tmp_path / ".eir", full_uninstall=True
     )
 
     out = capsys.readouterr().out
@@ -58,7 +58,7 @@ def test_dry_run_lists_named_profiles_without_desktop_userdata(monkeypatch, tmp_
 
 def test_build_uninstall_parser_accepts_dry_run():
     import argparse
-    from hermes_cli.subcommands.uninstall import build_uninstall_parser
+    from eir_cli.subcommands.uninstall import build_uninstall_parser
 
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command")

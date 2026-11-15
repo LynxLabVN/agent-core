@@ -11,27 +11,27 @@ import pytest
 
 
 @pytest.fixture
-def client(monkeypatch, _isolate_hermes_home):
+def client(monkeypatch, _isolate_eir_home):
     from starlette.testclient import TestClient
 
-    import hermes_state
-    from hermes_constants import get_hermes_home
-    from hermes_cli import profiles
-    from hermes_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
+    import eir_state
+    from eir_constants import get_eir_home
+    from eir_cli import profiles
+    from eir_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
 
-    home = get_hermes_home()
+    home = get_eir_home()
     home.mkdir(parents=True, exist_ok=True)
     (home / "config.yaml").write_text("{}\n", encoding="utf-8")
-    monkeypatch.setattr(profiles, "_get_default_hermes_home", lambda: home)
+    monkeypatch.setattr(profiles, "_get_default_eir_home", lambda: home)
     monkeypatch.setattr(profiles, "_get_profiles_root", lambda: home / "profiles")
-    monkeypatch.setattr(hermes_state, "DEFAULT_DB_PATH", home / "state.db")
+    monkeypatch.setattr(eir_state, "DEFAULT_DB_PATH", home / "state.db")
     c = TestClient(app)
     c.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
     return c
 
 
 def test_a_created_profile_is_served_without_waiting_for_the_rescan(client, monkeypatch):
-    from hermes_cli import gateway_multiplex_served
+    from eir_cli import gateway_multiplex_served
 
     served = []
 

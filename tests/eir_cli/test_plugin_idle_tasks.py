@@ -6,8 +6,8 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from hermes_cli.plugins import PluginContext, PluginManager, PluginManifest
-from hermes_cli.plugins_idle_tasks import cmd_idle_tasks, load_state, registered_idle_tasks, run_plugin_idle_tasks
+from eir_cli.plugins import PluginContext, PluginManager, PluginManifest
+from eir_cli.plugins_idle_tasks import cmd_idle_tasks, load_state, registered_idle_tasks, run_plugin_idle_tasks
 
 T0 = datetime(2026, 10, 1, 12, 0, tzinfo=UTC)
 IDLE = 3 * 3600.0
@@ -15,7 +15,7 @@ IDLE = 3 * 3600.0
 
 @pytest.fixture
 def home(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     return tmp_path
 
 
@@ -159,7 +159,7 @@ def test_profile_scoping_and_disposal(home, tmp_path):
 def test_the_gateway_idle_poll_runs_the_curator_and_the_plugin_tasks(home, monkeypatch):
     import agent.curator
     from gateway import run as gateway_run
-    from hermes_cli import plugins_idle_tasks
+    from eir_cli import plugins_idle_tasks
 
     seen = []
     monkeypatch.setattr(agent.curator, "maybe_run_curator", lambda **kw: seen.append(("curator", kw["idle_for_seconds"])))

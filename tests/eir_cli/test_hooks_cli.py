@@ -1,4 +1,4 @@
-"""Tests for the ``hermes hooks`` CLI subcommand."""
+"""Tests for the ``eir hooks`` CLI subcommand."""
 
 from __future__ import annotations
 
@@ -12,13 +12,13 @@ from unittest.mock import patch
 import pytest
 
 from agent import shell_hooks
-from hermes_cli import hooks as hooks_cli
+from eir_cli import hooks as hooks_cli
 
 
 @pytest.fixture(autouse=True)
 def _isolated_home(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "home"))
-    monkeypatch.delenv("HERMES_ACCEPT_HOOKS", raising=False)
+    monkeypatch.setenv("EIR_HOME", str(tmp_path / "home"))
+    monkeypatch.delenv("EIR_ACCEPT_HOOKS", raising=False)
     shell_hooks.reset_for_tests()
     yield
     shell_hooks.reset_for_tests()
@@ -62,7 +62,7 @@ class TestHooksList:
         # Approve one of the two so we can see both states in the output
         shell_hooks._record_approval("pre_tool_call", str(script))
 
-        with patch("hermes_cli.config.load_config", return_value=cfg):
+        with patch("eir_cli.config.load_config", return_value=cfg):
             out = _run(SimpleNamespace(hooks_action="list"))
 
         assert "[pre_tool_call]" in out
@@ -78,10 +78,10 @@ class TestHooksList:
 @pytest.mark.platforms("linux")
 class TestHooksTest:
     def test_synthetic_payload_matches_production_shape(self, tmp_path):
-        """`hermes hooks test` must feed the script stdin in the same
+        """`eir hooks test` must feed the script stdin in the same
         shape invoke_hook() would at runtime.  Prior to this fix,
         run_once bypassed _serialize_payload and the two paths diverged —
-        scripts tested with `hermes hooks test` saw different top-level
+        scripts tested with `eir hooks test` saw different top-level
         keys than at runtime, silently breaking in production."""
         capture = tmp_path / "captured.json"
         script = _hook_script(
@@ -89,7 +89,7 @@ class TestHooksTest:
             f"#!/usr/bin/env bash\ncat - > {capture}\nprintf '{{}}\\n'\n",
         )
         cfg = {"hooks": {"subagent_stop": [{"command": str(script)}]}}
-        with patch("hermes_cli.config.load_config", return_value=cfg):
+        with patch("eir_cli.config.load_config", return_value=cfg):
             _run(SimpleNamespace(
                 hooks_action="test", event="subagent_stop",
                 for_tool=None, payload_file=None,
@@ -122,7 +122,7 @@ class TestHooksTest:
                 ],
             },
         }
-        with patch("hermes_cli.config.load_config", return_value=cfg):
+        with patch("eir_cli.config.load_config", return_value=cfg):
             out = _run(SimpleNamespace(
                 hooks_action="test", event="pre_tool_call",
                 for_tool="terminal", payload_file=None,
@@ -173,13 +173,13 @@ class TestHooksDoctor:
         }))
 
         cfg = {"hooks": {"on_session_start": [{"command": str(script)}]}}
-        with patch("hermes_cli.config.load_config", return_value=cfg):
+        with patch("eir_cli.config.load_config", return_value=cfg):
             out = _run(SimpleNamespace(hooks_action="doctor"))
         assert "modified since approval" in out
 
 
     def test_unallowlisted_script_is_not_executed(self, tmp_path):
-        """Regression for M4: `hermes hooks doctor` used to run every
+        """Regression for M4: `eir hooks doctor` used to run every
         listed script against a synthetic payload as part of its JSON
         smoke test, which contradicted the documented workflow of
         "spot newly-added hooks *before they register*".  An un-allowlisted
@@ -191,7 +191,7 @@ class TestHooksDoctor:
             f"#!/usr/bin/env bash\ntouch {sentinel}\nprintf '{{}}\\n'\n",
         )
         cfg = {"hooks": {"on_session_start": [{"command": str(script)}]}}
-        with patch("hermes_cli.config.load_config", return_value=cfg):
+        with patch("eir_cli.config.load_config", return_value=cfg):
             out = _run(SimpleNamespace(hooks_action="doctor"))
 
         assert not sentinel.exists(), (
@@ -232,7 +232,7 @@ def test_print_run_result_shows_decision_for_error_and_timeout():
 
 
 def test_hooks_test_distinguishes_fail_closed_from_fail_open(tmp_path):
-    """`hermes hooks test` on a missing command shows the dispatcher's decision (#115968).
+    """`eir hooks test` on a missing command shows the dispatcher's decision (#115968).
 
     Drives the real CLI subcommand: a fail_closed hook whose command does not exist
     must print the block decision, while the fail-open twin prints the "contributed
@@ -248,7 +248,7 @@ def test_hooks_test_distinguishes_fail_closed_from_fail_open(tmp_path):
         },
         "hooks_auto_accept": True,
     }
-    with patch("hermes_cli.config.load_config", return_value=cfg):
+    with patch("eir_cli.config.load_config", return_value=cfg):
         out = _run(SimpleNamespace(
             hooks_action="test", event="pre_tool_call",
             for_tool="terminal", payload_file=None,

@@ -8,7 +8,7 @@ from __future__ import annotations
 import threading
 import time
 
-from hermes_cli.gateway_client import DISCONNECTED, NOT_SENT, GatewayClientError, GatewayRPCError, GatewayUnavailableError
+from eir_cli.gateway_client import DISCONNECTED, NOT_SENT, GatewayClientError, GatewayRPCError, GatewayUnavailableError
 
 # In-band owner refusals that leave the request intact: a draining owner admits nothing new, and a
 # retired authority's successor holds the admission the next connection reads.
@@ -58,8 +58,8 @@ class SuccessorWaitStopped(GatewayClientError):
 
 def restart_wait_budget() -> float:
     """Seconds an owner restart may take: its after-turn wait, then its stop envelope (the CLI's
-    ``hermes gateway restart`` waits the same)."""
-    from hermes_cli.gateway import _get_restart_exit_wait_budget
+    ``eir gateway restart`` waits the same)."""
+    from eir_cli.gateway import _get_restart_exit_wait_budget
     return _get_restart_exit_wait_budget()
 
 
@@ -74,7 +74,7 @@ def wait_for_successor(attempt, *, announce, wake=None, budget=None, clock=time.
     Any other failure is raised at once."""
     from agent.i18n import t
     from agent.retry_utils import jittered_backoff
-    from hermes_cli.gateway_connection import CallStopped
+    from eir_cli.gateway_connection import CallStopped
     wake = wake if wake is not None else threading.Event()
     deadline = None
     failures = 0
@@ -104,7 +104,7 @@ def wait_for_successor(attempt, *, announce, wake=None, budget=None, clock=time.
 def _fresh_connection(store):
     """A connection whose first dial failed never dials again (``GatewayConnection.final``): the
     retry after a refused dial (the old owner exiting) needs a new one, keeping this CLI's launch key."""
-    from hermes_cli.gateway_connection import GatewayConnection
+    from eir_cli.gateway_connection import GatewayConnection
     old = store.connection
     if not isinstance(old, GatewayConnection) or not old.final:
         return
@@ -172,6 +172,6 @@ def exit_on_stopped_wait(cli, exc) -> None:
     Interactive startup handles the same stop itself (``_tui_print_startup``)."""
     if isinstance(exc, SuccessorWaitStopped) and getattr(cli, "_single_query_mode", False):
         import sys
-        from hermes_cli.quiet_single_query import exit_single_query
+        from eir_cli.quiet_single_query import exit_single_query
         print(str(exc), file=sys.stderr, flush=True)
         exit_single_query(130)

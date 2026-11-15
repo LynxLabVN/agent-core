@@ -13,7 +13,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-from hermes_constants import get_default_hermes_root
+from eir_constants import get_default_eir_root
 
 _HEX32 = re.compile(r"[0-9a-f]{32}\Z")
 _HEX16 = re.compile(r"[0-9a-f]{16}\Z")
@@ -52,8 +52,8 @@ def _nonce(value: str) -> str:
 def _root() -> Path:
     # The helper uploads the token before the child applies `--profile`; read_token() runs after
     # profile activation. Anchor both to the machine root so a named profile (or custom
-    # HERMES_HOME) cannot move the reader away from the helper's token.
-    return get_default_hermes_root() / "desktop-ssh"
+    # EIR_HOME) cannot move the reader away from the helper's token.
+    return get_default_eir_root() / "desktop-ssh"
 
 
 def _directory(ownership_id: str) -> Path:
@@ -305,7 +305,7 @@ def remove_artifact(path: Path) -> bool:
     return True
 
 
-def process_state(pid: int, creation_time_ns: int, hermes_path: str, spawn_nonce: str) -> dict[str, Any]:
+def process_state(pid: int, creation_time_ns: int, eir_path: str, spawn_nonce: str) -> dict[str, Any]:
     import psutil
     _nonce(spawn_nonce)
     try:
@@ -321,15 +321,15 @@ def process_state(pid: int, creation_time_ns: int, hermes_path: str, spawn_nonce
                 "actualCreationTimeNs": str(actual_creation), "expectedCreationTimeNs": str(creation_time_ns)}
     if not argv:
         return {"alive": True, "owned": False, "indeterminate": True, "reason": "argv-unavailable"}
-    expected = os.path.normcase(os.path.abspath(hermes_path))
+    expected = os.path.normcase(os.path.abspath(eir_path))
     arg0 = os.path.normcase(os.path.abspath(argv[0]))
-    # argv[0] is the hermes exe or (normally) the base Python, whose path varies by venv/uv
+    # argv[0] is the eir exe or (normally) the base Python, whose path varies by venv/uv
     # layout — so match "a python running our module" (`-c` bootstrap or plain `-m`). Identity
     # is anchored by the unforgeable creation-time + secret owner-nonce below.
     is_python = os.path.basename(arg0).startswith("python")
     from gateway.status_inline_source import inline_bootstrap_argv
     logical_argv = inline_bootstrap_argv(argv) or argv
-    launches_module = logical_argv[1:3] == ["-m", "hermes_cli.main"]
+    launches_module = logical_argv[1:3] == ["-m", "eir_cli.main"]
     executable_match = arg0 == expected or (is_python and launches_module)
     try:
         serve = logical_argv.index("serve")
@@ -342,8 +342,8 @@ def process_state(pid: int, creation_time_ns: int, hermes_path: str, spawn_nonce
             "argv": argv[:20], "expectedExecutable": expected}
 
 
-def terminate_owned(pid: int, creation_time_ns: int, hermes_path: str, spawn_nonce: str) -> bool:
-    state = process_state(pid, creation_time_ns, hermes_path, spawn_nonce)
+def terminate_owned(pid: int, creation_time_ns: int, eir_path: str, spawn_nonce: str) -> bool:
+    state = process_state(pid, creation_time_ns, eir_path, spawn_nonce)
     if not state["alive"] or not state["owned"]:
         return False
     import psutil
@@ -359,30 +359,30 @@ def terminate_owned(pid: int, creation_time_ns: int, hermes_path: str, spawn_non
     return True
 
 
-def _resolve_direct_command(hermes_path: str) -> list[str]:
+def _resolve_direct_command(eir_path: str) -> list[str]:
     """Ask the configured installation for its direct, boot-selecting command.
 
     The port owner must be the process we lock, not a console-launcher child.
     No assumption about python.exe beside an external bin launcher is valid.
     """
-    out = subprocess.run([hermes_path, "--print-runtime-command"], capture_output=True,
+    out = subprocess.run([eir_path, "--print-runtime-command"], capture_output=True,
                          text=True, encoding="utf-8", errors="replace", timeout=30, check=False)
     if out.returncode != 0:
-        raise ValueError("could not resolve Hermes runtime; refresh this installation's launcher")
+        raise ValueError("could not resolve Eir runtime; refresh this installation's launcher")
     try:
         command = json.loads(out.stdout)
     except ValueError as exc:
-        raise ValueError("Hermes launcher did not report a runtime command") from exc
+        raise ValueError("Eir launcher did not report a runtime command") from exc
     if (not isinstance(command, list) or not command
             or not all(isinstance(part, str) and "\x00" not in part for part in command)
             or not os.path.isabs(command[0]) or not os.path.isfile(command[0])):
-        raise ValueError("Hermes launcher reported an invalid runtime command")
+        raise ValueError("Eir launcher reported an invalid runtime command")
     return command
 
 
 def _spawn_env(payload: dict[str, Any]) -> dict[str, str]:
     """The serve's environment. A Desktop dev build's renderer is an http origin the backend trusts
-    only from the HERMES_DESKTOP_DEV_SERVER it inherits, so the payload's ``devServer`` is handed
+    only from the EIR_DESKTOP_DEV_SERVER it inherits, so the payload's ``devServer`` is handed
     down exactly as the POSIX spawn command does; without one the variable is not set at all."""
     dev_server = str(payload.get("devServer") or "")
     if len(dev_server) > 2048 or any(ch in dev_server for ch in "\x00\r\n"):
@@ -390,24 +390,24 @@ def _spawn_env(payload: dict[str, Any]) -> dict[str, str]:
     env = dict(os.environ)
     env.pop("VIRTUAL_ENV", None)
     env.pop("PYTHONPATH", None)
-    env.pop("HERMES_DESKTOP_DEV_SERVER", None)
+    env.pop("EIR_DESKTOP_DEV_SERVER", None)
     if dev_server:
-        env["HERMES_DESKTOP_DEV_SERVER"] = dev_server
+        env["EIR_DESKTOP_DEV_SERVER"] = dev_server
     return env
 
 
 def spawn_backend(payload: dict[str, Any]) -> dict[str, Any]:
     ownership_id = _ownership(str(payload["ownershipId"]))
     spawn_nonce = _nonce(str(payload["spawnNonce"]))
-    configured_path = str(payload["hermesPath"])
+    configured_path = str(payload["eirPath"])
     if not os.path.isabs(configured_path):
-        raise ValueError("Hermes path must be absolute")
-    hermes_path = os.path.abspath(configured_path)
+        raise ValueError("Eir path must be absolute")
+    eir_path = os.path.abspath(configured_path)
     token_path = str(_token_path(ownership_id, spawn_nonce))
     profile = str(payload.get("profile") or "")
     if len(profile) > 256 or any(ch in profile for ch in "\x00\r\n"):
         raise ValueError("invalid profile")
-    args = _resolve_direct_command(hermes_path)
+    args = _resolve_direct_command(eir_path)
     if profile:
         args.extend(["--profile", profile])
     args.extend(["serve", "--isolated", "--host", "127.0.0.1", "--port", "0",
@@ -430,10 +430,10 @@ def spawn_backend(payload: dict[str, Any]) -> dict[str, Any]:
             "logPath": str(log_path), "tokenPath": token_path}
 
 
-def inspect_hermes(hermes_path: str) -> dict[str, Any]:
-    path = os.path.abspath(hermes_path)
-    if not os.path.isabs(hermes_path) or not os.path.isfile(path):
-        raise ValueError("Hermes path is not an executable file")
+def inspect_eir(eir_path: str) -> dict[str, Any]:
+    path = os.path.abspath(eir_path)
+    if not os.path.isabs(eir_path) or not os.path.isfile(path):
+        raise ValueError("Eir path is not an executable file")
     version = subprocess.run([path, "--version"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=20, check=False)
     help_result = subprocess.run([path, "serve", "--help"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=20, check=False)
     help_text = help_result.stdout + help_result.stderr
@@ -446,14 +446,14 @@ def inspect_hermes(hermes_path: str) -> dict[str, Any]:
 
 def _probe(*_: str) -> dict[str, Any]:
     import platform
-    return {"os": "Windows", "arch": platform.machine(), "hermesHome": str(get_default_hermes_root()), "python": sys.executable}
+    return {"os": "Windows", "arch": platform.machine(), "eirHome": str(get_default_eir_root()), "python": sys.executable}
 
 
 def _inventory(*_: str) -> dict[str, Any]:
     """Desktop's read-only roster: the canonical root and profile predicate; never mints an identity."""
-    from hermes_cli.install_identity import _INSTALL_ID_FILENAME, _read_existing
-    from hermes_cli.profiles import _iter_named_profile_dirs
-    install_id, _ = _read_existing(get_default_hermes_root() / _INSTALL_ID_FILENAME)
+    from eir_cli.install_identity import _INSTALL_ID_FILENAME, _read_existing
+    from eir_cli.profiles import _iter_named_profile_dirs
+    install_id, _ = _read_existing(get_default_eir_root() / _INSTALL_ID_FILENAME)
     return {"profiles": ["default", *[p.name for p in _iter_named_profile_dirs()]], "installId": install_id}
 
 
@@ -481,7 +481,7 @@ _OPERATIONS: dict[str, tuple[int | None, Any]] = {
     "read-log": (2, _read_log),
     "remove-log": (2, lambda o, n: {"removed": remove_artifact(_log_path(o, n))}),
     "spawn": (None, lambda *_: spawn_backend(_read_json_stdin())),
-    "inspect": (1, inspect_hermes),
+    "inspect": (1, inspect_eir),
     "process-state": (4, lambda p, c, h, n: process_state(int(p), int(c), h, n)),
     "terminate": (4, lambda p, c, h, n: {"terminated": terminate_owned(int(p), int(c), h, n)})}
 

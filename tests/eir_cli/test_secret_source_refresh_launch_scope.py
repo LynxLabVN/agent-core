@@ -30,9 +30,9 @@ _FIXTURE_PLUGIN = (
 @pytest.fixture
 def launch_home(tmp_path, monkeypatch):
     import agent.secret_sources.registry as reg
-    from hermes_cli import env_loader
+    from eir_cli import env_loader
 
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     plugin_dir = home / "plugins" / "fixture-secret-source"
     plugin_dir.mkdir(parents=True)
     (plugin_dir / "plugin.yaml").write_text("name: fixture-secret-source\nversion: 0.1.0\n", encoding="utf-8")
@@ -44,7 +44,7 @@ def launch_home(tmp_path, monkeypatch):
         "plugins:\n  enabled: [fixture-secret-source]\n"
         "secrets:\n  fixturevault:\n    enabled: true\n",
         encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     for key in ("TELEGRAM_ALLOWED_USERS", "GATEWAY_ALLOW_ALL_USERS", "GATEWAY_ALLOWED_USERS", "VAULT_ONLY_KEY"):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("SYSTEMD_ONLY_TOKEN", "env-only")  # e.g. systemd Environment=, no .env line
@@ -63,7 +63,7 @@ def test_forced_rediscovery_keeps_launch_env_in_the_bound_launch_scope(launch_ho
     from gateway.config import load_gateway_config
     from gateway.platforms._shared import platform_gate_env
     from gateway.run import _profile_runtime_scope
-    from hermes_cli.plugins import get_plugin_manager
+    from eir_cli.plugins import get_plugin_manager
     from tui_gateway.launch_profile_policy import activate_multi_profile_hosting
 
     load_gateway_config()  # the launch YAML bridge: allow_from -> TELEGRAM_ALLOWED_USERS, allow-all grant
@@ -99,7 +99,7 @@ def test_a_removed_plugin_sources_boot_write_leaves_the_frozen_launch_env(launch
     while the operator's own value for a name the source also supplied stays."""
     from agent.secret_scope import current_secret_scope, set_multiplex_active
     from gateway.run import _profile_runtime_scope
-    from hermes_cli.plugins import get_plugin_manager
+    from eir_cli.plugins import get_plugin_manager
     from tui_gateway.launch_profile_policy import activate_multi_profile_hosting, launch_secret_scope
 
     manager = get_plugin_manager()
@@ -128,7 +128,7 @@ def test_a_rotated_then_removed_sources_write_leaves_the_frozen_launch_env(launc
     must lose the pre-rotation value too, not only the source's last write."""
     from agent.secret_scope import current_secret_scope, set_multiplex_active
     from gateway.run import _profile_runtime_scope
-    from hermes_cli.plugins import get_plugin_manager
+    from eir_cli.plugins import get_plugin_manager
     from tui_gateway.launch_profile_policy import activate_multi_profile_hosting, launch_secret_scope
 
     plugin = launch_home / "plugins" / "fixture-secret-source" / "__init__.py"
@@ -177,7 +177,7 @@ def test_a_concurrent_write_during_the_fetch_never_enters_the_frozen_launch_env(
     The frozen launch env must keep the value the source published, not the foreign one."""
     from agent.secret_scope import set_multiplex_active
     from gateway.run import _profile_runtime_scope
-    from hermes_cli.plugins import get_plugin_manager
+    from eir_cli.plugins import get_plugin_manager
     from tui_gateway.launch_profile_policy import activate_multi_profile_hosting, capture_launch_env
 
     _rotating_override_source(launch_home, (
@@ -225,7 +225,7 @@ def test_a_foreign_value_never_enters_the_frozen_launch_env_when_a_later_refresh
     source's own write: it must never gain the foreign value (the launch env never saw it)."""
     from agent.secret_scope import set_multiplex_active
     from gateway.run import _profile_runtime_scope
-    from hermes_cli.plugins import get_plugin_manager
+    from eir_cli.plugins import get_plugin_manager
     from tui_gateway.launch_profile_policy import activate_multi_profile_hosting, capture_launch_env
 
     _rotating_override_source(launch_home, (
@@ -286,7 +286,7 @@ def test_the_frozen_launch_env_loses_an_override_sources_value_however_os_enviro
     """However os.environ diverged from the source's write after activation, removing the source
     takes its value out of the frozen launch env, and the snapshot never holds a foreign value."""
     from agent.secret_scope import set_multiplex_active
-    from hermes_cli.plugins import get_plugin_manager
+    from eir_cli.plugins import get_plugin_manager
     from tui_gateway.launch_profile_policy import activate_multi_profile_hosting, capture_launch_env
 
     _foreign_fetch_source(launch_home)
@@ -336,7 +336,7 @@ def test_a_displaced_default_sources_boot_write_leaves_the_frozen_launch_env(
     one more refresh re-applies the source. Removal must take from-plugin out of the frozen launch
     env either way, and the snapshot never holds the foreign value."""
     from agent.secret_scope import set_multiplex_active
-    from hermes_cli.plugins import get_plugin_manager
+    from eir_cli.plugins import get_plugin_manager
     from tui_gateway.launch_profile_policy import activate_multi_profile_hosting, capture_launch_env
 
     manager = get_plugin_manager()
@@ -364,7 +364,7 @@ def test_removal_gives_the_frozen_launch_env_back_its_own_pre_write_value(launch
     a foreign write, a re-apply and a rotation, removal restores the snapshot's own pre-write value,
     never the foreign one and never the rotated value."""
     from agent.secret_scope import set_multiplex_active
-    from hermes_cli.plugins import get_plugin_manager
+    from eir_cli.plugins import get_plugin_manager
     from tui_gateway.launch_profile_policy import activate_multi_profile_hosting, capture_launch_env
 
     monkeypatch.setenv("VAULT_ONLY_KEY", "operator")
@@ -391,7 +391,7 @@ def test_a_sources_first_write_after_activation_stays_out_of_the_frozen_launch_e
     is followed)."""
     from agent.secret_scope import set_multiplex_active
     from gateway.run import _profile_runtime_scope
-    from hermes_cli.plugins import get_plugin_manager
+    from eir_cli.plugins import get_plugin_manager
     from tui_gateway.launch_profile_policy import activate_multi_profile_hosting, capture_launch_env
 
     _rotating_override_source(launch_home)
@@ -420,7 +420,7 @@ def test_a_source_enabled_after_activation_never_revokes_an_equal_operator_value
     is removed again. The snapshot holds no write of that source, so it keeps the operator's value:
     matching the string is not ownership."""
     from agent.secret_scope import set_multiplex_active
-    from hermes_cli.plugins import get_plugin_manager
+    from eir_cli.plugins import get_plugin_manager
     from tui_gateway.launch_profile_policy import activate_multi_profile_hosting, capture_launch_env
 
     monkeypatch.setenv("VAULT_ONLY_KEY", "from-plugin")
@@ -449,7 +449,7 @@ def test_an_activation_racing_the_pass_start_never_gives_the_snapshot_a_foreign_
     os.environ. The pass must not record that post-activation value as the snapshot's prior: removing
     the source would otherwise write it into the frozen launch env, which keeps the operator's value."""
     from agent.secret_scope import set_multiplex_active
-    from hermes_cli.plugins import get_plugin_manager
+    from eir_cli.plugins import get_plugin_manager
     import tui_gateway.launch_profile_policy as policy
     from tui_gateway.launch_profile_policy import activate_multi_profile_hosting, capture_launch_env
 
@@ -489,8 +489,8 @@ def test_an_activation_landing_after_the_publish_still_lets_removal_revoke_the_w
     """Activation lands mid-pass, after the source's first write is published but before the pass
     records it: the snapshot froze that write, so removing the source must still take it out."""
     from agent.secret_scope import set_multiplex_active
-    from hermes_cli import env_loader
-    from hermes_cli.plugins import get_plugin_manager
+    from eir_cli import env_loader
+    from eir_cli.plugins import get_plugin_manager
     from tui_gateway.launch_profile_policy import activate_multi_profile_hosting, capture_launch_env
 
     real_sanitize = env_loader._sanitize_loaded_credentials
@@ -517,7 +517,7 @@ def test_a_source_reapplying_over_a_value_it_did_not_write_leaves_the_frozen_lau
     write, so the snapshot must not follow it."""
     from agent.secret_scope import set_multiplex_active
     from gateway.run import _profile_runtime_scope
-    from hermes_cli.plugins import get_plugin_manager
+    from eir_cli.plugins import get_plugin_manager
     from tui_gateway.launch_profile_policy import activate_multi_profile_hosting, capture_launch_env
 
     _rotating_override_source(launch_home)
@@ -540,7 +540,7 @@ def test_a_rotated_write_the_ascii_sweep_rewrote_is_still_followed(launch_home):
     credential sweep: the snapshot follows the sanitized value, so the later removal still drops it."""
     from agent.secret_scope import set_multiplex_active
     from gateway.run import _profile_runtime_scope
-    from hermes_cli.plugins import get_plugin_manager
+    from eir_cli.plugins import get_plugin_manager
     from tui_gateway.launch_profile_policy import activate_multi_profile_hosting, capture_launch_env
 
     _rotating_override_source(launch_home)
@@ -569,7 +569,7 @@ def test_an_activation_landing_after_the_tracking_step_still_lets_removal_revoke
     """Activation lands after the pass tracked the source's write (no snapshot yet) but before it
     published its write record: capture must still learn of the write, or removal leaves it frozen."""
     from agent.secret_scope import set_multiplex_active
-    from hermes_cli.plugins import get_plugin_manager
+    from eir_cli.plugins import get_plugin_manager
     import tui_gateway.launch_profile_policy as policy
     from tui_gateway.launch_profile_policy import activate_multi_profile_hosting, capture_launch_env
 
@@ -620,11 +620,11 @@ def test_a_refresh_for_one_home_never_replaces_another_homes_installed_scope(lau
 
 @pytest.mark.require_symlinks
 def test_an_unstamped_scope_on_a_pinned_host_belongs_to_the_pinned_home(tmp_path, monkeypatch):
-    """A host that pins its launch home and mirrors the served profile into HERMES_HOME (Hermes
+    """A host that pins its launch home and mirrors the served profile into EIR_HOME (Eir
     WebUI): an unstamped scope is the pinned launch home's, so the mirrored profile's refresh must
     not replace it, and a symlinked spelling of the pinned home still owns it."""
     from agent import secret_scope
-    from hermes_constants import pin_process_hermes_home
+    from eir_constants import pin_process_eir_home
 
     launch = tmp_path / "launch"
     ops = launch / "profiles" / "ops"
@@ -632,8 +632,8 @@ def test_an_unstamped_scope_on_a_pinned_host_belongs_to_the_pinned_home(tmp_path
     (ops / ".env").write_text("OPS_KEY=o\n", encoding="utf-8")
     link = tmp_path / "launch-link"
     link.symlink_to(launch, target_is_directory=True)
-    pin_process_hermes_home(launch)
-    monkeypatch.setenv("HERMES_HOME", str(ops))  # the mirror
+    pin_process_eir_home(launch)
+    monkeypatch.setenv("EIR_HOME", str(ops))  # the mirror
     token = secret_scope.set_secret_scope({"LAUNCH_KEY": "l"})
     try:
         assert secret_scope.refresh_installed_secret_scope(ops) is False
@@ -642,4 +642,4 @@ def test_an_unstamped_scope_on_a_pinned_host_belongs_to_the_pinned_home(tmp_path
         assert "OPS_KEY" not in secret_scope.current_secret_scope()
     finally:
         secret_scope.reset_secret_scope(token)
-        pin_process_hermes_home(None)
+        pin_process_eir_home(None)

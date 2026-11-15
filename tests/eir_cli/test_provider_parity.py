@@ -1,5 +1,5 @@
 """End-to-end provider parity contract: the desktop Providers tabs must show
-the SAME provider universe as ``hermes model`` (the CLI/TUI picker).
+the SAME provider universe as ``eir model`` (the CLI/TUI picker).
 
 This is the single load-bearing invariant of the unified provider catalog:
 
@@ -13,12 +13,12 @@ can never silently drift again when a provider plugin is added.
 
 from fastapi.testclient import TestClient
 
-from hermes_cli.models import CANONICAL_PROVIDERS
-from hermes_cli.provider_catalog import provider_catalog
-from hermes_cli.web_server import _SESSION_TOKEN, app
+from eir_cli.models import CANONICAL_PROVIDERS
+from eir_cli.provider_catalog import provider_catalog
+from eir_cli.web_server import _SESSION_TOKEN, app
 
 client = TestClient(app)
-HEADERS = {"X-Hermes-Session-Token": _SESSION_TOKEN}
+HEADERS = {"X-Eir-Session-Token": _SESSION_TOKEN}
 
 # `custom` is the bring-your-own-endpoint pseudo-provider configured inline via
 # the model picker's local-endpoint flow, not a fixed credential card. It is in
@@ -63,10 +63,10 @@ def _accounts_tab_providers() -> set[str]:
     return {p["id"] for p in data["providers"]}
 
 
-def test_every_hermes_model_provider_is_configurable_in_desktop():
-    """PARITY CONTRACT: GUI (keys ∪ accounts) == the `hermes model` universe (listed providers):
+def test_every_eir_model_provider_is_configurable_in_desktop():
+    """PARITY CONTRACT: GUI (keys ∪ accounts) == the `eir model` universe (listed providers):
     every listed provider is configurable, and an unlisted pre-release one is on neither tab."""
-    from hermes_cli.models_catalog_static import listed_canonical_providers
+    from eir_cli.models_catalog_static import listed_canonical_providers
 
     gui = _keys_tab_providers() | _accounts_tab_providers()
     listed = {e.slug for e in listed_canonical_providers()}
@@ -76,7 +76,7 @@ def test_every_hermes_model_provider_is_configurable_in_desktop():
         if slug not in _EXEMPT and slug not in gui
     ]
     assert not missing, (
-        "providers shown in `hermes model` but not configurable in the desktop "
+        "providers shown in `eir model` but not configurable in the desktop "
         f"Providers tabs: {missing}"
     )
     leaked = sorted(gui & ({e.slug for e in CANONICAL_PROVIDERS} - listed))

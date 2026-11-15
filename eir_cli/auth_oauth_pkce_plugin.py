@@ -7,16 +7,16 @@ factories into the ``ProviderProfile`` hooks::
     ProviderProfile(name="example", auth_type="oauth_external",
                     auth_handler=pkce_auth_handler(cfg), refresh_credential=pkce_refresh_credential(cfg))
 
-Hermes owns the security boundary: HTTPS-only endpoints (plain HTTP only for a loopback-literal host,
+Eir owns the security boundary: HTTPS-only endpoints (plain HTTP only for a loopback-literal host,
 i.e. a local development IdP), token endpoint host checked against the same allowlist as the authorize
 URL BEFORE any request, S256 PKCE, CSRF ``state`` compared in constant time, an RFC 8252 loopback
 listener on the literal ``127.0.0.1`` (explicit port, ``0`` = OS-assigned), persistence as a
 ``PooledCredential`` and single-use refresh tokens re-read from the store under the auth lock. No token,
 ``state`` or verifier is ever logged.
 
-Lives in ``hermes_cli`` because everything it drives (loopback helpers, the auth store lock, the pool)
+Lives in ``eir_cli`` because everything it drives (loopback helpers, the auth store lock, the pool)
 does; every core import is deferred into the callables so a plugin may import this module while
-provider discovery is still running inside ``hermes_cli.auth``'s own import.
+provider discovery is still running inside ``eir_cli.auth``'s own import.
 """
 
 from __future__ import annotations
@@ -62,7 +62,7 @@ class OAuthPKCEConfig:
 
 
 def _err(provider: str, message: str, code: str):
-    from hermes_cli.auth_constants import AuthError
+    from eir_cli.auth_constants import AuthError
 
     return AuthError(f"{provider}: {message}", provider=provider, code=code)
 
@@ -100,8 +100,8 @@ def validate_config(provider: str, cfg: OAuthPKCEConfig) -> None:
 def _post_token(provider: str, cfg: OAuthPKCEConfig, data: dict[str, str], *, code: str) -> dict[str, Any]:
     """POST the token endpoint (or the plugin's broker) and return the rotated pool fields; the payload
     is never logged."""
-    from hermes_cli.auth import _default_verify
-    from hermes_cli.auth_constants import httpx
+    from eir_cli.auth import _default_verify
+    from eir_cli.auth_constants import httpx
 
     if cfg.token_request is not None:
         return _token_fields(provider, cfg.token_request(dict(data)), data, code)
@@ -120,7 +120,7 @@ def _post_token(provider: str, cfg: OAuthPKCEConfig, data: dict[str, str], *, co
 
 def _token_fields(provider: str, payload: Mapping[str, Any], data: dict[str, str], code: str) -> dict[str, Any]:
     """Pool fields from a token-endpoint payload; a response without ``refresh_token`` keeps the old one."""
-    from hermes_cli.auth import _coerce_ttl_seconds, _utc_now_z
+    from eir_cli.auth import _coerce_ttl_seconds, _utc_now_z
 
     access_token = str(payload.get("access_token") or "").strip()
     if not access_token:
@@ -138,7 +138,7 @@ def _token_http_error(provider: str, response: Any, fallback_code: str):
     """Map a failed token HTTP response. A grant-dead JSON ``error`` value becomes the
     error's ``code`` — the pool's plugin recovery treats those codes as terminal. The
     response body is not logged."""
-    from hermes_cli.auth import _OAUTH_GRANT_DEAD_CODES
+    from eir_cli.auth import _OAUTH_GRANT_DEAD_CODES
 
     error = ""
     try:
@@ -162,7 +162,7 @@ def _pool_provider(args: Any) -> str:
 
 def login(provider: str, cfg: OAuthPKCEConfig, *, open_browser: bool = True) -> dict[str, Any]:
     """Run the browser Authorization-Code + PKCE flow; returns the pool fields for the new grant."""
-    from hermes_cli.auth_device_flow import (
+    from eir_cli.auth_device_flow import (
         _bind_loopback_callback_server, _can_open_graphical_browser, _make_loopback_callback_handler,
         _pkce_code_challenge, _pkce_code_verifier, _print_loopback_ssh_hint, _serve_loopback_callback)
 
@@ -185,7 +185,7 @@ def login(provider: str, cfg: OAuthPKCEConfig, *, open_browser: bool = True) -> 
         params["audience"] = cfg.audience
     authorize_url = f"{cfg.authorize_url}{'&' if urlparse(cfg.authorize_url).query else '?'}{urlencode(params)}"
 
-    print(f"\nOpen this URL to authorize Hermes with {cfg.label or provider}:\n  {authorize_url}\n")
+    print(f"\nOpen this URL to authorize Eir with {cfg.label or provider}:\n  {authorize_url}\n")
     print(f"Waiting for callback on {redirect_uri} (timeout {int(cfg.timeout_seconds)}s, Ctrl+C to cancel)...")
     _print_loopback_ssh_hint(redirect_uri)
     if open_browser and _can_open_graphical_browser():
@@ -242,7 +242,7 @@ def pkce_auth_handler(cfg: OAuthPKCEConfig) -> Callable[[str, Any], bool]:
             elif any(_is_usable(e.access_token, e.expires_at_ms, now_ms) for e in entries):
                 print(f"{provider}: logged in\n  auth_type: oauth (pkce)\n  credentials: {len(entries)}")
             else:
-                print(f"{provider}: expired (needs refresh) — run `hermes auth refresh {provider}`")
+                print(f"{provider}: expired (needs refresh) — run `eir auth refresh {provider}`")
             return True
         if action == "logout":
             pool = load_pool(provider)
@@ -264,7 +264,7 @@ def pkce_refresh_credential(cfg: OAuthPKCEConfig) -> Callable[[Any], Mapping[str
     """
 
     def refresh(entry: Any) -> Mapping[str, Any]:
-        from hermes_cli.auth import _auth_store_lock, read_credential_pool
+        from eir_cli.auth import _auth_store_lock, read_credential_pool
 
         provider = str(entry.provider)
         validate_config(provider, cfg)

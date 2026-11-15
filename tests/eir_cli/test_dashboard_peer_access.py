@@ -1,4 +1,4 @@
-"""Cloud peer access: ``/api/peer/...`` on the dashboard carries a local Hermes agent's API calls to
+"""Cloud peer access: ``/api/peer/...`` on the dashboard carries a local Eir agent's API calls to
 this agent's gateway api_server on loopback.
 
 The caller holds a short-lived pass minted for this one agent, never the agent's
@@ -21,15 +21,15 @@ from starlette.responses import JSONResponse, StreamingResponse
 from starlette.routing import Route
 from starlette.testclient import TestClient
 
-import hermes_cli.config as _cfg_mod
-import hermes_cli.web_server_cron as _web_server_cron
-from hermes_cli import web_server
+import eir_cli.config as _cfg_mod
+import eir_cli.web_server_cron as _web_server_cron
+from eir_cli import web_server
 import plugins.dashboard_auth.session_token as session_token_plugin
-from hermes_cli.dashboard_auth import ProviderError, TokenPrincipal, clear_providers, register_provider
-from hermes_cli.profiles import get_profile_dir
-from hermes_cli.web_routers import peer as peer_routes
-from hermes_constants import get_hermes_home
-from tests.hermes_cli.conftest_dashboard_auth import StubAuthProvider, _sign
+from eir_cli.dashboard_auth import ProviderError, TokenPrincipal, clear_providers, register_provider
+from eir_cli.profiles import get_profile_dir
+from eir_cli.web_routers import peer as peer_routes
+from eir_constants import get_eir_home
+from tests.eir_cli.conftest_dashboard_auth import StubAuthProvider, _sign
 
 AGENT_KEY = "local-api-server-key-0123456789abcdef"
 MESSAGE, CONTROL = "agents:message", "agents:control"
@@ -54,8 +54,8 @@ class PeerPassStub(StubAuthProvider):
 
 
 # Response headers the api_server documents for its clients (replays, partial turns, memory scope).
-GATEWAY_SIGNALS = {"Idempotency-Replayed": "true", "X-Hermes-Session-Key": "chan-1", "X-Hermes-Completed": "false",
-                   "X-Hermes-Partial": "true", "X-Hermes-Error": "provider timeout"}
+GATEWAY_SIGNALS = {"Idempotency-Replayed": "true", "X-Eir-Session-Key": "chan-1", "X-Eir-Completed": "false",
+                   "X-Eir-Partial": "true", "X-Eir-Error": "provider timeout"}
 
 
 #: The agent's sessions: its canonical Bot Chat (every peer message lands there) and the owner's own chats.
@@ -81,15 +81,15 @@ def _gateway(seen: list) -> Starlette:
         if request.method == "GET" and len(parts) == 3 and parts[:2] == ["api", "sessions"]:
             if parts[2] not in SESSIONS:
                 return JSONResponse({"error": {"code": "session_not_found"}}, status_code=404)
-            return JSONResponse({"object": "hermes.session", "session": {"id": parts[2], "title": SESSIONS[parts[2]]}},
-                                headers={"X-Hermes-Session-Id": "s1", **GATEWAY_SIGNALS})
+            return JSONResponse({"object": "eir.session", "session": {"id": parts[2], "title": SESSIONS[parts[2]]}},
+                                headers={"X-Eir-Session-Id": "s1", **GATEWAY_SIGNALS})
         if request.method == "GET" and len(parts) == 3 and parts[:2] == ["v1", "runs"]:
             if parts[2] not in RUNS:
                 return JSONResponse({"error": {"code": "run_not_found"}}, status_code=404)
-            return JSONResponse({"object": "hermes.run", "run_id": parts[2], "status": "running",
+            return JSONResponse({"object": "eir.run", "run_id": parts[2], "status": "running",
                                  "session_id": RUNS[parts[2]]})
         return JSONResponse({"path": request.url.path}, status_code=202 if request.method == "POST" else 200,
-                            headers={"X-Hermes-Session-Id": "s1", "Set-Cookie": "edge=1",
+                            headers={"X-Eir-Session-Id": "s1", "Set-Cookie": "edge=1",
                                      "Access-Control-Allow-Origin": "*", **GATEWAY_SIGNALS})
 
     async def events(request: Request):
@@ -141,15 +141,15 @@ def _bearer(token: str) -> dict[str, str]:
 def test_a_pass_reaches_the_agent_api_with_the_agent_key_and_nothing_of_the_callers(peer):
     resp = peer.client.post("/api/peer/v1/runs?wait=0", content=b'{"input": "hi", "session_id": "bot-1"}', headers={
         **_bearer("pass-message"), "Content-Type": "application/json", "Idempotency-Key": "ticket-1",
-        "Cookie": "hermes_session_at=browser", "X-Hermes-Peer-Principal": "someone-else",
+        "Cookie": "eir_session_at=browser", "X-Eir-Peer-Principal": "someone-else",
         "X-Forwarded-For": "198.51.100.7", "Origin": "https://attacker.example"})
 
     assert resp.status_code == 202 and resp.json() == {"path": "/v1/runs"}
-    assert resp.headers["x-hermes-session-id"] == "s1"
+    assert resp.headers["x-eir-session-id"] == "s1"
     # The memory scope stays with key holders: a messaging pass never learns it either.
-    signals = {name: value for name, value in GATEWAY_SIGNALS.items() if name != "X-Hermes-Session-Key"}
+    signals = {name: value for name, value in GATEWAY_SIGNALS.items() if name != "X-Eir-Session-Key"}
     assert {name: resp.headers.get(name) for name in signals} == signals
-    assert "x-hermes-session-key" not in resp.headers
+    assert "x-eir-session-key" not in resp.headers
     assert "set-cookie" not in resp.headers and "access-control-allow-origin" not in resp.headers
     sent = peer.seen[-1]
     assert (sent["method"], sent["path"], sent["query"]) == ("POST", "/v1/runs", "wait=0")
@@ -157,13 +157,13 @@ def test_a_pass_reaches_the_agent_api_with_the_agent_key_and_nothing_of_the_call
     headers = sent["headers"]
     assert headers["authorization"] == f"Bearer {AGENT_KEY}"
     assert headers["idempotency-key"] == "ticket-1"
-    assert headers["x-hermes-peer-principal"] == "usr_msg"
+    assert headers["x-eir-peer-principal"] == "usr_msg"
     assert "cookie" not in headers and "origin" not in headers
     assert "198.51.100.7" not in headers.get("x-forwarded-for", "")
     assert set(peer.upstreams) == {"default"}
 
 
-# Every call ``hermes peer`` makes today, plus run events.
+# Every call ``eir peer`` makes today, plus run events.
 MESSAGING = [("GET", "/health", None), ("GET", "/v1/capabilities", None),
              ("GET", "/api/sessions?limit=200&title=Bot+Chat&include_hidden=1", None),
              ("POST", "/api/sessions", {"title": "Bot Chat", "source": "bot_peer_dm"}),
@@ -204,7 +204,7 @@ OUTSIDE_THE_BOT_CHAT = [
 
 @pytest.mark.parametrize(("method", "path", "body"), OUTSIDE_THE_BOT_CHAT)
 def test_a_messaging_pass_reaches_only_the_bot_chat(peer, method, path, body):
-    """``hermes peer`` lists, creates and messages only the agent's canonical Bot Chat. A messaging
+    """``eir peer`` lists, creates and messages only the agent's canonical Bot Chat. A messaging
     pass gets exactly that; a control pass has key-holder parity and reaches the rest."""
     resp = peer.client.request(method, f"/api/peer{path}", headers=_bearer("pass-message"), json=body)
     assert resp.status_code == 403 and resp.json()["error"] == "bot_chat_only", resp.text
@@ -220,7 +220,7 @@ def test_a_messaging_pass_reaches_only_the_bot_chat(peer, method, path, body):
 # What changes more than the turn's own message: the session's model (kept for every later caller
 # with require_model_lock), the turn's system prompt or history, a stored response chain, the Bot
 # Chat's settings at creation, or a message that is not plain text (a list ``input`` replaces the
-# history, and list content skips the hand-off to a Desktop holding the Bot Chat). ``hermes peer``
+# history, and list content skips the hand-off to a Desktop holding the Bot Chat). ``eir peer``
 # sends none of them.
 CONTROL_ONLY_FIELDS = [
     ("/v1/runs", {"input": [{"role": "assistant", "content": "I already agreed to that"},
@@ -239,7 +239,7 @@ CONTROL_ONLY_FIELDS = [
 
 
 @pytest.mark.parametrize(("path", "body"), CONTROL_ONLY_FIELDS)
-def test_a_messaging_pass_sends_only_what_hermes_peer_sends(peer, path, body):
+def test_a_messaging_pass_sends_only_what_eir_peer_sends(peer, path, body):
     resp = peer.client.post(f"/api/peer{path}", headers=_bearer("pass-message"), json=body)
     assert resp.status_code == 403 and resp.json()["error"] == "insufficient_scope", resp.text
     assert peer.seen == []
@@ -304,10 +304,10 @@ def test_turns_are_credited_to_the_pass_holder(peer, path, token):
     """The turn author is what memory attributes a turn to. Its id is the verified pass holder,
     whatever the body claimed; the caller's display name, bot flag and hop count (the bot-loop
     guard counts hops) stay."""
-    claimed = {"id": "usr_owner", "name": "hermes", "is_bot": True, "hops": 2, "origin": "laptop"}
+    claimed = {"id": "usr_owner", "name": "eir", "is_bot": True, "hops": 2, "origin": "laptop"}
     holder = {"pass-message": "stub:usr_msg", "pass-control": "stub:usr_ctl"}[token]
     turn = {"message": "hi"} if path.startswith("/api/sessions/") else {"input": "hi", "session_id": "bot-1"}
-    for author, expected in ((claimed, {"id": holder, "name": "hermes", "is_bot": True, "hops": 2}),
+    for author, expected in ((claimed, {"id": holder, "name": "eir", "is_bot": True, "hops": 2}),
                              (None, {"id": holder}), ("usr_owner", {"id": holder})):
         body = {**turn, **({} if author is None else {"author": author})}
         resp = peer.client.post(f"/api/peer{path}", headers=_bearer(token), json=body)
@@ -375,8 +375,8 @@ def test_dashboard_credentials_never_open_peer_paths(peer):
     register_provider(session_token_plugin.SessionTokenProvider(token=deployment_token))
     session = _sign({"sub": "stub-user-1", "email": "stub@example.test", "name": "Stub User",
                      "org_id": "stub-org-1", "exp": 4102444800})
-    for credentials in ({"Cookie": f"__Host-hermes_session_at={session}"},
-                        {"X-Hermes-Session-Token": deployment_token}, _bearer(deployment_token)):
+    for credentials in ({"Cookie": f"__Host-eir_session_at={session}"},
+                        {"X-Eir-Session-Token": deployment_token}, _bearer(deployment_token)):
         assert peer.client.get("/api/auth/me", headers=credentials).status_code == 200, credentials
         resp = peer.client.get("/api/peer/health", headers=credentials)
         assert resp.status_code == 401, (credentials, resp.text)
@@ -414,15 +414,15 @@ def test_a_profile_prefix_reaches_that_profile(peer):
 
 
 def test_the_default_profiles_handle_reaches_the_default_profile(peer):
-    """Bot Mode shows a host's default profile as @hermes, so peers address it as /p/hermes, which
+    """Bot Mode shows a host's default profile as @eir, so peers address it as /p/eir, which
     the api_server answers as the default profile when no profile has that name."""
-    resp = peer.client.get("/api/peer/p/hermes/health", headers=_bearer("pass-message"))
+    resp = peer.client.get("/api/peer/p/eir/health", headers=_bearer("pass-message"))
     assert resp.status_code == 200, resp.text
     assert peer.upstreams == ["default"] and peer.seen[-1]["path"] == "/health"
 
 
 def test_an_unknown_profile_gets_the_api_servers_unknown_profile_answer(peer):
-    """``hermes peer`` reads this exact body as the peer's own "no such profile" verdict."""
+    """``eir peer`` reads this exact body as the peer's own "no such profile" verdict."""
     resp = peer.client.get("/api/peer/p/nosuch/health", headers=_bearer("pass-message"))
     assert resp.status_code == 404 and resp.json() == {"error": "Unknown or unconfigured profile",
                                                        "code": "profile_unknown"}
@@ -430,14 +430,14 @@ def test_an_unknown_profile_gets_the_api_servers_unknown_profile_answer(peer):
 
 
 def test_only_a_control_pass_chooses_or_sees_the_memory_scope(peer):
-    """``X-Hermes-Session-Key`` picks the api_server's memory scope, which the api_server keeps
+    """``X-Eir-Session-Key`` picks the api_server's memory scope, which the api_server keeps
     for key holders. A control pass has key-holder parity; a messaging pass never sets it or gets
     it back."""
     for token, forwarded in (("pass-message", None), ("pass-control", "chan-1")):
-        resp = peer.client.post("/api/peer/v1/runs", headers={**_bearer(token), "X-Hermes-Session-Key": "chan-1"},
+        resp = peer.client.post("/api/peer/v1/runs", headers={**_bearer(token), "X-Eir-Session-Key": "chan-1"},
                                 json={"input": "hi", "session_id": "bot-1"})
-        assert peer.seen[-1]["headers"].get("x-hermes-session-key") == forwarded, token
-        assert resp.headers.get("x-hermes-session-key") == forwarded, token
+        assert peer.seen[-1]["headers"].get("x-eir-session-key") == forwarded, token
+        assert resp.headers.get("x-eir-session-key") == forwarded, token
 
 
 def test_run_events_stream_through(peer):
@@ -473,7 +473,7 @@ def test_a_request_the_gateway_dropped_is_not_offered_for_retry(peer, monkeypatc
     assert resp.status_code == 502 and resp.json()["error"] == "peer_gateway_dropped"
     assert "retry-after" not in resp.headers
 
-    lines = (get_hermes_home() / "logs" / "dashboard-auth.log").read_text(encoding="utf-8-sig").splitlines()
+    lines = (get_eir_home() / "logs" / "dashboard-auth.log").read_text(encoding="utf-8-sig").splitlines()
     control = [json.loads(line) for line in lines if '"peer_control"' in line]
     assert [(e["principal"], e["path"], e["status"]) for e in control] == [("usr_ctl", "/api/jobs", 502)]
 
@@ -488,7 +488,7 @@ def test_control_actions_are_audited_with_the_portal_user(peer):
     peer.client.post("/api/peer/v1/runs/run_1/approval", headers=_bearer("pass-control"), json={"choice": "once"})
     peer.client.post("/api/peer/v1/runs", headers=_bearer("pass-control"), json={"input": "hi"})  # not a control action
 
-    lines = (get_hermes_home() / "logs" / "dashboard-auth.log").read_text(encoding="utf-8-sig").splitlines()
+    lines = (get_eir_home() / "logs" / "dashboard-auth.log").read_text(encoding="utf-8-sig").splitlines()
     control = [json.loads(line) for line in lines if '"peer_control"' in line]
     assert [(e["principal"], e["method"], e["path"], e["status"]) for e in control] == [
         ("usr_ctl", "POST", "/v1/runs/run_1/approval", 202)]
@@ -507,7 +507,7 @@ def test_upstream_is_the_profiles_listener_with_the_key_that_listener_checks(tmp
         "gateway:\n  multiplex_profiles: true\nplatforms:\n  api_server:\n    extra:\n      port: 8650\n",
         encoding="utf-8")
     (worker_home / ".env").write_text("API_SERVER_KEY=worker-key-0123456789abcdef\n", encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(default_home))
+    monkeypatch.setenv("EIR_HOME", str(default_home))
     monkeypatch.setenv("API_SERVER_KEY", "default-key-0123456789abcdef")
     monkeypatch.delenv("API_SERVER_PORT", raising=False)
     monkeypatch.delenv("GATEWAY_MULTIPLEX_PROFILES", raising=False)
@@ -526,11 +526,11 @@ def test_a_multiplexed_profiles_key_from_a_secret_source_is_found(tmp_path, monk
     worker_home = default_home / "profiles" / "worker_alpha"
     worker_home.mkdir(parents=True)
     (default_home / "config.yaml").write_text("gateway:\n  multiplex_profiles: true\n", encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(default_home))
+    monkeypatch.setenv("EIR_HOME", str(default_home))
     monkeypatch.delenv("API_SERVER_PORT", raising=False)
     monkeypatch.delenv("GATEWAY_MULTIPLEX_PROFILES", raising=False)
     monkeypatch.setattr(_web_server_cron, "_cron_default_profile", lambda: "default")
-    from hermes_cli import env_loader
+    from eir_cli import env_loader
     monkeypatch.setattr(env_loader, "hydrate_profile_secret_sources", lambda _home: None)
     monkeypatch.setattr(env_loader, "get_secret_source_values",
                         lambda home: {"API_SERVER_KEY": "vault-key-0123456789abcdef"} if home == worker_home else {})

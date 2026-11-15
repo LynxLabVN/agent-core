@@ -19,9 +19,9 @@ import threading
 
 import pytest
 
-import hermes_cli.web_server_sessions as _web_server_sessions
-import hermes_cli.web_routers.sessions as _rt_sessions
-from hermes_state import SessionDB
+import eir_cli.web_server_sessions as _web_server_sessions
+import eir_cli.web_routers.sessions as _rt_sessions
+from eir_state import SessionDB
 
 
 @pytest.fixture

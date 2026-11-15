@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 def _selected(root: Path) -> set[str]:
-    from hermes_cli.backup import _iter_backup_files
+    from eir_cli.backup import _iter_backup_files
 
     return {rel.as_posix() for _, rel in _iter_backup_files(root, root.parent / "out.zip")}
 

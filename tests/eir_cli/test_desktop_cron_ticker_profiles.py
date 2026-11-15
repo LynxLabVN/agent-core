@@ -13,7 +13,7 @@ import threading
 
 import pytest
 
-import hermes_cli.web_server as ws
+import eir_cli.web_server as ws
 
 
 class _RecordingBuiltin:
@@ -59,7 +59,7 @@ def test_multi_profile_homes_passed_to_builtin(monkeypatch, _providers, tmp_path
         ("default", tmp_path / "root"),
         ("coder", tmp_path / "profiles" / "coder"),
     ]
-    import hermes_cli.profiles as profiles_mod
+    import eir_cli.profiles as profiles_mod
 
     monkeypatch.setattr(profiles_mod, "profiles_to_serve", lambda **_kw: list(homes))
 
@@ -79,8 +79,8 @@ def test_multi_profile_homes_passed_to_builtin(monkeypatch, _providers, tmp_path
 def test_single_profile_ticks_only_without_gateway(monkeypatch, tmp_path, gateway_running):
     """Exercise Desktop startup through the real built-in scheduler loop."""
     from cron.scheduler_provider import InProcessCronScheduler
-    from hermes_constants import get_hermes_home
-    import hermes_cli.profiles as profiles_mod
+    from eir_constants import get_eir_home
+    import eir_cli.profiles as profiles_mod
 
     home = tmp_path / "root"
     home.mkdir()
@@ -91,7 +91,7 @@ def test_single_profile_ticks_only_without_gateway(monkeypatch, tmp_path, gatewa
     )
     ticked = []
     monkeypatch.setattr(
-        "cron.scheduler.tick", lambda **_kw: ticked.append(get_hermes_home())
+        "cron.scheduler.tick", lambda **_kw: ticked.append(get_eir_home())
     )
     stop = threading.Event()
     # One real scheduler cycle, with no wall-clock wait or job dispatch.
@@ -105,7 +105,7 @@ def test_single_profile_ticks_only_without_gateway(monkeypatch, tmp_path, gatewa
 def test_enumeration_failure_fails_open(monkeypatch, _providers):
     """The active profile's jobs keep firing even if profile listing breaks."""
     _sp, builtin = _providers
-    import hermes_cli.profiles as profiles_mod
+    import eir_cli.profiles as profiles_mod
 
     def _boom(**_kw):
         raise RuntimeError("profiles dir unreadable")
@@ -114,13 +114,13 @@ def test_enumeration_failure_fails_open(monkeypatch, _providers):
 
     ws._start_desktop_cron_ticker(threading.Event(), interval=11)
 
-    from hermes_constants import get_hermes_home
+    from eir_constants import get_eir_home
 
     # This backend's own store only, behind the per-tick gateway gate (see the stand-down tests).
     assert set(builtin.start_kwargs) == {"interval", "profile_homes", "profile_gate"}
     assert builtin.start_kwargs["interval"] == 11
     [(_name, home)] = builtin.start_kwargs["profile_homes"]()
-    assert home == Path(get_hermes_home())
+    assert home == Path(get_eir_home())
 
 
 def test_external_provider_never_gets_profile_homes(monkeypatch, tmp_path):
@@ -130,7 +130,7 @@ def test_external_provider_never_gets_profile_homes(monkeypatch, tmp_path):
     external = _RecordingExternal()
     monkeypatch.setattr(sp, "resolve_cron_scheduler", lambda: external)
 
-    import hermes_cli.profiles as profiles_mod
+    import eir_cli.profiles as profiles_mod
 
     monkeypatch.setattr(
         profiles_mod,
@@ -149,17 +149,17 @@ def test_desktop_ticker_serves_every_profile_and_yields_to_owning_gateway(monkey
     or the live default multiplexer that already ticks it — such a satellite has no gateway.pid
     of its own, so the per-home liveness check alone lets both tickers race for its fires
     (#107485, #108428)."""
-    import hermes_cli.profiles as profiles_mod
-    import hermes_yaml as yaml
+    import eir_cli.profiles as profiles_mod
+    import eir_yaml as yaml
 
     _sp, builtin = _providers
-    root = tmp_path / ".hermes"
+    root = tmp_path / ".eir"
     for name in ("worker", "guest", "solo"):
         (root / "profiles" / name).mkdir(parents=True)
         (root / "profiles" / name / "config.yaml").write_text("{}\n")  # identity marker: served
     (root / "config.yaml").write_text(yaml.safe_dump({"gateway": {"multiplex_profiles": True}}))
-    monkeypatch.setattr("hermes_constants.get_default_hermes_root", lambda: root)
-    monkeypatch.setattr(profiles_mod, "_get_default_hermes_home", lambda: root)
+    monkeypatch.setattr("eir_constants.get_default_eir_root", lambda: root)
+    monkeypatch.setattr(profiles_mod, "_get_default_eir_home", lambda: root)
     monkeypatch.setattr(profiles_mod, "_get_profiles_root", lambda: root / "profiles")
     monkeypatch.setattr(
         profiles_mod, "_check_gateway_running", lambda home: home == root / "profiles" / "solo")

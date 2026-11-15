@@ -5,8 +5,8 @@ from pathlib import Path
 
 from agent.secret_sources import registry
 from agent.secret_sources.base import FetchResult, SecretSource
-from hermes_cli import env_loader
-from hermes_constants import hermes_home_key
+from eir_cli import env_loader
+from eir_constants import eir_home_key
 
 
 class _HomeKeyProbe(SecretSource):
@@ -25,9 +25,9 @@ def test_hydration_reset_and_snapshot_share_canonical_home_key(tmp_path, monkeyp
         "secrets:\n  homekeyprobe:\n    enabled: true\n", encoding="utf-8"
     )
     alias = tmp_path / "alternate-spelling"
-    canonical = hermes_home_key(home)
+    canonical = eir_home_key(home)
     # Exercise the consumer contract independent of host filesystem case rules.
-    monkeypatch.setattr(env_loader, "hermes_home_key", lambda _home: canonical, raising=False)
+    monkeypatch.setattr(env_loader, "eir_home_key", lambda _home: canonical, raising=False)
     monkeypatch.delenv("HOME_KEY_PROBE_TOKEN", raising=False)
     registry._reset_registry_for_tests()
     registry.register_source(_HomeKeyProbe(), replace=True)
@@ -51,9 +51,9 @@ def test_dotenv_apply_restore_and_revoke_share_canonical_home_key(tmp_path, monk
         path.mkdir()
         (path / "config.yaml").write_text(
             "secrets:\n  homekeyprobe:\n    enabled: true\n    override_existing: true\n", encoding="utf-8")
-    canonical = hermes_home_key(home)
-    monkeypatch.setattr(env_loader, "hermes_home_key", lambda _home: canonical)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    canonical = eir_home_key(home)
+    monkeypatch.setattr(env_loader, "eir_home_key", lambda _home: canonical)
+    monkeypatch.setenv("EIR_HOME", str(home))
     monkeypatch.delenv("HOME_KEY_PROBE_TOKEN", raising=False)
     fetches = []
 
@@ -66,18 +66,18 @@ def test_dotenv_apply_restore_and_revoke_share_canonical_home_key(tmp_path, monk
     registry.register_source(_CountingProbe(), replace=True)
     env_loader.reset_secret_source_cache()
     try:
-        env_loader.load_hermes_dotenv(hermes_home=home)
+        env_loader.load_eir_dotenv(eir_home=home)
         assert os.environ["HOME_KEY_PROBE_TOKEN"] == "scoped-value"
         # Same home, other spelling: the once-per-home guard holds and the source beats a stale .env line.
         (alias / ".env").write_text("HOME_KEY_PROBE_TOKEN=stale\n", encoding="utf-8")
-        env_loader.load_hermes_dotenv(hermes_home=alias)
+        env_loader.load_eir_dotenv(eir_home=alias)
         assert len(fetches) == 1
         assert os.environ["HOME_KEY_PROBE_TOKEN"] == "scoped-value"
         # Source removed: a load under the other spelling takes back the earlier write.
         (alias / ".env").unlink()
         (alias / "config.yaml").write_text("model: {}\n", encoding="utf-8")
         env_loader.reset_secret_source_cache(alias)
-        env_loader.load_hermes_dotenv(hermes_home=alias)
+        env_loader.load_eir_dotenv(eir_home=alias)
         assert "HOME_KEY_PROBE_TOKEN" not in os.environ
     finally:
         env_loader.reset_secret_source_cache()

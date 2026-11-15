@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Skills Hub CLI — Unified interface for the Hermes Skills Hub."""
+"""Skills Hub CLI — Unified interface for the Eir Skills Hub."""
 
 import json
 import logging
@@ -15,7 +15,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 # tools.skills_hub / tools.skills_guard are imported inside functions (cycles + startup cost).
-from hermes_constants import display_hermes_home
+from eir_constants import display_eir_home
 
 _console = Console()
 
@@ -24,15 +24,15 @@ _VALID_CATEGORY_RE = re.compile(r"^[a-z][a-z0-9_/-]*$")
 _TRUST_STYLE = {"builtin": "bright_cyan", "trusted": "green", "community": "yellow", "local": "dim"}
 _TRUST_RANK = {"builtin": 3, "trusted": 2, "community": 1}
 # Browse per-source limits. With the centralized index available, parallel_search_sources
-# serves everything from "hermes-index", so that entry MUST exceed the whole catalog or browse
+# serves everything from "eir-index", so that entry MUST exceed the whole catalog or browse
 # silently caps the hub (50 and 5000 both truncated). The index is disk-cached and browse
 # paginates client-side. The external limits only apply when the index is unavailable.
 _BROWSE_LIMITS = {
-    "hermes-index": 1000000, "official": 200, "skills-sh": 200, "well-known": 50,
+    "eir-index": 1000000, "official": 200, "skills-sh": 200, "well-known": 50,
     "github": 200, "clawhub": 500, "lobehub": 500, "browse-sh": 500}
 # Programmatic (TUI gateway) browse keeps its own, lower caps.
 _BROWSE_API_LIMITS = {
-    "hermes-index": 5000, "official": 100, "skills-sh": 100, "well-known": 25,
+    "eir-index": 5000, "official": 100, "skills-sh": 100, "well-known": 25,
     "github": 100, "clawhub": 50, "lobehub": 50, "browse-sh": 500}
 _EXTRA_META_LABELS = (
     ("repo_url", "Repo"), ("detail_url", "Detail Page"), ("index_url", "Index"),
@@ -64,7 +64,7 @@ def _truncate(text: str, width: int) -> str:
 def _ident_col(style: str) -> tuple:
     # overflow="fold" keeps the full slug visible (wraps instead of ellipsis-truncating):
     # browse.sh slugs end in a `-XXXXXX` hash that is part of the identifier users must
-    # copy into `hermes skills install`.
+    # copy into `eir skills install`.
     return "Identifier", {"style": style, "overflow": "fold", "no_wrap": False}
 
 
@@ -202,7 +202,7 @@ def _exact_name_hits(results, name: str):
     """Results that ARE `name`: display name as written first, then — only when that finds nothing —
     the separator-insensitive form of the display name or of the identifier's trailing slug. Catalogs
     that carry a prettified title (ClawHub rows read "Blender Bpy Enhanced") or a path-shaped
-    identifier ("@org/my-skill") match by neither, so `hermes skills install my-skill` refused with
+    identifier ("@org/my-skill") match by neither, so `eir skills install my-skill` refused with
     "No exact match" while printing that very slug on the suggestion line."""
     query = str(name or "").strip().lower()
     hits = [r for r in results if str(r.name or "").strip().lower() == query]
@@ -296,7 +296,7 @@ def _is_valid_installed_skill_name(name: str) -> bool:
 
 
 def _existing_categories() -> list[str]:
-    """Sorted category buckets under ``~/.hermes/skills/`` (children without their own SKILL.md)."""
+    """Sorted category buckets under ``~/.eir/skills/`` (children without their own SKILL.md)."""
     from tools.skills_hub import SKILLS_DIR
     from tools.skills_hub_install import _category_skill_dirs
     try:
@@ -308,7 +308,7 @@ def _existing_categories() -> list[str]:
 
 def _line_input(prompt: str) -> Optional[str]:
     """Stripped interactive line; None on EOF/Ctrl-C."""
-    from hermes_cli.cli_output import line_input
+    from eir_cli.cli_output import line_input
     try:
         return line_input(prompt).strip()
     except (EOFError, KeyboardInterrupt):
@@ -341,7 +341,7 @@ def _prompt_for_category(c: Console, existing: list[str]) -> str:
         c.print(f"[dim]Existing: {', '.join(existing)}[/]")
     else:
         c.print("[bold]Category[/] "
-                f"[dim](optional — press Enter to install flat at {display_hermes_home()}/skills/<name>/)[/]")
+                f"[dim](optional — press Enter to install flat at {display_eir_home()}/skills/<name>/)[/]")
     answer = _line_input("Category: ")
     if answer and not _VALID_CATEGORY_RE.match(answer):
         c.print(f"[dim]Invalid category {answer!r} — installing flat.[/]")
@@ -376,8 +376,8 @@ def do_search(query: str, source: str = "all", limit: int = 10, console: Optiona
         table.add_row(r.name, _truncate(r.description, 60), _display_source(r),
                       _trust_cell(r.trust_level, r.source), r.identifier)
     c.print(table)
-    c.print("[dim]Use: hermes skills inspect <identifier> to preview, "
-            "hermes skills install <identifier> to install "
+    c.print("[dim]Use: eir skills inspect <identifier> to preview, "
+            "eir skills install <identifier> to install "
             "(--json for scripting)[/]\n")
 
 
@@ -445,9 +445,9 @@ def _render_browse_page(c: Console, deduped, page_items, page: int, total_pages:
     if timed_out:
         c.print(f"  [yellow]⚡ Slow sources skipped: {', '.join(timed_out)} "
                 f"— run again for cached results[/]")
-    c.print("[dim]Tip: 'hermes skills inspect <identifier>' to preview, "
-            "'hermes skills install <identifier>' to install, "
-            "'hermes skills search <query>' to search deeper[/]\n")
+    c.print("[dim]Tip: 'eir skills inspect <identifier>' to preview, "
+            "'eir skills install <identifier>' to install, "
+            "'eir skills search <query>' to search deeper[/]\n")
 
 
 def do_browse(page: int = 1, page_size: int = 20, source: str = "all",
@@ -475,7 +475,7 @@ def browse_skills(page: int = 1, page_size: int = 20, source: str = "all") -> di
     from tools.skills_hub_search import parallel_search_sources
     page_size = max(1, min(page_size, 100))
     # The shared parallel walker carries the index-aware source-skip logic — querying
-    # hermes-index AND the external APIs at once would double-count every skill.
+    # eir-index AND the external APIs at once would double-count every skill.
     all_results, _counts, _timed_out = parallel_search_sources(
         _sources(), query="", per_source_limits=_BROWSE_API_LIMITS,
         source_filter=source, overall_timeout=30)
@@ -508,7 +508,7 @@ def do_inspect(identifier: str, console: Optional[Console] = None) -> None:
     c.print(Panel("\n".join(info_lines), title=f"Skill: {meta.name}"))
     preview = _skill_md_preview(bundle)
     if preview is not None:
-        c.print(Panel(preview, title="SKILL.md Preview", subtitle="hermes skills install <id> to install"))
+        c.print(Panel(preview, title="SKILL.md Preview", subtitle="eir skills install <id> to install"))
     c.print()
 
 
@@ -542,16 +542,16 @@ def _scan_block_message(result, identifier: str) -> str:
     """User-facing sentence for a scan-blocked install (the audit row keeps the scanner's raw reason).
 
     Says what happened (not installed), why in plain words (high-risk patterns), whether ``--force``
-    can help, and the read-only next step (``hermes skills inspect``). The hard-block rule mirrors
+    can help, and the read-only next step (``eir skills inspect``). The hard-block rule mirrors
     ``tools.skills_guard.should_allow_install``: a dangerous verdict on a non-official source."""
     n = len(result.findings)
     findings = f"{n} high-risk pattern(s)" if n else "high-risk patterns"
     hard_block = result.verdict == "dangerous" and result.trust_level in ("community", "trusted")
-    policy = ("Hermes never installs unverified skills with high-risk findings, even with --force."
+    policy = ("Eir never installs unverified skills with high-risk findings, even with --force."
               if hard_block else "Re-run with --force to install anyway.")
     return (f"the security scan found {findings} in '{identifier}' (listed above). "
             f"{policy} Review the findings or ask the author to fix them; to read the skill without "
-            f"installing, run `hermes skills inspect {identifier}`.")
+            f"installing, run `eir skills inspect {identifier}`.")
 
 
 def _invalid_path(c: Console, bundle, exc: ValueError, q_path: Optional[Path] = None) -> None:
@@ -579,7 +579,7 @@ def _resolve_url_bundle_name(c: Console, bundle, meta, identifier: str,
                 "and the URL path doesn't produce a valid identifier.[/]\n\n"
                 "Retry with an explicit name:\n"
                 f"  [bold]/skills install {url} --name <your-name>[/]\n"
-                f"  [bold]hermes skills install {url} --name <your-name>[/]\n\n"
+                f"  [bold]eir skills install {url} --name <your-name>[/]\n\n"
                 "[dim]Or ask the SKILL.md's author to add a `name:` field to "
                 "its YAML frontmatter.[/]\n")
         return False
@@ -598,7 +598,7 @@ def _resolve_url_bundle_name(c: Console, bundle, meta, identifier: str,
 
 
 def _announce_blueprint(c: Console, skill_name: str) -> None:
-    """Offer an installed skill's ``metadata.hermes.blueprint`` via /suggestions — never
+    """Offer an installed skill's ``metadata.eir.blueprint`` via /suggestions — never
     auto-scheduled (installing must not silently create a recurring job). Never raises."""
     try:
         from tools.blueprints import BlueprintError, blueprint_spec_for_installed, register_blueprint_suggestion
@@ -620,7 +620,7 @@ def _announce_blueprint(c: Console, skill_name: str) -> None:
             c.print(f"{lead}, but it wasn't added to your suggestions (already offered/dismissed, "
                     "or the pending list is full — run [bold]/suggestions[/] to review).")
             c.print("[dim]You can still schedule it any time by asking the agent "
-                    "or via[/] [bold]hermes cron add[/][dim].[/]\n")
+                    "or via[/] [bold]eir cron add[/][dim].[/]\n")
     except Exception:  # pragma: no cover - blueprint detection is best-effort
         pass
 
@@ -662,20 +662,20 @@ def _print_fetch_failure(c: Console, sources, identifier: str, meta=None, source
         c.print(f"[bold red]Error:[/] '{identifier}' is listed in the {src_id} index, "
                 f"but its files no longer exist upstream.")
         c.print("[dim]Stale index entry: the skill was likely renamed or removed by "
-                "its author. Try `hermes skills search` for an alternative.[/]\n")
+                "its author. Try `eir skills search` for an alternative.[/]\n")
         return "stale_index"
     c.print(f"[bold red]Error:[/] Could not download '{identifier}'.")
     if rejected:
         c.print(f"[yellow]Hint:[/] GitHub rejected {' and '.join(rejected)} (401 Bad credentials). "
-                f"Replace or remove the token in {display_hermes_home()}/.env, or re-run [bold]gh auth login[/].")
+                f"Replace or remove the token in {display_eir_home()}/.env, or re-run [bold]gh auth login[/].")
     if rate_limited:
         c.print("[yellow]Hint:[/] GitHub API rate limit exhausted "
                 "(unauthenticated: 60 requests/hour).\n"
                 "Set [bold]GITHUB_TOKEN[/] in your .env or install the [bold]gh[/] CLI and run "
                 "[bold]gh auth login[/] to raise the limit to 5,000/hr.\n")
     else:
-        c.print(f"Check the name with [bold]hermes skills search {identifier.rsplit('/', 1)[-1]}[/] "
-                "and check your internet connection. If it keeps failing, run [bold]hermes doctor[/].\n")
+        c.print(f"Check the name with [bold]eir skills search {identifier.rsplit('/', 1)[-1]}[/] "
+                "and check your internet connection. If it keeps failing, run [bold]eir doctor[/].\n")
     return "rate_limited" if rate_limited else "auth_rejected" if rejected else "fetch_failed"
 
 
@@ -692,14 +692,14 @@ def _untrusted_scan_source(candidate: str, fallback: str = "") -> str:
 
 def _is_official_adapter(matched_source) -> bool:
     """Official provenance is the adapter that served the bytes, never a ``bundle.source`` string: the
-    hermes-index adapter copies ``source`` from its JSON rows onto GitHub-fetched bundles."""
+    eir-index adapter copies ``source`` from its JSON rows onto GitHub-fetched bundles."""
     from tools.skills_hub_official import OptionalSkillSource
     return isinstance(matched_source, OptionalSkillSource)
 
 
 def _scan_source_for_install(bundle, meta, identifier: str, matched_source) -> tuple[str, str | None]:
     """``(scan source, explicit trust tier or None)`` for a resolved hub bundle. Builtin trust only for the
-    official adapter's own optional-skills bytes (local, or its NousResearch/hermes-agent live-repo fallback): a
+    official adapter's own optional-skills bytes (local, or its NousResearch/eir-agent live-repo fallback): a
     catalog stub's upstream bundle is live third-party content labelled ``trusted``, so a dangerous verdict blocks."""
     if _is_official_adapter(matched_source):
         bundle_trust = getattr(bundle, "trust_level", "")
@@ -734,13 +734,13 @@ def _scan_quarantined(c: Console, q_path: Path, bundle, meta, identifier: str, m
 _INSTALL_PANELS = {
     "official": (
         "[bold bright_cyan]This is an official optional skill maintained by Nous Research.[/]\n\n"
-        "It ships with hermes-agent but is not activated by default.\n"
+        "It ships with eir-agent but is not activated by default.\n"
         "Installing will copy it to your skills directory where the agent can use it.\n\n",
         "Official Skill", "bright_cyan"),
     "upstream": (
         "[bold yellow]This catalog entry installs third-party content from "
         "[cyan]https://github.com/{repo}[/] (live default branch).[/]\n\n"
-        "It is listed in the Hermes optional-skills catalog but is not maintained by Nous Research.\n"
+        "It is listed in the Eir optional-skills catalog but is not maintained by Nous Research.\n"
         "Review the installed files before use.\n\n",
         "Third-Party Skill", "yellow"),
     "external": (
@@ -758,7 +758,7 @@ def _upstream_repo(bundle) -> Optional[str]:
 
 def _confirm_install(c: Console, bundle, category: str, official: bool) -> bool:
     """Source-appropriate disclaimer panel + `Install '<name>'?` prompt."""
-    files_at = f"Files will be at: [cyan]{display_hermes_home()}/skills/{category + '/' if category else ''}{bundle.name}/[/]"
+    files_at = f"Files will be at: [cyan]{display_eir_home()}/skills/{category + '/' if category else ''}{bundle.name}/[/]"
     upstream_repo = _upstream_repo(bundle) if official else None
     kind = "upstream" if upstream_repo else "official" if official else "external"
     body, title, style = _INSTALL_PANELS[kind]
@@ -773,7 +773,7 @@ _SKILL_METRIC_SOURCES = {"official": "catalog", "url": "url", "bundled": "bundle
 
 
 def _install_bundled(c: Console, name: str, invalidate_cache: bool) -> tuple:
-    """``_install_skill`` for a name Hermes ships: point at the active copy, or restore it from the
+    """``_install_skill`` for a name Eir ships: point at the active copy, or restore it from the
     bundled source. The hub copy of a built-in is either a stranger's same-named skill or this
     repo's files rescanned as community content and refused, so neither is fetched."""
     from types import SimpleNamespace
@@ -824,7 +824,7 @@ def _record_skill_install(identifier: str, bundle, outcome: str, attempt: Option
     stay anonymous, every other registry is the hub. ``attempt`` carries the failure class the
     failing exit named and the hub adapter id (``registry``); a raised ``error`` is classified by
     its type inside the metrics guard."""
-    from hermes_cli.observability.shared_metrics_events import record_extension_install
+    from eir_cli.observability.shared_metrics_events import record_extension_install
     attempt = attempt or {}
     origin = getattr(bundle, "source", None) or attempt.get("origin") or (
         "official" if identifier.startswith("official/")
@@ -961,7 +961,7 @@ def _install_skill(identifier: str, category: str, force: bool, c: Console, skip
     c.print(f"[dim]Quarantined to {q_path.relative_to(q_path.parents[3])}[/]")
 
     # Each quarantine is a unique staging dir; drop it on every exit (scan error, Ctrl-C at the
-    # prompt) so leftovers don't pile up as "pending review" in ``hermes doctor``.
+    # prompt) so leftovers don't pile up as "pending review" in ``eir doctor``.
     try:
         result = _scan_quarantined(c, q_path, bundle, meta, identifier, _matched_source)
         allowed, _reason = should_allow_install(result, force=force)
@@ -1032,7 +1032,7 @@ def _print_tier1_advisory(skill_dir, console) -> None:
 def do_list(source_filter: str = "all", enabled_only: bool = False,
             console: Optional[Console] = None) -> None:
     """List installed skills (hub / builtin / local). Enabled state comes from the active
-    profile's config — ``-p`` swaps HERMES_HOME at process start, so no profile flag here."""
+    profile's config — ``-p`` swaps EIR_HOME at process start, so no profile flag here."""
     from tools.skills_hub import HubLockFile, ensure_hub_dirs
     from tools.skills_sync import _read_manifest
     from tools.skills_tool import _skill_catalog
@@ -1099,7 +1099,7 @@ def do_check(name: Optional[str] = None, console: Optional[Console] = None) -> N
     if orphaned:
         c.print(f"[yellow]Orphaned:[/] {', '.join(orphaned)} — lock-file entries whose local "
                 "directory is missing or replaced by a non-directory. For missing directories, "
-                "remove the stale entry with: hermes skills uninstall <name>\n")
+                "remove the stale entry with: eir skills uninstall <name>\n")
 
 
 def _has_local_edits(installed: dict) -> bool:
@@ -1124,7 +1124,7 @@ def do_update(name: Optional[str] = None, console: Optional[Console] = None,
     Skills whose on-disk content no longer matches the hash recorded at install time have been edited
     locally; updating them would silently destroy the user's work (the reinstall
     rmtree-replaces the directory). Those are skipped by default and only overwritten when ``force=True``.
-    Mirrors the user-modified protection bundled skills already get from ``hermes update`` (ported from
+    Mirrors the user-modified protection bundled skills already get from ``eir update`` (ported from
     paperclipai/paperclip#10978's explicit-merge-mode rule: destructive replacement must be an explicit
     caller choice, never a rerun default).
     """
@@ -1168,7 +1168,7 @@ def do_update(name: Optional[str] = None, console: Optional[Console] = None,
     if skipped_local:
         c.print(f"[dim]{len(skipped_local)} skill(s) kept your local edits: "
                 f"{', '.join(sorted(skipped_local))}.[/]")
-        c.print("[dim]Overwrite with: hermes skills update <name> --force[/]\n")
+        c.print("[dim]Overwrite with: eir skills update <name> --force[/]\n")
     if failed:
         c.print(f"[bold red]Not updated:[/] {', '.join(sorted(failed))} (see the messages above).\n")
         return False
@@ -1241,7 +1241,7 @@ def do_reset(name: str, restore: bool = False, console: Optional[Console] = None
 
 
 def do_list_modified(console: Optional[Console] = None, as_json: bool = False) -> None:
-    """List bundled skills the user has edited (which `hermes update` keeps)."""
+    """List bundled skills the user has edited (which `eir update` keeps)."""
     from tools.skills_sync_bundled_ops import list_user_modified_bundled_skills
     c = console or _console
     modified = list_user_modified_bundled_skills()
@@ -1252,13 +1252,13 @@ def do_list_modified(console: Optional[Console] = None, as_json: bool = False) -
         c.print("[dim]No user-modified bundled skills — everything tracks upstream.[/]\n")
         return
     c.print(f"\n[bold]{len(modified)} user-modified bundled skill(s)[/] "
-            "[dim](kept as-is by `hermes update`):[/]")
+            "[dim](kept as-is by `eir update`):[/]")
     for entry in modified:
         c.print(f"  [yellow]~[/] {entry['name']}")
     c.print()
-    c.print("[dim]See changes:   hermes skills diff <name>[/]")
-    c.print("[dim]Resume updates: hermes skills reset <name>          (keep your copy, re-baseline)[/]")
-    c.print("[dim]Revert to stock: hermes skills reset <name> --restore[/]\n")
+    c.print("[dim]See changes:   eir skills diff <name>[/]")
+    c.print("[dim]Resume updates: eir skills reset <name>          (keep your copy, re-baseline)[/]")
+    c.print("[dim]Revert to stock: eir skills reset <name> --restore[/]\n")
 
 
 def _print_diff_line(c: Console, line: str) -> None:
@@ -1295,7 +1295,7 @@ def do_diff(name: str, console: Optional[Console] = None) -> None:
             line = _DIFF_STATUS_LINE.get(entry["status"], _DIFF_STATUS_LINE["binary"])
             c.print(line.format(**entry))
     c.print()
-    c.print(f"[dim]Revert with: hermes skills reset {name} --restore[/]\n")
+    c.print(f"[dim]Revert with: eir skills reset {name} --restore[/]\n")
 
 
 def do_opt_out(remove: bool = False, console: Optional[Console] = None, skip_confirm: bool = False,
@@ -1400,7 +1400,7 @@ def do_tap(action: str, repo: str = "", console: Optional[Console] = None) -> No
     elif action in _TAP_OPS:
         method, ok_line, fail_line = _TAP_OPS[action]
         if not repo:
-            _print_error(c, f"Repo required. Usage: hermes skills tap {action} owner/repo")
+            _print_error(c, f"Repo required. Usage: eir skills tap {action} owner/repo")
             return
         c.print((ok_line if getattr(mgr, method)(repo) else fail_line).format(repo=repo))
     else:
@@ -1409,7 +1409,7 @@ def do_tap(action: str, repo: str = "", console: Optional[Console] = None) -> No
 
 def _read_frontmatter(skill_md: str) -> dict:
     """YAML frontmatter of a SKILL.md body ({} when absent/invalid)."""
-    import hermes_yaml as yaml
+    import eir_yaml as yaml
     match = re.search(r'\n---\s*\n', skill_md[3:]) if skill_md.startswith("---") else None
     try:
         return (yaml.safe_load(skill_md[3:match.start() + 3]) or {}) if match else {}
@@ -1447,12 +1447,12 @@ def do_publish(skill_path: str, target: str = "github", repo: str = "",
     if target == "github":
         if not repo:
             _print_error(c, "--repo required for GitHub publish.\n"
-                            "Usage: hermes skills publish <path> --to github --repo owner/repo")
+                            "Usage: eir skills publish <path> --to github --repo owner/repo")
             return
         auth = GitHubAuth()
         if not auth.is_authenticated():
             _print_error(c, "GitHub authentication required.\n"
-                            f"Set GITHUB_TOKEN in {display_hermes_home()}/.env "
+                            f"Set GITHUB_TOKEN in {display_eir_home()}/.env "
                             "or run 'gh auth login'.")
             return
         c.print(f"[bold]Publishing '{name}' to {repo}...[/]")
@@ -1516,8 +1516,8 @@ def _github_publish(skill_path: Path, skill_name: str, target_repo: str, auth) -
     try:
         resp = call("post", f"{target_repo}/pulls", json={
             "title": f"Add skill: {skill_name}",
-            "body": f"Submitting the `{skill_name}` skill via Hermes Skills Hub.\n\n"
-                    f"This skill was scanned by the Hermes Skills Guard before submission.",
+            "body": f"Submitting the `{skill_name}` skill via Eir Skills Hub.\n\n"
+                    f"This skill was scanned by the Eir Skills Guard before submission.",
             "head": f"{fork_repo.split('/')[0]}:{branch_name}", "base": default_branch})
         if resp.status_code == 201:
             return True, f"PR created: {resp.json().get('html_url', '')}"
@@ -1533,7 +1533,7 @@ def do_snapshot_export(output_path: str, console: Optional[Console] = None) -> N
     installed = HubLockFile().list_installed()
     tap_list = TapsManager().list_taps()
     snapshot = {
-        "hermes_version": "0.1.0",
+        "eir_version": "0.1.0",
         "exported_at": datetime.now(UTC).isoformat(),
         "skills": [
             {"name": entry["name"], "source": entry.get("source", ""),
@@ -1606,20 +1606,20 @@ def _snapshot_cli(args) -> Optional[bool]:
     elif snap_action == "import":
         return do_snapshot_import(args.input, force=getattr(args, "force", False))
     else:
-        _console.print("Usage: hermes skills snapshot [export|import]\n")
+        _console.print("Usage: eir skills snapshot [export|import]\n")
     return None
 
 
 def _tap_cli(args) -> None:
     tap_action = getattr(args, "tap_action", None)
     if not tap_action:
-        _console.print("Usage: hermes skills tap [list|add|remove]\n")
+        _console.print("Usage: eir skills tap [list|add|remove]\n")
         return
     do_tap(tap_action, repo=getattr(args, "repo", "") or getattr(args, "name", ""))
 
 
-# `hermes skills <action>` -> handler(args). Lambdas late-bind the do_* names so
-# tests that patch("hermes_cli.skills_hub.do_install") still intercept.
+# `eir skills <action>` -> handler(args). Lambdas late-bind the do_* names so
+# tests that patch("eir_cli.skills_hub.do_install") still intercept.
 _CLI_ACTIONS = {
     "browse": lambda a: do_browse(page=a.page, page_size=a.size, source=a.source),
     "search": lambda a: do_search(a.query, source=a.source, limit=a.limit,
@@ -1649,16 +1649,16 @@ _CLI_ACTIONS = {
 
 
 def skills_command(args) -> Optional[int]:
-    """Router for `hermes skills <subcommand>` — called from hermes_cli/main.py."""
+    """Router for `eir skills <subcommand>` — called from eir_cli/main.py."""
     handler = _CLI_ACTIONS.get(getattr(args, "skills_action", None))
     if handler is None:
-        _console.print("Usage: hermes skills [browse|search|install|inspect|list|list-modified|diff|check|update|audit|uninstall|reset|opt-out|opt-in|publish|snapshot|tap]\n")
-        _console.print("Run 'hermes skills <command> --help' for details.\n")
+        _console.print("Usage: eir skills [browse|search|install|inspect|list|list-modified|diff|check|update|audit|uninstall|reset|opt-out|opt-in|publish|snapshot|tap]\n")
+        _console.print("Run 'eir skills <command> --help' for details.\n")
         return None
     # A handler reporting a real failure (install/update/uninstall's False) must exit non-zero: the
     # Desktop Hub reads the spawned action's exit code to decide whether to toast, so an exit-0
     # failure renders as "the button did nothing" while the reason sits unread in the action log.
-    # Returned, not sys.exit()-ed: `hermes` turns a handler's int into the exit code.
+    # Returned, not sys.exit()-ed: `eir` turns a handler's int into the exit code.
     return 1 if handler(args) is False else None
 
 

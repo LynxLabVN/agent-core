@@ -28,7 +28,7 @@ import {
   Tip,
   useI18n,
   useValue
-} from '@hermes/plugin-sdk'
+} from '@eir/plugin-sdk'
 
 import { avatarColor, botAppearance, BotFace } from './avatar'
 import { isBackfilledFacePng } from './avatar-image'
@@ -516,7 +516,7 @@ export function GroupRow({ active, group, members, needsYou, onOpen, onDisband, 
   const last = log.length ? log[log.length - 1] : null
   const lastAt = groupLastActivity(room)
   // Room previews speak the same handle vocabulary as the roster, mentions
-  // and the group prompt: the primary profile is @hermes, not @default.
+  // and the group prompt: the primary profile is @eir, not @default.
   const lastFrom = last?.from?.name || ''
 
   const lastHandle = botHandle(

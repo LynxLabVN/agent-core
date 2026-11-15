@@ -14,9 +14,9 @@ import sys
 def _session_thread_for(platform: str, chat_id: str) -> str | None:
     from gateway.session_context import get_session_env
 
-    if (str(get_session_env("HERMES_SESSION_PLATFORM", "")).lower() == platform.lower()
-            and str(get_session_env("HERMES_SESSION_CHAT_ID", "")) == str(chat_id)):
-        return get_session_env("HERMES_SESSION_THREAD_ID", "") or None
+    if (str(get_session_env("EIR_SESSION_PLATFORM", "")).lower() == platform.lower()
+            and str(get_session_env("EIR_SESSION_CHAT_ID", "")) == str(chat_id)):
+        return get_session_env("EIR_SESSION_THREAD_ID", "") or None
     return None
 
 
@@ -31,7 +31,7 @@ def resolve_unsubscribe_thread(conn, args) -> str | None:
     """The row ``notify-unsubscribe`` without ``--thread-id`` removes, mirroring subscribe's inference so the
     same arguments round-trip: a root-lane row first (the legacy meaning), else this session's thread, else
     the chat's only threaded row. Several threaded rows and no session match stay ambiguous: root (no-op)."""
-    from hermes_cli import kanban_db_notify as kbn
+    from eir_cli import kanban_db_notify as kbn
 
     if args.thread_id is not None:
         return args.thread_id
@@ -45,7 +45,7 @@ def resolve_unsubscribe_thread(conn, args) -> str | None:
 
 def resolve_subscribe_thread(conn, args) -> str | None:
     """``args.thread_id`` when given; otherwise the inferred thread (or None), reporting on stderr."""
-    from hermes_cli import kanban_db_notify as kbn
+    from eir_cli import kanban_db_notify as kbn
 
     if args.thread_id is not None:
         return args.thread_id

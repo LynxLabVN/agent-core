@@ -5,7 +5,7 @@ import pytest
 from rich.console import Console
 
 from cli import ChatConsole
-from hermes_cli.skills_hub import do_check, do_install, do_list, do_update, handle_skills_slash
+from eir_cli.skills_hub import do_check, do_install, do_list, do_update, handle_skills_slash
 
 
 class _DummyLockFile:
@@ -83,7 +83,7 @@ def _capture_check(monkeypatch, results, name=None) -> str:
 def _capture_update(monkeypatch, results) -> tuple[str, list[tuple[str, str, bool]]]:
     import tools.skills_hub as hub
     import tools.skills_hub_install as hub_install
-    import hermes_cli.skills_hub as cli_hub
+    import eir_cli.skills_hub as cli_hub
 
     sink = StringIO()
     console = Console(file=sink, force_terminal=False, color_system=None)
@@ -107,10 +107,10 @@ def _capture_update(monkeypatch, results) -> tuple[str, list[tuple[str, str, boo
 
 
 def test_do_list_platform_env_is_ignored(three_source_env, monkeypatch):
-    """`hermes skills list` reads the active profile's config via
-    HERMES_HOME (swapped by -p), so it must NOT pass a platform arg to
+    """`eir skills list` reads the active profile's config via
+    EIR_HOME (swapped by -p), so it must NOT pass a platform arg to
     ``get_disabled_skill_names`` — otherwise per-platform overrides
-    would silently leak in from HERMES_PLATFORM env."""
+    would silently leak in from EIR_PLATFORM env."""
     from agent import skill_utils
 
     seen = {}
@@ -198,7 +198,7 @@ def test_resolve_does_not_pair_catalog_meta_with_foreign_same_name_bundle():
     SKILL.md. The header then showed the requested identifier and the preview
     showed the wrong skill.
     """
-    from hermes_cli.skills_hub import _resolve_source_meta_and_bundle
+    from eir_cli.skills_hub import _resolve_source_meta_and_bundle
     from tools.skills_hub_models import SkillBundle, SkillMeta
 
     class CatalogSource:
@@ -249,7 +249,7 @@ def test_resolve_does_not_pair_catalog_meta_with_foreign_same_name_bundle():
 
 
 def test_resolve_keeps_catalog_meta_when_later_sources_do_not_fetch():
-    from hermes_cli.skills_hub import _resolve_source_meta_and_bundle
+    from eir_cli.skills_hub import _resolve_source_meta_and_bundle
     from tools.skills_hub_models import SkillMeta
 
     class CatalogSource:
@@ -287,7 +287,7 @@ def test_resolve_keeps_catalog_meta_when_later_sources_do_not_fetch():
 
 def test_inspect_reuses_one_ssrf_safe_client_for_metadata_and_bundle(monkeypatch, tmp_path):
     """A preview's (and an install's) sequential resolver calls must share one guarded connection pool."""
-    import hermes_cli.skills_hub as cli_hub
+    import eir_cli.skills_hub as cli_hub
     import tools.skills_hub as hub
     import tools.skills_hub_search as search
     import tools.skills_hub_clawhub as clawhub
@@ -321,8 +321,8 @@ def test_inspect_reuses_one_ssrf_safe_client_for_metadata_and_bundle(monkeypatch
 
         def inspect(self, _identifier):
             hub._guarded_http_get("https://example.com/metadata")
-            # The Hermes-index fetch must ride the same pool (no cache → real GET).
-            assert search._load_hermes_index() == {"skills": []}
+            # The Eir-index fetch must ride the same pool (no cache → real GET).
+            assert search._load_eir_index() == {"skills": []}
             return SkillMeta("example", "metadata", "test", "example/id", "community")
 
         def fetch(self, _identifier):
@@ -339,7 +339,7 @@ def test_inspect_reuses_one_ssrf_safe_client_for_metadata_and_bundle(monkeypatch
     monkeypatch.setattr(hub, "create_ssrf_safe_client", create_client, raising=False)
     monkeypatch.setattr(hub, "is_safe_url", lambda _url: True)
     monkeypatch.setattr(hub, "check_website_access", lambda _url: None)
-    monkeypatch.setattr(search, "_hermes_index_cache_file", lambda: tmp_path / "hermes-index.json")
+    monkeypatch.setattr(search, "_eir_index_cache_file", lambda: tmp_path / "eir-index.json")
     monkeypatch.setattr(search.httpx, "get", lambda *_a, **_k: pytest.fail("index fetch bypassed the pool"))
 
     result = cli_hub.inspect_skill("example/id")
@@ -447,7 +447,7 @@ def _install_mocks(monkeypatch, tmp_path, source_factory, category_hint=""):
 
 
 # ---------------------------------------------------------------------------
-# Regression: full identifier must be recoverable from `hermes skills search`
+# Regression: full identifier must be recoverable from `eir skills search`
 # even when the slug is too long to fit the terminal width (issue #33674).
 # ---------------------------------------------------------------------------
 
@@ -465,7 +465,7 @@ _LONG_RESULT = type("R", (), {
 
 def test_do_search_json_flag_emits_full_identifiers(capsys):
     """`--json` must print a parseable array with full identifiers and skip the table."""
-    from hermes_cli.skills_hub import do_search
+    from eir_cli.skills_hub import do_search
 
     sink = StringIO()
     console = Console(file=sink, force_terminal=False, color_system=None, width=40)
@@ -498,7 +498,7 @@ def _update_env(monkeypatch, tmp_path, *, edit_after_install: bool):
 
     Returns (console_sink, installs_list).
     """
-    import hermes_cli.skills_hub as cli_hub
+    import eir_cli.skills_hub as cli_hub
     import tools.skills_hub as hub
     import tools.skills_hub_install as hub_install
     from tools.skills_guard import content_hash
@@ -577,7 +577,7 @@ def test_do_update_unmodified_skill_updates_normally(monkeypatch, tmp_path):
 
 def _stale_env(monkeypatch):
     """do_install where the index has metadata but the files are gone (404)."""
-    import hermes_cli.skills_hub as cli_hub
+    import eir_cli.skills_hub as cli_hub
     import tools.skills_hub as hub
 
     class StaleSource:
@@ -597,7 +597,7 @@ def _stale_env(monkeypatch):
 
 def test_do_install_stale_index_names_the_problem(monkeypatch):
     """Index hit + missing files reads as a stale entry, not a typo (#3259)."""
-    from hermes_cli.skills_hub import do_install
+    from eir_cli.skills_hub import do_install
 
     console, sink = _stale_env(monkeypatch)
     do_install("skills-sh/org/gone-skill", console=console, skip_confirm=True)
@@ -611,10 +611,10 @@ def test_do_install_stale_index_names_the_problem(monkeypatch):
 def test_fetch_failure_names_rejected_github_credential():
     """A credential GitHub refused is named, never reported as a stale index entry (#98725)."""
     from types import SimpleNamespace
-    from hermes_cli.skills_hub import _print_fetch_failure
+    from eir_cli.skills_hub import _print_fetch_failure
 
     src = SimpleNamespace(is_rate_limited=False, auth=SimpleNamespace(rejected=["GITHUB_TOKEN/GH_TOKEN"]),
-                          source_id=lambda: "hermes-index")
+                          source_id=lambda: "eir-index")
     sink = StringIO()
     console = Console(file=sink, force_terminal=False, color_system=None, width=200)
     _print_fetch_failure(console, [src], "o/r/s", meta=object(), source=src)
@@ -628,9 +628,9 @@ def test_fetch_failure_names_rejected_github_credential():
 def test_do_install_generic_when_no_index_hit_or_rate_limited(monkeypatch, meta_hit):
     """No index hit — or a throttled fetch that only *looks* like a stale entry — keeps the
     generic message (plus the rate-limit hint), never the stale-entry verdict."""
-    import hermes_cli.skills_hub as cli_hub
+    import eir_cli.skills_hub as cli_hub
     import tools.skills_hub as hub
-    from hermes_cli.skills_hub import do_install
+    from eir_cli.skills_hub import do_install
 
     class ThrottledSource:
         is_rate_limited = meta_hit
@@ -680,15 +680,15 @@ def _stub_search(monkeypatch, results):
 
 
 @pytest.mark.parametrize("identifier", [
-    "computer-use", "NousResearch/hermes-agent/skills/productivity/pdf",
-    "skills-sh/nousresearch/hermes-agent/google-workspace", "blender-bpy-enhanced"])
+    "computer-use", "NousResearch/eir-agent/skills/productivity/pdf",
+    "skills-sh/nousresearch/eir-agent/google-workspace", "blender-bpy-enhanced"])
 def test_install_by_name_resolves_to_the_skill_it_names(monkeypatch, tmp_path, identifier):
-    """`hermes skills install <bundled skill>` failed every time: the name resolved to a stranger's
+    """`eir skills install <bundled skill>` failed every time: the name resolved to a stranger's
     same-named hub skill or an ambiguity table, and this repo's own copy was rescanned as community
     content and refused. It now makes the shipped skill active and fetches nothing. A hub slug behind
     a prettified catalog title ("Blender Bpy Enhanced") resolves too, where it answered "No exact match"
     while printing that very slug as the suggestion."""
-    import hermes_cli.skills_hub as cli_hub
+    import eir_cli.skills_hub as cli_hub
 
     if identifier == "blender-bpy-enhanced":
         _stub_search(monkeypatch, [_meta("Blender Bpy Enhanced", "@emergencescience/blender-bpy-enhanced")])
@@ -741,7 +741,7 @@ def test_install_by_name_resolves_to_the_skill_it_names(monkeypatch, tmp_path, i
     assert cli_hub.do_install(identifier, console=console, skip_confirm=True) is False
     # One line, subject and remedy together: the Desktop toast shows only a failed action's last 3 lines.
     error = next(line for line in sink.getvalue().splitlines() if line.startswith("Error:"))
-    assert f"'{name}' is a built-in skill" in error and f"`hermes skills uninstall {name}`" in error
+    assert f"'{name}' is a built-in skill" in error and f"`eir skills uninstall {name}`" in error
     assert "already available" not in sink.getvalue()
     assert (stranger / "SKILL.md").read_text().endswith("stranger\n")
 
@@ -751,7 +751,7 @@ def test_built_in_restore_survives_leftovers_and_records_every_outcome_as_bundle
     restore copied with copytree onto a dest dir left behind without its SKILL.md (EEXIST on every
     retry), refused a skill already present behind a symlinked category the loader follows, and a
     failed restore was labelled a hub install."""
-    import hermes_cli.skills_hub as cli_hub
+    import eir_cli.skills_hub as cli_hub
     import tools.skills_hub as hub
     from tools import skill_usage, skills_sync
 
@@ -759,7 +759,7 @@ def test_built_in_restore_survives_leftovers_and_records_every_outcome_as_bundle
         monkeypatch.delitem(vars(hub), stale)
     monkeypatch.setattr(cli_hub, "_sources", lambda: pytest.fail("a bundled skill must not hit the hub"))
     rows = []
-    monkeypatch.setattr("hermes_cli.observability.shared_metrics_events.record_extension_install",
+    monkeypatch.setattr("eir_cli.observability.shared_metrics_events.record_extension_install",
                         lambda **row: rows.append((row["source"], row["outcome"])))
     src = dict(skills_sync._discover_bundled_skills(skills_sync._get_bundled_dir()))["obsidian"]
     dest = skill_usage._skills_dir() / src.parent.name / "obsidian"

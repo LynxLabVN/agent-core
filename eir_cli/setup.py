@@ -1,9 +1,9 @@
-"""Interactive setup wizard for Hermes Agent (config lives in ~/.hermes/).
+"""Interactive setup wizard for Eir Agent (config lives in ~/.eir/).
 
 Independently-runnable sections: Model & Provider, Terminal Backend, Agent Settings, Messaging
 Platforms, Tools. Section bodies live in sibling setup_* modules and are re-exported here; they
 resolve shared prompt/config helpers lazily through this module so test patches on
-``hermes_cli.setup.<name>`` keep working.
+``eir_cli.setup.<name>`` keep working.
 """
 
 import importlib.util
@@ -17,20 +17,20 @@ from contextvars import ContextVar
 from pathlib import Path
 from typing import Callable
 
-from hermes_cli.curses_ui import MenuNavigationEvent, MenuNavigationStart
-# Config helpers are re-exported (tests patch them on this module). display_hermes_home is
-# imported lazily at call sites (stale-module safety during hermes update).
-from hermes_cli.config import (
-    cfg_get, DEFAULT_CONFIG, get_hermes_home, get_config_path, get_env_path, load_config, save_config,
-    save_env_value, remove_env_value, get_env_value, ensure_hermes_home,
+from eir_cli.curses_ui import MenuNavigationEvent, MenuNavigationStart
+# Config helpers are re-exported (tests patch them on this module). display_eir_home is
+# imported lazily at call sites (stale-module safety during eir update).
+from eir_cli.config import (
+    cfg_get, DEFAULT_CONFIG, get_eir_home, get_config_path, get_env_path, load_config, save_config,
+    save_env_value, remove_env_value, get_env_value, ensure_eir_home,
 )
-from hermes_cli.colors import Colors, color
-from hermes_cli.cli_output import print_error, print_info, print_success, print_warning
-from hermes_cli.secret_prompt import masked_secret_prompt
+from eir_cli.colors import Colors, color
+from eir_cli.cli_output import print_error, print_info, print_success, print_warning
+from eir_cli.secret_prompt import masked_secret_prompt
 
 logger = logging.getLogger(__name__)
 
-from hermes_cli._startup_fast import project_root_str
+from eir_cli._startup_fast import project_root_str
 
 PROJECT_ROOT = Path(project_root_str())
 
@@ -66,7 +66,7 @@ def _current_reasoning_effort(config: dict) -> str:
         return ""
     effort = agent_cfg.get("reasoning_effort")
     if isinstance(effort, dict):  # {enabled, effort} form: the tier name, never str(dict)
-        from hermes_constants import parse_reasoning_effort
+        from eir_constants import parse_reasoning_effort
         parsed = parse_reasoning_effort(effort) or {}
         effort = "none" if parsed.get("enabled") is False else parsed.get("effort")
     return str(effort or "").strip().lower()
@@ -87,17 +87,17 @@ def is_interactive_stdin() -> bool:
 def print_noninteractive_setup_guidance(reason: str | None = None) -> None:
     """Print guidance for headless/non-interactive setup flows."""
     print()
-    print(color("☤ Hermes Setup — Non-interactive mode", Colors.CYAN, Colors.BOLD))
+    print(color("☤ Eir Setup — Non-interactive mode", Colors.CYAN, Colors.BOLD))
     print()
     if reason:
         print_info(reason)
     _info("The interactive wizard cannot be used here.", None,
-          "Configure Hermes using environment variables or config commands:",
-          "  hermes config set model.provider custom",
-          "  hermes config set model.base_url http://localhost:8080/v1",
-          "  hermes config set model.default your-model-name", None,
+          "Configure Eir using environment variables or config commands:",
+          "  eir config set model.provider custom",
+          "  eir config set model.base_url http://localhost:8080/v1",
+          "  eir config set model.default your-model-name", None,
           "Or set OPENROUTER_API_KEY (OpenRouter) / OPENAI_API_KEY (OpenAI) in your environment.",
-          "Run 'hermes setup' in an interactive terminal to use the full wizard.", None)
+          "Run 'eir setup' in an interactive terminal to use the full wizard.", None)
 
 
 def _sanitize_pasted_input(value: str) -> str:
@@ -112,7 +112,7 @@ def prompt(question: str, default: str | None = None, password: bool = False) ->
         if password:
             value = masked_secret_prompt(display)
         else:
-            from hermes_cli.cli_output import line_input
+            from eir_cli.cli_output import line_input
             value = line_input(display)
         return _sanitize_pasted_input(value).strip() or default or ""
     except (KeyboardInterrupt, EOFError):
@@ -157,7 +157,7 @@ class _SetupNavigationState:
         self.replay_choices: list[object] = copy.deepcopy(replay or [])
 
 
-_SETUP_NAVIGATION: ContextVar[_SetupNavigationState | None] = ContextVar("hermes_setup_navigation", default=None)
+_SETUP_NAVIGATION: ContextVar[_SetupNavigationState | None] = ContextVar("eir_setup_navigation", default=None)
 
 
 def _handle_setup_menu_navigation(event: MenuNavigationEvent, value: object = None) -> MenuNavigationStart | None:
@@ -190,7 +190,7 @@ def _handle_setup_menu_navigation(event: MenuNavigationEvent, value: object = No
 @contextmanager
 def _setup_navigation_scope():
     """Install and reliably restore the setup menu navigation context."""
-    from hermes_cli.curses_ui import reset_menu_navigation_handler, set_menu_navigation_handler
+    from eir_cli.curses_ui import reset_menu_navigation_handler, set_menu_navigation_handler
     token = _SETUP_NAVIGATION.set(_SetupNavigationState())
     menu_token = set_menu_navigation_handler(_handle_setup_menu_navigation)
     try:
@@ -248,7 +248,7 @@ def run_setup_action_with_navigation(
     label: str, action: Callable[[], None], *, cancelled_message: str = "Setup cancelled."
 ) -> None:
     """Run a setup-style menu flow with Escape and nested Left navigation — for commands such as
-    ``hermes model`` that use the wizard's pickers outside ``run_setup_wizard``."""
+    ``eir model`` that use the wizard's pickers outside ``run_setup_wizard``."""
     with _setup_navigation_scope():
         try:
             _run_setup_steps([(label, action)])
@@ -261,7 +261,7 @@ def run_setup_action_with_navigation(
 
 def _curses_prompt_choice(question: str, choices: list, default: int = 0, description: str | None = None) -> int:
     """Single-select menu using curses. Delegates to curses_radiolist."""
-    from hermes_cli.curses_ui import curses_radiolist
+    from eir_cli.curses_ui import curses_radiolist
     return curses_radiolist(question, choices, selected=default, cancel_returns=-1, description=description)
 
 
@@ -281,13 +281,13 @@ def prompt_choice(question: str, choices: list, default: int = 0, description: s
 
 def is_noninteractive() -> bool:
     """True when no human is available to answer a prompt: the dashboard/desktop spawn CLI actions
-    with ``stdin=DEVNULL`` and ``HERMES_NONINTERACTIVE=1`` (``hermes_cli/web_server.py``), where a
+    with ``stdin=DEVNULL`` and ``EIR_NONINTERACTIVE=1`` (``eir_cli/web_server.py``), where a
     prompt that aborts on EOF would kill the spawned action — callers fall back to their default."""
-    return os.environ.get("HERMES_NONINTERACTIVE", "").strip().lower() in {"1", "true", "yes", "on"}
+    return os.environ.get("EIR_NONINTERACTIVE", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def prompt_yes_no(question: str, default: bool = True, description: str | None = None) -> bool:
-    """Prompt for yes/no. Ctrl+C exits; empty input, ``HERMES_NONINTERACTIVE=1`` or a
+    """Prompt for yes/no. Ctrl+C exits; empty input, ``EIR_NONINTERACTIVE=1`` or a
     closed/redirected stdin return ``default`` instead of aborting the whole process.
     ``description`` is the context the question refers to, shown above it in setup's full-screen
     menu, which hides everything printed before it; the line prompt keeps that text on screen."""
@@ -318,7 +318,7 @@ def prompt_yes_no(question: str, default: bool = True, description: str | None =
 def prompt_checklist(title: str, items: list, pre_selected: list | None = None) -> list:
     """Multi-select checklist; returns the sorted indices of selected items. ``pre_selected``
     start checked; Space toggles, Enter confirms, cancel keeps the pre-selection."""
-    from hermes_cli.curses_ui import curses_checklist
+    from eir_cli.curses_ui import curses_checklist
     pre = set(pre_selected or [])
     return sorted(curses_checklist(title, items, pre, cancel_returns=pre))
 
@@ -342,7 +342,7 @@ def _prompt_api_key(var: dict):
     if var.get("url"):
         print_info(f"  Get your key at: {var['url']}")
     print()
-    _prompt_and_save_env_var(var, "  ✓ Saved", "  Skipped (configure later with 'hermes setup')")
+    _prompt_and_save_env_var(var, "  ✓ Saved", "  Skipped (configure later with 'eir setup')")
 
 
 def _prompt_and_save_env_var(var: dict, saved_msg: str, skipped_msg: str) -> None:
@@ -377,15 +377,15 @@ def _print_banner(*lines: str) -> None:
 
 
 def setup_model_provider(config: dict, *, quick: bool = False):
-    """Configure the inference provider and default model via the ``hermes model`` flow (one code
+    """Configure the inference provider and default model via the ``eir model`` flow (one code
     path — any provider added there is available here). *quick* is accepted for the first-time
     quick setup caller; rotation, vision and TTS keep safe defaults either way."""
-    from hermes_cli.config import load_config, save_config
+    from eir_cli.config import load_config, save_config
     print_header("Inference Provider")
     _info("Choose how to connect to your main chat model.",
           f"   Guide: {_DOCS_BASE}/integrations/providers", None)
-    from hermes_cli.main import select_provider_and_model
-    from hermes_cli.observability.shared_metrics_setup import provider_setup_surface
+    from eir_cli.main import select_provider_and_model
+    from eir_cli.observability.shared_metrics_setup import provider_setup_surface
     try:
         with provider_setup_surface("cli_setup"):
             select_provider_and_model()
@@ -393,15 +393,15 @@ def setup_model_provider(config: dict, *, quick: bool = False):
         _info(None, "Provider setup skipped.")
     except Exception as exc:
         logger.debug("select_provider_and_model error during setup: %s", exc)
-        from hermes_cli.auth_error_copy import provider_setup_failure_lines
-        lead, *rest = provider_setup_failure_lines(exc, retry_command="hermes model")
+        from eir_cli.auth_error_copy import provider_setup_failure_lines
+        lead, *rest = provider_setup_failure_lines(exc, retry_command="eir model")
         print_warning(lead)
         for line in rest:
             print_info(line)
 
     # Re-sync from disk in place: cmd_model saved via its own load/save cycle and the wizard's
     # final save_config(config) must not clobber it with stale values. Rotation, vision and TTS
-    # keep safe defaults (configure via `hermes auth add` / `hermes setup tts`).
+    # keep safe defaults (configure via `eir auth add` / `eir setup tts`).
     config.clear()
     config.update(load_config())
     save_config(config)
@@ -415,15 +415,15 @@ def setup_model_provider(config: dict, *, quick: bool = False):
 def _apply_default_agent_settings(config: dict):
     """Apply recommended defaults for all agent settings without prompting."""
     config.setdefault("agent", {})["max_turns"] = 150
-    # config.yaml is authoritative for max_turns (the gateway bridges it into HERMES_MAX_ITERATIONS);
+    # config.yaml is authoritative for max_turns (the gateway bridges it into EIR_MAX_ITERATIONS);
     # a stale .env entry silently shadowing it caused the 60-vs-500 bug, so drop it.
-    remove_env_value("HERMES_MAX_ITERATIONS")
+    remove_env_value("EIR_MAX_ITERATIONS")
     config.setdefault("compression", {})["enabled"] = True
     config["compression"]["threshold"] = 0.50
     save_config(config)
     print_success("Applied recommended defaults:")
     _info("  Max iterations: 150", "  Compression threshold: 0.50",
-          "  Run `hermes setup agent` later to customize.")
+          "  Run `eir setup agent` later to customize.")
 
 
 def _prompt_number(label: str, current, cast=int):
@@ -447,7 +447,7 @@ _TOOL_PROGRESS_HELP = (
     "  new     — Show tool name only when it changes (less noise)",
     "  all     — Show every tool call with a short preview",
     "  verbose — Full args, results, and debug logs",
-    "  log     — Silent in chat; write every tool call to ~/.hermes/logs/tool_calls.log (gateway only)",
+    "  log     — Silent in chat; write every tool call to ~/.eir/logs/tool_calls.log (gateway only)",
 )
 def setup_agent_settings(config: dict):
     """Configure agent behavior: iterations, progress display and compression."""
@@ -465,10 +465,10 @@ def setup_agent_settings(config: dict):
     if max_iter is None:
         print_warning("Invalid number, keeping current value")
     elif max_iter > 0:
-        # config.yaml only; gateway/run.py derives HERMES_MAX_ITERATIONS from agent.max_turns.
+        # config.yaml only; gateway/run.py derives EIR_MAX_ITERATIONS from agent.max_turns.
         config.setdefault("agent", {})["max_turns"] = max_iter
         config.pop("max_turns", None)
-        remove_env_value("HERMES_MAX_ITERATIONS")
+        remove_env_value("EIR_MAX_ITERATIONS")
         print_success(f"Max iterations set to {max_iter}")
 
     # ── Tool Progress Display ──
@@ -505,9 +505,9 @@ def setup_agent_settings(config: dict):
 
 
 def setup_tools(config: dict, first_install: bool = False):
-    """`hermes setup tools` == `hermes tools`: platform selection → toolset toggles → provider keys.
+    """`eir setup tools` == `eir tools`: platform selection → toolset toggles → provider keys.
     ``first_install`` selects the simplified flow (no platform menu, prompts for all missing keys)."""
-    from hermes_cli.tools_config import tools_command
+    from eir_cli.tools_config import tools_command
     tools_command(first_install=first_install, config=config)
 
 
@@ -538,7 +538,7 @@ def setup_telemetry(config: dict):
           "counts, update and install results and timing (with a fixed-list reason",
           "and the stage when one fails; a fresh install is noted on this machine and",
           "counted only once you opt in), crashes,",
-          "startup and reply speed, messaging-platform health, how Hermes gets used",
+          "startup and reply speed, messaging-platform health, how Eir gets used",
           "(agent accuracy and efficiency, active time per surface, which features and",
           "settings are used or switched off, provider setup outcomes), and coarse",
           "machine facts (RAM range, GPU type, version age and channel, updates behind,",
@@ -547,7 +547,7 @@ def setup_telemetry(config: dict):
     _info(*_SEND_CONSENT_EXPLAINER)
     # The answer is written to config.yaml here, not by the caller's later save: that save strips
     # values equal to the defaults, so a "no" would vanish and every surface would ask again.
-    from hermes_cli.observability.shared_metrics_consent import save_consent
+    from eir_cli.observability.shared_metrics_consent import save_consent
 
     shared_metrics = _sub_dict(_sub_dict(config, "telemetry"), "shared_metrics")
     sharing = shared_metrics.get("enabled") is True and shared_metrics.get("send") is True
@@ -564,9 +564,9 @@ def _record_send_consent_change(*, enabled: bool) -> None:
     """Reconcile consent windows at the moment the user decides — same single writer as the relay
     and the sender, so wizard, relay and mid-pass callers cannot disagree."""
     try:
-        from hermes_cli.observability.shared_metrics import SharedMetricsStore
-        from hermes_cli.observability.shared_metrics_sender import reconcile_send_consent
-        from hermes_cli.sqlite_util import write_txn
+        from eir_cli.observability.shared_metrics import SharedMetricsStore
+        from eir_cli.observability.shared_metrics_sender import reconcile_send_consent
+        from eir_cli.sqlite_util import write_txn
         with SharedMetricsStore()._connection() as connection, write_txn(connection):
             reconcile_send_consent(connection, enabled)
     except Exception:
@@ -575,15 +575,15 @@ def _record_send_consent_change(*, enabled: bool) -> None:
 
 
 # Extracted sections, re-exported so callers and test patches keep resolving through
-# hermes_cli.setup. They import this module lazily inside bodies, so this is cycle-free.
+# eir_cli.setup. They import this module lazily inside bodies, so this is cycle-free.
 
-from hermes_cli.setup_tts import setup_tts
-from hermes_cli.setup_terminal import setup_terminal_backend
-from hermes_cli.setup_platforms import setup_gateway
-from hermes_cli.setup_summary import _print_setup_summary
-from hermes_cli.setup_migration import _skip_configured_section
-from hermes_cli.setup_agent_import import offer_agent_import
-from hermes_cli.setup_quick import _run_portal_one_shot, _run_quick_setup
+from eir_cli.setup_tts import setup_tts
+from eir_cli.setup_terminal import setup_terminal_backend
+from eir_cli.setup_platforms import setup_gateway
+from eir_cli.setup_summary import _print_setup_summary
+from eir_cli.setup_migration import _skip_configured_section
+from eir_cli.setup_agent_import import offer_agent_import
+from eir_cli.setup_quick import _run_portal_one_shot, _run_quick_setup
 
 
 # ── Main Wizard Orchestrator ──
@@ -610,27 +610,27 @@ def run_setup_wizard(args):
 
 
 def _run_setup_section(config: dict, section: str) -> None:
-    """``hermes setup <section>``: run one SETUP_SECTIONS entry under the banner."""
+    """``eir setup <section>``: run one SETUP_SECTIONS entry under the banner."""
     entry = next(((label, func) for key, label, func in SETUP_SECTIONS if key == section), None)
     if entry is None:
         print_error(f"Unknown setup section: {section}")
         print_info(f"Available sections: {', '.join(k for k, _, _ in SETUP_SECTIONS)}")
         return
     label, func = entry
-    _print_banner(f"│     ☤ Hermes Setup — {label:<34s} │")
+    _print_banner(f"│     ☤ Eir Setup — {label:<34s} │")
     _run_setup_steps([(label, lambda: func(config))])
     save_config(config)
     print()
     print_success(f"{label} configuration complete!")
 
 
-def _run_full_setup(config: dict, hermes_home, *, is_existing: bool, imported_from: str = "") -> None:
+def _run_full_setup(config: dict, eir_home, *, is_existing: bool, imported_from: str = "") -> None:
     """Full Setup — run all sections; after an import (*imported_from* names the agents) each
     already-configured section offers to skip."""
     print_header("Configuration Location")
     _info(f"Config file:  {get_config_path()}", f"Secrets file: {get_env_path()}",
-          f"Data folder:  {hermes_home}", f"Install dir:  {PROJECT_ROOT}", None,
-          "You can edit these files directly or use 'hermes config edit'")
+          f"Data folder:  {eir_home}", f"Install dir:  {PROJECT_ROOT}", None,
+          "You can edit these files directly or use 'eir config edit'")
     if imported_from:
         _info(None, f"Settings were imported from {imported_from}.",
               "Each section below shows what is already set up — keep it,",
@@ -648,7 +648,7 @@ def _run_full_setup(config: dict, hermes_home, *, is_existing: bool, imported_fr
             setup_gateway(config)
             return
         # An import does not imply consent to install a persistent service.
-        from hermes_cli.gateway_setup_service import ensure_gateway_service
+        from eir_cli.gateway_setup_service import ensure_gateway_service
         ensure_gateway_service(context="setup", interactive=True, config=config)
 
     def _step(key: str, label: str, run) -> tuple:
@@ -672,15 +672,15 @@ _FIRST_TIME_MODES = (
 
 def _run_setup_wizard_impl(args):
     """Run the interactive setup wizard: full/quick (auto-detected), ``--portal``, or one
-    ``hermes setup <section>`` from SETUP_SECTIONS."""
-    from hermes_cli.config import is_managed, managed_error
+    ``eir setup <section>`` from SETUP_SECTIONS."""
+    from eir_cli.config import is_managed, managed_error
     if is_managed():
         managed_error("run setup wizard")
         return
-    ensure_hermes_home()
+    ensure_eir_home()
     # Back up BEFORE --reset: save_config below overwrites the very file we copy (#3522, #77299).
     config_path = get_config_path()
-    from hermes_cli.config_backups import backup_config
+    from eir_cli.config_backups import backup_config
     _backup_path = backup_config(config_path, "pre-setup")
     if getattr(args, "reset", False):
         save_config(copy.deepcopy(DEFAULT_CONFIG))
@@ -690,7 +690,7 @@ def _run_setup_wizard_impl(args):
     reconfigure_requested = bool(getattr(args, "reconfigure", False))
     quick_requested = bool(getattr(args, "quick", False))
     config = load_config()
-    hermes_home = get_hermes_home()
+    eir_home = get_eir_home()
 
     # Non-interactive environments (headless SSH, Docker, CI/CD)
     if getattr(args, 'non_interactive', False) or not is_interactive_stdin():
@@ -705,12 +705,12 @@ def _run_setup_wizard_impl(args):
         return
 
     # Existing installation == a provider is configured
-    from hermes_cli.auth import get_active_provider
+    from eir_cli.auth import get_active_provider
     is_existing = bool(get_env_value("OPENROUTER_API_KEY") or get_env_value("OPENAI_BASE_URL")
                        or get_active_provider() is not None)
-    _print_banner("│             ☤ Hermes Agent Setup Wizard                │",
+    _print_banner("│             ☤ Eir Agent Setup Wizard                │",
                   "├─────────────────────────────────────────────────────────┤",
-                  "│  Let's configure your Hermes Agent installation.       │",
+                  "│  Let's configure your Eir Agent installation.       │",
                   "│  Press Ctrl+C at any time to exit.                     │")
     imported_from = ""
     if is_existing:
@@ -718,14 +718,14 @@ def _run_setup_wizard_impl(args):
         # narrows it to missing items (partial import, cleared key). --reconfigure is a
         # backwards-compatible no-op here.
         if quick_requested:
-            _run_setup_steps([("Quick Setup", lambda: _run_quick_setup(config, hermes_home))])
+            _run_setup_steps([("Quick Setup", lambda: _run_quick_setup(config, eir_home))])
             _record_setup_completed(config)
             return
         print_header("Reconfigure", gap=True)
-        print_success("You already have Hermes configured.")
+        print_success("You already have Eir configured.")
         _info("Running the full wizard — each prompt shows your current value.",
               "Press Enter to keep it, or type a new value to change it.", "",
-              "Tip: jump straight to a section with 'hermes setup model|terminal|",
+              "Tip: jump straight to a section with 'eir setup model|terminal|",
               "     gateway|tools|agent', or fill only missing items with --quick.")
     else:
         # First-time setup (--reconfigure / --quick are meaningless here; fall through)
@@ -734,19 +734,19 @@ def _run_setup_wizard_impl(args):
             _info("No existing configuration found — running first-time setup.", None)
         # Before configuration begins. The plugin install and the import write config.yaml from
         # outside this dict (the import from another process), so reload it.
-        imported_from = offer_agent_import(hermes_home)
+        imported_from = offer_agent_import(eir_home)
         config = load_config()
-        setup_mode = prompt_choice("How would you like to set up Hermes?", [label for label, _ in _FIRST_TIME_MODES], 0)
+        setup_mode = prompt_choice("How would you like to set up Eir?", [label for label, _ in _FIRST_TIME_MODES], 0)
         label, runner = _FIRST_TIME_MODES[setup_mode]
         if runner is not None:
-            from hermes_cli import setup_quick
+            from eir_cli import setup_quick
             # Quick Setup offers to keep a model the import brought (Full setup acknowledges it below).
-            run_args = (config, hermes_home, is_existing) + (
+            run_args = (config, eir_home, is_existing) + (
                 (imported_from,) if runner == "_run_first_time_quick_setup" else ())
             _run_setup_steps([(label, lambda: getattr(setup_quick, runner)(*run_args))])
             _record_setup_completed(config)
             return
-    _run_full_setup(config, hermes_home, is_existing=is_existing, imported_from=imported_from)
+    _run_full_setup(config, eir_home, is_existing=is_existing, imported_from=imported_from)
 
     # Save and show summary
     save_config(config)
@@ -754,16 +754,16 @@ def _run_setup_wizard_impl(args):
         _info(f"Previous config backed up to: {_backup_path}",
               "If setup changed a value you customized, restore it with:",
               f"  cp {_backup_path} {config_path}")
-    _print_setup_summary(config, hermes_home)
+    _print_setup_summary(config, eir_home)
     _record_setup_completed(config)
 
 
 def _record_setup_completed(config: dict) -> None:
     """Count a wizard run that finished. Every setup flow ends here, so the one-time
     shared-metrics offer runs first: a user who opts in now is counted; the API checks enablement."""
-    from hermes_cli.observability.shared_metrics_consent import offer_consent_if_undecided
+    from eir_cli.observability.shared_metrics_consent import offer_consent_if_undecided
 
     offer_consent_if_undecided(config)
-    from hermes_cli.observability.shared_metrics_events import record_setup_completed
+    from eir_cli.observability.shared_metrics_events import record_setup_completed
     model = config.get("model")
     record_setup_completed(surface="cli", provider=model.get("provider") if isinstance(model, dict) else None)

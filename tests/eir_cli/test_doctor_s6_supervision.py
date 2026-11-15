@@ -1,4 +1,4 @@
-"""``hermes doctor``'s s6 section probes the image's static s6-rc services in the root scandir and
+"""``eir doctor``'s s6 section probes the image's static s6-rc services in the root scandir and
 lists profile gateway slots from the separate, unprivileged gateway scandir."""
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from hermes_cli import doctor_platform, service_manager
+from eir_cli import doctor_platform, service_manager
 
 ROOT_SCANDIR = Path("/run/service")
 
@@ -34,9 +34,9 @@ def test_static_services_and_gateway_slots_use_distinct_scandirs(
 
     doctor_platform._check_s6_supervision([])
 
-    assert ROOT_SCANDIR / "main-hermes" in svstat_targets
+    assert ROOT_SCANDIR / "main-eir" in svstat_targets
     assert ROOT_SCANDIR / "dashboard" in svstat_targets
-    assert "main-hermes: up" in capsys.readouterr().out
-    # Gateway slots are hermes-registered, so they must not live in the root-supervised scandir.
+    assert "main-eir: up" in capsys.readouterr().out
+    # Gateway slots are eir-registered, so they must not live in the root-supervised scandir.
     assert len(listed) == 1 and listed[0] != ROOT_SCANDIR
     assert ROOT_SCANDIR not in listed[0].parents

@@ -16,7 +16,7 @@ import os
 
 import pytest
 
-from hermes_cli.auth import (
+from eir_cli.auth import (
     get_auth_status,
     get_external_process_provider_status,
     resolve_external_process_provider_credentials,
@@ -39,16 +39,16 @@ def acme_acp(tmp_path, monkeypatch):
     import providers
     from pathlib import Path
 
-    from hermes_cli import auth
+    from eir_cli import auth
 
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
-    for var in ("HERMES_ACME_ACP_COMMAND", "HERMES_ACME_ACP_ARGS", "ACME_ACP_BASE_URL"):
+    for var in ("EIR_ACME_ACP_COMMAND", "EIR_ACME_ACP_ARGS", "ACME_ACP_BASE_URL"):
         monkeypatch.delenv(var, raising=False)
     profile = _AcmeAcpProfile(name="acme-acp", auth_type="external_process", base_url="acp://acme",
                               process_command="acme", process_args=("--acp", "--stdio"),
-                              process_command_env_vars=("HERMES_ACME_ACP_COMMAND",),
-                              process_args_env_var="HERMES_ACME_ACP_ARGS",
+                              process_command_env_vars=("EIR_ACME_ACP_COMMAND",),
+                              process_args_env_var="EIR_ACME_ACP_ARGS",
                               base_url_env_var="ACME_ACP_BASE_URL")
     monkeypatch.setitem(providers._REGISTRY, profile.name, profile)
     monkeypatch.setattr(providers, "_PROVIDER_LIST_CACHE", None)
@@ -68,7 +68,7 @@ def test_get_auth_status_dispatches_external_process_by_auth_type(
     fake = tmp_path / ("acme.exe" if os.name == "nt" else "acme")
     fake.write_text("", encoding="utf-8")
     fake.chmod(0o755)
-    monkeypatch.setenv("HERMES_ACME_ACP_COMMAND", str(fake))
+    monkeypatch.setenv("EIR_ACME_ACP_COMMAND", str(fake))
     # Point HOME somewhere empty so on-disk credential stores don't leak in.
     monkeypatch.setenv("HOME", str(tmp_path))
 
@@ -131,7 +131,7 @@ def test_external_process_status_resolves_relative_configured_path_from_cwd(
     cli.chmod(0o755)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("PATH", str(tmp_path / "backend-bin"))
-    monkeypatch.setenv("HERMES_ACME_ACP_COMMAND", os.path.join(".", "bin", cli.name))
+    monkeypatch.setenv("EIR_ACME_ACP_COMMAND", os.path.join(".", "bin", cli.name))
 
     status = get_external_process_provider_status("acme-acp")
 
@@ -163,7 +163,7 @@ def test_external_process_claude_resolution_preserves_precedence(
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("PATH", str(tmp_path / "backend-bin"))
     monkeypatch.setenv(
-        "HERMES_ACME_ACP_COMMAND",
+        "EIR_ACME_ACP_COMMAND",
         str(candidates[preferred]) if preferred == "explicit" else "claude",
     )
 
@@ -199,7 +199,7 @@ def test_explicit_filter_keeps_signed_in_external_process_row(tmp_path, monkeypa
     # A verified CLI login leaves no trace in active_provider/config/env —
     # the explicit-only desktop filter must treat it like the Anthropic OAuth
     # carve-out and keep the row.
-    from hermes_cli.inventory import _filter_explicit_provider_rows
+    from eir_cli.inventory import _filter_explicit_provider_rows
 
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setattr(acme_acp, "evidence", (True, "~/.acme/credentials.json"), raising=False)
@@ -218,7 +218,7 @@ def test_explicit_filter_drops_unverified_external_process_row(tmp_path, monkeyp
     # Merely having the executable on PATH is ambient discovery, not an
     # explicit configuration — the desktop filter keeps its narrower contract
     # for a profile whose CLI exposes readable token stores (none here).
-    from hermes_cli.inventory import _filter_explicit_provider_rows
+    from eir_cli.inventory import _filter_explicit_provider_rows
 
     monkeypatch.setenv("HOME", str(tmp_path))  # no credential stores
     monkeypatch.setattr(acme_acp, "evidence", (False, None), raising=False)
@@ -236,12 +236,12 @@ def test_explicit_filter_drops_unverified_external_process_row(tmp_path, monkeyp
 
 
 def test_cli_command_reflects_configured_executable(tmp_path, monkeypatch, acme_acp):
-    from hermes_cli.web_server_oauth import _external_process_cli_command
+    from eir_cli.web_server_oauth import _external_process_cli_command
 
     fake = tmp_path / ("acme.exe" if os.name == "nt" else "acme")
     fake.write_text("", encoding="utf-8")
     fake.chmod(0o755)
-    monkeypatch.setenv("HERMES_ACME_ACP_COMMAND", str(fake))
+    monkeypatch.setenv("EIR_ACME_ACP_COMMAND", str(fake))
 
     rendered = _external_process_cli_command("acme-acp", "acme login")
 
@@ -249,20 +249,20 @@ def test_cli_command_reflects_configured_executable(tmp_path, monkeypatch, acme_
 
 
 def test_cli_command_untouched_for_non_external_providers(acme_acp):
-    from hermes_cli.web_server_oauth import _external_process_cli_command
+    from eir_cli.web_server_oauth import _external_process_cli_command
 
-    assert _external_process_cli_command("nous", "hermes auth add nous") == "hermes auth add nous"
+    assert _external_process_cli_command("nous", "eir auth add nous") == "eir auth add nous"
 
 
 def test_cli_command_default_when_no_override(monkeypatch, acme_acp):
-    from hermes_cli.web_server_oauth import _external_process_cli_command
+    from eir_cli.web_server_oauth import _external_process_cli_command
 
     assert _external_process_cli_command("acme-acp", "acme login") == "acme login"
 
 
 def _fake_external_process_plugin(monkeypatch, provider_id="fake-agy"):
     """Register a plugin external-process provider (command ``agy``) in the auth registry."""
-    from hermes_cli import auth as auth_mod
+    from eir_cli import auth as auth_mod
 
     monkeypatch.setitem(
         auth_mod.PROVIDER_REGISTRY, provider_id,
@@ -271,22 +271,22 @@ def _fake_external_process_plugin(monkeypatch, provider_id="fake-agy"):
         auth_mod, "get_external_process_provider_status",
         lambda pid: {"configured": True, "provider": pid, "command": "agy",
                      "resolved_command": "/usr/local/bin/agy"})
-    from hermes_cli import auth_plugin_providers as ap
+    from eir_cli import auth_plugin_providers as ap
 
     profile = ProviderProfile(name=provider_id, auth_type="external_process", process_command="agy")
     monkeypatch.setattr(ap, "plugin_profile", lambda provider: profile if provider == provider_id else None)
     return provider_id
 
 
-def test_cli_command_never_swaps_cli_into_hermes_template(monkeypatch):
+def test_cli_command_never_swaps_cli_into_eir_template(monkeypatch):
     """A handler-less external-process plugin never renders ``agy auth add <slug>``: that is a
-    Hermes command template with another CLI's executable pasted on top — neither side can run
+    Eir command template with another CLI's executable pasted on top — neither side can run
     it. The dialog must point at the provider CLI instead (#136071)."""
-    from hermes_cli.web_server_oauth import _external_process_cli_command
+    from eir_cli.web_server_oauth import _external_process_cli_command
 
     provider_id = _fake_external_process_plugin(monkeypatch)
 
-    rendered = _external_process_cli_command(provider_id, f"hermes auth add {provider_id}")
+    rendered = _external_process_cli_command(provider_id, f"eir auth add {provider_id}")
 
     assert rendered != f"agy auth add {provider_id}"
     assert "auth add" not in rendered
@@ -296,11 +296,11 @@ def test_cli_command_for_handlerless_plugin_is_runnable(monkeypatch):
     """The dialog shows the command with a ``$`` and a Copy button, so it must be one a shell runs:
     with no login command from the plugin, the same re-login every other surface gives, not a comment line."""
     from agent.turn_failure_copy import oauth_relogin_command
-    from hermes_cli.web_server_oauth import _external_process_cli_command
+    from eir_cli.web_server_oauth import _external_process_cli_command
 
     provider_id = _fake_external_process_plugin(monkeypatch)
 
-    rendered = _external_process_cli_command(provider_id, f"hermes auth add {provider_id}")
+    rendered = _external_process_cli_command(provider_id, f"eir auth add {provider_id}")
 
     assert not rendered.startswith("#")
     assert rendered == oauth_relogin_command(provider_id)
@@ -309,11 +309,11 @@ def test_cli_command_for_handlerless_plugin_is_runnable(monkeypatch):
 @pytest.mark.platforms("posix")
 def test_cli_command_is_the_plugins_own_login_when_it_declares_one(monkeypatch, tmp_path):
     """A plugin that declares its CLI's login (``login_args``) gets exactly that command: signing in
-    must not run ``hermes model``, which also makes the provider the default."""
-    from hermes_cli.web_server_oauth import _external_process_cli_command
+    must not run ``eir model``, which also makes the provider the default."""
+    from eir_cli.web_server_oauth import _external_process_cli_command
 
     provider_id = _fake_external_process_plugin(monkeypatch)
-    from hermes_cli import auth_plugin_providers as ap
+    from eir_cli import auth_plugin_providers as ap
 
     exe = tmp_path / "agy tools" / "agy"
     exe.parent.mkdir()
@@ -323,17 +323,17 @@ def test_cli_command_is_the_plugins_own_login_when_it_declares_one(monkeypatch, 
                               login_args=("auth", "login"))
     monkeypatch.setattr(ap, "plugin_profile", lambda provider: profile if provider == provider_id else None)
 
-    assert _external_process_cli_command(provider_id, f"hermes auth add {provider_id}") == f"'{exe}' auth login"
+    assert _external_process_cli_command(provider_id, f"eir auth add {provider_id}") == f"'{exe}' auth login"
 
 
-def test_cli_command_keeps_hermes_template_when_plugin_owns_auth(monkeypatch):
-    """With an ``auth_handler`` the plugin really answers ``hermes auth add``; the executable
-    must NOT be swapped into Hermes' own command."""
-    from hermes_cli import auth_plugin_providers as ap
-    from hermes_cli.web_server_oauth import _external_process_cli_command
+def test_cli_command_keeps_eir_template_when_plugin_owns_auth(monkeypatch):
+    """With an ``auth_handler`` the plugin really answers ``eir auth add``; the executable
+    must NOT be swapped into Eir' own command."""
+    from eir_cli import auth_plugin_providers as ap
+    from eir_cli.web_server_oauth import _external_process_cli_command
 
     provider_id = _fake_external_process_plugin(monkeypatch)
     monkeypatch.setattr(ap, "plugin_auth_handler", lambda provider: lambda action, args: True)
 
-    assert _external_process_cli_command(provider_id, f"hermes auth add {provider_id}") == \
-        f"hermes auth add {provider_id}"
+    assert _external_process_cli_command(provider_id, f"eir auth add {provider_id}") == \
+        f"eir auth add {provider_id}"

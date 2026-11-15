@@ -4,13 +4,13 @@ sha: "e1e11aaf4601eec0bf5b55d90df77decdacb8f71"
 version: "0.1.0"
 title: WRM Pro
 description: >-
-  A guided Hermes skill for working with an existing WRM Pro MCP server. Connect
-  Hermes to your WRM Pro deployment and safely inspect or operate authorized
+  A guided Eir skill for working with an existing WRM Pro MCP server. Connect
+  Eir to your WRM Pro deployment and safely inspect or operate authorized
   servers through the configured MCP connection.
 maintainer: vedranius
 tier: community
 category: automation
-requires_hermes: ">=0.22.0"
+requires_eir: ">=0.22.0"
 docs_url: https://github.com/vedranius/hermes-wrm-pro/blob/e1e11aaf4601eec0bf5b55d90df77decdacb8f71/README.md
 platforms: [linux, macos, windows]
 capabilities:

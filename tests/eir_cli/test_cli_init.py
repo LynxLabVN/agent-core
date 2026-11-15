@@ -1,4 +1,4 @@
-"""Tests for HermesCLI initialization -- catches configuration bugs
+"""Tests for EirCLI initialization -- catches configuration bugs
 that only manifest at runtime (not in mocked unit tests)."""
 
 import os
@@ -12,7 +12,7 @@ from agent.i18n import t
 
 
 def _make_cli(env_overrides=None, config_overrides=None, **kwargs):
-    """Create a HermesCLI instance with minimal mocking."""
+    """Create a EirCLI instance with minimal mocking."""
     import importlib
 
     _clean_config = {
@@ -27,7 +27,7 @@ def _make_cli(env_overrides=None, config_overrides=None, **kwargs):
     }
     if config_overrides:
         _clean_config.update(config_overrides)
-    clean_env = {"LLM_MODEL": "", "HERMES_MAX_ITERATIONS": ""}
+    clean_env = {"LLM_MODEL": "", "EIR_MAX_ITERATIONS": ""}
     if env_overrides:
         clean_env.update(env_overrides)
     prompt_toolkit_stubs = {
@@ -54,7 +54,7 @@ def _make_cli(env_overrides=None, config_overrides=None, **kwargs):
             _cli_mod = importlib.reload(_cli_mod)
             with patch.object(_cli_mod, "get_tool_definitions", return_value=[]), \
                  patch.dict(_cli_mod.__dict__, {"CLI_CONFIG": _clean_config}):
-                return _cli_mod.HermesCLI(**kwargs)
+                return _cli_mod.EirCLI(**kwargs)
     finally:
         # The reload above re-executed cli.py while prompt_toolkit was stubbed
         # with MagicMocks, permanently rebinding cli's module globals
@@ -315,7 +315,7 @@ class TestPromptToolkitTerminalCompatibility:
 
         The native-Windows arm (``_terminal_may_leak_cpr() is False``, plus
         the ``PROMPT_TOOLKIT_NO_CPR`` override that outranks it) lives in
-        ``tests/hermes_cli/test_cpr_local_leak.py`` under ``platforms("windows")``, where it
+        ``tests/eir_cli/test_cpr_local_leak.py`` under ``platforms("windows")``, where it
         runs against a real Windows console.
         """
         from cli import _terminal_may_leak_cpr
@@ -352,11 +352,11 @@ class TestHistoryDisplay:
         output = capsys.readouterr().out
 
         assert "[You #1]" in output
-        assert "[Hermes #2]" in output
+        assert "[Eir #2]" in output
         assert "(requested 2 tool calls)" in output
         assert "[Tools]" in output
         assert "(2 tool messages hidden)" in output
-        assert "[Hermes #3]" in output
+        assert "[Eir #3]" in output
         assert "[You #4]" in output
         assert "[You #5]" not in output
         assert "A" * 250 in output
@@ -376,8 +376,8 @@ class TestHistoryDisplay:
             },
             {
                 "id": "20260401_201329_d85961",
-                "title": "Checking Running Hermes Agent",
-                "preview": "check running gateways for hermes agent",
+                "title": "Checking Running Eir Agent",
+                "preview": "check running gateways for eir agent",
                 "last_active": 0,
             },
         ]
@@ -386,7 +386,7 @@ class TestHistoryDisplay:
         output = capsys.readouterr().out
 
         assert t("cli.session.recent_header") in output
-        assert "Checking Running Hermes Agent" in output
+        assert "Checking Running Eir Agent" in output
 
 
 
@@ -404,8 +404,8 @@ class TestHistoryDisplay:
         cli._session_db.list_sessions_rich.return_value = [
             {
                 "id": "20260401_201329_d85961",
-                "title": "Checking Running Hermes Agent",
-                "preview": "check running gateways for hermes agent",
+                "title": "Checking Running Eir Agent",
+                "preview": "check running gateways for eir agent",
                 "last_active": 0,
             },
         ]
@@ -417,7 +417,7 @@ class TestHistoryDisplay:
 
         assert "Unknown command" not in output
         assert t("cli.session.recent_header") in output
-        assert "Checking Running Hermes Agent" in output
+        assert "Checking Running Eir Agent" in output
         assert "20260401_201329_d85961" in output
 
 
@@ -430,10 +430,10 @@ class TestHistoryDisplay:
         """
         cli = _make_cli()
         with patch.object(cli, "_handle_resume_command") as mock_resume:
-            cli.process_command("/sessions Checking Running Hermes Agent")
+            cli.process_command("/sessions Checking Running Eir Agent")
 
         mock_resume.assert_called_once_with(
-            "/resume Checking Running Hermes Agent"
+            "/resume Checking Running Eir Agent"
         )
 
 
@@ -441,7 +441,7 @@ class TestNestedDictModelDefaultPairing:
     """A dict-valued ``model.default`` must keep its nested provider paired.
 
     ``model.default: {provider: ..., model: ...}`` canonicalizes to the string
-    model AND the nested provider, so ``HermesCLI`` routes the model through
+    model AND the nested provider, so ``EirCLI`` routes the model through
     that provider instead of discarding it and falling back to the outer
     merged ``model.provider`` (``"auto"`` — authoritative at runtime
     resolution, which would route the model through the wrong active
@@ -535,13 +535,13 @@ class TestRootLevelProviderOverride:
 
     def test_model_provider_wins_over_root_provider(self, tmp_path, monkeypatch):
         """model.provider takes priority — root-level provider is only a fallback."""
-        import hermes_yaml as yaml
+        import eir_yaml as yaml
 
-        hermes_home = tmp_path / ".hermes"
-        hermes_home.mkdir()
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        eir_home = tmp_path / ".eir"
+        eir_home.mkdir()
+        monkeypatch.setenv("EIR_HOME", str(eir_home))
 
-        config_path = hermes_home / "config.yaml"
+        config_path = eir_home / "config.yaml"
         config_path.write_text(yaml.safe_dump({
             "provider": "opencode-go",  # stale root-level key
             "model": {
@@ -551,20 +551,20 @@ class TestRootLevelProviderOverride:
         }))
 
         import cli
-        monkeypatch.setattr(cli, "_hermes_home", hermes_home)
+        monkeypatch.setattr(cli, "_eir_home", eir_home)
         cfg = cli.load_cli_config()
 
         assert cfg["model"]["provider"] == "openrouter"
 
     def test_root_provider_used_as_fallback_when_model_provider_missing(self, tmp_path, monkeypatch):
         """Legacy root-level provider still populates model.provider in the CLI loader."""
-        import hermes_yaml as yaml
+        import eir_yaml as yaml
 
-        hermes_home = tmp_path / ".hermes"
-        hermes_home.mkdir()
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        eir_home = tmp_path / ".eir"
+        eir_home.mkdir()
+        monkeypatch.setenv("EIR_HOME", str(eir_home))
 
-        config_path = hermes_home / "config.yaml"
+        config_path = eir_home / "config.yaml"
         config_path.write_text(yaml.safe_dump({
             "provider": "opencode-go",  # stale root key
             "model": {
@@ -574,20 +574,20 @@ class TestRootLevelProviderOverride:
         }))
 
         import cli
-        monkeypatch.setattr(cli, "_hermes_home", hermes_home)
+        monkeypatch.setattr(cli, "_eir_home", eir_home)
         cfg = cli.load_cli_config()
 
         assert cfg["model"]["provider"] == "opencode-go"
 
     def test_root_base_url_used_as_fallback_when_model_base_url_missing(self, tmp_path, monkeypatch):
         """Legacy root-level base_url still populates model.base_url in the CLI loader."""
-        import hermes_yaml as yaml
+        import eir_yaml as yaml
 
-        hermes_home = tmp_path / ".hermes"
-        hermes_home.mkdir()
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        eir_home = tmp_path / ".eir"
+        eir_home.mkdir()
+        monkeypatch.setenv("EIR_HOME", str(eir_home))
 
-        config_path = hermes_home / "config.yaml"
+        config_path = eir_home / "config.yaml"
         config_path.write_text(yaml.safe_dump({
             "base_url": "https://example.com/v1",
             "model": {
@@ -596,21 +596,21 @@ class TestRootLevelProviderOverride:
         }))
 
         import cli
-        monkeypatch.setattr(cli, "_hermes_home", hermes_home)
+        monkeypatch.setattr(cli, "_eir_home", eir_home)
         cfg = cli.load_cli_config()
 
         assert cfg["model"]["base_url"] == "https://example.com/v1"
 
     def test_terminal_vercel_runtime_bridged_to_env(self, tmp_path, monkeypatch):
         """Classic CLI must expose terminal.vercel_runtime to terminal_tool.py."""
-        import hermes_yaml as yaml
+        import eir_yaml as yaml
 
-        hermes_home = tmp_path / ".hermes"
-        hermes_home.mkdir()
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        eir_home = tmp_path / ".eir"
+        eir_home.mkdir()
+        monkeypatch.setenv("EIR_HOME", str(eir_home))
         monkeypatch.delenv("TERMINAL_VERCEL_RUNTIME", raising=False)
 
-        config_path = hermes_home / "config.yaml"
+        config_path = eir_home / "config.yaml"
         config_path.write_text(yaml.safe_dump({
             "terminal": {
                 "backend": "vercel_sandbox",
@@ -619,7 +619,7 @@ class TestRootLevelProviderOverride:
         }))
 
         import cli
-        monkeypatch.setattr(cli, "_hermes_home", hermes_home)
+        monkeypatch.setattr(cli, "_eir_home", eir_home)
         cfg = cli.load_cli_config()
 
         assert cfg["terminal"]["vercel_runtime"] == "python3.13"
@@ -627,7 +627,7 @@ class TestRootLevelProviderOverride:
 
     def test_normalize_root_model_keys_moves_to_model(self):
         """_normalize_root_model_keys migrates root keys into model section."""
-        from hermes_cli.config import _normalize_root_model_keys
+        from eir_cli.config import _normalize_root_model_keys
 
         config = {
             "provider": "opencode-go",
@@ -646,7 +646,7 @@ class TestRootLevelProviderOverride:
 
     def test_normalize_root_model_keys_does_not_override_existing(self):
         """Existing model.provider is never overridden by root-level key."""
-        from hermes_cli.config import _normalize_root_model_keys
+        from eir_cli.config import _normalize_root_model_keys
 
         config = {
             "provider": "stale-provider",
@@ -672,7 +672,7 @@ class TestRootLevelProviderOverride:
 
     def test_normalize_model_alias_to_default(self):
         """model.model becomes model.default."""
-        from hermes_cli.config import _normalize_root_model_keys
+        from eir_cli.config import _normalize_root_model_keys
 
         result = _normalize_root_model_keys({"model": {"model": "via-model-key"}})
         assert result["model"]["default"] == "via-model-key"
@@ -682,7 +682,7 @@ class TestRootLevelProviderOverride:
 
     def test_normalize_model_wins_over_name(self):
         """Precedence: model > name when both are aliases and default is empty."""
-        from hermes_cli.config import _normalize_root_model_keys
+        from eir_cli.config import _normalize_root_model_keys
 
         result = _normalize_root_model_keys({"model": {"model": "m-key", "name": "n-key"}})
         assert result["model"]["default"] == "m-key"
@@ -698,7 +698,7 @@ class TestRootLevelProviderOverride:
 
     def test_nested_dict_default_flattens_model_and_provider(self):
         """dict model.default -> string default + provider, no outer provider set."""
-        from hermes_cli.config import _normalize_root_model_keys
+        from eir_cli.config import _normalize_root_model_keys
 
         result = _normalize_root_model_keys({
             "model": {
@@ -710,7 +710,7 @@ class TestRootLevelProviderOverride:
 
     def test_nested_dict_default_provider_wins_over_auto(self):
         """Nested provider replaces the merged default "auto"."""
-        from hermes_cli.config import _normalize_root_model_keys
+        from eir_cli.config import _normalize_root_model_keys
 
         result = _normalize_root_model_keys({
             "model": {
@@ -723,7 +723,7 @@ class TestRootLevelProviderOverride:
 
     def test_nested_dict_default_never_overrides_explicit_provider(self):
         """An explicitly configured model.provider beats the nested provider."""
-        from hermes_cli.config import _normalize_root_model_keys
+        from eir_cli.config import _normalize_root_model_keys
 
         result = _normalize_root_model_keys({
             "model": {
@@ -736,7 +736,7 @@ class TestRootLevelProviderOverride:
 
     def test_nested_dict_model_alias_flattens_to_default(self):
         """dict model.model alias also flattens (default > model > name)."""
-        from hermes_cli.config import _normalize_root_model_keys
+        from eir_cli.config import _normalize_root_model_keys
 
         result = _normalize_root_model_keys({
             "model": {
@@ -755,9 +755,9 @@ class TestRootLevelProviderOverride:
         import os
         from unittest.mock import patch
 
-        import hermes_yaml as yaml
-        from hermes_cli import config_providers
-        from hermes_cli.config import load_config, save_config
+        import eir_yaml as yaml
+        from eir_cli import config_providers
+        from eir_cli.config import load_config, save_config
 
         monkeypatch.setattr(config_providers, "_PROVIDER_NORMALIZE_WARNED", set())
         (tmp_path / "config.yaml").write_text(yaml.safe_dump({"model": {
@@ -765,7 +765,7 @@ class TestRootLevelProviderOverride:
                         "name": "discarded-name-value", "base_url": "https://nested.example/v1"},
             "base_url": "https://outer.example/v1",
         }}), encoding="utf-8")
-        with patch.dict(os.environ, {"HERMES_HOME": str(tmp_path)}):
+        with patch.dict(os.environ, {"EIR_HOME": str(tmp_path)}):
             save_config(load_config())
         model = yaml.safe_load((tmp_path / "config.yaml").read_text(encoding="utf-8"))["model"]
         assert model["default"] == "x/y" and model["provider"] == "openrouter"
@@ -780,7 +780,7 @@ class TestRootLevelProviderOverride:
         assert model["base_url"] == "https://outer.example/v1"
 
     def test_nested_extras_do_not_change_endpoint_precedence(self):
-        from hermes_cli.config import _normalize_root_model_keys
+        from eir_cli.config import _normalize_root_model_keys
 
         result = _normalize_root_model_keys({"model": {
             "api_base": "https://outer.invalid",
@@ -793,7 +793,7 @@ class TestRootLevelProviderOverride:
 
     def test_flat_string_default_untouched(self):
         """Plain string defaults keep existing behavior exactly."""
-        from hermes_cli.config import _normalize_root_model_keys
+        from eir_cli.config import _normalize_root_model_keys
 
         result = _normalize_root_model_keys({
             "model": {"default": "flat-default-model", "provider": "auto"},
@@ -806,17 +806,17 @@ class TestPluginToolsetStartupValidation:
     """Plugin toolsets are only known where plugins load (the gateway), so the CLI's toolset init
     neither probes plugins nor judges names (#71650, PLG-7): the gateway refuses an unknown picked
     name at session.create and reports a stale profile one with the session
-    (tests/hermes_cli/test_cli_profile_toolsets.py)."""
+    (tests/eir_cli/test_cli_profile_toolsets.py)."""
 
     def test_init_probes_no_plugins_and_keeps_the_list(self, monkeypatch):
         import cli as _cli_mod
 
-        stub = object.__new__(_cli_mod.HermesCLI)
+        stub = object.__new__(_cli_mod.EirCLI)
         printed: list[str] = []
         stub._console_print = printed.append
         monkeypatch.setattr(_cli_mod, "CLI_CONFIG", {"agent": {}})
         for name in ("get_plugin_toolset_keys_nowait", "discover_plugins", "get_plugin_manager"):
-            monkeypatch.setattr(f"hermes_cli.plugins.{name}", lambda *_a: pytest.fail("probed plugins"))
+            monkeypatch.setattr(f"eir_cli.plugins.{name}", lambda *_a: pytest.fail("probed plugins"))
         stub._init_toolsets(["terminal", "voice_stack", "voice_stak"])
         assert printed == []
         assert stub.enabled_toolsets == ["terminal", "voice_stack", "voice_stak"]

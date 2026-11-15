@@ -2,10 +2,10 @@
 
 Every writer that wants a "before" copy of the user's config (setup wizard, corrupt-file
 snapshot, model migrations) goes through :func:`backup_config`. Copies live in
-``<HERMES_HOME>/backups/config/`` — ``backups/`` is already excluded from full backups, so they
+``<EIR_HOME>/backups/config/`` — ``backups/`` is already excluded from full backups, so they
 never nest — as ``config.yaml.<reason>.<YYYYMMDD-HHMMSS>``. A copy identical to the newest one
 for the same reason is skipped, and only the newest ``keep`` per reason survive, so repeated
-``hermes setup`` runs or a gateway restarting against broken YAML cannot litter the home dir.
+``eir setup`` runs or a gateway restarting against broken YAML cannot litter the home dir.
 """
 
 from __future__ import annotations
@@ -48,7 +48,7 @@ def backup_config(config_path: Path, reason: str, *, keep: int = DEFAULT_KEEP) -
     identical bytes. Never raises: a failed backup must not block the write it precedes.
     Skipped entirely for a config backend without file tooling (no local copies, D2).
     """
-    from hermes_cli.config_backend import supports_file_tooling
+    from eir_cli.config_backend import supports_file_tooling
     if not supports_file_tooling():
         return None
     try:
@@ -60,7 +60,7 @@ def backup_config(config_path: Path, reason: str, *, keep: int = DEFAULT_KEEP) -
         # Copies written before backups were secured kept their source's (often 0644) mode, and a
         # reason that never fires again never rotates them out. Drop only the world bits, as for
         # config.yaml writes: a shared-group home may keep its backups group-readable on purpose.
-        from hermes_cli.config_backend import drop_other_access
+        from eir_cli.config_backend import drop_other_access
         for old in list_config_backups(config_path):
             if not old.is_symlink():
                 drop_other_access(old)
@@ -75,7 +75,7 @@ def backup_config(config_path: Path, reason: str, *, keep: int = DEFAULT_KEEP) -
         shutil.copy2(config_path, dest)  # config-reader: ok — file tooling, gated above
         # copy2 carries the source mode over, so a config.yaml left 0644 by an editor would yield a
         # world-readable copy of the user's credentials. Apply the same owner-only policy as config.yaml.
-        from hermes_cli.config import _secure_file
+        from eir_cli.config import _secure_file
         _secure_file(dest)
         for stale in [dest, *existing][keep:]:
             stale.unlink(missing_ok=True)
@@ -92,7 +92,7 @@ def load_newest_good_backup(config_path: Path) -> Optional[dict]:
     tried: a backup that fails to parse means the on-disk copy was damaged after the fact, and
     guessing further back would serve a config the user never saw as current.
     """
-    from hermes_cli.config_backend import supports_file_tooling
+    from eir_cli.config_backend import supports_file_tooling
     if not supports_file_tooling():
         return None
     newest = list_config_backups(config_path, "good")[:1]
@@ -109,7 +109,7 @@ def load_newest_good_backup(config_path: Path) -> Optional[dict]:
 
 
 def _sweep_legacy_siblings(config_path: Path, root: Path) -> None:
-    from hermes_cli.config import _secure_file
+    from eir_cli.config import _secure_file
     for pattern in _LEGACY_SIBLING_GLOBS:
         for old in config_path.parent.glob(pattern):
             if not old.is_file() or old.is_symlink():

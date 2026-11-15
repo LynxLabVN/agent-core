@@ -10,7 +10,7 @@ import sys
 import time
 from typing import Optional
 
-from hermes_cli.cli_output import (
+from eir_cli.cli_output import (
     print_info as _print_info, print_success as _print_success, print_warning as _print_warning)
 
 
@@ -35,7 +35,7 @@ def _print_output_tail(result: subprocess.CompletedProcess, printer=None) -> Non
 
 def _post_setup_no_window_flags(*, streams_to_console: bool = False) -> int:
     """Hide Windows children unless their output is going to a real console."""
-    from hermes_cli._subprocess_compat import windows_hide_flags
+    from eir_cli._subprocess_compat import windows_hide_flags
     flags = windows_hide_flags()
     try:
         if flags and streams_to_console and sys.stdout is not None and sys.stdout.isatty():
@@ -46,7 +46,7 @@ def _post_setup_no_window_flags(*, streams_to_console: bool = False) -> int:
 
 
 def _cua_driver_cmd() -> str:
-    return os.environ.get("HERMES_CUA_DRIVER_CMD", "").strip() or "cua-driver"
+    return os.environ.get("EIR_CUA_DRIVER_CMD", "").strip() or "cua-driver"
 
 
 def _cua_version_summary(raw: str, *, limit: int = 120) -> str:
@@ -111,16 +111,16 @@ def install_cua_driver(upgrade: bool = False, show_installer_progress: bool = Tr
     """
     from pm import ensure
 
-    override = os.environ.get("HERMES_CUA_DRIVER_CMD", "").strip()
+    override = os.environ.get("EIR_CUA_DRIVER_CMD", "").strip()
     binary = _resolved_cua_driver_cmd()
     fresh_install = binary is None
     if override:
         if not binary:
-            return _fail(f"    HERMES_CUA_DRIVER_CMD does not resolve to an executable: {override}",
+            return _fail(f"    EIR_CUA_DRIVER_CMD does not resolve to an executable: {override}",
                          "    Fix or unset the override before running computer-use install.")
     else:
         if show_installer_progress:
-            _print_info("    Preparing the pinned cua-driver with Hermes PM...")
+            _print_info("    Preparing the pinned cua-driver with Eir PM...")
         try:
             ensure("cua-driver", explicit=True)
         except Exception as exc:
@@ -132,8 +132,8 @@ def install_cua_driver(upgrade: bool = False, show_installer_progress: bool = Tr
     _CUA_DRIVER_CONTRACT_CACHE.clear()
     contract = _cua_driver_contract_status(binary)
     if not contract.get("ready"):
-        hint = ("    Update the binary selected by HERMES_CUA_DRIVER_CMD, or unset the override."
-                if override else "    Run: hermes computer-use doctor")
+        hint = ("    Update the binary selected by EIR_CUA_DRIVER_CMD, or unset the override."
+                if override else "    Run: eir computer-use doctor")
         return _fail("    cua-driver runtime contract is unusable: "
                      f"{contract.get('reason') or 'unknown error'}.", hint)
     if sys.platform == "win32" and not _repair_cua_driver_autostart_windows(
@@ -200,7 +200,7 @@ def _cua_autostart_opt_in() -> bool:
     install/enable time — needed when driving Windows over SSH (Session 0 has no interactive
     desktop). Unreadable config fails closed to the on-demand default."""
     with contextlib.suppress(Exception):
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
         return bool(((load_config() or {}).get("computer_use") or {}).get("autostart", False))
     return False
 
@@ -267,4 +267,4 @@ def _print_cua_platform_notes(is_windows: bool, is_linux: bool, *, fresh_install
                     else "    Grant macOS permissions if not done yet:")
         _print_info("      System Settings > Privacy & Security > Accessibility")
         _print_info("      System Settings > Privacy & Security > Screen Recording")
-        _print_info("    Allow CuaDriver.app; run `hermes computer-use permissions grant` for guidance.")
+        _print_info("    Allow CuaDriver.app; run `eir computer-use permissions grant` for guidance.")

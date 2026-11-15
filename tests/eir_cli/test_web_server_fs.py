@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from hermes_cli import ssh_workspace_fs, web_server
-from hermes_cli.web_routers import files as file_routes
+from eir_cli import ssh_workspace_fs, web_server
+from eir_cli.web_routers import files as file_routes
 
 pytest.importorskip("starlette.testclient")
 from starlette.testclient import TestClient
@@ -290,7 +290,7 @@ def test_ssh_requested_credential_store_stays_denied_after_remote_realpath(clien
 def test_ssh_requested_credential_store_checked_as_normalized(client, monkeypatch):
     """The SSH normalizer strips whitespace and joins a relative path onto the cwd before the remote
     realpath, so the requested-name check judges that normalized spelling, not the raw text."""
-    from hermes_cli.ssh_workspace_fs import SshWorkspaceFs
+    from eir_cli.ssh_workspace_fs import SshWorkspaceFs
 
     links = {"/home/dev/.netrc": "/home/dev/dotfiles/netrc", "/home/dev/.config/gh/hosts.yml": "/home/dev/gh-store/hosts.yml"}
 
@@ -316,8 +316,8 @@ def test_ssh_requested_credential_store_checked_as_normalized(client, monkeypatc
 
 
 @pytest.mark.parametrize("endpoint", ["/api/fs/read-text", "/api/fs/read-data-url"])
-@pytest.mark.parametrize("resolved", ["/srv/repos/.env", "/home/dev/.hermes/auth.json",
-                                      "/home/dev/.hermes/mcp-tokens/github.json"])
+@pytest.mark.parametrize("resolved", ["/srv/repos/.env", "/home/dev/.eir/auth.json",
+                                      "/home/dev/.eir/mcp-tokens/github.json"])
 def test_fs_readers_reject_sensitive_resolved_ssh_path_before_reading(client, monkeypatch, endpoint, resolved):
     """An SSH profile's previews refuse what download refuses, judged on the path the SSH machine
     resolves (a harmless-looking link to a credential file included), before any byte is read."""
@@ -414,7 +414,7 @@ def test_fs_ssh_readers_refuse_a_resolved_name_the_adapter_would_rewrite(client,
             self.commands.append(command)
             if len(self.commands) > 1:
                 pytest.fail("a path the adapter rewrites must not be read")
-            return {"returncode": 0, "output": f"__HERMES_FS_TARGET__:{resolved}\n__HERMES_FS_SIZE__:8\n"}
+            return {"returncode": 0, "output": f"__EIR_FS_TARGET__:{resolved}\n__EIR_FS_SIZE__:8\n"}
 
         def _build_ssh_command(self):
             pytest.fail("a path the adapter rewrites must not be streamed")
@@ -457,18 +457,18 @@ def test_a_browser_download_reads_the_ssh_workspace_file_it_listed(client, monke
     the session header). Both read the file on the SSH machine, as native Desktop's download does,
     never a file at the same path on the gateway's own disk. The ticket allows a few retries of
     that exact URL, then dies with its profile."""
-    from hermes_cli import web_server_file_tickets as file_tickets
-    from hermes_constants import mark_named_profile_deleted
+    from eir_cli import web_server_file_tickets as file_tickets
+    from eir_constants import mark_named_profile_deleted
 
     # The Webapp: the browser's file routes (download tickets) exist only there.
     monkeypatch.setattr(web_server.app.state, "ui_surface", "webapp", raising=False)
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     profile = home / "profiles" / "remote-dev"
     profile.mkdir(parents=True)
     (profile / "config.yaml").write_text("{}", encoding="utf-8")
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.delenv("HERMES_DASHBOARD_FILES_ROOT", raising=False)
+    monkeypatch.setenv("EIR_HOME", str(home))
+    monkeypatch.delenv("EIR_DASHBOARD_FILES_ROOT", raising=False)
     same_path = tmp_path / "srv" / "report.txt"
     same_path.parent.mkdir()
     same_path.write_bytes(b"gateway copy")
@@ -579,9 +579,9 @@ def test_fs_media_shell_paths_deliver_files_and_preserve_access_checks(client, t
         assert response.status_code == expected, response.text
         assert "must-not-be-delivered" not in response.text
 
-    from hermes_constants import get_hermes_home
-    from hermes_state import SessionDB
-    SessionDB(db_path=get_hermes_home() / "state.db").close()  # read-only lookups need an initialized store
+    from eir_constants import get_eir_home
+    from eir_state import SessionDB
+    SessionDB(db_path=get_eir_home() / "state.db").close()  # read-only lookups need an initialized store
     invalid_session = client.get(endpoint, params={
         "path": shell_path(target), "profile": "default", "session_id": "missing-session",
     })
@@ -592,7 +592,7 @@ def test_fs_media_shell_paths_deliver_files_and_preserve_access_checks(client, t
 
 @pytest.mark.platforms("posix")
 def test_fs_media_posix_paths_are_not_interpreted_as_windows_drives():
-    from hermes_cli.web_server_files import _fs_path
+    from eir_cli.web_server_files import _fs_path
 
     for path in ("/c/Users/example/checklist.txt", "/cygdrive/c/checklist.txt", "/mnt/c/checklist.txt"):
         assert _fs_path(path) == Path(path).resolve()
@@ -657,7 +657,7 @@ def test_fs_default_cwd_answers_each_profile_with_its_own_start_folder(client, m
     gateway serving several profiles starts each one's sessions and browser terminals in its own
     folder. A profile without one starts in the home folder: never another profile's folder and
     never the folder the serving process was started from."""
-    from hermes_cli import profiles
+    from eir_cli import profiles
 
     default_home = tmp_path / "default-home"
     work_home = default_home / "profiles" / "work"
@@ -673,8 +673,8 @@ def test_fs_default_cwd_answers_each_profile_with_its_own_start_folder(client, m
     (work_home / "config.yaml").write_text(
         f"terminal:\n  cwd: {work_project.as_posix()}\n", encoding="utf-8")
     (plain_home / "config.yaml").write_text("terminal:\n  cwd: .\n", encoding="utf-8")
-    monkeypatch.setattr(profiles, "_get_default_hermes_home", lambda: default_home)
-    monkeypatch.setenv("HERMES_HOME", str(default_home))
+    monkeypatch.setattr(profiles, "_get_default_eir_home", lambda: default_home)
+    monkeypatch.setenv("EIR_HOME", str(default_home))
     # What the gateway's startup leaves in its own environment for its own profile.
     monkeypatch.setenv("TERMINAL_CWD", str(default_project))
     monkeypatch.delenv("TERMINAL_ENV", raising=False)
@@ -869,7 +869,7 @@ def test_fs_write_text_refuses_a_credential_name_mid_link_chain(client, tmp_path
     async def detail(session_id, profile=None):  # ... or, with a session, against its cwd
         return {"id": session_id, "cwd": str(tmp_path)}
 
-    monkeypatch.setattr("hermes_cli.web_routers.sessions.get_session_detail", detail)
+    monkeypatch.setattr("eir_cli.web_routers.sessions.get_session_detail", detail)
     monkeypatch.chdir(tmp_path.parent)
     response = client.post("/api/fs/write-text", json={"path": "notes.md", "content": "EVIL=1", "session_id": "s"})
     assert response.status_code == 403
@@ -970,7 +970,7 @@ def test_a_down_ssh_host_is_unavailable_on_workspace_file_routes(client, monkeyp
 
         def execute(self, command, **_options):
             code, rc = ("EACCES", 46) if "/srv/secret" in command else ("ENOENT", 44)
-            return {"returncode": rc, "output": f"__HERMES_FS_ERROR__:{code}\n"}
+            return {"returncode": rc, "output": f"__EIR_FS_ERROR__:{code}\n"}
 
         def cleanup(self):
             pass
@@ -1031,13 +1031,13 @@ class _NotOnTheSshMachine:
 
 def _ssh_profiles(tmp_path, monkeypatch):
     """A default home and a named profile ``remote-dev``, both with an SSH machine as workspace."""
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     profile = home / "profiles" / "remote-dev"
     profile.mkdir(parents=True)
     (profile / "config.yaml").write_text("{}", encoding="utf-8")
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.delenv("HERMES_DASHBOARD_FILES_ROOT", raising=False)
+    monkeypatch.setenv("EIR_HOME", str(home))
+    monkeypatch.delenv("EIR_DASHBOARD_FILES_ROOT", raising=False)
     workspace = _NotOnTheSshMachine()
     monkeypatch.setattr(file_routes, "_fs_backend", lambda profile=None: workspace)
     return profile, workspace
@@ -1167,7 +1167,7 @@ def test_a_staged_text_preview_reads_back_under_a_locked_files_root(client, monk
         path.write_bytes(b"not staged")
     managed = tmp_path / "managed"
     managed.mkdir()
-    monkeypatch.setenv("HERMES_DASHBOARD_FILES_ROOT", str(managed))
+    monkeypatch.setenv("EIR_DASHBOARD_FILES_ROOT", str(managed))
 
     def read_text(path, query):
         return client.get("/api/fs/read-text", params={"path": str(path), **query})
@@ -1341,7 +1341,7 @@ def test_fs_download_maps_workspace_container_to_its_sandbox(client, monkeypatch
     monkeypatch.delenv("TERMINAL_DOCKER_VOLUMES", raising=False)
     monkeypatch.delenv("TERMINAL_DOCKER_MOUNT_CWD_TO_WORKSPACE", raising=False)
     monkeypatch.setattr(
-        "hermes_cli.web_routers.sessions.get_session_detail",
+        "eir_cli.web_routers.sessions.get_session_detail",
         _session_detail({
             "sess-ws": str(project),
             "sess-other": str(other),
@@ -1415,7 +1415,7 @@ def test_fs_download_cwd_mount_wins_then_falls_back_to_workspace_sandbox(
     monkeypatch.setenv("TERMINAL_CWD", str(mounted))
     monkeypatch.delenv("TERMINAL_DOCKER_VOLUMES", raising=False)
     monkeypatch.setattr(
-        "hermes_cli.web_routers.sessions.get_session_detail",
+        "eir_cli.web_routers.sessions.get_session_detail",
         _session_detail({"sess-ws": str(project)}),
     )
 
@@ -1438,7 +1438,7 @@ def test_agent_fs_path_translates_before_host_normalization(monkeypatch, tmp_pat
     """On a Windows gateway ``_fs_path("/workspace/x")`` anchors to the current
     drive (``D:\\workspace\\x``) and could serve an unrelated host file; the
     container path must reach the translator verbatim, before normalization."""
-    from hermes_cli import web_server_files
+    from eir_cli import web_server_files
 
     mapped = tmp_path / "x.txt"
     seen = []
@@ -1464,7 +1464,7 @@ def test_agent_fs_path_unmapped_container_path_404s_on_windows(monkeypatch):
     """A container path that misses translation must not fall back to the drive."""
     from fastapi import HTTPException
 
-    from hermes_cli import web_server_files
+    from eir_cli import web_server_files
 
     monkeypatch.setenv("TERMINAL_ENV", "docker")
     monkeypatch.setenv("TERMINAL_CONTAINER_PERSISTENT", "false")
@@ -1520,7 +1520,7 @@ def test_local_backend_ignores_leftover_docker_volumes(client, monkeypatch, tmp_
 def test_fs_download_profile_uses_that_profiles_sandbox(client, monkeypatch, tmp_path):
     """``profile=work`` must resolve /root/... in the work profile's sandbox, not the
     active profile's."""
-    from hermes_cli import profiles
+    from eir_cli import profiles
 
     default_home = tmp_path / "default-home"
     work_home = default_home / "profiles" / "work"
@@ -1528,8 +1528,8 @@ def test_fs_download_profile_uses_that_profiles_sandbox(client, monkeypatch, tmp
         home.mkdir(parents=True, exist_ok=True)
         (home / "config.yaml").write_text(
             "terminal:\n  backend: docker\n  container_persistent: true\n", encoding="utf-8")
-    monkeypatch.setattr(profiles, "_get_default_hermes_home", lambda: default_home)
-    monkeypatch.setenv("HERMES_HOME", str(default_home))
+    monkeypatch.setattr(profiles, "_get_default_eir_home", lambda: default_home)
+    monkeypatch.setenv("EIR_HOME", str(default_home))
     monkeypatch.delenv("TERMINAL_SANDBOX_DIR", raising=False)
     monkeypatch.delenv("TERMINAL_DOCKER_VOLUMES", raising=False)
     monkeypatch.setenv("TERMINAL_ENV", "docker")
@@ -1564,7 +1564,7 @@ def test_fs_reads_accept_profile_current_for_host_files(client, tmp_path):
 
 def _two_profile_homes(monkeypatch, tmp_path, *, active_backend, work_backend):
     """Default + ``work`` homes with their own ``terminal.backend``; returns (default, work)."""
-    from hermes_cli import profiles
+    from eir_cli import profiles
 
     default_home = tmp_path / "default-home"
     work_home = default_home / "profiles" / "work"
@@ -1572,8 +1572,8 @@ def _two_profile_homes(monkeypatch, tmp_path, *, active_backend, work_backend):
         home.mkdir(parents=True, exist_ok=True)
         (home / "config.yaml").write_text(
             f"terminal:\n  backend: {backend}\n  container_persistent: false\n", encoding="utf-8")
-    monkeypatch.setattr(profiles, "_get_default_hermes_home", lambda: default_home)
-    monkeypatch.setenv("HERMES_HOME", str(default_home))
+    monkeypatch.setattr(profiles, "_get_default_eir_home", lambda: default_home)
+    monkeypatch.setenv("EIR_HOME", str(default_home))
     monkeypatch.setenv("TERMINAL_ENV", active_backend)
     monkeypatch.delenv("TERMINAL_DOCKER_VOLUMES", raising=False)
     return default_home, work_home
@@ -1588,7 +1588,7 @@ def test_unmapped_classification_uses_requested_profiles_backend(
 ):
     """The Windows 404-or-drive decision and the sandbox hint read the same profile
     translation used, in both mixed-backend directions."""
-    from hermes_cli import web_server_files
+    from eir_cli import web_server_files
 
     _default, work_home = _two_profile_homes(
         monkeypatch, tmp_path, active_backend=active, work_backend=work)
@@ -1601,8 +1601,8 @@ def test_unmapped_classification_uses_requested_profiles_backend(
 def test_native_home_override_translates_with_that_profiles_volumes(monkeypatch, tmp_path):
     """A native ticket binds the profile's home before the route runs; translation must
     install that profile's terminal policy, not read the launch env's volumes."""
-    from hermes_cli import web_server_files
-    from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+    from eir_cli import web_server_files
+    from eir_constants import reset_eir_home_override, set_eir_home_override
 
     _default, work_home = _two_profile_homes(
         monkeypatch, tmp_path, active_backend="docker", work_backend="docker")
@@ -1616,11 +1616,11 @@ def test_native_home_override_translates_with_that_profiles_volumes(monkeypatch,
         "terminal:\n  backend: docker\n  container_persistent: false\n"
         f"  docker_volumes:\n    - {work_mount}:/workspace\n", encoding="utf-8")
 
-    token = set_hermes_home_override(str(work_home))
+    token = set_eir_home_override(str(work_home))
     try:
         translated = web_server_files._agent_container_path("/workspace/native.txt")
     finally:
-        reset_hermes_home_override(token)
+        reset_eir_home_override(token)
 
     assert translated == (work_mount / "native.txt").resolve()
     assert web_server_files._agent_container_path("/workspace/native.txt") == (
@@ -1639,7 +1639,7 @@ def test_fs_read_plain_host_path_logs_no_docker_media_warning(client, docker_vol
 
 
 def test_agent_fs_path_leaves_host_paths_to_fs_path(monkeypatch, tmp_path):
-    from hermes_cli import web_server_files
+    from eir_cli import web_server_files
 
     def translate(*_a, **_k):
         raise AssertionError("relative/UNC/drive paths are not container paths")

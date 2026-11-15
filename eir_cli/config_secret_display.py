@@ -1,5 +1,5 @@
-"""Masking of credential-shaped config values before ``hermes config`` prints them (moved out of
-``hermes_cli.config``, which re-exports ``redact_config_value`` for its callers)."""
+"""Masking of credential-shaped config values before ``eir config`` prints them (moved out of
+``eir_cli.config``, which re-exports ``redact_config_value`` for its callers)."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ def redact_config_value(value: Any, _depth: int = 0) -> Any:
     """Copy of ``value`` with credential-shaped keys masked. ``print`` bypasses the logging
     redactor and opaque tokens miss the vendor-prefix regexes, so structural masking is required."""
     from agent.redact import mask_secret
-    from hermes_cli.config import _ENV_PLACEHOLDER_RE, _is_secret_config_key
+    from eir_cli.config import _ENV_PLACEHOLDER_RE, _is_secret_config_key
 
     if _depth > 20:  # bound recursion for pathological/cyclic configs
         return value

@@ -15,12 +15,12 @@ from datetime import datetime, timedelta, timezone, UTC
 
 import pytest
 
-from hermes_cli.observability.shared_metrics import SharedMetricsStore
-from hermes_cli.observability.shared_metrics_sender import (
+from eir_cli.observability.shared_metrics import SharedMetricsStore
+from eir_cli.observability.shared_metrics_sender import (
     CONSENT_GATE_SQL,
     reconcile_send_consent,
 )
-from hermes_cli.sqlite_util import write_txn
+from eir_cli.sqlite_util import write_txn
 
 T0 = datetime(2026, 8, 1, tzinfo=UTC)
 
@@ -158,7 +158,7 @@ class TestClockAdversaries:
         permanent). Capped, the mark moves at most MAX_OBS_ADVANCE_SECONDS
         past its previous value, so honest time overtakes it.
         """
-        from hermes_cli.observability.shared_metrics_sender import (
+        from eir_cli.observability.shared_metrics_sender import (
             MAX_OBS_ADVANCE_SECONDS,
         )
 
@@ -269,12 +269,12 @@ class TestReconcilerProperties:
             with write_txn(connection):
                 connection.execute(
                     "INSERT INTO counter_aggregates("
-                    " period_start, metric_name, hermes_version, os_family,"
+                    " period_start, metric_name, eir_version, os_family,"
                     " architecture, install_method, dimensions_json, value,"
                     " packaged_value"
                     ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (
-                        yesterday, "hermes.client.active", "0.0.0-test",
+                        yesterday, "eir.client.active", "0.0.0-test",
                         "macos", "arm64", "git", "{}", 1, 0,
                     ),
                 )

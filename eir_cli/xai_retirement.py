@@ -27,7 +27,7 @@ _RETIRED_MODELS: dict[str, dict[str, Optional[str]]] = {
 
 @dataclass(frozen=True)
 class RetirementIssue:
-    """A reference to a retired xAI model found in a Hermes config."""
+    """A reference to a retired xAI model found in a Eir config."""
 
     config_path: str            # e.g. "principal.model" or "auxiliary.vision.model"
     current_model: str          # exact value found in config (preserves casing/prefix)
@@ -50,7 +50,7 @@ def _looks_like_xai(model_id: Optional[str]) -> bool:
 
 
 def find_retired_xai_refs(config: dict[str, Any]) -> list[RetirementIssue]:
-    """Walk all model slots in a Hermes config and return retirement issues.
+    """Walk all model slots in a Eir config and return retirement issues.
 
     Slots scanned: ``principal.model``, ``auxiliary.<any>.model`` (introspective, covers future
     aux slots), ``delegation.model``, ``tts.xai.model``, ``plugins.image_gen.xai.model``.
@@ -131,7 +131,7 @@ def apply_migration(
     Unless ``backup=False`` a copy goes to ``backups/config/`` (reason ``pre-migrate-xai``).
     """
     from ruamel.yaml import YAML  # local import — avoid hard dep at module load
-    from hermes_cli.config_backend import require_file_tooling
+    from eir_cli.config_backend import require_file_tooling
     # A type-literal-preserving rewrite of the file itself; a non-file backend has no file.
     require_file_tooling("The xAI model migration")
     config_path = Path(config_path)
@@ -141,7 +141,7 @@ def apply_migration(
     if not issues:
         return unchanged
 
-    from hermes_yaml import ROUNDTRIP_YAML_WIDTH
+    from eir_yaml import ROUNDTRIP_YAML_WIDTH
     yaml = YAML(typ="rt")
     yaml.width = ROUNDTRIP_YAML_WIDTH
     yaml.preserve_quotes = True
@@ -165,10 +165,10 @@ def apply_migration(
 
     backup_path: Optional[Path] = None
     if backup:
-        from hermes_cli.config_backups import backup_config
+        from eir_cli.config_backups import backup_config
         backup_path = backup_config(config_path, "pre-migrate-xai")
 
-    from hermes_cli.config import require_readable_config_before_write
+    from eir_cli.config import require_readable_config_before_write
     from utils import atomic_write_text
     require_readable_config_before_write(config_path)
     # Dump to a buffer, then atomic-write: ``open(path, "w")`` truncates before the dump runs, so a
@@ -179,6 +179,6 @@ def apply_migration(
     buf = io.StringIO()
     yaml.dump(doc, buf)
     atomic_write_text(config_path, buf.getvalue(), preserve_mode=True)  # config-reader: ok — file tooling (gated above)
-    from hermes_cli.config_backend import drop_other_access
+    from eir_cli.config_backend import drop_other_access
     drop_other_access(config_path)
     return ApplyResult(file_path=config_path, backup_path=backup_path, issues_resolved=resolved, config_changed=True)

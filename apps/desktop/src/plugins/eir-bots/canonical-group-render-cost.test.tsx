@@ -35,7 +35,7 @@ vi.mock('./canonical-group-history', async importOriginal => {
 
     return real.CanonicalGroupHistory(props) } }
 })
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@eir/plugin-sdk', async () => {
   const { pluginSdkMock, createGroupGateway } = await import('./group-test-utils')
   const gateway = createGroupGateway()
   const { en } = await import('@/i18n/en')
@@ -57,7 +57,7 @@ import { CanonicalGroupWorkspace } from './canonical-group-workspace'
 const members = [{ member_id: 'ops', profile: 'ops', handle: 'ops', display_name: 'Ops' }]
 const binding = { connectionId: 'local', profile: 'team', roomId: 'busy', roomName: 'Room' }
 
-beforeEach(() => { Object.defineProperty(window, 'hermesDesktop', { configurable: true, writable: true, value: undefined }) })
+beforeEach(() => { Object.defineProperty(window, 'eirDesktop', { configurable: true, writable: true, value: undefined }) })
 afterEach(() => { cleanup(); request.mockReset(); localStorage.clear(); vi.useRealTimers(); handoffScans.count = 0; cycleRuns.count = 0; outcomeRuns.count = 0; historyRenders.count = 0 })
 
 it('ticks only the working member’s time, never re-deriving the room each second', async () => {

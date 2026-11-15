@@ -5,10 +5,10 @@ import stat
 
 import pytest
 
-import hermes_constants
-from hermes_cli.config import atomic_config_replace, atomic_config_write
-from hermes_cli.config_backend import write_config_key
-from hermes_cli.xai_retirement import apply_migration, find_retired_xai_refs
+import eir_constants
+from eir_cli.config import atomic_config_replace, atomic_config_write
+from eir_cli.config_backend import write_config_key
+from eir_cli.xai_retirement import apply_migration, find_retired_xai_refs
 
 pytestmark = pytest.mark.platforms("posix")  # POSIX permission bits
 
@@ -17,10 +17,10 @@ pytestmark = pytest.mark.platforms("posix")  # POSIX permission bits
 def config_path(tmp_path, monkeypatch):
     home = tmp_path / "home"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    for name in ("HERMES_MANAGED", "HERMES_CONTAINER", "HERMES_SKIP_CHMOD"):
+    monkeypatch.setenv("EIR_HOME", str(home))
+    for name in ("EIR_MANAGED", "EIR_CONTAINER", "EIR_SKIP_CHMOD"):
         monkeypatch.delenv(name, raising=False)
-    monkeypatch.setattr(hermes_constants, "_detect_container", lambda: False)
+    monkeypatch.setattr(eir_constants, "_detect_container", lambda: False)
     path = home / "config.yaml"
     path.write_text("model:\n  default: old\n", encoding="utf-8")
     return path
@@ -59,7 +59,7 @@ def test_group_bits_and_setgid_are_kept(config_path, before, after):
 
 
 def test_managed_install_mode_is_left_alone(config_path, monkeypatch):
-    monkeypatch.setenv("HERMES_MANAGED", "nixos")
+    monkeypatch.setenv("EIR_MANAGED", "nixos")
     os.chmod(config_path, 0o644)
 
     atomic_config_write(config_path, {"model": {"default": "new"}})
@@ -70,7 +70,7 @@ def test_managed_install_mode_is_left_alone(config_path, monkeypatch):
 def test_xai_migration_drops_world_access(config_path):
     config_path.write_text("principal:\n  provider: xai\n  model: grok-code-fast-1\n", encoding="utf-8")
     os.chmod(config_path, 0o666)
-    from hermes_cli.config import read_user_config_raw
+    from eir_cli.config import read_user_config_raw
     issues = find_retired_xai_refs(read_user_config_raw(config_path))
     assert issues
 

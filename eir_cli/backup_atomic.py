@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Callable, Optional
 
-from hermes_cli.backup_staging import staged_backup_file
+from eir_cli.backup_staging import staged_backup_file
 
 
 @contextmanager

@@ -13,7 +13,7 @@ import concurrent.futures
 import logging
 from typing import Any, Optional
 
-logger = logging.getLogger("hermes_cli.plugins")
+logger = logging.getLogger("eir_cli.plugins")
 
 _TIMEOUT_S = 30.0
 

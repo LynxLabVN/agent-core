@@ -10,12 +10,12 @@ import sys
 import types
 from pathlib import Path
 
-import hermes_yaml as yaml
+import eir_yaml as yaml
 import pytest
 
 from agent.context_references import _context_reference_providers, get_context_reference_providers
-from hermes_cli import plugins as plugins_mod
-from hermes_cli.plugins import PluginManager, _plugin_home_scope
+from eir_cli import plugins as plugins_mod
+from eir_cli.plugins import PluginManager, _plugin_home_scope
 
 _PROVIDER = '''
 from agent.context_references import ContextReferenceProvider
@@ -51,7 +51,7 @@ def _write_config(home: Path, *names: str) -> None:
 
 @pytest.fixture
 def home(tmp_path, monkeypatch):
-    home = Path(os.environ["HERMES_HOME"])
+    home = Path(os.environ["EIR_HOME"])
     empty_bundled = tmp_path / "bundled"
     empty_bundled.mkdir()
     monkeypatch.setattr(plugins_mod, "get_bundled_plugins_dir", lambda: empty_bundled)

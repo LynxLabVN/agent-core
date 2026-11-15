@@ -1,4 +1,4 @@
-"""Tests for the Linux XDG desktop entry installed by ``hermes desktop``."""
+"""Tests for the Linux XDG desktop entry installed by ``eir desktop``."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from hermes_cli import linux_desktop_entry as lde
+from eir_cli import linux_desktop_entry as lde
 
 
 @pytest.fixture
@@ -20,14 +20,14 @@ def xdg_home(tmp_path, monkeypatch) -> Path:
     data_home = tmp_path / "xdg-data"
     monkeypatch.setenv("XDG_DATA_HOME", str(data_home))
     # Isolate the known-wrapper probe too: tests must never see the real
-    # ~/.local/bin/hermes on the dev machine.
+    # ~/.local/bin/eir on the dev machine.
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setattr(lde.sys, "platform", "linux")
     return data_home
 
 
 def _make_project(tmp_path: Path) -> Path:
-    root = tmp_path / "hermes-agent"
+    root = tmp_path / "eir-agent"
     icon = root / "apps" / "desktop" / "assets" / "icon.png"
     icon.parent.mkdir(parents=True)
     icon.write_bytes(b"\x89PNG fake")
@@ -45,11 +45,11 @@ def _png_ihdr(width: int, height: int) -> bytes:
 
 
 def _stub_install(tmp_path, monkeypatch) -> None:
-    hermes_bin = tmp_path / "bin" / "hermes"
-    hermes_bin.parent.mkdir(exist_ok=True)
-    hermes_bin.write_text("", encoding="utf-8")
+    eir_bin = tmp_path / "bin" / "eir"
+    eir_bin.parent.mkdir(exist_ok=True)
+    eir_bin.write_text("", encoding="utf-8")
     monkeypatch.setattr(
-        "hermes_cli.relaunch.resolve_hermes_bin", lambda: str(hermes_bin)
+        "eir_cli.relaunch.resolve_eir_bin", lambda: str(eir_bin)
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
@@ -67,11 +67,11 @@ def test_install_writes_entry_with_absolute_exec_and_icon(
     tmp_path, xdg_home, monkeypatch
 ):
     root = _make_project(tmp_path)
-    hermes_bin = tmp_path / "bin" / "hermes"
-    hermes_bin.parent.mkdir()
-    hermes_bin.write_text("", encoding="utf-8")
+    eir_bin = tmp_path / "bin" / "eir"
+    eir_bin.parent.mkdir()
+    eir_bin.write_text("", encoding="utf-8")
     monkeypatch.setattr(
-        "hermes_cli.relaunch.resolve_hermes_bin", lambda: str(hermes_bin)
+        "eir_cli.relaunch.resolve_eir_bin", lambda: str(eir_bin)
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
     # Keep the icon install out of the way: this test pins the
@@ -84,8 +84,8 @@ def test_install_writes_entry_with_absolute_exec_and_icon(
     values = _parse(entry.read_text(encoding="utf-8"))
 
     # Exec must be the absolute path of the resolved binary. The launcher
-    # runs with a minimal PATH, so a bare `hermes` would not resolve.
-    assert values["Exec"] == f"{hermes_bin} desktop"
+    # runs with a minimal PATH, so a bare `eir` would not resolve.
+    assert values["Exec"] == f"{eir_bin} desktop"
     assert Path(values["Exec"].split(" ")[0]).is_absolute()
 
     # Icon must be an absolute path to the real icon in the checkout.
@@ -102,23 +102,23 @@ def test_install_prefers_themed_icon_from_hicolor(tmp_path, xdg_home, monkeypatc
     fixed for).
     """
     root = _make_project(tmp_path)
-    hermes_bin = tmp_path / "bin" / "hermes"
-    hermes_bin.parent.mkdir()
-    hermes_bin.write_text("", encoding="utf-8")
+    eir_bin = tmp_path / "bin" / "eir"
+    eir_bin.parent.mkdir()
+    eir_bin.write_text("", encoding="utf-8")
     monkeypatch.setattr(
-        "hermes_cli.relaunch.resolve_hermes_bin", lambda: str(hermes_bin)
+        "eir_cli.relaunch.resolve_eir_bin", lambda: str(eir_bin)
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
     entry = lde.install_desktop_entry(root)
 
     values = _parse(entry.read_text(encoding="utf-8"))
-    assert values["Icon"] == "hermes"
+    assert values["Icon"] == "eir"
 
     # And the icon really landed in the hicolor tree: the fixture icon is
     # a fake PNG (no valid IHDR), so the size is unknown and the icon
     # lands under 256x256/ (indexed; never scalable, which is SVG-only).
-    dest = xdg_home / "icons" / "hicolor" / "256x256" / "apps" / "hermes.png"
+    dest = xdg_home / "icons" / "hicolor" / "256x256" / "apps" / "eir.png"
     assert dest.is_file()
     assert dest.read_bytes() == lde.icon_path(root).read_bytes()
 
@@ -128,11 +128,11 @@ def test_install_icon_copy_failure_falls_back_to_absolute(
 ):
     """An impossible icon copy keeps the absolute path (never breaks)."""
     root = _make_project(tmp_path)
-    hermes_bin = tmp_path / "bin" / "hermes"
-    hermes_bin.parent.mkdir()
-    hermes_bin.write_text("", encoding="utf-8")
+    eir_bin = tmp_path / "bin" / "eir"
+    eir_bin.parent.mkdir()
+    eir_bin.write_text("", encoding="utf-8")
     monkeypatch.setattr(
-        "hermes_cli.relaunch.resolve_hermes_bin", lambda: str(hermes_bin)
+        "eir_cli.relaunch.resolve_eir_bin", lambda: str(eir_bin)
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
@@ -148,14 +148,14 @@ def test_install_icon_copy_failure_falls_back_to_absolute(
     assert values["Icon"] == str(lde.icon_path(root))
 
     assert values["Type"] == "Application"
-    assert values["Name"] == "Hermes"
+    assert values["Name"] == "Eir"
     assert values["Terminal"] == "false"
 
 
 def test_installed_entry_is_executable(tmp_path, xdg_home, monkeypatch):
     root = _make_project(tmp_path)
     monkeypatch.setattr(
-        "hermes_cli.relaunch.resolve_hermes_bin", lambda: "/usr/bin/hermes"
+        "eir_cli.relaunch.resolve_eir_bin", lambda: "/usr/bin/eir"
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
@@ -166,17 +166,17 @@ def test_installed_entry_is_executable(tmp_path, xdg_home, monkeypatch):
 
 def test_exec_falls_back_to_interpreter_module(tmp_path, xdg_home, monkeypatch):
     root = _make_project(tmp_path)
-    monkeypatch.setattr("hermes_cli.relaunch.resolve_hermes_bin", lambda: None)
+    monkeypatch.setattr("eir_cli.relaunch.resolve_eir_bin", lambda: None)
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
     entry = lde.install_desktop_entry(root)
     exec_line = _parse(entry.read_text(encoding="utf-8"))["Exec"]
 
-    assert exec_line.endswith("-m hermes_cli.main desktop")
+    assert exec_line.endswith("-m eir_cli.main desktop")
     assert Path(exec_line.split(" ")[0]).is_absolute()
 
 
-# #90292: the shell installer's bash wrapper makes argv[0] the repo `hermes`
+# #90292: the shell installer's bash wrapper makes argv[0] the repo `eir`
 # python script whose `#!/usr/bin/env python3` shebang resolves to the SYSTEM
 # interpreter when the DE spawns the .desktop entry → ModuleNotFoundError,
 # silent (Terminal=false). The Exec line must prefix sys.executable for any
@@ -187,14 +187,14 @@ def test_exec_prefixes_interpreter_for_env_shebang_python_script(
     import sys
 
     root = _make_project(tmp_path)
-    hermes_bin = tmp_path / "bin" / "hermes"
-    hermes_bin.parent.mkdir()
-    hermes_bin.write_text(
-        "#!/usr/bin/env python3\nimport hermes_cli\n", encoding="utf-8"
+    eir_bin = tmp_path / "bin" / "eir"
+    eir_bin.parent.mkdir()
+    eir_bin.write_text(
+        "#!/usr/bin/env python3\nimport eir_cli\n", encoding="utf-8"
     )
-    hermes_bin.chmod(0o755)
+    eir_bin.chmod(0o755)
     monkeypatch.setattr(
-        "hermes_cli.relaunch.resolve_hermes_bin", lambda: str(hermes_bin)
+        "eir_cli.relaunch.resolve_eir_bin", lambda: str(eir_bin)
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
@@ -203,20 +203,20 @@ def test_exec_prefixes_interpreter_for_env_shebang_python_script(
 
     interpreter = os.path.abspath(sys.executable)
     assert exec_line.split(" ")[0].strip('"') == interpreter
-    assert str(hermes_bin) in exec_line
+    assert str(eir_bin) in exec_line
     assert exec_line.endswith("desktop")
 
 
 def test_exec_leaves_shell_wrapper_launchers_alone(tmp_path, xdg_home, monkeypatch):
     root = _make_project(tmp_path)
-    hermes_bin = tmp_path / "bin" / "hermes"
-    hermes_bin.parent.mkdir()
-    hermes_bin.write_text(
-        '#!/usr/bin/env bash\nexec /opt/hermes/venv/bin/python "$@"\n', encoding="utf-8"
+    eir_bin = tmp_path / "bin" / "eir"
+    eir_bin.parent.mkdir()
+    eir_bin.write_text(
+        '#!/usr/bin/env bash\nexec /opt/eir/venv/bin/python "$@"\n', encoding="utf-8"
     )
-    hermes_bin.chmod(0o755)
+    eir_bin.chmod(0o755)
     monkeypatch.setattr(
-        "hermes_cli.relaunch.resolve_hermes_bin", lambda: str(hermes_bin)
+        "eir_cli.relaunch.resolve_eir_bin", lambda: str(eir_bin)
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
@@ -224,20 +224,20 @@ def test_exec_leaves_shell_wrapper_launchers_alone(tmp_path, xdg_home, monkeypat
     exec_line = _parse(entry.read_text(encoding="utf-8"))["Exec"]
 
     # A bash wrapper execs the venv python itself — no interpreter prefix.
-    assert exec_line == f"{hermes_bin} desktop"
+    assert exec_line == f"{eir_bin} desktop"
 
 
 def test_exec_leaves_venv_shebang_scripts_alone(tmp_path, xdg_home, monkeypatch):
     import sys
 
     root = _make_project(tmp_path)
-    hermes_bin = tmp_path / "bin" / "hermes"
-    hermes_bin.parent.mkdir()
+    eir_bin = tmp_path / "bin" / "eir"
+    eir_bin.parent.mkdir()
     interpreter = os.path.abspath(sys.executable)
-    hermes_bin.write_text(f"#!{interpreter}\nimport hermes_cli\n", encoding="utf-8")
-    hermes_bin.chmod(0o755)
+    eir_bin.write_text(f"#!{interpreter}\nimport eir_cli\n", encoding="utf-8")
+    eir_bin.chmod(0o755)
     monkeypatch.setattr(
-        "hermes_cli.relaunch.resolve_hermes_bin", lambda: str(hermes_bin)
+        "eir_cli.relaunch.resolve_eir_bin", lambda: str(eir_bin)
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
@@ -246,7 +246,7 @@ def test_exec_leaves_venv_shebang_scripts_alone(tmp_path, xdg_home, monkeypatch)
 
     # Console-script with the venv's own interpreter in the shebang: correct
     # as-is, prefixing would only add noise.
-    assert exec_line == f"{hermes_bin} desktop"
+    assert exec_line == f"{eir_bin} desktop"
 
 
 # The persisted entry must be launch-context independent: whatever process
@@ -265,19 +265,19 @@ def test_exec_converges_from_repo_script_argv0_to_installed_wrapper(
 ):
     """A broken interpreter-form entry must self-heal to the wrapper form.
 
-    Launching with argv[0] = <checkout>/hermes (what the broken entry
+    Launching with argv[0] = <checkout>/eir (what the broken entry
     itself spawns) previously re-persisted the same broken form forever —
     the bootstrap loop that kept #90492 from repairing existing installs.
     """
     import sys
 
     root = _make_project(tmp_path)
-    repo_script = root / "hermes"  # checkout-internal launcher candidate
+    repo_script = root / "eir"  # checkout-internal launcher candidate
     repo_script.write_text(
-        "#!/usr/bin/env python3\nimport hermes_cli\n", encoding="utf-8"
+        "#!/usr/bin/env python3\nimport eir_cli\n", encoding="utf-8"
     )
     repo_script.chmod(0o755)
-    wrapper = tmp_path / "installed" / "bin" / "hermes"
+    wrapper = tmp_path / "installed" / "bin" / "eir"
     wrapper.parent.mkdir(parents=True)
     wrapper.write_text(f'#!/usr/bin/env bash\nexec {sys.executable} "$@"\n', encoding="utf-8")
     wrapper.chmod(0o755)
@@ -285,7 +285,7 @@ def test_exec_converges_from_repo_script_argv0_to_installed_wrapper(
     # argv[0] = repo script; PATH lookup finds the installed wrapper.
     _argv0_context(monkeypatch, str(repo_script))
     monkeypatch.setattr(
-        "shutil.which", lambda name: str(wrapper) if name == "hermes" else None
+        "shutil.which", lambda name: str(wrapper) if name == "eir" else None
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
@@ -300,11 +300,11 @@ def test_exec_converges_from_repo_script_argv0_to_installed_wrapper(
 def test_exec_never_persists_a_bare_interpreter_command(
     tmp_path, xdg_home, monkeypatch
 ):
-    """The `python -m hermes_cli.main` relaunch context must not write
+    """The `python -m eir_cli.main` relaunch context must not write
     `Exec=<python> desktop` — a command line no DE can run."""
 
     root = _make_project(tmp_path)
-    wrapper = tmp_path / "installed" / "bin" / "hermes"
+    wrapper = tmp_path / "installed" / "bin" / "eir"
     wrapper.parent.mkdir(parents=True)
     wrapper.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
     wrapper.chmod(0o755)
@@ -317,7 +317,7 @@ def test_exec_never_persists_a_bare_interpreter_command(
     # argv[0] IS the interpreter (python -m context); PATH has the wrapper.
     _argv0_context(monkeypatch, str(interpreter))
     monkeypatch.setattr(
-        "shutil.which", lambda name: str(wrapper) if name == "hermes" else None
+        "shutil.which", lambda name: str(wrapper) if name == "eir" else None
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
@@ -340,16 +340,16 @@ def test_exec_keeps_resolver_fallback_when_no_wrapper_on_path(
 
     With argv[0] checkout-internal and PATH + known locations both empty,
     the resolver returns None and resolve_exec_command emits the runnable
-    `sys.executable -m hermes_cli.main desktop` fallback. Persisting the
+    `sys.executable -m eir_cli.main desktop` fallback. Persisting the
     interpreter itself (`<python> desktop`) would be unrunnable by any DE;
     persisting the repo script alone dies on its env shebang.
     """
     import sys
 
     root = _make_project(tmp_path)
-    repo_script = root / "hermes"
+    repo_script = root / "eir"
     repo_script.write_text(
-        "#!/usr/bin/env python3\nimport hermes_cli\n", encoding="utf-8"
+        "#!/usr/bin/env python3\nimport eir_cli\n", encoding="utf-8"
     )
     repo_script.chmod(0o755)
 
@@ -358,17 +358,17 @@ def test_exec_keeps_resolver_fallback_when_no_wrapper_on_path(
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
     def fake_resolve():
-        # Mirror resolve_hermes_bin's chain: argv[0] → relative → PATH → None.
+        # Mirror resolve_eir_bin's chain: argv[0] → relative → PATH → None.
         return sys.argv[0] if sys.argv[0] else None
 
-    monkeypatch.setattr("hermes_cli.relaunch.resolve_hermes_bin", fake_resolve)
+    monkeypatch.setattr("eir_cli.relaunch.resolve_eir_bin", fake_resolve)
 
     entry = lde.install_desktop_entry(root)
     exec_line = _parse(entry.read_text(encoding="utf-8"))["Exec"]
 
     # The runnable module fallback — NOT the bare repo script (its env
     # shebang would escape the venv under a DE) and NOT `<python> desktop`.
-    assert exec_line.endswith("-m hermes_cli.main desktop")
+    assert exec_line.endswith("-m eir_cli.main desktop")
     assert Path(exec_line.split(" ")[0].strip('"')).is_absolute()
     assert str(repo_script) not in exec_line
 
@@ -386,20 +386,20 @@ def test_exec_uses_known_wrapper_when_path_lookup_misses(
     import sys
 
     root = _make_project(tmp_path)
-    repo_script = root / "hermes"
+    repo_script = root / "eir"
     repo_script.write_text(
-        "#!/usr/bin/env python3\nimport hermes_cli\n", encoding="utf-8"
+        "#!/usr/bin/env python3\nimport eir_cli\n", encoding="utf-8"
     )
     repo_script.chmod(0o755)
 
     # The wrapper exists at the known location but is NOT on PATH.
     # Realistic installer shim: execs this checkout's venv python on the
-    # checkout's hermes script (the aidiyet check requires it to target
+    # checkout's eir script (the aidiyet check requires it to target
     # the writing checkout).
-    known_wrapper = tmp_path / "known-home" / ".local" / "bin" / "hermes"
+    known_wrapper = tmp_path / "known-home" / ".local" / "bin" / "eir"
     known_wrapper.parent.mkdir(parents=True)
     known_wrapper.write_text(
-        f'#!/usr/bin/env bash\nexec {root / "venv" / "bin" / "python"} {root / "hermes"} "$@"\n',
+        f'#!/usr/bin/env bash\nexec {root / "venv" / "bin" / "python"} {root / "eir"} "$@"\n',
         encoding="utf-8",
     )
     known_wrapper.chmod(0o755)
@@ -411,7 +411,7 @@ def test_exec_uses_known_wrapper_when_path_lookup_misses(
     def fake_resolve():
         return sys.argv[0] if sys.argv[0] else None
 
-    monkeypatch.setattr("hermes_cli.relaunch.resolve_hermes_bin", fake_resolve)
+    monkeypatch.setattr("eir_cli.relaunch.resolve_eir_bin", fake_resolve)
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
     entry = lde.install_desktop_entry(root)
@@ -438,15 +438,15 @@ def test_exec_never_persists_a_checkout_internal_path_hit(tmp_path, xdg_home, mo
     checkout must fall through to the durable probe.
     """
     root = _make_project(tmp_path)
-    venv_script = root / "venv" / "bin" / "hermes"
+    venv_script = root / "venv" / "bin" / "eir"
     venv_script.parent.mkdir(parents=True)
     venv_script.write_text("#!/usr/bin/env bash\nexec true\n", encoding="utf-8")
     venv_script.chmod(0o755)
 
-    known_wrapper = tmp_path / "path-home" / ".local" / "bin" / "hermes"
+    known_wrapper = tmp_path / "path-home" / ".local" / "bin" / "eir"
     known_wrapper.parent.mkdir(parents=True)
     known_wrapper.write_text(
-        f'#!/usr/bin/env bash\nexec {root / "venv" / "bin" / "python"} {root / "hermes"} "$@"\n',
+        f'#!/usr/bin/env bash\nexec {root / "venv" / "bin" / "python"} {root / "eir"} "$@"\n',
         encoding="utf-8",
     )
     known_wrapper.chmod(0o755)
@@ -457,7 +457,7 @@ def test_exec_never_persists_a_checkout_internal_path_hit(tmp_path, xdg_home, mo
     def fake_resolve():
         return sys.argv[0] or str(venv_script)
 
-    monkeypatch.setattr("hermes_cli.relaunch.resolve_hermes_bin", fake_resolve)
+    monkeypatch.setattr("eir_cli.relaunch.resolve_eir_bin", fake_resolve)
     _argv0_context(monkeypatch, str(venv_script))
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
@@ -494,15 +494,15 @@ def test_exec_skips_managed_environment_cli_without_desktop(
     generation = installs / install_key(root) / "environments" / "gen"
     workspace = generation / "workspace"
     workspace.mkdir(parents=True)
-    managed = generation / "venv" / "bin" / "hermes"
+    managed = generation / "venv" / "bin" / "eir"
     managed.parent.mkdir(parents=True)
     managed.write_text("#!/usr/bin/env bash\nexec true\n", encoding="utf-8")
     managed.chmod(0o755)
 
-    known_wrapper = tmp_path / ".local" / "bin" / "hermes"
+    known_wrapper = tmp_path / ".local" / "bin" / "eir"
     known_wrapper.parent.mkdir(parents=True)
     known_wrapper.write_text(
-        f'#!/usr/bin/env bash\nexec {root / "venv" / "bin" / "python"} {root / "hermes"} "$@"\n',
+        f'#!/usr/bin/env bash\nexec {root / "venv" / "bin" / "python"} {root / "eir"} "$@"\n',
         encoding="utf-8",
     )
     known_wrapper.chmod(0o755)
@@ -510,7 +510,7 @@ def test_exec_skips_managed_environment_cli_without_desktop(
     def fake_resolve():
         return str(managed)
 
-    monkeypatch.setattr("hermes_cli.relaunch.resolve_hermes_bin", fake_resolve)
+    monkeypatch.setattr("eir_cli.relaunch.resolve_eir_bin", fake_resolve)
     _argv0_context(monkeypatch, str(managed))
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
@@ -528,10 +528,10 @@ def test_exec_finds_known_wrapper_when_resolver_has_no_candidate(
     """`None` from the resolver must still probe known wrapper locations.
 
     A cold relaunch (argv[0] is not an executable file, e.g. `-c` under
-    `python -m`, and PATH has no `hermes`) makes resolve_hermes_bin return
+    `python -m`, and PATH has no `eir`) makes resolve_eir_bin return
     None outright. The early `return primary` that used to fire here skipped
     the durable-wrapper probe, so the persisted Exec flipped to the bare
-    `<python> -m hermes_cli.main desktop` module form. Each flip between the
+    `<python> -m eir_cli.main desktop` module form. Each flip between the
     wrapper and module forms rewrites the entry on the next launch; any
     rewrite that lands while gnome-shell's ShellApp for the entry is still
     STARTING crashes the shell (shell_app_dispose `state == STOPPED`
@@ -540,10 +540,10 @@ def test_exec_finds_known_wrapper_when_resolver_has_no_candidate(
     """
     root = _make_project(tmp_path)
 
-    known_wrapper = tmp_path / "cold-home" / ".local" / "bin" / "hermes"
+    known_wrapper = tmp_path / "cold-home" / ".local" / "bin" / "eir"
     known_wrapper.parent.mkdir(parents=True)
     known_wrapper.write_text(
-        f'#!/usr/bin/env bash\nexec {root / "venv" / "bin" / "python"} {root / "hermes"} "$@"\n',
+        f'#!/usr/bin/env bash\nexec {root / "venv" / "bin" / "python"} {root / "eir"} "$@"\n',
         encoding="utf-8",
     )
     known_wrapper.chmod(0o755)
@@ -553,7 +553,7 @@ def test_exec_finds_known_wrapper_when_resolver_has_no_candidate(
     # yields None with or without argv[0].
     _argv0_context(monkeypatch, "-c")
     monkeypatch.setattr("shutil.which", lambda name: None)
-    monkeypatch.setattr("hermes_cli.relaunch.resolve_hermes_bin", lambda: None)
+    monkeypatch.setattr("eir_cli.relaunch.resolve_eir_bin", lambda: None)
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
     entry = lde.install_desktop_entry(root)
@@ -575,7 +575,7 @@ def test_exec_rejects_known_wrapper_from_another_checkout(
 ):
     """A known-location wrapper that targets a DIFFERENT checkout is skipped.
 
-    On machines with multiple installs over time, ~/.local/bin/hermes may
+    On machines with multiple installs over time, ~/.local/bin/eir may
     belong to another checkout. Persisting it would make the entry stable
     but silently point at that other installation — the failure class the
     aidiyet check exists to prevent. The runnable module fallback must win
@@ -584,20 +584,20 @@ def test_exec_rejects_known_wrapper_from_another_checkout(
     import sys
 
     root = _make_project(tmp_path)
-    repo_script = root / "hermes"
+    repo_script = root / "eir"
     repo_script.write_text(
-        "#!/usr/bin/env python3\nimport hermes_cli\n", encoding="utf-8"
+        "#!/usr/bin/env python3\nimport eir_cli\n", encoding="utf-8"
     )
     repo_script.chmod(0o755)
 
     # A shim belonging to a DIFFERENT checkout.
     other_root = tmp_path / "other-install"
     other_root.mkdir()
-    foreign_wrapper = tmp_path / "known-home" / ".local" / "bin" / "hermes"
+    foreign_wrapper = tmp_path / "known-home" / ".local" / "bin" / "eir"
     foreign_wrapper.parent.mkdir(parents=True)
     foreign_wrapper.write_text(
         f"#!/usr/bin/env bash\nexec {other_root / 'venv' / 'bin' / 'python'} "
-        f'{other_root / "hermes"} "$@"\n',
+        f'{other_root / "eir"} "$@"\n',
         encoding="utf-8",
     )
     foreign_wrapper.chmod(0o755)
@@ -609,7 +609,7 @@ def test_exec_rejects_known_wrapper_from_another_checkout(
     def fake_resolve():
         return sys.argv[0] if sys.argv[0] else None
 
-    monkeypatch.setattr("hermes_cli.relaunch.resolve_hermes_bin", fake_resolve)
+    monkeypatch.setattr("eir_cli.relaunch.resolve_eir_bin", fake_resolve)
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
     entry = lde.install_desktop_entry(root)
@@ -617,7 +617,7 @@ def test_exec_rejects_known_wrapper_from_another_checkout(
 
     # The foreign wrapper was rejected; the runnable module fallback won.
     assert str(foreign_wrapper) not in exec_line
-    assert exec_line.endswith("-m hermes_cli.main desktop")
+    assert exec_line.endswith("-m eir_cli.main desktop")
 
 
 @pytest.mark.parametrize(
@@ -626,25 +626,25 @@ def test_exec_rejects_known_wrapper_from_another_checkout(
         pytest.param(
             "user",
             {},
-            "HOME-SET-BY-TEST/.local/bin/hermes",
+            "HOME-SET-BY-TEST/.local/bin/eir",
             id="user-layout",
         ),
         pytest.param(
             "termux",
             {"PREFIX": "PREFIX-SET-BY-TEST"},
-            "PREFIX-SET-BY-TEST/bin/hermes",
+            "PREFIX-SET-BY-TEST/bin/eir",
             id="termux-prefix-first",
         ),
         pytest.param(
             "root-fhs",
             {"__EUID0__": "1"},
-            "/usr/local/bin/hermes",
+            "/usr/local/bin/eir",
             id="root-fhs",
         ),
         pytest.param(
             "non-root-no-fhs",
             {"__EUID0__": "0"},
-            "HOME-SET-BY-TEST/.local/bin/hermes",
+            "HOME-SET-BY-TEST/.local/bin/eir",
             id="non-root-excludes-fhs",
         ),
     ],
@@ -677,16 +677,16 @@ def test_known_wrapper_candidates_cover_installer_layouts(
         assert candidates[0] == expected_resolved
     if layout == "root-fhs":
         # Root FHS outranks the user layout.
-        assert candidates.index("/usr/local/bin/hermes") < candidates.index(
-            f"{sentinel_home}/.local/bin/hermes"
+        assert candidates.index("/usr/local/bin/eir") < candidates.index(
+            f"{sentinel_home}/.local/bin/eir"
         )
     if layout == "non-root-no-fhs":
         # Non-root euid: /usr/local/bin must be excluded outright.
-        assert "/usr/local/bin/hermes" not in candidates
+        assert "/usr/local/bin/eir" not in candidates
 
 
 def test_installed_entry_carries_the_window_app_id(tmp_path, xdg_home, monkeypatch):
-    """The window's app_id is what GNOME matches the entry against — not the old "Hermes"."""
+    """The window's app_id is what GNOME matches the entry against — not the old "Eir"."""
     _stub_install(tmp_path, monkeypatch)
     root = _make_project(tmp_path)
 
@@ -696,13 +696,13 @@ def test_installed_entry_carries_the_window_app_id(tmp_path, xdg_home, monkeypat
     assert entry.name == f"{lde.APP_ID}.desktop"
     values = _parse(entry.read_text(encoding="utf-8"))
     assert values["StartupWMClass"] == lde.APP_ID
-    assert values["Name"] == "Hermes"  # the menu label is not part of the identity
+    assert values["Name"] == "Eir"  # the menu label is not part of the identity
 
 
 def test_install_keeps_the_legacy_entry_as_a_hidden_alias(tmp_path, xdg_home, monkeypatch):
     """A pin resolves by the entry file name it was pinned against (#124492).
 
-    Deleting ``hermes.desktop`` silently kills existing taskbar pins (GNOME drops
+    Deleting ``eir.desktop`` silently kills existing taskbar pins (GNOME drops
     the favourite, Plasma leaves an inert item) and the shell has no mechanism to
     re-point the association for the user. The pre-rename entry must survive as a
     ``NoDisplay=true`` alias of the app-id entry: out of the app grid, still
@@ -714,7 +714,7 @@ def test_install_keeps_the_legacy_entry_as_a_hidden_alias(tmp_path, xdg_home, mo
     legacy = xdg_home / "applications" / lde.LEGACY_DESKTOP_ENTRY_NAME
     legacy.parent.mkdir(parents=True)
     legacy.write_text(
-        "[Desktop Entry]\nType=Application\nName=Hermes\nExec=hermes desktop\n",
+        "[Desktop Entry]\nType=Application\nName=Eir\nExec=eir desktop\n",
         encoding="utf-8",
     )
 
@@ -723,7 +723,7 @@ def test_install_keeps_the_legacy_entry_as_a_hidden_alias(tmp_path, xdg_home, mo
     assert entry is not None and entry.is_file()
     assert legacy.is_file(), "an existing pin resolves through this file — it must survive"
     alias = _parse(legacy.read_text(encoding="utf-8"))
-    assert alias["NoDisplay"] == "true"  # no second Hermes in the app grid
+    assert alias["NoDisplay"] == "true"  # no second Eir in the app grid
     assert alias["StartupWMClass"] == lde.APP_ID  # still groups with the window
     entry_values = _parse(entry.read_text(encoding="utf-8"))
     assert alias["Exec"] == entry_values["Exec"]  # launches the same command
@@ -736,7 +736,7 @@ def test_unchanged_entry_still_aliases_a_legacy_entry(tmp_path, xdg_home, monkey
     root = _make_project(tmp_path)
     assert lde.install_desktop_entry(root) is not None
     legacy = xdg_home / "applications" / lde.LEGACY_DESKTOP_ENTRY_NAME
-    legacy.write_text("[Desktop Entry]\nType=Application\nName=Hermes\nExec=hermes desktop\n", encoding="utf-8")
+    legacy.write_text("[Desktop Entry]\nType=Application\nName=Eir\nExec=eir desktop\n", encoding="utf-8")
 
     lde.install_desktop_entry(root)
 
@@ -766,10 +766,10 @@ def test_install_opt_out_preserves_the_legacy_entry(tmp_path, xdg_home, monkeypa
     The missing-entry path still creates the app-id entry; the rewrite is
     management too and must not run when the user asked to be left alone.
     """
-    hermes_home = tmp_path / "hermes-home"
-    hermes_home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
-    (hermes_home / "config.yaml").write_text(
+    eir_home = tmp_path / "eir-home"
+    eir_home.mkdir()
+    monkeypatch.setenv("EIR_HOME", str(eir_home))
+    (eir_home / "config.yaml").write_text(
         "desktop:\n  manage_launcher_entry: false\n", encoding="utf-8"
     )
     _stub_install(tmp_path, monkeypatch)
@@ -777,7 +777,7 @@ def test_install_opt_out_preserves_the_legacy_entry(tmp_path, xdg_home, monkeypa
     legacy = xdg_home / "applications" / lde.LEGACY_DESKTOP_ENTRY_NAME
     legacy.parent.mkdir(parents=True)
     legacy.write_text(
-        "[Desktop Entry]\nType=Application\nName=Hermes\nExec=hermes desktop\n",
+        "[Desktop Entry]\nType=Application\nName=Eir\nExec=eir desktop\n",
         encoding="utf-8",
     )
 
@@ -785,7 +785,7 @@ def test_install_opt_out_preserves_the_legacy_entry(tmp_path, xdg_home, monkeypa
 
     assert entry == xdg_home / "applications" / lde.DESKTOP_ENTRY_NAME
     assert legacy.read_text(encoding="utf-8") == (
-        "[Desktop Entry]\nType=Application\nName=Hermes\nExec=hermes desktop\n"
+        "[Desktop Entry]\nType=Application\nName=Eir\nExec=eir desktop\n"
     ), "the opt-out must leave the legacy entry byte-for-byte untouched"
 
 
@@ -811,7 +811,7 @@ def test_app_id_matches_the_desktop_build_identity():
 def test_install_is_idempotent_and_skips_cache_refresh(tmp_path, xdg_home, monkeypatch):
     root = _make_project(tmp_path)
     monkeypatch.setattr(
-        "hermes_cli.relaunch.resolve_hermes_bin", lambda: "/usr/bin/hermes"
+        "eir_cli.relaunch.resolve_eir_bin", lambda: "/usr/bin/eir"
     )
     calls: list[Path] = []
     monkeypatch.setattr(
@@ -827,18 +827,18 @@ def test_install_is_idempotent_and_skips_cache_refresh(tmp_path, xdg_home, monke
 
 
 def test_install_without_source_icon_uses_themed_name(tmp_path, xdg_home, monkeypatch):
-    root = tmp_path / "hermes-agent"
+    root = tmp_path / "eir-agent"
     root.mkdir()
     monkeypatch.setattr(
-        "hermes_cli.relaunch.resolve_hermes_bin", lambda: "/usr/bin/hermes"
+        "eir_cli.relaunch.resolve_eir_bin", lambda: "/usr/bin/eir"
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
     entry = lde.install_desktop_entry(root)
 
     # A broken absolute path renders as no icon. The themed name resolves
-    # when Hermes is installed some other way.
-    assert _parse(entry.read_text(encoding="utf-8"))["Icon"] == "hermes"
+    # when Eir is installed some other way.
+    assert _parse(entry.read_text(encoding="utf-8"))["Icon"] == "eir"
 
 
 @pytest.mark.platforms("macos")
@@ -967,9 +967,9 @@ def test_exec_falls_back_to_running_interpreter_when_probe_fails(
     def fake_resolve():
         return _s.argv[0] if _s.argv[0] else None
 
-    monkeypatch.setattr("hermes_cli.relaunch.resolve_hermes_bin", fake_resolve)
+    monkeypatch.setattr("eir_cli.relaunch.resolve_eir_bin", fake_resolve)
     # Force the probe to fail for whatever interpreter gets chosen first.
-    monkeypatch.setattr(lde, "_can_import_hermes_cli", lambda p: False)
+    monkeypatch.setattr(lde, "_can_import_eir_cli", lambda p: False)
     # And the fallback interpreter must itself pass (it always should).
     monkeypatch.setattr(
         lde,
@@ -982,7 +982,7 @@ def test_exec_falls_back_to_running_interpreter_when_probe_fails(
 
     # Runnable module form under the RUNNING interpreter - never the
     # unprobeable ELF fake, never a bare "<python> desktop".
-    assert exec_line.endswith("-m hermes_cli.main desktop")
+    assert exec_line.endswith("-m eir_cli.main desktop")
     first = exec_line.split(" ")[0].strip('"')
     assert first == os.path.abspath(sys.executable)
     assert str(interpreter) not in exec_line
@@ -999,13 +999,13 @@ def test_wrapper_ownership_rejects_sibling_extensions(suffix, tmp_path):
     must reject them (stable-but-wrong entry pointing at the renamed
     old install).
     """
-    checkout = tmp_path / "hermes-agent"
+    checkout = tmp_path / "eir-agent"
     checkout.mkdir()
     evil = tmp_path / "evil-shim"
     evil.write_text(
         f"#!/usr/bin/env bash\n"
         f"exec {checkout}{suffix}/venv/bin/python "
-        f'{checkout}{suffix}/hermes "$@"\n',
+        f'{checkout}{suffix}/eir "$@"\n',
         encoding="utf-8",
     )
     assert lde._wrapper_targets_checkout(evil, checkout) is False
@@ -1025,15 +1025,15 @@ def test_wrapper_ownership_accepts_shim_via_symlinked_home(tmp_path, monkeypatch
     home_real = tmp_path / "home-real"
     home_real.mkdir()
     home_link.symlink_to(home_real)
-    lexical_checkout = home_link / "hermes-agent"
-    (home_real / "hermes-agent").mkdir()
+    lexical_checkout = home_link / "eir-agent"
+    (home_real / "eir-agent").mkdir()
 
-    shim = home_link / ".local" / "bin" / "hermes"
+    shim = home_link / ".local" / "bin" / "eir"
     shim.parent.mkdir(parents=True)
     shim.write_text(
         f"#!/usr/bin/env bash\n"
         f"exec {lexical_checkout}/venv/bin/python "
-        f'{lexical_checkout}/hermes "$@"\n',
+        f'{lexical_checkout}/eir "$@"\n',
         encoding="utf-8",
     )
     assert lde._wrapper_targets_checkout(shim, lexical_checkout) is True
@@ -1044,10 +1044,10 @@ def test_wrapper_ownership_accepts_shim_via_symlinked_home(tmp_path, monkeypatch
     shim.chmod(0o755)
     monkeypatch.setenv("HOME", str(home_link))
     monkeypatch.setattr("shutil.which", lambda name: None)
-    repo_script = lexical_checkout / "hermes"
+    repo_script = lexical_checkout / "eir"
     repo_script.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
     monkeypatch.setattr(sys, "argv", [str(repo_script), "desktop"])
-    assert lde._resolve_hermes_bin_for_desktop_entry(
+    assert lde._resolve_eir_bin_for_desktop_entry(
         resolve_fn=lambda: sys.argv[0] if sys.argv[0] else None,
         checkout_root=lexical_checkout,
     ) == str(shim)
@@ -1066,8 +1066,8 @@ def test_needs_interpreter_case_insensitive_match(tmp_path, monkeypatch):
     interpreter = venv_bin / "python"
     interpreter.write_text("", encoding="utf-8")
 
-    console_script = venv_bin / "hermes"
-    console_script.write_text(f"#!{interpreter}\nimport hermes_cli\n", encoding="utf-8")
+    console_script = venv_bin / "eir"
+    console_script.write_text(f"#!{interpreter}\nimport eir_cli\n", encoding="utf-8")
     monkeypatch.setattr(lde.sys, "executable", str(interpreter))
 
     assert lde._needs_interpreter(console_script) is False
@@ -1089,7 +1089,7 @@ def test_needs_interpreter_rejects_sibling_directory(tmp_path, monkeypatch):
 
     sibling_script = tmp_path / "sibling"
     sibling_script.write_text(
-        f"#!{tmp_path}/venv/bin-extra/python\nimport hermes_cli\n",
+        f"#!{tmp_path}/venv/bin-extra/python\nimport eir_cli\n",
         encoding="utf-8",
     )
     assert lde._needs_interpreter(sibling_script) is True
@@ -1104,7 +1104,7 @@ def test_needs_interpreter_strips_flags_before_comparing(tmp_path, monkeypatch):
     monkeypatch.setattr(lde.sys, "executable", str(interp))
 
     flagged = tmp_path / "flagged"
-    flagged.write_text(f"#!{interp} -S\nimport hermes_cli\n", encoding="utf-8")
+    flagged.write_text(f"#!{interp} -S\nimport eir_cli\n", encoding="utf-8")
     assert lde._needs_interpreter(flagged) is False
 
 
@@ -1120,14 +1120,14 @@ def test_needs_interpreter_env_shebang_always_escapes(tmp_path, monkeypatch):
     # pass), the PATH resolution semantics mean the shebang escapes.
     env_script = tmp_path / "envscript"
     env_script.write_text(
-        f"#!{venv_bin}/env python3\nimport hermes_cli\n", encoding="utf-8"
+        f"#!{venv_bin}/env python3\nimport eir_cli\n", encoding="utf-8"
     )
     assert lde._needs_interpreter(env_script) is True
 
     # ...unless env carries an absolute venv interpreter after -S.
     env_abs = tmp_path / "envabs"
     env_abs.write_text(
-        f"#!/usr/bin/env -S {interp}\nimport hermes_cli\n", encoding="utf-8"
+        f"#!/usr/bin/env -S {interp}\nimport eir_cli\n", encoding="utf-8"
     )
     assert lde._needs_interpreter(env_abs) is False
 
@@ -1144,17 +1144,17 @@ def test_probe_skips_wrapper_with_escaping_python_shebang(
     """
 
     root = _make_project(tmp_path)
-    repo_script = root / "hermes"
+    repo_script = root / "eir"
     repo_script.write_text(
-        "#!/usr/bin/env python3\nimport hermes_cli\n", encoding="utf-8"
+        "#!/usr/bin/env python3\nimport eir_cli\n", encoding="utf-8"
     )
     repo_script.chmod(0o755)
 
     # A wrapper that targets this checkout but cannot run itself.
-    broken_wrapper = xdg_home / ".local" / "bin" / "hermes"
+    broken_wrapper = xdg_home / ".local" / "bin" / "eir"
     broken_wrapper.parent.mkdir(parents=True)
     broken_wrapper.write_text(
-        f"#!/usr/bin/env python3\n# launcher for {root}\nimport hermes_cli\n",
+        f"#!/usr/bin/env python3\n# launcher for {root}\nimport eir_cli\n",
         encoding="utf-8",
     )
     broken_wrapper.chmod(0o755)
@@ -1165,30 +1165,30 @@ def test_probe_skips_wrapper_with_escaping_python_shebang(
     def fake_resolve():
         return sys.argv[0] if sys.argv[0] else None
 
-    monkeypatch.setattr("hermes_cli.relaunch.resolve_hermes_bin", fake_resolve)
+    monkeypatch.setattr("eir_cli.relaunch.resolve_eir_bin", fake_resolve)
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
     entry = lde.install_desktop_entry(root)
     exec_line = _parse(entry.read_text(encoding="utf-8"))["Exec"]
 
     assert str(broken_wrapper) not in exec_line
-    assert exec_line.endswith("-m hermes_cli.main desktop")
+    assert exec_line.endswith("-m eir_cli.main desktop")
 
 
 def test_probe_accepts_shell_launcher_wrapper(tmp_path, xdg_home, monkeypatch):
     """A bash launcher is safe by construction and still wins the probe."""
     root = _make_project(tmp_path)
-    repo_script = root / "hermes"
+    repo_script = root / "eir"
     repo_script.write_text(
-        "#!/usr/bin/env python3\nimport hermes_cli\n", encoding="utf-8"
+        "#!/usr/bin/env python3\nimport eir_cli\n", encoding="utf-8"
     )
     repo_script.chmod(0o755)
 
-    good_wrapper = xdg_home / ".local" / "bin" / "hermes"
+    good_wrapper = xdg_home / ".local" / "bin" / "eir"
     good_wrapper.parent.mkdir(parents=True)
     good_wrapper.write_text(
         f"#!/usr/bin/env bash\nexec {root / 'venv' / 'bin' / 'python'} "
-        f'{root / "hermes"} "$@"\n',
+        f'{root / "eir"} "$@"\n',
         encoding="utf-8",
     )
     good_wrapper.chmod(0o755)
@@ -1199,7 +1199,7 @@ def test_probe_accepts_shell_launcher_wrapper(tmp_path, xdg_home, monkeypatch):
     def fake_resolve():
         return sys.argv[0] if sys.argv[0] else None
 
-    monkeypatch.setattr("hermes_cli.relaunch.resolve_hermes_bin", fake_resolve)
+    monkeypatch.setattr("eir_cli.relaunch.resolve_eir_bin", fake_resolve)
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
     entry = lde.install_desktop_entry(root)
@@ -1216,19 +1216,19 @@ def test_install_icon_handles_truncated_png_header(tmp_path, xdg_home, monkeypat
     icon.write_bytes(
         b"\x89PNG\r\n\x1a\n\x00\x00\x00\x0dIHDR\x00\x00"  # 22 bytes
     )
-    hermes_bin = tmp_path / "bin" / "hermes"
-    hermes_bin.parent.mkdir()
-    hermes_bin.write_text("", encoding="utf-8")
+    eir_bin = tmp_path / "bin" / "eir"
+    eir_bin.parent.mkdir()
+    eir_bin.write_text("", encoding="utf-8")
     monkeypatch.setattr(
-        "hermes_cli.relaunch.resolve_hermes_bin", lambda: str(hermes_bin)
+        "eir_cli.relaunch.resolve_eir_bin", lambda: str(eir_bin)
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
     entry = lde.install_desktop_entry(root)
 
     values = _parse(entry.read_text(encoding="utf-8"))
-    assert values["Icon"] == "hermes"
-    dest = xdg_home / "icons" / "hicolor" / "256x256" / "apps" / "hermes.png"
+    assert values["Icon"] == "eir"
+    dest = xdg_home / "icons" / "hicolor" / "256x256" / "apps" / "eir.png"
     assert dest.is_file()
 
 
@@ -1255,28 +1255,28 @@ def test_install_places_1024_png_in_256x256_not_scalable(
     entry = lde.install_desktop_entry(root)
     values = _parse(entry.read_text(encoding="utf-8"))
 
-    dest = xdg_home / "icons" / "hicolor" / "256x256" / "apps" / "hermes.png"
-    stale = xdg_home / "icons" / "hicolor" / "scalable" / "apps" / "hermes.png"
-    assert values["Icon"] == "hermes"
+    dest = xdg_home / "icons" / "hicolor" / "256x256" / "apps" / "eir.png"
+    stale = xdg_home / "icons" / "hicolor" / "scalable" / "apps" / "eir.png"
+    assert values["Icon"] == "eir"
     assert dest.is_file()
     assert dest.read_bytes() == lde.icon_path(root).read_bytes()
     assert not stale.exists()
 
 
 def test_install_removes_stale_scalable_png(tmp_path, xdg_home, monkeypatch):
-    """v2026.8.31 wrote the PNG into scalable/. A later hermes desktop
+    """v2026.8.31 wrote the PNG into scalable/. A later eir desktop
     must delete that leftover so Cinnamon does not keep using it."""
     root = _make_project(tmp_path)
     lde.icon_path(root).write_bytes(_png_ihdr(1024, 1024))
     _stub_install(tmp_path, monkeypatch)
 
-    stale = xdg_home / "icons" / "hicolor" / "scalable" / "apps" / "hermes.png"
+    stale = xdg_home / "icons" / "hicolor" / "scalable" / "apps" / "eir.png"
     stale.parent.mkdir(parents=True)
     stale.write_bytes(b"old scalable png")
 
     lde.install_desktop_entry(root)
 
-    dest = xdg_home / "icons" / "hicolor" / "256x256" / "apps" / "hermes.png"
+    dest = xdg_home / "icons" / "hicolor" / "256x256" / "apps" / "eir.png"
     assert dest.is_file()
     assert not stale.exists()
 
@@ -1288,10 +1288,10 @@ def test_install_exact_48_png_uses_48x48_dir(tmp_path, xdg_home, monkeypatch):
 
     lde.install_desktop_entry(root)
 
-    dest = xdg_home / "icons" / "hicolor" / "48x48" / "apps" / "hermes.png"
+    dest = xdg_home / "icons" / "hicolor" / "48x48" / "apps" / "eir.png"
     assert dest.is_file()
     assert not (
-        xdg_home / "icons" / "hicolor" / "scalable" / "apps" / "hermes.png"
+        xdg_home / "icons" / "hicolor" / "scalable" / "apps" / "eir.png"
     ).exists()
 
 
@@ -1313,9 +1313,9 @@ def test_install_resizes_decodable_png_to_panel_sizes(
 
     lde.install_desktop_entry(root)
 
-    dest_24 = xdg_home / "icons" / "hicolor" / "24x24" / "apps" / "hermes.png"
-    dest_256 = xdg_home / "icons" / "hicolor" / "256x256" / "apps" / "hermes.png"
-    stale = xdg_home / "icons" / "hicolor" / "scalable" / "apps" / "hermes.png"
+    dest_24 = xdg_home / "icons" / "hicolor" / "24x24" / "apps" / "eir.png"
+    dest_256 = xdg_home / "icons" / "hicolor" / "256x256" / "apps" / "eir.png"
+    stale = xdg_home / "icons" / "hicolor" / "scalable" / "apps" / "eir.png"
     assert dest_24.is_file()
     assert dest_256.is_file()
     assert not stale.exists()
@@ -1352,11 +1352,11 @@ def _write_script(path: Path, text: str) -> Path:
 
 
 def _env_shaped_tree(tmp_path: Path, name: str = "managed-env") -> Path:
-    """The runtime env layout: a code tree (workspace/hermes_cli) with no desktop app in it."""
+    """The runtime env layout: a code tree (workspace/eir_cli) with no desktop app in it."""
     tree = tmp_path / name
-    (tree / "workspace" / "hermes_cli").mkdir(parents=True)
-    (tree / "workspace" / "hermes_cli" / "main.py").write_text("", encoding="utf-8")
-    _write_script(tree / "venv" / "bin" / "hermes", "#!/bin/sh\nexit 0\n")
+    (tree / "workspace" / "eir_cli").mkdir(parents=True)
+    (tree / "workspace" / "eir_cli" / "main.py").write_text("", encoding="utf-8")
+    _write_script(tree / "venv" / "bin" / "eir", "#!/bin/sh\nexit 0\n")
     python_bin = tree / "venv" / "bin" / "python"
     python_bin.write_bytes(b"\x7fELF fake")  # real interpreters are binaries, never scripts
     python_bin.chmod(0o755)
@@ -1364,12 +1364,12 @@ def _env_shaped_tree(tmp_path: Path, name: str = "managed-env") -> Path:
 
 
 def _full_tree(tmp_path: Path, name: str = "install") -> Path:
-    """A checkout that carries the desktop app beside hermes_cli."""
+    """A checkout that carries the desktop app beside eir_cli."""
     tree = tmp_path / name
-    (tree / "hermes_cli").mkdir(parents=True)
+    (tree / "eir_cli").mkdir(parents=True)
     (tree / "apps" / "desktop" / "assets").mkdir(parents=True)
     (tree / "apps" / "desktop" / "package.json").write_text("{}", encoding="utf-8")
-    _write_script(tree / "venv" / "bin" / "hermes", "#!/bin/sh\nexit 0\n")
+    _write_script(tree / "venv" / "bin" / "eir", "#!/bin/sh\nexit 0\n")
     python_bin = tree / "venv" / "bin" / "python"
     python_bin.write_bytes(b"\x7fELF fake")  # real interpreters are binaries, never scripts
     python_bin.chmod(0o755)
@@ -1379,17 +1379,17 @@ def _full_tree(tmp_path: Path, name: str = "install") -> Path:
 def test_capability_rejects_env_shaped_launcher_and_accepts_full_tree(tmp_path):
     env_tree = _env_shaped_tree(tmp_path)
     full_tree = _full_tree(tmp_path)
-    assert lde._can_serve_desktop(str(env_tree / "venv" / "bin" / "hermes")) is False
-    assert lde._can_serve_desktop(str(full_tree / "venv" / "bin" / "hermes")) is True
+    assert lde._can_serve_desktop(str(env_tree / "venv" / "bin" / "eir")) is False
+    assert lde._can_serve_desktop(str(full_tree / "venv" / "bin" / "eir")) is True
     # Interpreters are not judged: a launcher execing one is followed to its own tree instead.
     assert lde._can_serve_desktop(str(env_tree / "venv" / "bin" / "python")) is None
     assert lde._can_serve_desktop(str(full_tree / "venv" / "bin" / "python")) is None
 
 
 def test_capability_unknown_shapes_pass(tmp_path):
-    missing = tmp_path / "nowhere" / "bin" / "hermes"
+    missing = tmp_path / "nowhere" / "bin" / "eir"
     assert lde._can_serve_desktop(str(missing)) is None
-    native = _write_script(tmp_path / "opt" / "bin" / "hermes", "")
+    native = _write_script(tmp_path / "opt" / "bin" / "eir", "")
     assert lde._can_serve_desktop(str(native)) is None
 
 
@@ -1397,12 +1397,12 @@ def test_capability_follows_wrapper_to_its_target(tmp_path):
     env_tree = _env_shaped_tree(tmp_path)
     full_tree = _full_tree(tmp_path)
     bad_wrapper = _write_script(
-        tmp_path / "shims" / "hermes",
-        f'#!/usr/bin/env bash\nexec "{env_tree}/venv/bin/hermes" "$@"\n',
+        tmp_path / "shims" / "eir",
+        f'#!/usr/bin/env bash\nexec "{env_tree}/venv/bin/eir" "$@"\n',
     )
     good_wrapper = _write_script(
-        tmp_path / "shims" / "hermes-good",
-        f'#!/usr/bin/env bash\nexec "{full_tree}/venv/bin/hermes" "$@"\n',
+        tmp_path / "shims" / "eir-good",
+        f'#!/usr/bin/env bash\nexec "{full_tree}/venv/bin/eir" "$@"\n',
     )
     assert lde._can_serve_desktop(str(bad_wrapper)) is False
     assert lde._can_serve_desktop(str(good_wrapper)) is True
@@ -1413,11 +1413,11 @@ def test_resolver_skips_incapable_primary_for_wrapper(tmp_path, xdg_home):
     env_tree = _env_shaped_tree(tmp_path)
     checkout = _full_tree(tmp_path, "checkout")
     wrapper = _write_script(
-        tmp_path / ".local" / "bin" / "hermes",
-        f'#!/usr/bin/env bash\nexec "{checkout}/venv/bin/hermes" "$@"\n',
+        tmp_path / ".local" / "bin" / "eir",
+        f'#!/usr/bin/env bash\nexec "{checkout}/venv/bin/eir" "$@"\n',
     )
-    resolution = lde._resolve_hermes_bin_for_desktop_entry(
-        resolve_fn=lambda: str(env_tree / "venv" / "bin" / "hermes"),
+    resolution = lde._resolve_eir_bin_for_desktop_entry(
+        resolve_fn=lambda: str(env_tree / "venv" / "bin" / "eir"),
         checkout_root=checkout,
     )
     assert resolution == str(wrapper)
@@ -1431,7 +1431,7 @@ def test_install_skips_write_when_exec_provably_cannot_serve_desktop(tmp_path, x
     monkeypatch.setattr(
         lde,
         "resolve_exec_command",
-        lambda project_root=None: f"{env_tree / 'venv' / 'bin' / 'hermes'} desktop",
+        lambda project_root=None: f"{env_tree / 'venv' / 'bin' / 'eir'} desktop",
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
@@ -1450,7 +1450,7 @@ def test_install_leaves_existing_entry_untouched_when_exec_incapable(tmp_path, x
     monkeypatch.setattr(
         lde,
         "resolve_exec_command",
-        lambda project_root=None: f"{env_tree / 'venv' / 'bin' / 'hermes'} desktop",
+        lambda project_root=None: f"{env_tree / 'venv' / 'bin' / 'eir'} desktop",
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
@@ -1462,7 +1462,7 @@ def test_module_form_passes_the_gate(tmp_path):
     """The module fallback is not second-guessed: only a process that already passed the desktop
     launch checks (or the bundled payload) ever writes it."""
     env_tree = _env_shaped_tree(tmp_path)
-    module_form = f'"{env_tree / "venv" / "bin" / "python"}" -m hermes_cli.main desktop'
+    module_form = f'"{env_tree / "venv" / "bin" / "python"}" -m eir_cli.main desktop'
     assert lde._persisted_exec_serves_desktop(module_form) is None
 
 
@@ -1472,13 +1472,13 @@ def test_install_through_wrapper_when_primary_is_incapable(tmp_path, xdg_home, m
     (root / "apps" / "desktop" / "assets" / "icon.png").write_bytes(b"\x89PNG fake")
     env_tree = _env_shaped_tree(tmp_path)
     wrapper = _write_script(
-        tmp_path / ".local" / "bin" / "hermes",
-        f'#!/usr/bin/env bash\nexec "{root}/venv/bin/hermes" "$@"\n',
+        tmp_path / ".local" / "bin" / "eir",
+        f'#!/usr/bin/env bash\nexec "{root}/venv/bin/eir" "$@"\n',
     )
     monkeypatch.setattr(lde, "_launcher_entry_management_enabled", lambda: True)
     monkeypatch.setattr(
-        "hermes_cli.relaunch.resolve_hermes_bin",
-        lambda: str(env_tree / "venv" / "bin" / "hermes"),
+        "eir_cli.relaunch.resolve_eir_bin",
+        lambda: str(env_tree / "venv" / "bin" / "eir"),
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
@@ -1496,8 +1496,8 @@ def test_exec_appends_skip_build_when_packaged_app_exists(tmp_path, xdg_home, mo
     root = _make_project(tmp_path)
     unpacked = root / "apps" / "desktop" / "release" / "linux-unpacked"
     unpacked.mkdir(parents=True)
-    (unpacked / "hermes").write_text("", encoding="utf-8")
-    monkeypatch.setattr("hermes_cli.relaunch.resolve_hermes_bin", lambda: None)
+    (unpacked / "eir").write_text("", encoding="utf-8")
+    monkeypatch.setattr("eir_cli.relaunch.resolve_eir_bin", lambda: None)
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
     entry = lde.install_desktop_entry(root)
@@ -1510,7 +1510,7 @@ def test_exec_keeps_build_then_launch_when_no_packaged_app(tmp_path, xdg_home, m
     # First install (nothing packaged yet): the click must still build and
     # launch — --skip-build would exit with "no packaged desktop app found".
     root = _make_project(tmp_path)
-    monkeypatch.setattr("hermes_cli.relaunch.resolve_hermes_bin", lambda: None)
+    monkeypatch.setattr("eir_cli.relaunch.resolve_eir_bin", lambda: None)
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
     entry = lde.install_desktop_entry(root)

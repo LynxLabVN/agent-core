@@ -1,20 +1,20 @@
-"""Hermes-tools-as-MCP server for the codex_app_server runtime.
+"""Eir-tools-as-MCP server for the codex_app_server runtime.
 
-Codex owns the loop and tool list there, so a curated subset of Hermes tools is
+Codex owns the loop and tool list there, so a curated subset of Eir tools is
 exposed over stdio MCP; codex registers it via ``~/.codex/config.toml
-[mcp_servers.hermes-tools]``. Run: ``python -m agent.transports.hermes_tools_mcp_server``.
+[mcp_servers.eir-tools]``. Run: ``python -m agent.transports.eir_tools_mcp_server``.
 """
 
 from __future__ import annotations
 
-# First, like every entry point: stdio, import-path and environ-lifetime fixes (hermes_bootstrap).
+# First, like every entry point: stdio, import-path and environ-lifetime fixes (eir_bootstrap).
 # Only as ``python -m``: codex_runtime & co. import this module for a constant, and the
 # bootstrap's scratch/TMPDIR exports must not fire in those library importers.
 if __name__ == "__main__":
     try:
-        import hermes_bootstrap
+        import eir_bootstrap
     except ModuleNotFoundError:
-        pass  # a partial ``hermes update`` can leave the bootstrap unregistered
+        pass  # a partial ``eir update`` can leave the bootstrap unregistered
 
 import inspect
 import json
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 # codex-side reference to it (worker ``-c mcp_servers.<name>.env.*`` overrides, elicitation
 # auto-accept, display-name stripping) must use this constant: a drifted name materialises a
 # second env-only entry that codex rejects at bootstrap ("invalid transport").
-HERMES_TOOLS_MCP_SERVER_NAME = "hermes-tools"
+EIR_TOOLS_MCP_SERVER_NAME = "eir-tools"
 
 # JSON Schema type -> Python type mapping for signature generation
 _JSON_TO_PY = {"string": str, "integer": int, "number": float, "boolean": bool, "array": list, "object": dict}
@@ -50,37 +50,37 @@ def _signature_from_schema(schema: dict | None) -> tuple[inspect.Signature, dict
     return inspect.Signature(params, return_annotation=str), annots
 
 
-# Each name MUST match a registered Hermes tool ``model_tools.handle_function_call()`` can dispatch.
+# Each name MUST match a registered Eir tool ``model_tools.handle_function_call()`` can dispatch.
 # NOT exposed: terminal/file/search/process/clarify (codex built-ins + its own approval UI);
 # delegate_task/memory/session_search/todo (need the running AIAgent context); browser_exec (runs
-# model-written Python on the Hermes host, outside codex's sandbox and approval UI).
+# model-written Python on the Eir host, outside codex's sandbox and approval UI).
 EXPOSED_TOOLS: tuple[str, ...] = (
     "web_search", "web_extract",
     "vision_analyze", "image_generate", "skill_view", "skills_list", "text_to_speech",
-    # Kanban handoff tools: stateless (read HERMES_KANBAN_TASK, write kanban.db).
+    # Kanban handoff tools: stateless (read EIR_KANBAN_TASK, write kanban.db).
     # Without them a codex-runtime worker can't report completion and hangs.
     "kanban_complete", "kanban_block", "kanban_schedule", "kanban_request_review",
     "kanban_request_changes", "kanban_comment",
     "kanban_heartbeat", "kanban_show", "kanban_list",
-    # Orchestrator-only (the kanban tool gates them on HERMES_KANBAN_TASK unset).
+    # Orchestrator-only (the kanban tool gates them on EIR_KANBAN_TASK unset).
     "kanban_create", "kanban_unblock", "kanban_link",
 )
 
 
 def _build_server() -> Any:
-    """Create the MCP server with Hermes tools attached (lazy imports: importable without ``mcp``)."""
+    """Create the MCP server with Eir tools attached (lazy imports: importable without ``mcp``)."""
     try:
         # mcp 2.0 renamed `mcp.server.fastmcp` to `mcp.server.MCPServer` (same surface).
         from mcp.server import MCPServer
     except ImportError as exc:  # pragma: no cover - install hint
-        raise ImportError(f"hermes-tools MCP server requires the 'mcp' package: {exc}") from exc
+        raise ImportError(f"eir-tools MCP server requires the 'mcp' package: {exc}") from exc
 
     from model_tools import get_tool_definitions, handle_function_call
 
     mcp = MCPServer(
-        HERMES_TOOLS_MCP_SERVER_NAME,
+        EIR_TOOLS_MCP_SERVER_NAME,
         instructions=(
-            "Hermes Agent's tool surface, exposed for use inside a Codex "
+            "Eir Agent's tool surface, exposed for use inside a Codex "
             "session. Use these for capabilities Codex's built-in toolset "
             "doesn't cover: web search/extract, "
             "subagent delegation, vision, image generation, persistent "
@@ -88,7 +88,7 @@ def _build_server() -> Any:
         ),
     )
 
-    # Authoritative Hermes schemas so MCP clients see the same parameter docs the model does.
+    # Authoritative Eir schemas so MCP clients see the same parameter docs the model does.
     all_defs = {
         td["function"]["name"]: td["function"]
         for td in (get_tool_definitions(quiet_mode=True) or [])
@@ -117,9 +117,9 @@ def _build_server() -> Any:
     for name in EXPOSED_TOOLS:
         spec = all_defs.get(name)
         if spec is None:
-            logger.debug("skipping %s — not registered in this Hermes process", name)
+            logger.debug("skipping %s — not registered in this Eir process", name)
             continue
-        description = spec.get("description") or f"Hermes {name} tool"
+        description = spec.get("description") or f"Eir {name} tool"
         params_schema = spec.get("parameters") or {"type": "object", "properties": {}}
         try:
             mcp.add_tool(_make_handler(name, params_schema, description), name=name, description=description)
@@ -128,34 +128,34 @@ def _build_server() -> Any:
             mcp.tool(name=name, description=description)(_make_handler(name, params_schema, description))
         exposed_count += 1
 
-    logger.info("hermes-tools MCP server registered %d/%d tools", exposed_count, len(EXPOSED_TOOLS))
+    logger.info("eir-tools MCP server registered %d/%d tools", exposed_count, len(EXPOSED_TOOLS))
     return mcp
 
 
 def main(argv: Optional[list[str]] = None) -> int:
-    """Entry point for `python -m agent.transports.hermes_tools_mcp_server`."""
+    """Entry point for `python -m agent.transports.eir_tools_mcp_server`."""
     argv = argv or sys.argv[1:]
     verbose = "--verbose" in argv or "-v" in argv
-    from hermes_logging import DisplayNameFormatter
+    from eir_logging import DisplayNameFormatter
     stderr_handler = logging.StreamHandler(sys.stderr)  # MCP uses stdio for protocol — logs MUST go to stderr
     stderr_handler.setFormatter(DisplayNameFormatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
     logging.basicConfig(level=logging.INFO if verbose else logging.WARNING, handlers=[stderr_handler])
-    # Keep Hermes' own banners off stdout (the MCP wire).
-    os.environ.setdefault("HERMES_QUIET", "1")
-    os.environ.setdefault("HERMES_REDACT_SECRETS", "true")
+    # Keep Eir' own banners off stdout (the MCP wire).
+    os.environ.setdefault("EIR_QUIET", "1")
+    os.environ.setdefault("EIR_REDACT_SECRETS", "true")
 
     try:
         server = _build_server()
     except ImportError as exc:
-        sys.stderr.write(f"hermes-tools MCP server cannot start: {exc}\n")
+        sys.stderr.write(f"eir-tools MCP server cannot start: {exc}\n")
         return 2
     try:
         server.run()  # defaults to stdio transport, which codex spawns us on
     except KeyboardInterrupt:
         pass
     except Exception as exc:
-        logger.exception("hermes-tools MCP server crashed")
-        sys.stderr.write(f"hermes-tools MCP server error: {exc}\n")
+        logger.exception("eir-tools MCP server crashed")
+        sys.stderr.write(f"eir-tools MCP server error: {exc}\n")
         return 1
     return 0
 

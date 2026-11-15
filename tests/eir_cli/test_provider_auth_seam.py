@@ -1,7 +1,7 @@
-"""OAuth-shaped model-provider plugins are first-class in `hermes auth` (#116408).
+"""OAuth-shaped model-provider plugins are first-class in `eir auth` (#116408).
 
-The seam: ``ProviderProfile.auth_handler``. These tests drive the real ``hermes auth`` argparse
-surface against a plugin discovered from an isolated HERMES_HOME, so they fail if the dispatch is
+The seam: ``ProviderProfile.auth_handler``. These tests drive the real ``eir auth`` argparse
+surface against a plugin discovered from an isolated EIR_HOME, so they fail if the dispatch is
 dropped, reordered after the built-in paths, or the registry stops admitting non-api-key profiles.
 """
 
@@ -51,7 +51,7 @@ register_provider(ProviderProfile(name="__NAME__", auth_type="oauth_external",
 
 
 def _rediscover() -> None:
-    """Point the next profile lookup at the (new) HERMES_HOME user plugin dir.
+    """Point the next profile lookup at the (new) EIR_HOME user plugin dir.
 
     Only the discovery flag is cleared: bundled plugin modules stay in
     ``sys.modules`` (so their profiles stay registered) while the user dir is
@@ -61,18 +61,18 @@ def _rediscover() -> None:
     import providers as _pkg
 
     _pkg._discovered = False
-    for mod in [m for m in sys.modules if m.startswith("_hermes_user_provider")]:
+    for mod in [m for m in sys.modules if m.startswith("_eir_user_provider")]:
         del sys.modules[mod]
 
 
 @pytest.fixture
 def install_provider(tmp_path, monkeypatch):
-    """Write a model-provider plugin into an isolated HERMES_HOME and discover it."""
+    """Write a model-provider plugin into an isolated EIR_HOME and discover it."""
     installed: list[str] = []
 
     def _install(name: str = "fake-auth", *, with_handler: bool = True) -> Path:
         """Write (or rewrite) the fixture plugin and re-run discovery."""
-        plugin_dir = tmp_path / "hermes" / "plugins" / "model-providers" / name
+        plugin_dir = tmp_path / "eir" / "plugins" / "model-providers" / name
         plugin_dir.mkdir(parents=True, exist_ok=True)
         (plugin_dir / "plugin.yaml").write_text(
             f"name: {name}\nkind: model-provider\nversion: 0.0.1\n"
@@ -82,7 +82,7 @@ def install_provider(tmp_path, monkeypatch):
             source = source.replace(", auth_handler=handler", "")
         (plugin_dir / "__init__.py").write_text(source, encoding="utf-8")
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes"))
+        monkeypatch.setenv("EIR_HOME", str(tmp_path / "eir"))
         monkeypatch.setenv("FAKE_AUTH_LOG", str(tmp_path / "auth-log.jsonl"))
         _rediscover()
         installed.append(name)
@@ -102,8 +102,8 @@ def install_provider(tmp_path, monkeypatch):
 
 
 def _parse_auth_args(argv: list[str]) -> argparse.Namespace:
-    """Parse `hermes auth <argv>` through the real subcommand parser."""
-    from hermes_cli.subcommands.auth import build_auth_parser
+    """Parse `eir auth <argv>` through the real subcommand parser."""
+    from eir_cli.subcommands.auth import build_auth_parser
 
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command")
@@ -132,12 +132,12 @@ def _log(tmp_path: Path) -> list[dict]:
     ],
 )
 def test_oauth_plugin_owns_every_auth_action(tmp_path, install_provider, capsys, argv, expected):
-    """An oauth_external plugin registers and `hermes auth <action>` reaches its handler, args included,
+    """An oauth_external plugin registers and `eir auth <action>` reaches its handler, args included,
     before any built-in path (nothing printed, nothing written to the pool)."""
     install_provider()
 
-    import hermes_cli.auth as auth_mod
-    from hermes_cli.auth_commands import auth_command
+    import eir_cli.auth as auth_mod
+    from eir_cli.auth_commands import auth_command
 
     assert auth_mod.resolve_provider("fake-auth") == "fake-auth"
     assert auth_mod.PROVIDER_REGISTRY["fake-auth"].auth_type == "oauth_external"
@@ -146,7 +146,7 @@ def test_oauth_plugin_owns_every_auth_action(tmp_path, install_provider, capsys,
 
     assert _log(tmp_path) == [expected]
     assert capsys.readouterr().out == ""
-    assert not (tmp_path / "hermes" / "auth.json").exists()
+    assert not (tmp_path / "eir" / "auth.json").exists()
 
 
 def test_oauth_plugin_without_handler_fails_loud_and_builtins_are_untouched(tmp_path, install_provider):
@@ -154,7 +154,7 @@ def test_oauth_plugin_without_handler_fails_loud_and_builtins_are_untouched(tmp_
     api-key prompt or "Unknown provider"); a built-in provider never consults the seam."""
     install_provider("handlerless", with_handler=False)
 
-    from hermes_cli.auth_commands import auth_command
+    from eir_cli.auth_commands import auth_command
 
     with pytest.raises(SystemExit) as excinfo:
         auth_command(_parse_auth_args(["add", "handlerless"]))
@@ -162,35 +162,35 @@ def test_oauth_plugin_without_handler_fails_loud_and_builtins_are_untouched(tmp_
 
     auth_command(_parse_auth_args(["add", "openrouter", "--api-key", "sk-or-fixture", "--label", "personal"]))
     assert _log(tmp_path) == []
-    pool = json.loads((tmp_path / "hermes" / "auth.json").read_text(encoding="utf-8"))["credential_pool"]
+    pool = json.loads((tmp_path / "eir" / "auth.json").read_text(encoding="utf-8"))["credential_pool"]
     assert next(e for e in pool["openrouter"] if e["access_token"] == "sk-or-fixture")["label"] == "personal"
 
 
 def test_external_process_plugin_relogin_hint_never_names_a_failing_auth_add(install_provider, monkeypatch):
     """An ``external_process`` plugin with no ``auth_handler`` (its vendor CLI owns sign-in) must not be
-    told to run ``hermes auth add <slug> --type oauth``: that exact command fails loud with "ships no
-    auth_handler". The hint points at ``hermes model``, whose external-process flow runs the CLI login."""
+    told to run ``eir auth add <slug> --type oauth``: that exact command fails loud with "ships no
+    auth_handler". The hint points at ``eir model``, whose external-process flow runs the CLI login."""
     plugin_dir = install_provider("cli-owned", with_handler=False)
     init = plugin_dir / "__init__.py"
     init.write_text(init.read_text(encoding="utf-8").replace(
         'auth_type="oauth_external"', 'auth_type="external_process", process_command="vendor-cli"'),
         encoding="utf-8")
     _rediscover()
-    monkeypatch.setattr("hermes_constants.profile_cli_selector", lambda: "")
+    monkeypatch.setattr("eir_constants.profile_cli_selector", lambda: "")
 
     from agent.turn_failure_copy import oauth_relogin_command, relogin_command_hint
-    from hermes_cli.auth_commands import auth_command
+    from eir_cli.auth_commands import auth_command
 
     with pytest.raises(SystemExit) as excinfo:
         auth_command(_parse_auth_args(["add", "cli-owned", "--type", "oauth"]))
     assert "ships no auth_handler" in str(excinfo.value)
 
-    assert oauth_relogin_command("cli-owned") == "hermes model"
+    assert oauth_relogin_command("cli-owned") == "eir model"
     assert "auth add" not in relogin_command_hint("cli-owned")
-    # Handler-shipping plugins and built-ins keep their `hermes auth add` command.
+    # Handler-shipping plugins and built-ins keep their `eir auth add` command.
     install_provider("fake-auth")
-    assert oauth_relogin_command("fake-auth") == "hermes auth add fake-auth --type oauth"
-    assert oauth_relogin_command("nous") == "hermes portal"
+    assert oauth_relogin_command("fake-auth") == "eir auth add fake-auth --type oauth"
+    assert oauth_relogin_command("nous") == "eir portal"
 
 
 def _declares_login(monkeypatch, tmp_path, *, cli="vendor cli/vendor", login_args=("auth", "login")):
@@ -198,7 +198,7 @@ def _declares_login(monkeypatch, tmp_path, *, cli="vendor cli/vendor", login_arg
 
     ``setup_status`` raises: building a sign-in hint must never run the plugin's live status probe
     (Claude's runs ``claude auth status``), because hints are built on the gateway's event loop."""
-    from hermes_cli import auth_plugin_providers as ap
+    from eir_cli import auth_plugin_providers as ap
     from providers.base import ProviderProfile
 
     exe = tmp_path / cli
@@ -214,14 +214,14 @@ def _declares_login(monkeypatch, tmp_path, *, cli="vendor cli/vendor", login_arg
                         login_args=login_args)
     monkeypatch.setattr(ap, "plugin_profile", lambda slug: profile if slug == "cli-declares" else None)
     monkeypatch.setattr(ap, "plugin_auth_handler", lambda slug: None)
-    monkeypatch.setattr("hermes_constants.profile_cli_selector", lambda: "")
+    monkeypatch.setattr("eir_constants.profile_cli_selector", lambda: "")
     return exe
 
 
 @pytest.mark.platforms("posix")
 def test_external_process_plugin_relogin_is_its_declared_login_command(monkeypatch, tmp_path):
     """A plugin that declares its CLI's login (``login_args``) gets exactly that command on every
-    re-login surface: ``hermes model`` also runs that login, but then saves the provider as the
+    re-login surface: ``eir model`` also runs that login, but then saves the provider as the
     default, which a sign-in hint must not do. The command comes from the declaration, not a probe."""
     exe = _declares_login(monkeypatch, tmp_path)
     from agent.turn_failure_copy import oauth_relogin_command, relogin_command_hint
@@ -231,12 +231,12 @@ def test_external_process_plugin_relogin_is_its_declared_login_command(monkeypat
     assert relogin_command_hint("cli-declares") == expected
 
 
-def test_external_process_plugin_without_declared_login_keeps_hermes_model(monkeypatch, tmp_path):
-    """No ``login_args``: the hint stays ``hermes model`` and still never runs the status probe."""
+def test_external_process_plugin_without_declared_login_keeps_eir_model(monkeypatch, tmp_path):
+    """No ``login_args``: the hint stays ``eir model`` and still never runs the status probe."""
     _declares_login(monkeypatch, tmp_path, login_args=())
     from agent.turn_failure_copy import oauth_relogin_command
 
-    assert oauth_relogin_command("cli-declares") == "hermes model"
+    assert oauth_relogin_command("cli-declares") == "eir model"
 
 
 @pytest.mark.platforms("windows")

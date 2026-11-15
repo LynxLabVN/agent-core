@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:hermes-agent:schema:shared-metrics:v3",
-  "title": "Hermes Shared Metrics Package v3",
+  "$id": "urn:eir-agent:schema:shared-metrics:v3",
+  "title": "Eir Shared Metrics Package v3",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -16,13 +16,13 @@
   ],
   "properties": {
     "schema_version": {
-      "const": "hermes.shared_metrics.v3"
+      "const": "eir.shared_metrics.v3"
     },
     "package_id": {
       "$ref": "#/$defs/uuid"
     },
     "install_id": {
-      "description": "Random persistent identifier scoped to one HERMES_HOME.",
+      "description": "Random persistent identifier scoped to one EIR_HOME.",
       "$ref": "#/$defs/uuid"
     },
     "period_start": {
@@ -42,7 +42,7 @@
       "additionalProperties": false,
       "required": [
         "architecture",
-        "hermes_version",
+        "eir_version",
         "install_method",
         "os_family"
       ],
@@ -57,7 +57,7 @@
             "x86_64"
           ]
         },
-        "hermes_version": {
+        "eir_version": {
           "type": "string",
           "minLength": 1,
           "maxLength": 64
@@ -290,7 +290,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.client.active"
+          "const": "eir.client.active"
         },
         "type": {
           "const": "counter"
@@ -320,7 +320,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.model_call.count"
+          "const": "eir.model_call.count"
         },
         "type": {
           "const": "counter"
@@ -406,7 +406,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.model_route.count"
+          "const": "eir.model_route.count"
         },
         "type": {
           "const": "counter"
@@ -496,7 +496,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.task_run.started"
+          "const": "eir.task_run.started"
         },
         "type": {
           "const": "counter"
@@ -537,7 +537,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.task_run.finished"
+          "const": "eir.task_run.finished"
         },
         "type": {
           "const": "counter"
@@ -762,7 +762,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.tool_call.count"
+          "const": "eir.tool_call.count"
         },
         "type": {
           "const": "counter"
@@ -851,7 +851,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.tool_approval.count"
+          "const": "eir.tool_approval.count"
         },
         "type": {
           "const": "counter"
@@ -898,7 +898,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.skill.lifecycle.count"
+          "const": "eir.skill.lifecycle.count"
         },
         "type": {
           "const": "counter"
@@ -944,7 +944,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.skill.load.count"
+          "const": "eir.skill.load.count"
         },
         "type": {
           "const": "counter"
@@ -1002,7 +1002,7 @@
     "vocabulary_identifier": {
       "type": "string",
       "pattern": "^[a-z0-9][a-z0-9_]{0,63}$",
-      "description": "Closed vocabulary owned by hermes_cli/observability/shared_metrics_contract.py (derived from in-repo registries); values outside it are never emitted."
+      "description": "Closed vocabulary owned by eir_cli/observability/shared_metrics_contract.py (derived from in-repo registries); values outside it are never emitted."
     },
     "tool_usage_counter": {
       "type": "object",
@@ -1015,7 +1015,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.tool.usage.count"
+          "const": "eir.tool.usage.count"
         },
         "type": {
           "const": "counter"
@@ -1087,7 +1087,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.install.snapshot"
+          "const": "eir.install.snapshot"
         },
         "type": {
           "const": "counter"
@@ -1248,7 +1248,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.session.count"
+          "const": "eir.session.count"
         },
         "type": {
           "const": "counter"
@@ -1322,7 +1322,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.install.milestone"
+          "const": "eir.install.milestone"
         },
         "type": {
           "const": "counter"
@@ -1371,7 +1371,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.setup.completed"
+          "const": "eir.setup.completed"
         },
         "type": {
           "const": "counter"
@@ -1413,7 +1413,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.model_tokens.sum"
+          "const": "eir.model_tokens.sum"
         },
         "type": {
           "const": "counter"
@@ -1476,7 +1476,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.compression.count"
+          "const": "eir.compression.count"
         },
         "type": {
           "const": "counter"
@@ -1534,7 +1534,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.model_switch.count"
+          "const": "eir.model_switch.count"
         },
         "type": {
           "const": "counter"
@@ -1576,7 +1576,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.fallback.count"
+          "const": "eir.fallback.count"
         },
         "type": {
           "const": "counter"
@@ -1618,7 +1618,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.slash_command.count"
+          "const": "eir.slash_command.count"
         },
         "type": {
           "const": "counter"
@@ -1656,7 +1656,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.extension.install.count"
+          "const": "eir.extension.install.count"
         },
         "type": {
           "const": "counter"
@@ -1716,7 +1716,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.memory.op.count"
+          "const": "eir.memory.op.count"
         },
         "type": {
           "const": "counter"
@@ -1776,7 +1776,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.curator.run.count"
+          "const": "eir.curator.run.count"
         },
         "type": {
           "const": "counter"
@@ -1837,7 +1837,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.delegation.run.count"
+          "const": "eir.delegation.run.count"
         },
         "type": {
           "const": "counter"
@@ -1896,7 +1896,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.execution_backend.count"
+          "const": "eir.execution_backend.count"
         },
         "type": {
           "const": "counter"
@@ -1982,7 +1982,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.platform.health"
+          "const": "eir.platform.health"
         },
         "type": {
           "const": "counter"
@@ -2036,7 +2036,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.platform.delivery"
+          "const": "eir.platform.delivery"
         },
         "type": {
           "const": "counter"
@@ -2089,7 +2089,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.gateway.reply_latency"
+          "const": "eir.gateway.reply_latency"
         },
         "type": {
           "const": "counter"
@@ -2133,7 +2133,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.cron.run"
+          "const": "eir.cron.run"
         },
         "type": {
           "const": "counter"
@@ -2186,7 +2186,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.model_tool_quality.count"
+          "const": "eir.model_tool_quality.count"
         },
         "type": {
           "const": "counter"
@@ -2246,7 +2246,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.model_friction.count"
+          "const": "eir.model_friction.count"
         },
         "type": {
           "const": "counter"
@@ -2298,7 +2298,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.context_peak.count"
+          "const": "eir.context_peak.count"
         },
         "type": {
           "const": "counter"
@@ -2369,7 +2369,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.startup.latency"
+          "const": "eir.startup.latency"
         },
         "type": {
           "const": "counter"
@@ -2420,7 +2420,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.update.run"
+          "const": "eir.update.run"
         },
         "type": {
           "const": "counter"
@@ -2511,7 +2511,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.update.stage"
+          "const": "eir.update.stage"
         },
         "type": {
           "const": "counter"
@@ -2571,7 +2571,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.process.exit"
+          "const": "eir.process.exit"
         },
         "type": {
           "const": "counter"
@@ -2632,7 +2632,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.file_edit.count"
+          "const": "eir.file_edit.count"
         },
         "type": {
           "const": "counter"
@@ -2703,7 +2703,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.loop_guard.count"
+          "const": "eir.loop_guard.count"
         },
         "type": {
           "const": "counter"
@@ -2766,7 +2766,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.tool_recovery.count"
+          "const": "eir.tool_recovery.count"
         },
         "type": {
           "const": "counter"
@@ -2829,7 +2829,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.terminal.outcome.count"
+          "const": "eir.terminal.outcome.count"
         },
         "type": {
           "const": "counter"
@@ -2900,7 +2900,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.model_reply_issue.count"
+          "const": "eir.model_reply_issue.count"
         },
         "type": {
           "const": "counter"
@@ -2952,7 +2952,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.task_cost.count"
+          "const": "eir.task_cost.count"
         },
         "type": {
           "const": "counter"
@@ -3042,7 +3042,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.wasted_tokens.count"
+          "const": "eir.wasted_tokens.count"
         },
         "type": {
           "const": "counter"
@@ -3104,7 +3104,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.tool_output_truncation.count"
+          "const": "eir.tool_output_truncation.count"
         },
         "type": {
           "const": "counter"
@@ -3139,7 +3139,7 @@
               ]
             }
           },
-          "description": "One per tool result: whether Hermes spilled or truncated it (per-result cap or per-turn budget), by raw size."
+          "description": "One per tool result: whether Eir spilled or truncated it (per-result cap or per-turn budget), by raw size."
         },
         "value": {
           "type": "integer",
@@ -3158,7 +3158,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.tool_overhead.count"
+          "const": "eir.tool_overhead.count"
         },
         "type": {
           "const": "counter"
@@ -3209,7 +3209,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.tool_enabled_unused.count"
+          "const": "eir.tool_enabled_unused.count"
         },
         "type": {
           "const": "counter"
@@ -3243,29 +3243,29 @@
                 "feishu_doc",
                 "feishu_drive",
                 "file",
-                "hermes-acp",
-                "hermes-api-server",
-                "hermes-bluebubbles",
-                "hermes-cli",
-                "hermes-cron",
-                "hermes-dingtalk",
-                "hermes-discord",
-                "hermes-email",
-                "hermes-feishu",
-                "hermes-gateway",
-                "hermes-matrix",
-                "hermes-mattermost",
-                "hermes-qqbot",
-                "hermes-signal",
-                "hermes-slack",
-                "hermes-sms",
-                "hermes-telegram",
-                "hermes-webhook",
-                "hermes-wecom",
-                "hermes-wecom-callback",
-                "hermes-weixin",
-                "hermes-whatsapp",
-                "hermes-yuanbao",
+                "eir-acp",
+                "eir-api-server",
+                "eir-bluebubbles",
+                "eir-cli",
+                "eir-cron",
+                "eir-dingtalk",
+                "eir-discord",
+                "eir-email",
+                "eir-feishu",
+                "eir-gateway",
+                "eir-matrix",
+                "eir-mattermost",
+                "eir-qqbot",
+                "eir-signal",
+                "eir-slack",
+                "eir-sms",
+                "eir-telegram",
+                "eir-webhook",
+                "eir-wecom",
+                "eir-wecom-callback",
+                "eir-weixin",
+                "eir-whatsapp",
+                "eir-yuanbao",
                 "image_gen",
                 "kanban",
                 "memory",
@@ -3313,7 +3313,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.cache_break.count"
+          "const": "eir.cache_break.count"
         },
         "type": {
           "const": "counter"
@@ -3347,7 +3347,7 @@
               "$ref": "#/$defs/provider_identifier"
             }
           },
-          "description": "A prompt-cache break mid-conversation: a cause Hermes knows (compression is expected), or a cold provider read after a warm one on the same route."
+          "description": "A prompt-cache break mid-conversation: a cause Eir knows (compression is expected), or a cold provider read after a warm one on the same route."
         },
         "value": {
           "type": "integer",
@@ -3366,7 +3366,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.engagement.day.count"
+          "const": "eir.engagement.day.count"
         },
         "type": {
           "const": "counter"
@@ -3433,7 +3433,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.engagement.surface_day.count"
+          "const": "eir.engagement.surface_day.count"
         },
         "type": {
           "const": "counter"
@@ -3486,7 +3486,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.model_switch_after.count"
+          "const": "eir.model_switch_after.count"
         },
         "type": {
           "const": "counter"
@@ -3554,7 +3554,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.desktop.feature_use"
+          "const": "eir.desktop.feature_use"
         },
         "type": {
           "const": "counter"
@@ -3636,7 +3636,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.desktop.friction"
+          "const": "eir.desktop.friction"
         },
         "type": {
           "const": "counter"
@@ -3727,7 +3727,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.desktop.onboarding"
+          "const": "eir.desktop.onboarding"
         },
         "type": {
           "const": "counter"
@@ -3786,7 +3786,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.desktop.mode_use"
+          "const": "eir.desktop.mode_use"
         },
         "type": {
           "const": "counter"
@@ -3862,7 +3862,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.desktop.action_use"
+          "const": "eir.desktop.action_use"
         },
         "type": {
           "const": "counter"
@@ -3994,7 +3994,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.desktop.dislike"
+          "const": "eir.desktop.dislike"
         },
         "type": {
           "const": "counter"
@@ -4193,7 +4193,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.tool_unavailable.count"
+          "const": "eir.tool_unavailable.count"
         },
         "type": {
           "const": "counter"
@@ -4313,7 +4313,7 @@
               ]
             }
           },
-          "description": "A model called a tool Hermes ships that this session did not enable (background reviews and delegated children excluded)."
+          "description": "A model called a tool Eir ships that this session did not enable (background reviews and delegated children excluded)."
         },
         "value": {
           "type": "integer",
@@ -4332,7 +4332,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.provider_setup.count"
+          "const": "eir.provider_setup.count"
         },
         "type": {
           "const": "counter"
@@ -4397,7 +4397,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.feature_adoption.count"
+          "const": "eir.feature_adoption.count"
         },
         "type": {
           "const": "counter"
@@ -4458,7 +4458,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.feature_disabled.count"
+          "const": "eir.feature_disabled.count"
         },
         "type": {
           "const": "counter"
@@ -4508,7 +4508,7 @@
               ]
             }
           },
-          "description": "A user turned off something Hermes ships on (or removed a shipped skill), or turned it back on. name is a shipped toolset / bundled or catalog skill or plugin / DEFAULT_CONFIG key path (never a value), else custom. At most once per (kind, name, event) per day."
+          "description": "A user turned off something Eir ships on (or removed a shipped skill), or turned it back on. name is a shipped toolset / bundled or catalog skill or plugin / DEFAULT_CONFIG key path (never a value), else custom. At most once per (kind, name, event) per day."
         },
         "value": {
           "const": 1
@@ -4526,7 +4526,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.tool_call.latency"
+          "const": "eir.tool_call.latency"
         },
         "type": {
           "const": "counter"
@@ -4587,7 +4587,7 @@
       ],
       "properties": {
         "name": {
-          "const": "hermes.task_run.duration"
+          "const": "eir.task_run.duration"
         },
         "type": {
           "const": "counter"

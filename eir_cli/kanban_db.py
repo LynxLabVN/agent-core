@@ -1,10 +1,10 @@
 """SQLite-backed Kanban board shared across profiles (the cross-profile coordination primitive).
 
-Lives under the shared Hermes root: ``default`` board DB at ``<root>/kanban.db`` (pre-boards
+Lives under the shared Eir root: ``default`` board DB at ``<root>/kanban.db`` (pre-boards
 back-compat), other boards at ``<root>/kanban/boards/<slug>/``; a worker on one board never sees
-another. Board resolution: ``board=`` arg > ``HERMES_KANBAN_BOARD`` > ``HERMES_KANBAN_DB`` (pins the
+another. Board resolution: ``board=`` arg > ``EIR_KANBAN_BOARD`` > ``EIR_KANBAN_DB`` (pins the
 file path) > ``<root>/kanban/current`` > ``default`` — but only for unfenced callers; the dispatcher
-injects these into workers, and dispatched workers (``HERMES_KANBAN_TASK``), delegated children and
+injects these into workers, and dispatched workers (``EIR_KANBAN_TASK``), delegated children and
 board-enumerating machine flows (gateway notifier/watcher/dispatcher, ``pin_first_board_resolution``)
 always resolve through the pin, so workers physically cannot see other boards.
 Concurrency: WAL + ``BEGIN IMMEDIATE`` + compare-and-swap on ``tasks.status``/``claim_lock`` —
@@ -29,7 +29,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
-from hermes_cli.kanban_workflow import DEFAULT_STATUSES as VALID_STATUSES
+from eir_cli.kanban_workflow import DEFAULT_STATUSES as VALID_STATUSES
 from toolsets import get_toolset_names
 from utils import unlink_files_older_than
 
@@ -120,7 +120,7 @@ def normalize_reasoning_effort(effort: Optional[str]) -> Optional[str]:
     """``VALID_REASONING_EFFORTS`` or ``"none"`` (thinking off), case-insensitive;
     empty/None = inherit the profile's own effort (NULL). Anything else raises —
     a typo'd level must not quietly hand the task back to the profile default."""
-    from hermes_constants import VALID_REASONING_EFFORTS
+    from eir_constants import VALID_REASONING_EFFORTS
 
     value = str(effort or "").strip().lower()
     if not value:
@@ -156,7 +156,7 @@ def _fire_kanban_lifecycle_hook(event: str, task_id: str, **fields: Any) -> None
     run under the SQLite write lock, always see durable state); failures are
     swallowed so an observer can never break a transition."""
     try:
-        from hermes_cli.lifecycle import invoke_hook
+        from eir_cli.lifecycle import invoke_hook
 
         invoke_hook(event, task_id=task_id, profile_name=_hook_profile_name(), **fields)
     except Exception as exc:  # pragma: no cover - defensive
@@ -173,7 +173,7 @@ def _fire_task_hook(event: str, task: Optional[Task], task_id: str, run_id: Opti
 
 def _hook_profile_name() -> str:
     """Active profile for hook payloads; ``"default"`` when it cannot be resolved."""
-    from hermes_cli.profiles import get_active_profile_name
+    from eir_cli.profiles import get_active_profile_name
 
     try:
         return get_active_profile_name()
@@ -185,7 +185,7 @@ def _kanban_observer_consumed(event: str) -> bool:
     """Hot-path short-circuit: skip payload assembly when nothing subscribes.
     Inspection failure counts as unconsumed (dropping an observer is always safe)."""
     try:
-        from hermes_cli.lifecycle import has_hook
+        from eir_cli.lifecycle import has_hook
 
         return has_hook(event)
     except Exception:  # pragma: no cover - defensive
@@ -254,7 +254,7 @@ def _fire_dispatch_tick_hook(
     if not _kanban_observer_consumed("on_kanban_dispatch_tick"):
         return
     try:
-        from hermes_cli.lifecycle import invoke_hook
+        from eir_cli.lifecycle import invoke_hook
 
         profile_name = _hook_profile_name()
         if board is None:
@@ -276,7 +276,7 @@ def _fire_dispatch_tick_hook(
 
 
 # Claim window before the next tick reclaims a running task; long workers
-# ``heartbeat_claim`` or raise it via HERMES_KANBAN_CLAIM_TTL_SECONDS.
+# ``heartbeat_claim`` or raise it via EIR_KANBAN_CLAIM_TTL_SECONDS.
 DEFAULT_CLAIM_TTL_SECONDS = 15 * 60
 
 # A live PID with a heartbeat older than this is wedged and reclaimed anyway
@@ -294,11 +294,11 @@ RECLAIM_DEFER_GRACE_SECONDS = 120
 
 
 def _resolve_claim_ttl_seconds(ttl_seconds: Optional[int] = None) -> int:
-    """Explicit ``ttl_seconds`` > ``HERMES_KANBAN_CLAIM_TTL_SECONDS`` > default."""
+    """Explicit ``ttl_seconds`` > ``EIR_KANBAN_CLAIM_TTL_SECONDS`` > default."""
     if ttl_seconds is not None:
         return max(1, int(ttl_seconds))
 
-    return _env_int("HERMES_KANBAN_CLAIM_TTL_SECONDS", DEFAULT_CLAIM_TTL_SECONDS, minimum=1)
+    return _env_int("EIR_KANBAN_CLAIM_TTL_SECONDS", DEFAULT_CLAIM_TTL_SECONDS, minimum=1)
 
 
 # ``detect_crashed_workers`` skips ``_pid_alive`` this long after start: the
@@ -316,25 +316,25 @@ KANBAN_TERMINAL_PROVIDER_EXIT_CODE = 78
 
 
 def _resolve_crash_grace_seconds() -> int:
-    """``HERMES_KANBAN_CRASH_GRACE_SECONDS`` (0 = immediate, for tests) else default."""
-    return _env_int("HERMES_KANBAN_CRASH_GRACE_SECONDS", DEFAULT_CRASH_GRACE_SECONDS)
+    """``EIR_KANBAN_CRASH_GRACE_SECONDS`` (0 = immediate, for tests) else default."""
+    return _env_int("EIR_KANBAN_CRASH_GRACE_SECONDS", DEFAULT_CRASH_GRACE_SECONDS)
 
 
 def _resolve_rate_limit_cooldown_seconds() -> int:
-    """``HERMES_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS`` (0 = next tick, for tests) else default."""
-    return _env_int("HERMES_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS", DEFAULT_RATE_LIMIT_COOLDOWN_SECONDS)
+    """``EIR_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS`` (0 = next tick, for tests) else default."""
+    return _env_int("EIR_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS", DEFAULT_RATE_LIMIT_COOLDOWN_SECONDS)
 
 
 # --- Paths ---
 
 DEFAULT_BOARD = "default"
 _CURRENT_BOARD_OVERRIDE: ContextVar[str | None] = ContextVar(
-    "hermes_kanban_current_board_override", default=None,
+    "eir_kanban_current_board_override", default=None,
 )
 # Machine flows that enumerate boards (gateway notifier / watcher / dispatcher
 # ticks) resolve board paths env-pin-first — see pin_first_board_resolution().
 _PIN_FIRST_BOARD_RESOLUTION: ContextVar[bool] = ContextVar(
-    "hermes_kanban_pin_first_board_resolution", default=False,
+    "eir_kanban_pin_first_board_resolution", default=False,
 )
 
 
@@ -345,7 +345,7 @@ def pin_first_board_resolution():
     The gateway notifier, per-subscription cursor writes and the embedded
     dispatcher poll every board slug from ``list_boards()`` — the slug is not
     caller intent, it is an iteration variable. On a box whose environment pins
-    ``HERMES_KANBAN_DB`` (the dispatcher default) every slug must map to that
+    ``EIR_KANBAN_DB`` (the dispatcher default) every slug must map to that
     one pinned file: the notifier dedupes resolved DB paths, and per-slug
     paths read empty boards nobody writes, silently killing wake
     notifications. Explicit cross-board intent (CLI ``--board``, a model
@@ -399,14 +399,14 @@ def _require_slug(slug: str) -> str:
 
 
 def kanban_home() -> Path:
-    """``HERMES_KANBAN_HOME`` else ``get_default_hermes_root()``. Shared across
-    profiles BY DESIGN: resolving through the active profile's HERMES_HOME would
+    """``EIR_KANBAN_HOME`` else ``get_default_eir_root()``. Shared across
+    profiles BY DESIGN: resolving through the active profile's EIR_HOME would
     fork the board per profile and break the dispatcher/worker handoff."""
-    override = os.environ.get("HERMES_KANBAN_HOME", "").strip()
+    override = os.environ.get("EIR_KANBAN_HOME", "").strip()
     if override:
         return Path(override).expanduser()
-    from hermes_constants import get_default_hermes_root
-    return get_default_hermes_root()
+    from eir_constants import get_default_eir_root
+    return get_default_eir_root()
 
 
 def boards_root() -> Path:
@@ -421,7 +421,7 @@ def current_board_path() -> Path:
 
 
 def get_current_board() -> str:
-    """Active slug: context override -> ``HERMES_KANBAN_BOARD`` -> ``<root>/kanban/current``
+    """Active slug: context override -> ``EIR_KANBAN_BOARD`` -> ``<root>/kanban/current``
     (only while that board exists) -> ``DEFAULT_BOARD``. A malformed/stale slug
     falls through — the dispatcher must never crash on a hand-edited file."""
     def _existing(candidate: str) -> Optional[str]:
@@ -434,7 +434,7 @@ def get_current_board() -> str:
         if not (normed and board_exists(normed)):
             return None
         # An archived board leaves a tombstone board.json; a stale `current`
-        # file or HERMES_KANBAN_BOARD pointing at one falls through to
+        # file or EIR_KANBAN_BOARD pointing at one falls through to
         # default rather than resurrecting it (#43243).
         if read_board_metadata(normed).get("archived"):
             return None
@@ -442,7 +442,7 @@ def get_current_board() -> str:
 
     for candidate in (
         (_CURRENT_BOARD_OVERRIDE.get() or "").strip(),
-        os.environ.get("HERMES_KANBAN_BOARD", "").strip(),
+        os.environ.get("EIR_KANBAN_BOARD", "").strip(),
     ):
         found = _existing(candidate)
         if found:
@@ -502,13 +502,13 @@ def board_exists(board: Optional[str] = None) -> bool:
 
 def _explicit_board_slug(board: Optional[str]) -> Optional[str]:
     """Explicit caller intent: a direct ``board=`` argument, else the scoped
-    ``--board`` context (CLI ``hermes kanban --board``, dashboard plugin_api);
+    ``--board`` context (CLI ``eir kanban --board``, dashboard plugin_api);
     ``None`` when the caller expressed neither."""
     if board is not None:
         return _normalize_board_slug(board)
-    # A caller-scoped board (CLI `hermes kanban --board B ...`, dashboard
+    # A caller-scoped board (CLI `eir kanban --board B ...`, dashboard
     # plugin_api) is explicit intent just like a direct board= argument —
-    # without this a worker-pinned HERMES_KANBAN_DB silently outranks --board
+    # without this a worker-pinned EIR_KANBAN_DB silently outranks --board
     # (os-reviewer P1 on PR#107195 / t_11c4afd8).
     ctx = (_CURRENT_BOARD_OVERRIDE.get() or "").strip()
     if ctx:
@@ -521,12 +521,12 @@ def _explicit_board_slug(board: Optional[str]) -> Optional[str]:
 
 def _explicit_board_intent_pinned() -> bool:
     """Whether an explicit ``board=`` (or scoped ``--board``) must still resolve
-    through the ``HERMES_KANBAN_DB``-style env pins instead of its own board dir.
+    through the ``EIR_KANBAN_DB``-style env pins instead of its own board dir.
 
     True for machine flows wrapped in :func:`pin_first_board_resolution` and
     for every execution the dispatcher fences: its own workers (they carry
-    ``HERMES_KANBAN_TASK``) and delegated children / descendants (the
-    ``HERMES_DELEGATED_CHILD_CONTEXT`` marker). The pins ARE the "workers
+    ``EIR_KANBAN_TASK``) and delegated children / descendants (the
+    ``EIR_DELEGATED_CHILD_CONTEXT`` marker). The pins ARE the "workers
     physically cannot see other boards" isolation (5ec6baa), and
     ``agent.delegation_context.kanban_path_is_fenced`` checks the pinned path /
     fenced root — an explicit board that resolved elsewhere would also escape
@@ -561,21 +561,21 @@ def _board_path(
 
 
 def kanban_db_path(board: Optional[str] = None) -> Path:
-    """``kanban.db`` path: ``HERMES_KANBAN_DB`` pins it (injected into workers);
+    """``kanban.db`` path: ``EIR_KANBAN_DB`` pins it (injected into workers);
     ``default`` -> ``<root>/kanban.db`` (back-compat), else the board dir."""
-    return _board_path("HERMES_KANBAN_DB", board, ("kanban.db",), "kanban.db")
+    return _board_path("EIR_KANBAN_DB", board, ("kanban.db",), "kanban.db")
 
 
 def workspaces_root(board: Optional[str] = None) -> Path:
-    """Per-board scratch workspace root (``HERMES_KANBAN_WORKSPACES_ROOT`` wins);
+    """Per-board scratch workspace root (``EIR_KANBAN_WORKSPACES_ROOT`` wins);
     ``default`` keeps the legacy ``<root>/kanban/workspaces/``."""
-    return _board_path("HERMES_KANBAN_WORKSPACES_ROOT", board, ("kanban", "workspaces"), "workspaces")
+    return _board_path("EIR_KANBAN_WORKSPACES_ROOT", board, ("kanban", "workspaces"), "workspaces")
 
 
 def attachments_root(board: Optional[str] = None) -> Path:
-    """Per-board attachments root (``HERMES_KANBAN_ATTACHMENTS_ROOT`` wins). Workers
+    """Per-board attachments root (``EIR_KANBAN_ATTACHMENTS_ROOT`` wins). Workers
     read attachments by absolute path, so remote terminal backends must mount it."""
-    return _board_path("HERMES_KANBAN_ATTACHMENTS_ROOT", board, ("kanban", "attachments"), "attachments")
+    return _board_path("EIR_KANBAN_ATTACHMENTS_ROOT", board, ("kanban", "attachments"), "attachments")
 
 
 def task_attachments_dir(task_id: str, board: Optional[str] = None) -> Path:
@@ -584,7 +584,7 @@ def task_attachments_dir(task_id: str, board: Optional[str] = None) -> Path:
 
 
 def worker_logs_dir(board: Optional[str] = None) -> Path:
-    """Per-board worker log dir (logs follow the board so ``hermes kanban log``
+    """Per-board worker log dir (logs follow the board so ``eir kanban log``
     is unambiguous when two boards share a task id)."""
     return _board_path(None, board, ("kanban", "logs"), "logs")
 
@@ -633,7 +633,7 @@ class Task:
     # done / budget exhausted (-> kanban_block); ``goal_max_turns`` None -> goals default.
     goal_mode: bool = False
     goal_max_turns: Optional[int] = None
-    session_id: Optional[str] = None         # originating HERMES_SESSION_ID; NULL from CLI/dashboard
+    session_id: Optional[str] = None         # originating EIR_SESSION_ID; NULL from CLI/dashboard
     # VALID_BLOCK_KINDS or None (legacy); kept across unblock so a same-kind re-block reads as a loop.
     block_kind: Optional[str] = None
     block_recurrences: int = 0               # unblock-loop counter, see BLOCK_RECURRENCE_LIMIT
@@ -788,7 +788,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     workspace_kind       TEXT NOT NULL DEFAULT 'scratch',
     workspace_path       TEXT,
     branch_name          TEXT,
-    -- Optional link to a first-class Project (hermes_cli/projects_db). When set,
+    -- Optional link to a first-class Project (eir_cli/projects_db). When set,
     -- the task's worktree is anchored under the project's primary repo with a
     -- deterministic branch name instead of a random wt/<task-id> fallback.
     project_id           TEXT,
@@ -856,7 +856,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     -- goals-engine default.
     goal_max_turns       INTEGER,
     -- Originating chat/agent session id when the task was created from
-    -- inside an agent loop that propagated ``HERMES_SESSION_ID``. NULL
+    -- inside an agent loop that propagated ``EIR_SESSION_ID``. NULL
     -- for tasks created from the CLI, dashboard, or any path that doesn't
     -- set the env var, and for an id with no ``sessions`` row in this
     -- profile's state.db (kanban_create verifies before stamping). Indexed
@@ -1023,7 +1023,7 @@ def _canonical_assignee(assignee: Optional[str]) -> Optional[str]:
     """Lowercase-assignee normalization for Kanban rows (dashboard/CLI parity)."""
     if assignee is None:
         return None
-    from hermes_cli.profiles import normalize_profile_name
+    from eir_cli.profiles import normalize_profile_name
 
     return normalize_profile_name(assignee)
 
@@ -1043,7 +1043,7 @@ def _resolve_project_link(
     project_id = (str(project_id).strip() or None) if project_id is not None else None
     if not project_id:
         return None, None, None, workspace_kind
-    from hermes_cli import projects_db as _pdb
+    from eir_cli import projects_db as _pdb
 
     project_repo: Optional[str] = None
     try:
@@ -1184,8 +1184,8 @@ def create_task(
     ``workspace_kind=None`` (omitted) inherits a project-scoped board's project;
     an explicit ``"scratch"`` or ``project_id=""`` is a request for no project.
     """
-    from hermes_cli.kanban_db_graph import initial_task_state, inherit_creator_origin
-    from hermes_cli.kanban_pr_acceptance import validate_contract
+    from eir_cli.kanban_db_graph import initial_task_state, inherit_creator_origin
+    from eir_cli.kanban_pr_acceptance import validate_contract
 
     completion_contract = validate_contract(completion_contract)
     model_override, provider_override = _validate_model_override(model_override, provider_override)
@@ -1335,7 +1335,7 @@ def _board_meta_for(board: Optional[str]) -> dict:
 
 
 def _project_branch_name(project_obj: Any, task_id: str, title: Optional[str]) -> Optional[str]:
-    from hermes_cli import projects_db as _pdb
+    from eir_cli import projects_db as _pdb
 
     try:
         return _pdb.branch_name_for(project_obj, task_id, title=title or "")
@@ -1404,7 +1404,7 @@ def get_task(conn: sqlite3.Connection, task_id: str) -> Optional[Task]:
     return Task.from_row(row) if row else None
 
 
-# Canonical sort-order mappings for ``hermes kanban list --sort``.
+# Canonical sort-order mappings for ``eir kanban list --sort``.
 # Each value is a raw SQL fragment appended after ``ORDER BY``.
 VALID_SORT_ORDERS: dict[str, str] = {
     "created": "created_at ASC, id ASC",
@@ -1632,7 +1632,7 @@ def _linked_ids(conn: sqlite3.Connection, want: str, where: str, task_id: str) -
 
 # Dependency edge removed — re-evaluate promotion eligibility for the child immediately. Matches the
 # contract of complete_task and unblock_task; without this the child stays stuck in todo until the next
-# dispatcher tick or a manual `hermes kanban recompute` (issue #22459).
+# dispatcher tick or a manual `eir kanban recompute` (issue #22459).
 def parent_ids(conn: sqlite3.Connection, task_id: str) -> list[str]:
     return _linked_ids(conn, "parent_id", "child_id", task_id)
 
@@ -2353,7 +2353,7 @@ def release_stale_claims(
         "WHERE status = 'running' AND claim_expires IS NOT NULL "
         "  AND claim_expires < ?", (now,),
     ).fetchall()
-    from hermes_cli.kanban_owner_recovery import owner_reclaim_blocked, owner_reclaim_blocked_after_kill, reclaim_error
+    from eir_cli.kanban_owner_recovery import owner_reclaim_blocked, owner_reclaim_blocked_after_kill, reclaim_error
     for row in stale:
         if owner_reclaim_blocked(conn, row["id"]):
             continue
@@ -2664,7 +2664,7 @@ def complete_task(
     # Cheap pre-check; re-checked inside the txn to close the parent-reopen race.
     if not _parents_satisfied(conn, task_id):
         return False
-    from hermes_cli.kanban_pr_acceptance_store import prepare_acceptance, record_acceptance
+    from eir_cli.kanban_pr_acceptance_store import prepare_acceptance, record_acceptance
     verified_cards = _gate_created_cards(conn, task_id, created_cards, summary or result)
     _gate_empty_completion(conn, task_id, result=result, summary=summary)
     metadata = _merge_completion_prose_artifacts(
@@ -3506,7 +3506,7 @@ def promote_task(
             f"unsatisfied parent dependencies: {', '.join(unsatisfied)} "
             f"(the ready -> running claim re-checks parents, so promotion cannot "
             f"bypass them; complete the parents or drop the link with "
-            f"`hermes kanban unlink <parent_id> {task_id}`)"
+            f"`eir kanban unlink <parent_id> {task_id}`)"
         )
 
     if dry_run:
@@ -3901,7 +3901,7 @@ def build_worker_context(conn: sqlite3.Connection, task_id: str) -> str:
     task = get_task(conn, task_id)
     if not task:
         raise ValueError(f"unknown task {task_id}")
-    from hermes_cli.kanban_db_context import (
+    from eir_cli.kanban_db_context import (
         _ctx_attachments, _ctx_comments, _ctx_header, _ctx_parent_results, _ctx_prior_attempts,
         _ctx_role_history,
     )
@@ -4074,10 +4074,10 @@ def read_worker_log(
 
 def list_profiles_on_disk() -> list[str]:
     """Profiles with a ``config.yaml`` plus the implicit ``default``; reads paths
-    directly to avoid importing ``hermes_cli.profiles`` at startup."""
+    directly to avoid importing ``eir_cli.profiles`` at startup."""
     try:
-        from hermes_constants import get_default_hermes_root
-        default_root = get_default_hermes_root()
+        from eir_constants import get_default_eir_root
+        default_root = get_default_eir_root()
         profiles_dir = default_root / "profiles"
     except Exception:
         return []
@@ -4195,7 +4195,7 @@ def current_run_started_ats(conn: sqlite3.Connection, task_ids: Iterable[str]) -
 
 
 # --- Split modules (imported at the tail: they import this module as ``_kb``) ---
-from hermes_cli.kanban_db_boards import (
+from eir_cli.kanban_db_boards import (
     _default_board_display_name,
     _dir_holds_board,
     board_metadata_path,
@@ -4205,18 +4205,18 @@ from hermes_cli.kanban_db_boards import (
     remove_board,
     write_board_metadata,
 )
-from hermes_cli.kanban_db_connect import (
+from eir_cli.kanban_db_connect import (
     _INITIALIZED_PATHS,
     init_db,
     write_txn,
 )
-from hermes_cli.kanban_db_workspace import (
+from eir_cli.kanban_db_workspace import (
     _cleanup_workspace,
     _is_managed_scratch_path,
     _managed_scratch_path_info,
     _scratch_workspace,
 )
-from hermes_cli.kanban_db_dispatch import (
+from eir_cli.kanban_db_dispatch import (
     DEFAULT_FAILURE_LIMIT,
     DEFAULT_RATE_LIMIT_COOLDOWN_SECONDS,
     DispatchResult,

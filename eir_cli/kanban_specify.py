@@ -1,10 +1,10 @@
 """Kanban triage specifier — flesh out a one-liner into a real spec.
 
-``hermes kanban specify [task_id | --all]`` asks the auxiliary LLM for a
+``eir kanban specify [task_id | --all]`` asks the auxiliary LLM for a
 tightened title + concrete body for a Triage task, then flips it
 ``triage -> todo`` via ``kanban_db.specify_triage_task``.
 
-Mirrors ``hermes_cli/goals.py``: same aux-client pattern, same "empty config
+Mirrors ``eir_cli/goals.py``: same aux-client pattern, same "empty config
 => skip, don't crash" tolerance. One shot, no retry loop. JSON mode is not
 requested (works on providers without it); the parse is lenient and falls
 back to "whole reply is the body" so a malformed reply never strands a task.
@@ -19,17 +19,17 @@ import re
 from dataclasses import dataclass
 from typing import Optional
 
-from hermes_cli import kanban_db as kb
-from hermes_cli import kanban_db_connect as kbc
+from eir_cli import kanban_db as kb
+from eir_cli import kanban_db_connect as kbc
 
 from utils import env_int
 
-HERMES_KANBAN_SPECIFY_MAX_TOKENS = max(1500, env_int("HERMES_KANBAN_SPECIFY_MAX_TOKENS", 6000))
+EIR_KANBAN_SPECIFY_MAX_TOKENS = max(1500, env_int("EIR_KANBAN_SPECIFY_MAX_TOKENS", 6000))
 
 logger = logging.getLogger(__name__)
 
 
-_SYSTEM_PROMPT = """You are the Kanban triage specifier for the Hermes Agent board.
+_SYSTEM_PROMPT = """You are the Kanban triage specifier for the Eir Agent board.
 A user dropped a rough idea into the Triage column. Your job is to turn it
 into a concrete, actionable task spec that an autonomous worker can pick up
 and execute without further clarification.
@@ -117,9 +117,9 @@ def _title_body(parsed: dict) -> tuple[Optional[str], Optional[str]]:
 
 
 def _profile_author(default: str = "specifier") -> str:
-    """Same identity contract as ``hermes_cli.kanban._profile_author``; ``$USER`` as the last
+    """Same identity contract as ``eir_cli.kanban._profile_author``; ``$USER`` as the last
     resort for a human running the CLI outside any profile."""
-    from hermes_cli.profiles import current_profile_name
+    from eir_cli.profiles import current_profile_name
     return current_profile_name() or os.environ.get("USER") or default
 
 
@@ -203,7 +203,7 @@ def specify_task(
     raw, reason = _call_aux(
         "specify", task_id, aux_task="triage_specifier", system=_SYSTEM_PROMPT,
         user=_USER_TEMPLATE.format(**_task_prompt_fields(task)),
-        max_tokens=HERMES_KANBAN_SPECIFY_MAX_TOKENS, timeout=timeout or 120,
+        max_tokens=EIR_KANBAN_SPECIFY_MAX_TOKENS, timeout=timeout or 120,
     )
     if raw is None:
         return SpecifyOutcome(task_id, False, reason)

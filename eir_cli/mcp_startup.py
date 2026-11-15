@@ -8,10 +8,10 @@ from contextlib import contextmanager, nullcontext
 from contextvars import copy_context
 from typing import Dict, Iterator, Optional, Set
 
-from hermes_constants import hermes_home_key
+from eir_constants import eir_home_key
 
 _mcp_discovery_lock = threading.Lock()
-# Discovery slot per profile home (``hermes_home_key()`` follows the context-local HERMES_HOME
+# Discovery slot per profile home (``eir_home_key()`` follows the context-local EIR_HOME
 # override): a shared Desktop/dashboard backend serving several profiles runs one discovery per
 # profile instead of the first profile to build an agent claiming the slot for everybody (#67605).
 # A single-profile process has exactly one key, so behaviour is the old single-slot form.
@@ -54,12 +54,12 @@ def get_mcp_server_filter() -> Optional[list[str]]:
 def _has_configured_mcp_servers() -> bool:
     """Cheap config probe so non-MCP users avoid importing the MCP stack."""
     try:
-        from hermes_cli.config import read_raw_config
+        from eir_cli.config import read_raw_config
 
         raw_config = read_raw_config() or {}
         if isinstance(raw_config.get("mcp_servers"), dict) and raw_config["mcp_servers"]:
             return True
-        from hermes_cli.agent_plugins import has_enabled_agent_plugin_mcp
+        from eir_cli.agent_plugins import has_enabled_agent_plugin_mcp
 
         return has_enabled_agent_plugin_mcp(raw_config)
     except Exception:
@@ -95,11 +95,11 @@ def start_background_mcp_discovery(*, logger, thread_name: str) -> None:
 
     If the first run exits without connecting any server (e.g. startup cancellation / OOM restart),
     later calls may retry instead of pinning the profile in "already started" with zero MCP tools.
-    Likewise a server added to ``mcp_servers`` after that run (``hermes mcp add`` against a running
+    Likewise a server added to ``mcp_servers`` after that run (``eir mcp add`` against a running
     Desktop backend) is connected by the next call, which every agent build makes, so a new session
     gets its tools without a reload (#76954). Discovery is additive: live servers are untouched.
     """
-    home_key = hermes_home_key()
+    home_key = eir_home_key()
     with _mcp_discovery_lock:
         if home_key in _mcp_discovery_started:
             thread = _mcp_discovery_thread.get(home_key)
@@ -127,7 +127,7 @@ def start_background_mcp_discovery(*, logger, thread_name: str) -> None:
             return
 
         # Bare threads start from an empty context: run discovery under a copy of the caller's, so
-        # the context-local HERMES_HOME override (multi-profile dashboard/desktop backends, #67605)
+        # the context-local EIR_HOME override (multi-profile dashboard/desktop backends, #67605)
         # AND the profile's secret scope reach it. Without the scope a session switched to profile
         # X would discover the LAUNCH profile's mcp_servers, and ``${TOKEN}`` interpolation / the
         # stdio child env would fail closed (multiplex) or resolve the launch profile's value.
@@ -162,7 +162,7 @@ def _resolve_discovery_timeout(explicit: float | None, *, single_query: bool = F
     key = "mcp_single_query_discovery_timeout" if single_query else "mcp_discovery_timeout"
     fallback = 15.0 if single_query else 1.5
     try:
-        from hermes_cli.config import load_config, DEFAULT_CONFIG
+        from eir_cli.config import load_config, DEFAULT_CONFIG
 
         default = float(DEFAULT_CONFIG.get(key, fallback))
     except Exception:
@@ -227,7 +227,7 @@ def defer_background_mcp_discovery(*, logger, thread_name: str, delay: float | N
     """
     global _mcp_discovery_deferred
     with _mcp_discovery_lock:
-        if hermes_home_key() in _mcp_discovery_started or _mcp_discovery_deferred is not None:
+        if eir_home_key() in _mcp_discovery_started or _mcp_discovery_deferred is not None:
             return
 
         def _fire() -> None:
@@ -273,7 +273,7 @@ def wait_for_mcp_discovery(timeout: float | None = None, *, single_query: bool =
 
 def _current_home_thread() -> Optional[threading.Thread]:
     """Discovery thread for the profile home the caller is scoped to, if any."""
-    return _mcp_discovery_thread.get(hermes_home_key())
+    return _mcp_discovery_thread.get(eir_home_key())
 
 
 def mcp_discovery_in_flight() -> bool:
@@ -308,7 +308,7 @@ def ensure_mcp_discovery_before_agent_build(
     thread_name: str = "cli-mcp-discovery") -> None:
     """Give configured MCP tools a bounded chance to register before AIAgent.
 
-    Non-interactive first turns (``chat -q``, ``hermes -z``) can construct ``AIAgent`` before any
+    Non-interactive first turns (``chat -q``, ``eir -z``) can construct ``AIAgent`` before any
     path started discovery, and ``wait_for_mcp_discovery()`` only joins an existing thread — so
     start discovery if needed, then wait up to the configured bound.
     """

@@ -4,16 +4,16 @@ from pathlib import Path
 
 import pytest
 
-from hermes_cli import profile_provision, profiles
-from hermes_cli.profile_provision import ProfileCreateRequest, provision_profile
+from eir_cli import profile_provision, profiles
+from eir_cli.profile_provision import ProfileCreateRequest, provision_profile
 
 
 @pytest.fixture()
 def launch(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     home.mkdir()
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     (home / "config.yaml").write_text("model:\n  default: m\n  provider: openrouter\n")
     (home / ".env").write_text("OPENROUTER_API_KEY=sk-or-x\nTELEGRAM_BOT_TOKEN=1:x\n")
     (home / "auth.json").write_text('{"version": 1, "providers": {}, "credential_pool": {}}')
@@ -73,7 +73,7 @@ def test_a_named_launch_profile_copies_its_logins_instead_of_sharing_the_roots(l
     (b / "config.yaml").write_text("model:\n  default: m\n  provider: openrouter\n")
     (b / ".env").write_text("OPENROUTER_API_KEY=sk-or-b\n")
     (b / "auth.json").write_text('{"version": 1, "providers": {"b-only": {}}, "credential_pool": {}}')
-    monkeypatch.setenv("HERMES_HOME", str(b))
+    monkeypatch.setenv("EIR_HOME", str(b))
     result = provision_profile(ProfileCreateRequest(name="child"))
     assert result.path == launch / "profiles" / "child"
     assert "OPENROUTER_API_KEY=sk-or-b" in (result.path / ".env").read_text()
@@ -87,7 +87,7 @@ def test_a_named_launch_profiles_subscription_login_is_not_copied_and_says_so(la
     b.mkdir(parents=True)
     (b / "auth.json").write_text('{"version": 1, "providers": {}, "credential_pool": {"anthropic": '
                                  '[{"id": "x", "auth_type": "oauth", "refresh_token": "rt", "access_token": "at"}]}}')
-    monkeypatch.setenv("HERMES_HOME", str(b))
+    monkeypatch.setenv("EIR_HOME", str(b))
     result = provision_profile(ProfileCreateRequest(name="child"))
     assert "anthropic" not in (result.path / "auth.json").read_text()
     assert any("subscription logins not carried over (anthropic)" in w for w in result.warnings)
@@ -110,8 +110,8 @@ def test_only_a_fresh_profile_gets_bundled_skills(launch):
 
 
 def test_a_rejected_model_pick_is_reported_and_the_create_still_succeeds(launch, monkeypatch):
-    from hermes_cli.model_switch import ModelSwitchResult
-    monkeypatch.setattr("hermes_cli.model_switch.switch_model",
+    from eir_cli.model_switch import ModelSwitchResult
+    monkeypatch.setattr("eir_cli.model_switch.switch_model",
                         lambda **_kw: ModelSwitchResult(success=False, error_message="Unknown provider 'nope'."))
     result = provision_profile(ProfileCreateRequest(name="work", provider="nope", model="m"))
     assert (result.model_set, result.model_error, result.warnings) == (False, "Unknown provider 'nope'.", [])
@@ -150,13 +150,13 @@ def test_every_surface_creates_through_provision_profile(launch, monkeypatch):
 
     monkeypatch.setattr(profile_provision, "provision_profile", spy)
     from argparse import Namespace
-    from hermes_cli import profile_cmd
+    from eir_cli import profile_cmd
     profile_cmd._profile_create(Namespace(
         profile_name="cli", clone=False, clone_all=False, no_alias=True, no_skills=False, clone_from=None,
         clone_channels=False, sync_imports=False, description=None))
     import asyncio
-    from hermes_cli.web_models import ProfileCreate
-    from hermes_cli.web_routers.profiles import create_profile_endpoint
+    from eir_cli.web_models import ProfileCreate
+    from eir_cli.web_routers.profiles import create_profile_endpoint
     asyncio.run(create_profile_endpoint(ProfileCreate(name="rest")))
     from tui_gateway import server
     assert server._methods["profiles.create"](1, {"name": "rpc", "no_alias": True})["result"]["ok"]
@@ -166,9 +166,9 @@ def test_every_surface_creates_through_provision_profile(launch, monkeypatch):
 
 
 def _cli_args(*argv):
-    """Parse ``hermes profile create ...`` with the real parser, so a misnamed flag dest fails here."""
+    """Parse ``eir profile create ...`` with the real parser, so a misnamed flag dest fails here."""
     import argparse
-    from hermes_cli.subcommands.profile import build_profile_parser
+    from eir_cli.subcommands.profile import build_profile_parser
     parser = argparse.ArgumentParser()
     build_profile_parser(parser.add_subparsers(), cmd_profile=lambda args: None)
     return parser.parse_args(["profile", "create", *argv])
@@ -177,9 +177,9 @@ def _cli_args(*argv):
 def test_every_surface_has_both_opt_outs(launch, monkeypatch):
     """CLI flags, dashboard fields and RPC params map onto the same two request fields."""
     import asyncio
-    from hermes_cli import profile_cmd
-    from hermes_cli.web_models import ProfileCreate
-    from hermes_cli.web_routers.profiles import create_profile_endpoint
+    from eir_cli import profile_cmd
+    from eir_cli.web_models import ProfileCreate
+    from eir_cli.web_routers.profiles import create_profile_endpoint
     from tui_gateway import server
     seen = []
     real = profile_provision.provision_profile
@@ -203,7 +203,7 @@ def test_every_surface_has_both_opt_outs(launch, monkeypatch):
 def test_a_clone_reaches_the_selected_memory_providers_create_hook_once(launch, monkeypatch):
     import plugins.memory as memory_pkg
     from agent.memory_provider import MemoryProvider
-    from hermes_constants import get_hermes_home
+    from eir_constants import get_eir_home
 
     calls = []
 
@@ -219,8 +219,8 @@ def test_a_clone_reaches_the_selected_memory_providers_create_hook_once(launch, 
         def get_tool_schemas(self):
             return []
 
-        def on_profile_created(self, profile_name, hermes_home):
-            calls.append((profile_name, hermes_home, str(get_hermes_home())))
+        def on_profile_created(self, profile_name, eir_home):
+            calls.append((profile_name, eir_home, str(get_eir_home())))
 
     monkeypatch.setattr(memory_pkg, "load_memory_provider", lambda name, **kw: Recorder() if name == "recorder" else None)
     (launch / "config.yaml").write_text("memory:\n  provider: recorder\n")
@@ -231,7 +231,7 @@ def test_a_clone_reaches_the_selected_memory_providers_create_hook_once(launch, 
 
 
 def test_the_cli_does_not_say_no_keys_when_it_copied_them(launch, capsys):
-    from hermes_cli import profile_cmd
+    from eir_cli import profile_cmd
     profile_cmd._profile_create(_cli_args("keys", "--no-alias"))
     out = capsys.readouterr().out
     assert "Copied API keys from 'default'" in out
@@ -253,7 +253,7 @@ def test_the_cli_does_not_say_no_keys_when_it_copied_them(launch, capsys):
 
 def test_validating_in_another_home_runs_under_multiplex_semantics(launch, monkeypatch):
     from agent.secret_scope import is_multiplex_active
-    from hermes_cli.model_switch import ModelSwitchResult
+    from eir_cli.model_switch import ModelSwitchResult
     other = launch / "profiles" / "other"
     other.mkdir(parents=True)
     (other / "config.yaml").write_text("{}\n", encoding="utf-8")
@@ -263,7 +263,7 @@ def test_validating_in_another_home_runs_under_multiplex_semantics(launch, monke
         seen.append(is_multiplex_active())
         return ModelSwitchResult(success=False, error_message="no")
 
-    monkeypatch.setattr("hermes_cli.model_switch.switch_model", switch)
+    monkeypatch.setattr("eir_cli.model_switch.switch_model", switch)
     provision_profile(ProfileCreateRequest(name="a", provider="p", model="m", model_validate_in=launch))
     provision_profile(ProfileCreateRequest(name="b", provider="p", model="m", model_validate_in=other))
     assert (seen, is_multiplex_active()) == ([False, True], False)

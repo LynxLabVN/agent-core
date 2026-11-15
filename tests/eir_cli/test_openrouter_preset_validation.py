@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from hermes_cli.models_validate import validate_requested_model
+from eir_cli.models_validate import validate_requested_model
 
 
 @pytest.mark.parametrize(
@@ -19,7 +19,7 @@ from hermes_cli.models_validate import validate_requested_model
 def test_direct_openrouter_preset_reference_skips_model_listing(model_name):
     """An account-scoped direct preset has no public model row to probe."""
     with patch(
-        "hermes_cli.models.fetch_api_models",
+        "eir_cli.models.fetch_api_models",
         side_effect=AssertionError("direct preset references must not probe /models"),
     ):
         result = validate_requested_model(
@@ -40,7 +40,7 @@ def test_direct_openrouter_preset_reference_skips_model_listing(model_name):
 def test_combined_openrouter_preset_reference_validates_base_model():
     """Combined references validate the base model, not the preset-decorated ID."""
     with patch(
-        "hermes_cli.models.fetch_api_models",
+        "eir_cli.models.fetch_api_models",
         return_value=["openai/gpt-5.4"],
     ):
         result = validate_requested_model(
@@ -59,7 +59,7 @@ def test_combined_openrouter_preset_reference_validates_base_model():
 
 
 def test_combined_openrouter_preset_reference_rejects_unknown_base_model():
-    with patch("hermes_cli.models.fetch_api_models", return_value=["openai/gpt-5.4"]):
+    with patch("eir_cli.models.fetch_api_models", return_value=["openai/gpt-5.4"]):
         result = validate_requested_model(
             "openai/gpt-5.4-preview@preset/email-copywriter",
             "openrouter",
@@ -76,7 +76,7 @@ def test_combined_openrouter_preset_reference_rejects_unknown_base_model():
 def test_combined_preset_near_miss_base_is_not_rewritten():
     """A base model close to a listed id is the user's pick, not a typo — the verdict rejects with a
     suggestion instead of swapping the model under the preset."""
-    with patch("hermes_cli.models.fetch_api_models", return_value=["openai/gpt-5.4"]):
+    with patch("eir_cli.models.fetch_api_models", return_value=["openai/gpt-5.4"]):
         result = validate_requested_model(
             "openai/gpt-5.44@preset/email-copywriter",
             "openrouter",
@@ -104,7 +104,7 @@ def test_combined_preset_near_miss_base_is_not_rewritten():
 def test_openrouter_preset_reference_requires_a_url_safe_slug(model_name):
     """Malformed preset references must fail before model-list probing."""
     with patch(
-        "hermes_cli.models.fetch_api_models",
+        "eir_cli.models.fetch_api_models",
         side_effect=AssertionError("malformed presets must not probe /models"),
     ):
         result = validate_requested_model(
@@ -120,7 +120,7 @@ def test_openrouter_preset_reference_requires_a_url_safe_slug(model_name):
 
 
 def test_preset_reference_does_not_bypass_other_provider_validation():
-    with patch("hermes_cli.models.fetch_api_models", return_value=["gpt-5.4"]):
+    with patch("eir_cli.models.fetch_api_models", return_value=["gpt-5.4"]):
         result = validate_requested_model(
             "@preset/email-copywriter",
             "openai",
@@ -140,7 +140,7 @@ def test_preset_reference_does_not_bypass_custom_endpoint_validation():
         "suggested_base_url": None,
         "used_fallback": False,
     }
-    with patch("hermes_cli.models.probe_api_models", return_value=probe) as mock_probe:
+    with patch("eir_cli.models.probe_api_models", return_value=probe) as mock_probe:
         result = validate_requested_model(
             "@preset/email-copywriter",
             "openrouter",
@@ -157,7 +157,7 @@ def test_preset_reference_does_not_bypass_custom_endpoint_validation():
 def test_custom_provider_on_openrouter_host_accepts_preset_without_catalog_note(provider):
     """A custom provider pointed at openrouter.ai is OpenRouter: its dashboard presets never appear in
     /v1/models, so the switch must not carry a "not found" note whose URL Telegram previews as models.json."""
-    with patch("hermes_cli.models.probe_api_models", side_effect=AssertionError("must not probe /models")):
+    with patch("eir_cli.models.probe_api_models", side_effect=AssertionError("must not probe /models")):
         result = validate_requested_model(
             "@preset/email-copywriter", provider, api_key="key", base_url="https://openrouter.ai/api/v1")
     assert result == {"accepted": True, "persist": True, "recognized": False, "message": None}
@@ -181,8 +181,8 @@ model_aliases:
 
     script = r"""
 import json
-import hermes_cli.model_switch as model_switch
-import hermes_cli.models as models
+import eir_cli.model_switch as model_switch
+import eir_cli.models as models
 
 
 def fail_model_probe(*args, **kwargs):
@@ -203,7 +203,7 @@ print(json.dumps(vars(result)))
 """
     env = {
         "HOME": str(tmp_path),
-        "HERMES_HOME": str(tmp_path),
+        "EIR_HOME": str(tmp_path),
         "LANG": "C.UTF-8",
         "OPENROUTER_API_KEY": "key",
         "PATH": os.environ.get("PATH", ""),

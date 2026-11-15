@@ -1,4 +1,4 @@
-"""MCP picker — interactive `hermes mcp picker` (also the default `hermes mcp`)."""
+"""MCP picker — interactive `eir mcp picker` (also the default `eir mcp`)."""
 
 from __future__ import annotations
 
@@ -6,14 +6,14 @@ import sys
 from dataclasses import dataclass
 from typing import List, Optional
 
-from hermes_cli.colors import Colors
-from hermes_cli.cli_output import prompt_yes_no
-from hermes_cli.curses_ui import curses_single_select
-from hermes_cli.mcp_catalog import (
+from eir_cli.colors import Colors
+from eir_cli.cli_output import prompt_yes_no
+from eir_cli.curses_ui import curses_single_select
+from eir_cli.mcp_catalog import (
     CatalogEntry, CatalogError, catalog_diagnostics, install_entry, is_enabled, is_installed,
     list_catalog, installed_servers, remove_server, server_enabled, uninstall_entry, _say,
 )
-from hermes_cli.config import load_config, save_config
+from eir_cli.config import load_config, save_config
 
 _STATUS_NOT_INSTALLED = "available"
 _STATUS_DISABLED = "installed (disabled)"
@@ -79,14 +79,14 @@ def _enable_disable(name: str, *, enable: bool) -> None:
     save_config(cfg)
     _say(
         f"  ✓ '{name}' {'enabled' if enable else 'disabled'}. "
-        "Start a new Hermes session for changes to take effect."
+        "Start a new Eir session for changes to take effect."
     )
 
 
 def _configure_tools(name: str) -> None:
     """Open the tool selection checklist for an already-installed MCP."""
     from argparse import Namespace
-    from hermes_cli.mcp_config import cmd_mcp_configure
+    from eir_cli.mcp_config import cmd_mcp_configure
 
     cmd_mcp_configure(Namespace(name=name))
 
@@ -160,7 +160,7 @@ def _handle_row(row: _Row) -> None:
 
 
 def _print_rows_text(rows: list[_Row]) -> None:
-    """Plain-text catalog dump: `hermes mcp catalog` output and the non-curses fallback."""
+    """Plain-text catalog dump: `eir mcp catalog` output and the non-curses fallback."""
     print()
     if not rows:
         _say("  No MCPs in the catalog or configured.", Colors.DIM)
@@ -174,24 +174,24 @@ def _print_rows_text(rows: list[_Row]) -> None:
     for row in rows:
         print(f"  {_format_row(row)}")
     print()
-    _say("  Install: hermes mcp install <name>    Picker: hermes mcp", Colors.DIM)
-    # Manifest-version warnings: the user's Hermes is too old to install everything listed.
+    _say("  Install: eir mcp install <name>    Picker: eir mcp", Colors.DIM)
+    # Manifest-version warnings: the user's Eir is too old to install everything listed.
     future = [d for d in catalog_diagnostics() if d[1] == "future_manifest"]
     if future:
         print()
         for name, _, _msg in future:
-            _say(f"  ⚠ '{name}' requires a newer Hermes — run `hermes update` to install this entry.", Colors.YELLOW)
+            _say(f"  ⚠ '{name}' requires a newer Eir — run `eir update` to install this entry.", Colors.YELLOW)
         print()
     print()
 
 
 def show_catalog() -> None:
-    """`hermes mcp catalog` — print the curated list + custom servers, no interaction."""
+    """`eir mcp catalog` — print the curated list + custom servers, no interaction."""
     _print_rows_text(_build_rows())
 
 
 def run_picker() -> None:
-    """`hermes mcp picker` (and default `hermes mcp`) — interactive selector; re-renders after each
+    """`eir mcp picker` (and default `eir mcp`) — interactive selector; re-renders after each
     action until ESC/q."""
     while True:
         rows = _build_rows()
@@ -208,13 +208,13 @@ def run_picker() -> None:
 
 
 def install_by_name(identifier: str) -> int:
-    """`hermes mcp install <name>` — non-interactive entry-point."""
-    from hermes_cli.mcp_catalog import get_entry
+    """`eir mcp install <name>` — non-interactive entry-point."""
+    from eir_cli.mcp_catalog import get_entry
 
     entry = get_entry(identifier)
     if entry is None:
         _say(
-            f"  ✗ '{identifier}' is not in the catalog. Run `hermes mcp catalog` to see available entries.",
+            f"  ✗ '{identifier}' is not in the catalog. Run `eir mcp catalog` to see available entries.",
             Colors.RED,
         )
         return 1

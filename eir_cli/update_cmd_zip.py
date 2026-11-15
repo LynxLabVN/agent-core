@@ -1,6 +1,6 @@
-"""ZIP-download fallback for ``hermes update`` (Windows with broken git): two-phase stage/commit swap, dirty-tree guard.
+"""ZIP-download fallback for ``eir update`` (Windows with broken git): two-phase stage/commit swap, dirty-tree guard.
 
-Split out of ``update_cmd.py``; every name is re-imported there so ``hermes_cli.update_cmd.<name>`` keeps
+Split out of ``update_cmd.py``; every name is re-imported there so ``eir_cli.update_cmd.<name>`` keeps
 resolving/monkeypatching. Origin helpers are imported lazily per function (no cycle; test patches stay effective).
 """
 
@@ -14,23 +14,23 @@ import sys
 from pathlib import Path
 from typing import Collection, Optional
 
-from hermes_cli._early_recovery import _keep_aside
-from hermes_cli._early_recovery_zip import (
+from eir_cli._early_recovery import _keep_aside
+from eir_cli._early_recovery_zip import (
     ZIP_SWAP_JOURNAL, restore_interrupted_zip_swap, write_zip_swap_journal, zip_entry_identity, zip_swap_owner_lock)
-from hermes_cli.update_cmd_common import _record_stop
+from eir_cli.update_cmd_common import _record_stop
 
 # Log-record parity with the origin module.
-logger = logging.getLogger("hermes_cli.update_cmd")
+logger = logging.getLogger("eir_cli.update_cmd")
 
-_ZIP_STAGING_ARTIFACT_SUFFIXES = ".hermes-update-staging", ".hermes-update-old"
-# Hermes' own root breadcrumbs: the swap journal + its owner lock, and the update/refresh markers.
+_ZIP_STAGING_ARTIFACT_SUFFIXES = ".eir-update-staging", ".eir-update-old"
+# Eir' own root breadcrumbs: the swap journal + its owner lock, and the update/refresh markers.
 # They are never user work, so the dirty-tree guard must not refuse (and wedge) on them.
-_ZIP_HERMES_ROOT_ARTIFACTS = frozenset({
-    ".hermes-update-zip-swap", ".hermes-update-zip-swap.lock", ".update-incomplete", ".lazy-refresh-incomplete"})
+_ZIP_EIR_ROOT_ARTIFACTS = frozenset({
+    ".eir-update-zip-swap", ".eir-update-zip-swap.lock", ".update-incomplete", ".lazy-refresh-incomplete"})
 # A journal temp a killed writer left (``write_durable_text``'s unpredictable name). The swap never
 # touches it (no ZIP ships it) and nothing deletes it, so admitting it risks no user bytes. A file at
-# the old fixed ``.hermes-update-zip-swap.tmp`` name is no longer Hermes': it blocks (review Z5).
-_ZIP_JOURNAL_TEMP = re.compile(r"\.hermes-update-zip-swap\.[0-9a-f]{12}\.tmp")
+# the old fixed ``.eir-update-zip-swap.tmp`` name is no longer Eir': it blocks (review Z5).
+_ZIP_JOURNAL_TEMP = re.compile(r"\.eir-update-zip-swap\.[0-9a-f]{12}\.tmp")
 
 # Single source of truth for entries the ZIP swap preserves — used by the dirty-tree filter and the swap loop.
 _ZIP_PRESERVED_TOP_LEVEL = {"venv", ".venv", "node_modules", ".git", ".env"}
@@ -44,12 +44,12 @@ _ZIP_PRESERVED_TOP_LEVEL = {"venv", ".venv", "node_modules", ".git", ".env"}
 # own dependencies. The next build relinks them from pnpm's store.
 _ZIP_PRESERVED_NESTED = {
     "apps": ("desktop/release", "desktop/dist", "desktop/dist-webapp", "desktop/build"),
-    "hermes_cli": ("web_dist",),
+    "eir_cli": ("web_dist",),
     "scripts": ("whatsapp-bridge/node_modules",),
-    "ui-tui": ("dist", "packages/hermes-ink/dist"),
+    "ui-tui": ("dist", "packages/eir-ink/dist"),
 }
 
-_STASH_HINT = "  Stash or commit your changes, then rerun `hermes update`."
+_STASH_HINT = "  Stash or commit your changes, then rerun `eir update`."
 
 
 def _remove_path(path: str, *, ignore_errors: bool = False) -> None:
@@ -67,7 +67,7 @@ def _remove_path(path: str, *, ignore_errors: bool = False) -> None:
 def _atomic_replace_dir(src: str, dst: str) -> None:
     """Replace *dst* with *src* without a half-deleted window (naive ``rmtree; copytree`` loses the old
     tree when the copy fails partway — likely here, since the ZIP path only runs when file I/O is flaky).
-    Thin alias over the two-phase helpers; retained for the ``hermes_cli.main`` re-export surface.
+    Thin alias over the two-phase helpers; retained for the ``eir_cli.main`` re-export surface.
 
     The naive ``rmtree(dst); copytree(src, dst)`` has a destructive window: if the copy fails partway
     (common on the Windows ZIP-update path, which only runs because file I/O is already flaky on that
@@ -83,8 +83,8 @@ def _stage_replacement(src: str, dst: str, on_created=None) -> str:
     """Phase 1: copy *src* (dir or file) to a sibling staging path for *dst*; return it.
     Touches nothing live, so a failure here leaves the install untouched. ``on_created(staging)`` runs
     once the staging entry exists (a directory: before it is filled), so the journal can record it."""
-    staging = f"{dst}.hermes-update-staging"
-    backup = f"{dst}.hermes-update-old"
+    staging = f"{dst}.eir-update-staging"
+    backup = f"{dst}.eir-update-old"
     # A prior run may have died mid-swap leaving the backup as the ONLY copy. Restore it BEFORE
     # clearing leftovers, else deleting it then failing to stage (disk exhaustion) leaves a hole.
     if not os.path.lexists(dst) and os.path.lexists(backup):  # a dangling symlink backup is still one (Z3)
@@ -198,13 +198,13 @@ def _commit_staged_replacements(staged, *, on_committed=None, tag: str = "", on_
     A plain file is never absent, not even for one rename: its backup is a hardlink (or, without
     hardlinks, a complete copy) and ``os.replace`` lands the new bytes over it; only directories move
     aside. The root modules every launcher imports first
-    (``hermes_constants``, ``hermes_bootstrap``) therefore always import, and ``hermes_bootstrap`` runs the
-    journal-driven restore even while a killed swap left a directory (``hermes_cli/`` included) moved aside.
+    (``eir_constants``, ``eir_bootstrap``) therefore always import, and ``eir_bootstrap`` runs the
+    journal-driven restore even while a killed swap left a directory (``eir_cli/`` included) moved aside.
     """
     swapped: list[tuple[str, str]] = []  # (dst, backup) in swap order; "" = absent
     try:
         for staging, dst in staged:
-            backup = f"{dst}.hermes-update-old"
+            backup = f"{dst}.eir-update-old"
             if os.path.lexists(backup):  # appeared since staging set leftovers aside: not ours to replace (F78)
                 raise FileExistsError(f"{backup} appeared during the update; it was left in place")
             if os.path.isfile(dst) and not os.path.islink(dst):
@@ -245,7 +245,7 @@ def _zip_overlay_block_reason(
 
     The swap replaces every top-level entry (minus a tiny preserve set) and deletes backups, so uncommitted
     edits and untracked files are gone. Fails closed when git status cannot run. ``staged`` is for the
-    pre-swap re-check: phase 1 leaves ``<entry>.hermes-update-staging`` for those entries, which git
+    pre-swap re-check: phase 1 leaves ``<entry>.eir-update-staging`` for those entries, which git
     reports as untracked; without the filter the re-check always refuses. ``shipped`` is the extracted
     ZIP's top-level entry set once known (the re-check); before the download the tracked root entries stand
     in for it. A gitignored path under a root entry the ZIP does not ship is never touched by the swap.
@@ -254,7 +254,7 @@ def _zip_overlay_block_reason(
     """
     if not (root / ".git").exists():
         return None
-    from hermes_cli.update_custody import run_git
+    from eir_cli.update_custody import run_git
 
     git_cmd = ["git", "-c", "windows.appendAtomically=false"] if sys.platform == "win32" else ["git"]
     result = run_git(
@@ -296,7 +296,7 @@ def _status_top_level(path: str) -> str:
 def _is_zip_preserved_entry_status_line(line: str, shipped: Optional[Collection[str]] = None) -> bool:
     """True when the swap would not destroy what a porcelain status line names: every path sits under a
     preserved top-level entry; or the line is gitignored (``!!``) and under a root entry the ZIP does not
-    ship (``.bytecode-fingerprint``, ``.hermes-bootstrap-complete``, ``hermes_agent.egg-info/`` — the swap
+    ship (``.bytecode-fingerprint``, ``.eir-bootstrap-complete``, ``eir_agent.egg-info/`` — the swap
     replaces ``shipped`` entries only); or a ``!!`` build output nested under a shipped dir that the swap
     keeps (`_ZIP_PRESERVED_NESTED`) or regenerates (``__pycache__``, ``node_modules``). Every real install
     has all of these, and blocking on them made the ZIP fallback refuse every install. Tracked edits,
@@ -321,11 +321,11 @@ def _is_zip_preserved_entry_status_line(line: str, shipped: Optional[Collection[
 
 
 def _is_zip_staging_artifact_status_line(line: str, staged: Collection[str] = ()) -> bool:
-    """True when a porcelain status line is Hermes' own: a root breadcrumb, or the staging copy of an
-    entry this run staged. Any other ``*.hermes-update-staging``/``-old`` may be a user's file (a manual
-    ``cp -r tools tools.hermes-update-old``) that staging would delete, so it blocks."""
+    """True when a porcelain status line is Eir' own: a root breadcrumb, or the staging copy of an
+    entry this run staged. Any other ``*.eir-update-staging``/``-old`` may be a user's file (a manual
+    ``cp -r tools tools.eir-update-old``) that staging would delete, so it blocks."""
     top = _status_top_level(line[3:] if len(line) >= 3 else line)
-    return (top in _ZIP_HERMES_ROOT_ARTIFACTS or bool(_ZIP_JOURNAL_TEMP.fullmatch(top))
+    return (top in _ZIP_EIR_ROOT_ARTIFACTS or bool(_ZIP_JOURNAL_TEMP.fullmatch(top))
             or top in {item + _ZIP_STAGING_ARTIFACT_SUFFIXES[0] for item in staged})
 
 
@@ -334,7 +334,7 @@ def _abort_zip_update_if_dirty_tree() -> None:
 
     See #87304.
     """
-    from hermes_cli.update_cmd import _m
+    from eir_cli.update_cmd import _m
     # Settle an interrupted swap first: only its journal tells its staging/backup siblings apart from a
     # user's lookalike file, and once settled none are left to refuse the retry on.
     restore_interrupted_zip_swap(_m().PROJECT_ROOT)
@@ -375,8 +375,8 @@ def _archive_commit(zip_path: str) -> Optional[str]:
 
 
 def _extracted_root(tmp_dir: str, branch: str) -> str:
-    """GitHub ZIPs extract to ``hermes-agent-<branch>/``; fall back to the first non-``__MACOSX`` dir."""
-    extracted = os.path.join(tmp_dir, f"hermes-agent-{branch}")
+    """GitHub ZIPs extract to ``eir-agent-<branch>/``; fall back to the first non-``__MACOSX`` dir."""
+    extracted = os.path.join(tmp_dir, f"eir-agent-{branch}")
     if not os.path.isdir(extracted):
         for d in os.listdir(tmp_dir):
             candidate = os.path.join(tmp_dir, d)
@@ -394,7 +394,7 @@ def _require_staging_space(extracted: str, entries: list[str], project_root: str
         # same-filesystem renames and rolls back every swap if any one fails. Replacing entries
         # one-at-a-time (the previous shape) meant an interruption partway left `agent/` new and `tools/`
         # stale — all files valid, the tree unbootable. Files matter as much as directories here: the repo
-        # root holds 20 first-party modules (run_agent.py, cli.py, hermes_constants.py, ...). Check up front
+        # root holds 20 first-party modules (run_agent.py, cli.py, eir_constants.py, ...). Check up front
         # so we fail with a clear message instead of running out mid-copy.
         os.path.getsize(os.path.join(dirpath, f))
         for entry in entries
@@ -412,7 +412,7 @@ def _require_staging_space(extracted: str, entries: list[str], project_root: str
 
 def _link_or_copy_artifact(source: str, destination: str) -> None:
     """Hardlink where the filesystem allows (apps/desktop/release is hundreds of MB, and a link stays
-    valid after the swap unlinks the old tree; on Windows a link also succeeds on a locked Hermes.exe
+    valid after the swap unlinks the old tree; on Windows a link also succeeds on a locked Eir.exe
     where copy2 raises); byte copy otherwise."""
     try:
         os.link(source, destination)
@@ -456,12 +456,12 @@ def _stage_entries(extracted: str, entries: list[str], project_root: str,
     return staged
 
 
-def _drop_journal_if_clean(root: Path, entries: list[str], suffixes=(".hermes-update-staging",)) -> None:
+def _drop_journal_if_clean(root: Path, entries: list[str], suffixes=(".eir-update-staging",)) -> None:
     """The journal is the only record of the swap's siblings (``<entry><suffix>``): it goes only once
     every one of them is gone, else the next launch's recovery could not tell them from a user's file."""
     left = [item for item in entries if any(os.path.lexists(os.path.join(root, item + x)) for x in suffixes)]
     if left:
-        print(f"  ⚠ Could not remove the update's own copies of {', '.join(left)}; the next `hermes` launch "
+        print(f"  ⚠ Could not remove the update's own copies of {', '.join(left)}; the next `eir` launch "
               "removes them.")
         return
     (root / ZIP_SWAP_JOURNAL).unlink(missing_ok=True)
@@ -470,8 +470,8 @@ def _drop_journal_if_clean(root: Path, entries: list[str], suffixes=(".hermes-up
 def _journaled_stage_and_swap(extracted: str, entries: list[str], root: Path, target_sha) -> list:
     """Stage + swap under the ZIP swap journal and its owner lock (``_early_recovery``), so a kill at
     any point is finished or rolled back by the next launch and no staging/backup sibling leaks."""
-    from hermes_cli import update_cmd_commit as _commit
-    from hermes_cli.update_cmd import _UPDATE_CRITICAL_FILES, _m
+    from eir_cli import update_cmd_commit as _commit
+    from eir_cli.update_cmd import _UPDATE_CRITICAL_FILES, _m
 
     # A previous run killed mid-swap: settle it before staging over its leftovers. A journal it could
     # not settle is that swap's only record: never overwrite it with this run's.
@@ -480,14 +480,14 @@ def _journaled_stage_and_swap(extracted: str, entries: list[str], root: Path, ta
         raise RuntimeError("an interrupted ZIP update could not be settled; see the warning above")
     with zip_swap_owner_lock(root, wait=10.0) as owned:
         if not owned:
-            raise RuntimeError("another `hermes update` is swapping this install right now"
+            raise RuntimeError("another `eir update` is swapping this install right now"
                                if owned.reason == "busy" else f"no ZIP swap lock, no swap ({owned.reason})")
         # A leftover backup counts: _stage_replacement puts it back as the entry before the swap.
         # Each entry also carries the identities recovery needs before it may delete anything (review
         # Z1): its staging copy's, recorded as the copy comes into existence, and the live entry's (the
         # one its backup links or renames), recorded at the swapping phase.
         journal_entries = [[item, any(os.path.lexists(os.path.join(root, item + suffix))
-                                      for suffix in ("", ".hermes-update-old")), "", ""] for item in entries]
+                                      for suffix in ("", ".eir-update-old")), "", ""] for item in entries]
         gen = os.urandom(6).hex()
         write_zip_swap_journal(root, "staging", journal_entries, gen)
 
@@ -545,8 +545,8 @@ def _journaled_stage_and_swap(extracted: str, entries: list[str], root: Path, ta
         # while a backup (or backup temp) the best-effort cleanup could not remove is still on disk:
         # recovery's own terminal check, else that backup is orphaned and wedges the retry (Q1/F79).
         with suppress(OSError):
-            _drop_journal_if_clean(root, entries, (".hermes-update-staging", ".hermes-update-old",
-                                                   f".hermes-update-old.{gen}.tmp"))
+            _drop_journal_if_clean(root, entries, (".eir-update-staging", ".eir-update-old",
+                                                   f".eir-update-old.{gen}.tmp"))
     return staged
 
 
@@ -569,15 +569,15 @@ def _download_and_swap_zip(branch: str, zip_url: str, target_sha: str | None = N
     Two-phase: stage every entry (dirs AND top-level files) beside its target, then swap all in with
     same-filesystem renames, rolling back on failure — one-at-a-time replacement left a mixed, unbootable
     tree on interruption."""
-    from hermes_cli.update_cmd import _m
+    from eir_cli.update_cmd import _m
 
     import tempfile
     from urllib.request import urlretrieve
     print("→ Downloading latest version...")
-    tmp_dir = tempfile.mkdtemp(prefix="hermes-update-")
+    tmp_dir = tempfile.mkdtemp(prefix="eir-update-")
     downloaded = False
     try:
-        zip_path = os.path.join(tmp_dir, f"hermes-agent-{branch}.zip")
+        zip_path = os.path.join(tmp_dir, f"eir-agent-{branch}.zip")
         urlretrieve(zip_url, zip_path)
         downloaded = True
         print("→ Extracting...")
@@ -602,12 +602,12 @@ def _download_and_swap_zip(branch: str, zip_url: str, target_sha: str | None = N
         with suppress(Exception):
             restore_interrupted_zip_swap(_m().PROJECT_ROOT)
             if not (Path(_m().PROJECT_ROOT) / ZIP_SWAP_JOURNAL).exists():
-                from hermes_cli import update_cmd_commit as _commit
+                from eir_cli import update_cmd_commit as _commit
                 _commit.disarm_commit_obligations()  # the old tree is whole again: nothing is owed
         print(f"✗ ZIP update failed: {e}")
         # Two-phase replace commits all or rolls all back, so no mixed tree here — don't push a needless reinstall.
         print("  Your existing install was left in place.")
-        print("  Re-run `hermes update` to retry; if the agent won't start, reinstall from https://hermes-agent.nousresearch.com")
+        print("  Re-run `eir update` to retry; if the agent won't start, reinstall from https://hermes-agent.nousresearch.com")
         _record_stop(_zip_stop_class(e, downloaded=downloaded))
         _m().sys.exit(1)
     finally:
@@ -622,7 +622,7 @@ def _update_via_zip(args, *, had_desktop_app_before_update: bool = False,
 
     A supplied commit keeps the archive on the target selected before Git failed.
     """
-    from hermes_cli.update_cmd import _m, _complete_source_update
+    from eir_cli.update_cmd import _m, _complete_source_update
     # The static archive would silently ignore --branch — the exact silent-divergence bug it exists to
     # prevent. Refuse rather than lie.
     branch = _m()._resolve_update_branch(args)
@@ -631,20 +631,20 @@ def _update_via_zip(args, *, had_desktop_app_before_update: bool = False,
         print(
             "  This path runs when git file I/O is broken on the system. "
             "Either resolve the git-side breakage (typically an antivirus "
-            "or NTFS filter holding files open) and rerun `hermes update "
-            f"--branch {branch}`, or update against main with `hermes update`."
+            "or NTFS filter holding files open) and rerun `eir update "
+            f"--branch {branch}`, or update against main with `eir update`."
         )
         _record_stop("branch_unsupported")
         _m().sys.exit(1)
     _abort_zip_update_if_dirty_tree()
     # Older callers lack the snapshot/receipt/lifecycle handoff. Refuse before swap.
     if completion_request is None:
-        from hermes_cli._old_updater import stop_for_relaunch
+        from eir_cli._old_updater import stop_for_relaunch
         stop_for_relaunch(incomplete=True)
     if target_sha is not None and not re.fullmatch(r"[0-9a-f]{40}", target_sha):
         raise ValueError("ZIP update requires an exact full commit SHA")
     ref = target_sha if target_sha is not None else f"refs/heads/{branch}"
-    repository = target_repository or "NousResearch/hermes-agent"
+    repository = target_repository or "NousResearch/eir-agent"
     if (not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository)
             or any(part in (".", "..") for part in repository.split("/"))):
         raise ValueError("ZIP update requires a GitHub owner/repository")

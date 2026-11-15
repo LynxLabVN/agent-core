@@ -3,7 +3,7 @@
 Verifies that _scan_gateway_pids() uses /proc/*/cmdline when available
 (Docker without procps) and falls back to ps only when /proc is absent.
 
-See: NousResearch/hermes-agent#7622
+See: NousResearch/eir-agent#7622
 """
 
 import os
@@ -11,14 +11,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-import hermes_cli.gateway as gateway_mod
+import eir_cli.gateway as gateway_mod
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-_GATEWAY_CMD = "python -m hermes_cli.main gateway run"
+_GATEWAY_CMD = "python -m eir_cli.main gateway run"
 _OTHER_CMD = "python -m some_other_thing"
 
 
@@ -66,7 +66,7 @@ class TestProcFallback:
     def test_detects_gateway_pid_via_proc(self):
         my_pid = os.getpid()
         entries = {
-            my_pid: "python -m hermes_cli.main",   # own process — excluded
+            my_pid: "python -m eir_cli.main",   # own process — excluded
             12345: _GATEWAY_CMD,
             99999: _OTHER_CMD,
         }
@@ -78,8 +78,8 @@ class TestProcFallback:
             patch("builtins.open", side_effect=_open),
             # The fake /proc entries are ours: the other-users filter stats the REAL /proc/<pid>,
             # so a root-owned runner process that happens to hold PID 12345 dropped the fake gateway.
-            patch("hermes_cli.gateway_migrate_guards.pid_is_other_users", return_value=False),
-            patch("hermes_cli.gateway._get_ancestor_pids", return_value=set()),
+            patch("eir_cli.gateway_migrate_guards.pid_is_other_users", return_value=False),
+            patch("eir_cli.gateway._get_ancestor_pids", return_value=set()),
             patch("subprocess.run") as mock_ps,
         ):
             pids = gateway_mod._scan_gateway_pids(set(), all_profiles=True)
@@ -107,7 +107,7 @@ class TestProcFallback:
             patch("os.path.isdir", side_effect=_isdir),
             patch("os.listdir", side_effect=_listdir),
             patch("builtins.open", side_effect=_open),
-            patch("hermes_cli.gateway._get_ancestor_pids", return_value=set()),
+            patch("eir_cli.gateway._get_ancestor_pids", return_value=set()),
             patch("subprocess.run") as mock_ps,
         ):
             pids = gateway_mod._scan_gateway_pids(set(), all_profiles=True)
@@ -126,8 +126,8 @@ def test_other_users_gateways_are_not_ours_unless_root(euid, expected):
     with (
         patch("os.path.isdir", side_effect=lambda p: p != "/proc"),
         patch("os.geteuid", return_value=euid),  # windows-footgun: ok — POSIX-only test (platforms marker)
-        patch("hermes_cli.gateway_migrate_guards._pid_uid", side_effect=owners.get),
-        patch("hermes_cli.gateway._get_ancestor_pids", return_value=set()),
+        patch("eir_cli.gateway_migrate_guards._pid_uid", side_effect=owners.get),
+        patch("eir_cli.gateway._get_ancestor_pids", return_value=set()),
         patch("subprocess.run", return_value=MagicMock(returncode=0, stdout=ps_out, stderr="")),
     ):
         assert gateway_mod._scan_gateway_pids(set(), all_profiles=True) == expected
@@ -146,7 +146,7 @@ class TestPsFallbackBsdCompat:
     def test_ps_fallback_uses_bsd_compatible_flags_and_columns(self):
         with (
             patch("os.path.isdir", side_effect=lambda p: p != "/proc"),
-            patch("hermes_cli.gateway._get_ancestor_pids", return_value=set()),
+            patch("eir_cli.gateway._get_ancestor_pids", return_value=set()),
             patch("subprocess.run") as mock_run,
         ):
             mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="")
@@ -175,13 +175,13 @@ class TestGetServicePidsAllProfiles:
             return ("gui/501", 123)
 
         with (
-            patch("hermes_cli.gateway.supports_systemd_services", return_value=False),
+            patch("eir_cli.gateway.supports_systemd_services", return_value=False),
             patch(
-                "hermes_cli.gateway.get_launchd_label",
-                return_value="ai.hermes.gateway.myprofile",
+                "eir_cli.gateway.get_launchd_label",
+                return_value="ai.eir.gateway.myprofile",
             ),
             patch(
-                "hermes_cli.gateway._locate_launchd_gateway_service",
+                "eir_cli.gateway._locate_launchd_gateway_service",
                 side_effect=_fake_locate,
             ),
             patch("subprocess.run") as mock_run,
@@ -191,7 +191,7 @@ class TestGetServicePidsAllProfiles:
         assert pids == {123}
         # Default scope: exactly the current profile's label, no fleet
         # enumeration and no bare `launchctl list` scan.
-        assert located == ["ai.hermes.gateway.myprofile"]
+        assert located == ["ai.eir.gateway.myprofile"]
         launchctl_calls = [
             c[0][0]
             for c in mock_run.call_args_list
@@ -203,12 +203,12 @@ class TestGetServicePidsAllProfiles:
     def test_all_profiles_enumerates_all_gateway_labels(self):
         """With all_profiles=True, every install-derived gateway label is
         located (#73627), and the bare ``launchctl list`` prefix scan still
-        widens the EXCLUDE set with unmapped ai.hermes.gateway* agents
+        widens the EXCLUDE set with unmapped ai.eir.gateway* agents
         (#74075 belt-and-suspenders)."""
         located = []
         label_pids = {
-            "ai.hermes.gateway": 123,
-            "ai.hermes.gateway-profile-b": 456,
+            "ai.eir.gateway": 123,
+            "ai.eir.gateway-profile-b": 456,
         }
 
         def _fake_locate(label):
@@ -217,17 +217,17 @@ class TestGetServicePidsAllProfiles:
             return ("gui/501", pid) if pid else (None, None)
 
         with (
-            patch("hermes_cli.gateway.supports_systemd_services", return_value=False),
+            patch("eir_cli.gateway.supports_systemd_services", return_value=False),
             patch(
-                "hermes_cli.gateway.get_launchd_label",
-                return_value="ai.hermes.gateway",
+                "eir_cli.gateway.get_launchd_label",
+                return_value="ai.eir.gateway",
             ),
             patch(
-                "hermes_cli.gateway.launchd_gateway_labels_for_install",
-                return_value=["ai.hermes.gateway", "ai.hermes.gateway-profile-b"],
+                "eir_cli.gateway.launchd_gateway_labels_for_install",
+                return_value=["ai.eir.gateway", "ai.eir.gateway-profile-b"],
             ),
             patch(
-                "hermes_cli.gateway._locate_launchd_gateway_service",
+                "eir_cli.gateway._locate_launchd_gateway_service",
                 side_effect=_fake_locate,
             ),
             patch("subprocess.run") as mock_run,
@@ -235,7 +235,7 @@ class TestGetServicePidsAllProfiles:
             mock_run.return_value = MagicMock(
                 returncode=0,
                 stdout=(
-                    "999\t0\tai.hermes.gateway-unmapped\n"
+                    "999\t0\tai.eir.gateway-unmapped\n"
                     "789\t0\tcom.apple.some.other.agent\n"
                 ),
                 stderr="",
@@ -246,8 +246,8 @@ class TestGetServicePidsAllProfiles:
         assert pids == {123, 456, 999}
         assert 789 not in pids
         assert sorted(located) == [
-            "ai.hermes.gateway",
-            "ai.hermes.gateway-profile-b",
+            "ai.eir.gateway",
+            "ai.eir.gateway-profile-b",
         ]
         launchctl_calls = [
             c[0][0]
@@ -259,9 +259,9 @@ class TestGetServicePidsAllProfiles:
     @pytest.mark.platforms("linux")
     def test_all_profiles_preserves_systemd_behavior(self):
         """systemd scope is unaffected by the all_profiles switch — it already
-        lists every hermes-gateway* unit unconditionally."""
+        lists every eir-gateway* unit unconditionally."""
         with (
-            patch("hermes_cli.gateway.supports_systemd_services", return_value=True),
+            patch("eir_cli.gateway.supports_systemd_services", return_value=True),
             patch("subprocess.run") as mock_run,
         ):
             def _run_side_effect(args, **kwargs):
@@ -270,7 +270,7 @@ class TestGetServicePidsAllProfiles:
                 if "list-units" in cmd_str:
                     return MagicMock(
                         returncode=0,
-                        stdout="hermes-gateway-jarvis.service loaded active running\n",
+                        stdout="eir-gateway-jarvis.service loaded active running\n",
                         stderr="",
                     )
                 if "show" in cmd_str and "MainPID" in cmd_str:

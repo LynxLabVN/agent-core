@@ -1,5 +1,5 @@
 """Terminal repaint/resize recovery, input-mode healing, and clipboard helpers for the interactive
-CLI. Mixin on ``HermesCLI``; cli.py symbols are imported lazily inside methods (import cycle)."""
+CLI. Mixin on ``EirCLI``; cli.py symbols are imported lazily inside methods (import cycle)."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ import threading
 import time
 
 from agent.i18n import t
-from hermes_cli.cli_render import (
+from eir_cli.cli_render import (
     _chrome_floor,
     _hold_paints,
     _output_history_rows,
@@ -21,7 +21,7 @@ from hermes_cli.cli_render import (
     _set_paint_gate,
     _take_suspect_rows,
 )
-from hermes_constants import get_hermes_home
+from eir_constants import get_eir_home
 
 
 # A replay ``fit`` with no room: nothing is replayed.
@@ -213,7 +213,7 @@ class CLITerminalMixin:
         if getattr(self, "_terminal_io_broken", False):
             return
         try:
-            from hermes_cli.curses_ui import flush_stdin
+            from eir_cli.curses_ui import flush_stdin
             flush_stdin()
         except Exception:
             pass
@@ -389,7 +389,7 @@ class CLITerminalMixin:
         Same-width SIGWINCH (tmux attach, GNOME tab bar, focus) and the first signal
         without a seeded baseline are left alone — 2J+replay against preserved scrollback
         duplicates ``_OUTPUT_HISTORY`` (#65293). tmux-attach's stale previous_screen is
-        handled by ``_hermes_call_output_screen_diff`` (#83874). Suppression is cleared by
+        handled by ``_eir_call_output_screen_diff`` (#83874). Suppression is cleared by
         a debounced timer so the bar returns during idle; next-submit stays a fast path.
         """
         try:
@@ -578,12 +578,12 @@ class CLITerminalMixin:
         return bool(getattr(self, "_resize_recovery_pending", False))
 
     def _try_attach_clipboard_image(self) -> bool:
-        """Save a clipboard image to ~/.hermes/images/ and attach it; True if attached."""
+        """Save a clipboard image to ~/.eir/images/ and attach it; True if attached."""
         from cli import datetime
-        from hermes_cli.clipboard import save_clipboard_image
+        from eir_cli.clipboard import save_clipboard_image
         self._image_counter += 1
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        img_path = get_hermes_home() / "images" / f"clip_{ts}_{self._image_counter}.png"
+        img_path = get_eir_home() / "images" / f"clip_{ts}_{self._image_counter}.png"
         if save_clipboard_image(img_path):
             self._attached_images.append(img_path)
             return True

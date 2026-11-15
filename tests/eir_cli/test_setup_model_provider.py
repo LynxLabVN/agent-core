@@ -1,19 +1,19 @@
 """Regression tests for interactive setup provider/model persistence.
 
 Since setup_model_provider delegates to select_provider_and_model()
-from hermes_cli.main, these tests mock the delegation point and verify
+from eir_cli.main, these tests mock the delegation point and verify
 that the setup wizard correctly syncs config from disk after the call.
 """
 
 from __future__ import annotations
 
-from hermes_cli.config import load_config, save_config
-from hermes_cli.setup import _print_setup_summary, setup_model_provider
+from eir_cli.config import load_config, save_config
+from eir_cli.setup import _print_setup_summary, setup_model_provider
 
 
 def _clear_provider_env(monkeypatch):
     for key in (
-        "HERMES_INFERENCE_PROVIDER",
+        "EIR_INFERENCE_PROVIDER",
         "OPENAI_BASE_URL",
         "OPENAI_API_KEY",
         "OPENROUTER_API_KEY",
@@ -40,8 +40,8 @@ def _write_aux_config(task="compression", provider="gemini", model_name="gemini-
 
 
 def test_setup_model_provider_preserves_auxiliary_choices_written_by_picker(tmp_path, monkeypatch):
-    """Aux choices made inside hermes setup must survive the wizard's final save."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    """Aux choices made inside eir setup must survive the wizard's final save."""
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     _clear_provider_env(monkeypatch)
 
     config = load_config()
@@ -50,7 +50,7 @@ def test_setup_model_provider_preserves_auxiliary_choices_written_by_picker(tmp_
     def fake_select():
         _write_aux_config("compression", "gemini", "gemini-2.5-flash")
 
-    monkeypatch.setattr("hermes_cli.main.select_provider_and_model", fake_select)
+    monkeypatch.setattr("eir_cli.main.select_provider_and_model", fake_select)
 
     setup_model_provider(config, quick=True)
     save_config(config)  # mirrors run_setup_wizard(section="model") final save
@@ -69,9 +69,9 @@ def test_setup_summary_local_browser_unavailable_without_chromium(
 
     Unlike the mocked-feature tests above, this drives the real
     ``get_nous_subscription_features`` so the surface stays aligned with the
-    launcher's Chromium selection (``hermes_cli.browser_runtime.chromium_executable``).
+    launcher's Chromium selection (``eir_cli.browser_runtime.chromium_executable``).
     """
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     _clear_provider_env(monkeypatch)
 
     cfg = load_config()
@@ -83,12 +83,12 @@ def test_setup_summary_local_browser_unavailable_without_chromium(
     save_config(cfg)
 
     # Only stub the readiness probes; the feature resolver itself is real.
-    monkeypatch.setattr("hermes_cli.nous_subscription._has_browser_harness", lambda: True)
+    monkeypatch.setattr("eir_cli.nous_subscription._has_browser_harness", lambda: True)
     monkeypatch.setattr(
-        "hermes_cli.nous_subscription.get_nous_portal_account_info",
+        "eir_cli.nous_subscription.get_nous_portal_account_info",
         lambda *a, **k: None,
     )
-    monkeypatch.setattr("hermes_cli.browser_runtime.chromium_executable", lambda **_kw: None)
+    monkeypatch.setattr("eir_cli.browser_runtime.chromium_executable", lambda **_kw: None)
     monkeypatch.setattr(
         "agent.auxiliary_client.get_available_vision_backends", list
     )
@@ -97,4 +97,4 @@ def test_setup_summary_local_browser_unavailable_without_chromium(
     output = capsys.readouterr().out
 
     assert "Browser Automation (Local browser)" not in output
-    assert "hermes pm install chromium" in output
+    assert "eir pm install chromium" in output

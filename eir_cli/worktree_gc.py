@@ -1,4 +1,4 @@
-"""On-demand worktree + branch reclaim (``hermes worktree`` / ``/worktree prune``).
+"""On-demand worktree + branch reclaim (``eir worktree`` / ``/worktree prune``).
 
 The startup pruner (``cli._prune_stale_worktrees``) is conservative and silent — clean, fully
 merged scratch past an age tier only. This module also reclaims trees whose only "dirt" is
@@ -73,7 +73,7 @@ def _git(args: list, cwd: str, timeout: int = 15) -> subprocess.CompletedProcess
     on nonzero, so a slow ``git cherry`` on a huge repo degrades to keep instead of aborting the
     audit mid-list. :func:`noninteractive_repo_git_env` because ``status`` executes the repo's
     ``core.fsmonitor`` and clean filters (GHSA-7x36-8jrh-v4pw)."""
-    from hermes_cli._subprocess_compat import FILTER_DISCOVERY_FAILED, noninteractive_repo_git_env
+    from eir_cli._subprocess_compat import FILTER_DISCOVERY_FAILED, noninteractive_repo_git_env
     env = noninteractive_repo_git_env(cwd)
     if env is None:
         return subprocess.CompletedProcess(args=["git", *args], returncode=1, stdout="",
@@ -88,8 +88,8 @@ def _git(args: list, cwd: str, timeout: int = 15) -> subprocess.CompletedProcess
 def _tree_size_mb(path: Path, timeout: int = 30) -> Optional[int]:
     """Cheap directory size via ``du -sm`` — best-effort, None on failure or timeout. Not
     ``subprocess.run``: its post-kill ``wait()`` never returns for a ``du`` stuck in uninterruptible
-    disk I/O, so the caller (a ``hermes -w`` launch, the cron prune thread) would hang with it."""
-    from hermes_cli._subprocess_compat import bounded_probe_run
+    disk I/O, so the caller (a ``eir -w`` launch, the cron prune thread) would hang with it."""
+    from eir_cli._subprocess_compat import bounded_probe_run
 
     try:
         result = bounded_probe_run(["du", "-sm", str(path)], timeout=timeout)
@@ -107,7 +107,7 @@ def _dirty_split(path: str) -> tuple[bool, list[str]]:
         lines = [line for line in result.stdout.splitlines() if line.strip()]
         untracked = [line[3:].strip() for line in lines if line.startswith("??")]
         if len(untracked) == len(lines):
-            from hermes_cli.worktree_retention import hidden_index_edits
+            from eir_cli.worktree_retention import hidden_index_edits
             if hidden_index_edits(path):  # skip-worktree / assume-unchanged edits
                 return True, []
         return len(untracked) != len(lines), untracked
@@ -118,8 +118,8 @@ def _dirty_split(path: str) -> tuple[bool, list[str]]:
 def _archive_untracked(tree: Path, untracked: list[str]) -> Optional[Path]:
     """Copy untracked files out of a doomed tree; None on any failure (caller must then keep)."""
     stamp = time.strftime("%Y%m%d-%H%M%S")
-    from hermes_constants import get_hermes_home
-    dest = get_hermes_home() / "archive" / "worktree-prune" / f"{tree.name}-{stamp}"
+    from eir_constants import get_eir_home
+    dest = get_eir_home() / "archive" / "worktree-prune" / f"{tree.name}-{stamp}"
     try:
         for rel in untracked:
             src = tree / rel
@@ -142,7 +142,7 @@ def _classify_tree(_ops, repo_root: str, entry: Path, merge_cache, remote_heads)
     if _KANBAN_RE.match(entry.name):
         return "keep", "kanban task tree (owned by kanban gc)", []
     if _ops._worktree_lock_is_live(repo_root, path, timeout=5) == "live":
-        return "keep", "in use by a running hermes session", []
+        return "keep", "in use by a running eir session", []
     tracked_dirty, untracked = _dirty_split(path)
     if tracked_dirty:
         return "keep", "uncommitted tracked changes (real work)", []
@@ -171,7 +171,7 @@ def _classify_tree(_ops, repo_root: str, entry: Path, merge_cache, remote_heads)
 def audit_external_trees(repo_root: str) -> list[ExternalTreeRecord]:
     """List linked worktrees registered OUTSIDE ``.worktrees/``.
 
-    ``hermes -w`` scratch trees all live under ``<repo>/.worktrees/``, but
+    ``eir -w`` scratch trees all live under ``<repo>/.worktrees/``, but
     ``git worktree list --porcelain`` also knows about trees the user (or
     another tool) registered elsewhere. Those are someone else's state, so
     the reclaim paths never touch them — but hiding them entirely makes the
@@ -197,7 +197,7 @@ def audit_external_trees(repo_root: str) -> list[ExternalTreeRecord]:
         if real == main_root:
             return  # the main checkout itself
         if real == managed_root or real.startswith(managed_root + os.sep):
-            return  # hermes-managed scratch tree — covered by audit_worktrees
+            return  # eir-managed scratch tree — covered by audit_worktrees
         branch = current.get("branch", "")
         if not branch and current.get("head"):
             branch = f"detached @{current['head'][:10]}"
@@ -251,7 +251,7 @@ def audit_worktrees(repo_root: str, *, with_sizes: bool = True,
     ``older_than_days`` only ever RESTRICTS: a reapable tree younger than the threshold is kept
     ("too recent"). It never widens eligibility — age alone can't doom a tree carrying unmerged work.
     """
-    from hermes_cli import worktree_ops as _ops
+    from eir_cli import worktree_ops as _ops
     worktrees_dir = Path(repo_root) / ".worktrees"
     if not worktrees_dir.exists():
         return []
@@ -343,7 +343,7 @@ def reclaim_worktrees(
 def audit_branches(repo_root: str) -> list[BranchRecord]:
     """Classify EVERY local branch: deletable when fully merged OR every commit is patch-equivalent
     upstream (``git cherry``) and not checked out. The gate is content reachability, not name."""
-    from hermes_cli import worktree_ops as _ops
+    from eir_cli import worktree_ops as _ops
     if _ops._repo_is_shallow(repo_root):
         _ops._deepen_shallow_repo(repo_root)
 
@@ -399,7 +399,7 @@ def audit_branches(repo_root: str) -> list[BranchRecord]:
     workers = max(1, min(8, (os.cpu_count() or 4), len(branches)))
     if workers > 1:
         try:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=workers, thread_name_prefix="hermes-branch-gc") as pool:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=workers, thread_name_prefix="eir-branch-gc") as pool:
                 return list(pool.map(_classify_branch, branches))
         except Exception:
             pass

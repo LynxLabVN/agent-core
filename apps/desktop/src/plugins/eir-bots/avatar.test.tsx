@@ -20,7 +20,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { blobatarSvgMock } = vi.hoisted(() => ({ blobatarSvgMock: vi.fn() }))
 
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@eir/plugin-sdk', async () => {
   const { atom } = await import('nanostores')
 
   return {
@@ -36,7 +36,7 @@ vi.mock('@hermes/plugin-sdk', async () => {
   }
 })
 
-vi.mock('./shared', () => ({ getPluginCtx: () => null, ID: 'hermes-bots' }))
+vi.mock('./shared', () => ({ getPluginCtx: () => null, ID: 'eir-bots' }))
 
 /** The library's frozen band per silhouette (gen2 thresholds). */
 const BANDS: Record<string, [number, number]> = {
@@ -168,7 +168,7 @@ describe('rendering a blob face', () => {
 describe('an SDK that predates blobatarSvg', () => {
   it('renders the legacy deterministic shape instead of nothing', async () => {
     vi.resetModules()
-    vi.doMock('@hermes/plugin-sdk', async () => {
+    vi.doMock('@eir/plugin-sdk', async () => {
       const { atom } = await import('nanostores')
 
       return {

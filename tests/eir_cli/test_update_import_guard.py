@@ -1,4 +1,4 @@
-"""Tests for the post-update *import* guard in ``hermes update``.
+"""Tests for the post-update *import* guard in ``eir update``.
 
 ``tree_syntax_error`` only parses files, so it cannot detect a
 partially-updated tree: when one package is refreshed and a sibling is not,
@@ -21,9 +21,9 @@ from pathlib import Path
 
 import pytest
 
-from hermes_cli import update_cmd
-from hermes_cli import update_cmd_validation
-from hermes_constants import partial_update_hint
+from eir_cli import update_cmd
+from eir_cli import update_cmd_validation
+from eir_constants import partial_update_hint
 
 def _write_skewed_tree(root: Path, *, skewed: bool) -> None:
     """Build a tiny two-package tree that mimics the real failure.
@@ -43,7 +43,7 @@ def test_syntax_guard_passes_but_import_guard_catches_skew(monkeypatch, probe_ro
     _write_skewed_tree(probe_root, skewed=True)
 
     # Both files are valid Python -- the syntax guard sees nothing wrong.
-    from hermes_cli import update_cmd_commit
+    from eir_cli import update_cmd_commit
 
     assert update_cmd_commit.tree_syntax_error(probe_root, ("consumer.py", "provider/thing.py")) is None, (
         "sanity: the skewed tree must parse cleanly")
@@ -165,7 +165,7 @@ def test_import_guard_does_not_accept_forged_static_marker(monkeypatch, probe_ro
     """Imported stdout cannot impersonate the per-probe completion marker."""
     (probe_root / "consumer.py").write_text(
         "import os, sys\n"
-        "sys.stdout.write('__HERMES_IMPORT_HEALTH__[]')\n"
+        "sys.stdout.write('__EIR_IMPORT_HEALTH__[]')\n"
         "sys.stdout.flush()\n"
         "os._exit(7)\n"
     )
@@ -184,7 +184,7 @@ def test_import_guard_rejects_malformed_health_payload(monkeypatch, tmp_path):
         stdout = ""
 
     def malformed(_cmd, **_kwargs):
-        Result.stdout = "__HERMES_IMPORT_HEALTH_fixed__{}"
+        Result.stdout = "__EIR_IMPORT_HEALTH_fixed__{}"
         return Result()
 
     monkeypatch.setattr(secrets, "token_hex", lambda _length: "fixed")
@@ -297,35 +297,35 @@ def test_import_guard_rejects_module_satisfied_only_by_inherited_pythonpath(
     """
     stale = probe_root / "stale"
     stale.mkdir()
-    (stale / "hermes_stale_supply.py").write_text("VALUE = 'from the stale tree'\n")
+    (stale / "eir_stale_supply.py").write_text("VALUE = 'from the stale tree'\n")
 
     monkeypatch.setattr(
-        update_cmd, "_UPDATE_CRITICAL_MODULES", ("hermes_stale_supply",)
+        update_cmd, "_UPDATE_CRITICAL_MODULES", ("eir_stale_supply",)
     )
     monkeypatch.setattr(
-        update_cmd_validation, "_UPDATE_CRITICAL_MODULES", ("hermes_stale_supply",)
+        update_cmd_validation, "_UPDATE_CRITICAL_MODULES", ("eir_stale_supply",)
     )
     monkeypatch.setenv("PYTHONPATH", str(stale))
 
     ok, module, error = update_cmd._validate_critical_modules_import(probe_root)
 
     assert ok is False
-    assert module == "hermes_stale_supply"
-    assert error is not None and "hermes_stale_supply" in error
+    assert module == "eir_stale_supply"
+    assert error is not None and "eir_stale_supply" in error
 
 def test_import_guard_accepts_candidate_with_foreign_pythonpath(monkeypatch, probe_root):
     """The env scrub must not overreach: a candidate that carries the module
     still passes while a foreign PYTHONPATH is set (#115032)."""
     stale = probe_root / "stale"
     stale.mkdir()
-    (stale / "hermes_stale_supply.py").write_text("VALUE = 'stale'\n")
-    (probe_root / "hermes_stale_supply.py").write_text("VALUE = 'candidate'\n")
+    (stale / "eir_stale_supply.py").write_text("VALUE = 'stale'\n")
+    (probe_root / "eir_stale_supply.py").write_text("VALUE = 'candidate'\n")
 
     monkeypatch.setattr(
-        update_cmd, "_UPDATE_CRITICAL_MODULES", ("hermes_stale_supply",)
+        update_cmd, "_UPDATE_CRITICAL_MODULES", ("eir_stale_supply",)
     )
     monkeypatch.setattr(
-        update_cmd_validation, "_UPDATE_CRITICAL_MODULES", ("hermes_stale_supply",)
+        update_cmd_validation, "_UPDATE_CRITICAL_MODULES", ("eir_stale_supply",)
     )
     monkeypatch.setenv("PYTHONPATH", str(stale))
 
@@ -344,7 +344,7 @@ def test_import_guard_flags_missing_first_party_module(monkeypatch, probe_root):
     assert module == "consumer"
     assert error is not None and "tools.nonexistent_module" in error
 
-@pytest.mark.parametrize("modname", ["agents", "agentops", "toolsets_x", "hermesx"])
+@pytest.mark.parametrize("modname", ["agents", "agentops", "toolsets_x", "eirx"])
 def test_hint_does_not_claim_partial_update_for_lookalike_third_party(modname):
     """``startswith`` would match third-party ``agents``/``agentops`` and blame
     our updater for someone else's import error."""
@@ -353,7 +353,7 @@ def test_hint_does_not_claim_partial_update_for_lookalike_third_party(modname):
     assert partial_update_hint(exc) == []
 
 @pytest.mark.parametrize("modname", ["tools.todo_tool", "agent.context_compressor",
-                                     "hermes_constants", "hermes_cli.config", "cli"])
+                                     "eir_constants", "eir_cli.config", "cli"])
 def test_hint_fires_for_each_first_party_root(modname):
     exc = ImportError("cannot import name 'X'")
     exc.name = modname

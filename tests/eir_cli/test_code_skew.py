@@ -5,7 +5,7 @@ crash; these prove the guard that turns it into a clear "restart the gateway"
 message before a model switch can hit it.  The dashboard mirror (#86207) lives
 here too: ``web_server_config._dashboard_code_skew_guard`` and the
 ``/api/model/options`` 503 guard, which protect the Models page from the same
-stale-module ImportError after ``hermes update``.
+stale-module ImportError after ``eir update``.
 """
 
 import asyncio
@@ -14,9 +14,9 @@ import contextlib
 import pytest
 
 from gateway import code_skew
-import hermes_cli.web_routers.models as _rt_models
-import hermes_cli.web_server_config as _web_server_config
-import hermes_cli.web_server_profiles as _web_server_profiles
+import eir_cli.web_routers.models as _rt_models
+import eir_cli.web_server_config as _web_server_config
+import eir_cli.web_server_profiles as _web_server_profiles
 
 
 @pytest.fixture(autouse=True)
@@ -60,7 +60,7 @@ class TestModelSwitchSkewGuard:
         assert msg is not None
         assert "abc1234567" in msg
         assert "def4567890" in msg
-        assert "hermes gateway restart" in msg
+        assert "eir gateway restart" in msg
 
 
 class TestDashboardCodeSkewGuard:
@@ -69,7 +69,7 @@ class TestDashboardCodeSkewGuard:
 
     def test_dashboard_guard_message_names_revs_and_restart(self, monkeypatch):
 
-        monkeypatch.delenv("HERMES_SERVE_HEADLESS", raising=False)
+        monkeypatch.delenv("EIR_SERVE_HEADLESS", raising=False)
         monkeypatch.setattr(code_skew, "detect_code_skew", lambda: ("abc1234567", "def4567890"))
         msg = _web_server_config._dashboard_code_skew_guard()
         assert msg is not None
@@ -81,19 +81,19 @@ class TestDashboardCodeSkewGuard:
 
     def test_serve_guard_message_points_at_desktop_backend(self, monkeypatch):
 
-        monkeypatch.setenv("HERMES_SERVE_HEADLESS", "1")
+        monkeypatch.setenv("EIR_SERVE_HEADLESS", "1")
         monkeypatch.setattr(code_skew, "detect_code_skew", lambda: ("abc1234567", "def4567890"))
         msg = _web_server_config._dashboard_code_skew_guard()
         assert msg is not None
         assert "Desktop-owned backend" in msg
         assert "systemctl" not in msg
-        assert "hermes-dashboard" not in msg
+        assert "eir-dashboard" not in msg
 
 
 class TestModelOptionsSkewGuard:
     """/api/model/options must refuse with a clear 503 when the dashboard is stale.
 
-    Regression for #86207: a dashboard kept alive across ``hermes update``
+    Regression for #86207: a dashboard kept alive across ``eir update``
     serves stale modules, so the picker's lazy import of names the update added
     (``agent.model_metadata.is_grok_46_family``) raised ImportError and the
     handler collapsed it into a generic 500.  With the guard, the stale process
@@ -107,7 +107,7 @@ class TestModelOptionsSkewGuard:
 
         payload_calls: list = []
         monkeypatch.setattr(
-            "hermes_cli.inventory.build_model_options_payload",
+            "eir_cli.inventory.build_model_options_payload",
             lambda *a, **k: payload_calls.append(1) or {"providers": []},
         )
 
@@ -130,12 +130,12 @@ class TestModelOptionsSkewGuard:
         monkeypatch.setattr(
             _web_server_profiles, "_profile_scope", lambda profile: contextlib.nullcontext()
         )
-        monkeypatch.setattr("hermes_cli.inventory.load_picker_context", dict)
+        monkeypatch.setattr("eir_cli.inventory.load_picker_context", dict)
 
         payload_calls: list = []
         expected = {"providers": [], "model": {}, "provider": None}
         monkeypatch.setattr(
-            "hermes_cli.inventory.build_model_options_payload",
+            "eir_cli.inventory.build_model_options_payload",
             lambda *a, **k: payload_calls.append(1) or expected,
         )
 

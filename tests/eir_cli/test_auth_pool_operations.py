@@ -8,8 +8,8 @@ from urllib.parse import parse_qs
 
 import pytest
 
-from hermes_cli import auth_commands
-from hermes_cli.auth import read_credential_pool, write_credential_pool
+from eir_cli import auth_commands
+from eir_cli.auth import read_credential_pool, write_credential_pool
 
 
 @pytest.fixture(autouse=True)
@@ -17,7 +17,7 @@ def isolated_external_auth_stores(tmp_path, monkeypatch):
     from pathlib import Path
 
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_SHARED_AUTH_DIR", str(tmp_path / "shared"))
+    monkeypatch.setenv("EIR_SHARED_AUTH_DIR", str(tmp_path / "shared"))
 
 
 def _rows():
@@ -31,7 +31,7 @@ def _rows():
 
 @pytest.mark.parametrize("status", [200, 503, 401])
 def test_refresh_uses_target_grant_and_preserves_sibling(monkeypatch, status):
-    from hermes_cli import auth_codex
+    from eir_cli import auth_codex
     requests = []
 
     class Endpoint(BaseHTTPRequestHandler):

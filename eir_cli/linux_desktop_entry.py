@@ -26,19 +26,19 @@ from typing import Callable, Mapping, Optional
 # `appId` into extraMetadata.desktopName, and Electron hands that string to the compositor
 # verbatim (Wayland app_id, CHROME_DESKTOP). GNOME links a window to a launcher by StartupWMClass
 # or by a `<app_id>.desktop` file name, so the entry has to carry the same id — under the old
-# "hermes.desktop" name a packaged launch matches neither rung and lands on the placeholder icon.
-APP_ID = "com.nousresearch.hermes"
+# "eir.desktop" name a packaged launch matches neither rung and lands on the placeholder icon.
+APP_ID = "com.nousresearch.eir"
 DESKTOP_ENTRY_NAME = f"{APP_ID}.desktop"
 
 # Entry name written before the app-id rename; a successful install converts it into a hidden
 # alias (NoDisplay=true) so pre-rename taskbar pins keep resolving (see _alias_legacy_desktop_entry).
-LEGACY_DESKTOP_ENTRY_NAME = "hermes.desktop"
+LEGACY_DESKTOP_ENTRY_NAME = "eir.desktop"
 
 # XDG startup notification: set by an app-grid / menu launch, absent for terminal and detached
 # (updater relaunch) launches. See launched_from_shell().
 SHELL_LAUNCH_ENV_VAR = "DESKTOP_STARTUP_ID"
 # Write end of the reveal pipe handed to Electron; one byte means "main window is on screen".
-READY_FD_ENV_VAR = "HERMES_DESKTOP_READY_FD"
+READY_FD_ENV_VAR = "EIR_DESKTOP_READY_FD"
 REVEAL_BYTE = b"r"  # what linux-launcher-ready.ts writes; anything else is finish()'s wake-up
 
 _SHELL_NAMES = ("bash", "sh", "dash", "zsh", "ksh")
@@ -84,8 +84,8 @@ def _running_interpreter() -> str:
 _probe_cache: dict[str, bool] = {}
 
 
-def _can_import_hermes_cli(interpreter: Path) -> bool:
-    """Whether *interpreter* can import ``hermes_cli.main`` unaided.
+def _can_import_eir_cli(interpreter: Path) -> bool:
+    """Whether *interpreter* can import ``eir_cli.main`` unaided.
 
     Runs under ``-I`` (no user site, no PYTHONPATH, no cwd on ``sys.path``) from a neutral cwd, so
     the answer matches a cold desktop environment. Cached per process; an unprobeable interpreter
@@ -98,7 +98,7 @@ def _can_import_hermes_cli(interpreter: Path) -> bool:
     if key in _probe_cache:
         return _probe_cache[key]
     ok = _run_quiet(
-        [key, "-I", "-c", "import hermes_cli.main"],
+        [key, "-I", "-c", "import eir_cli.main"],
         cwd=os.path.abspath(os.sep), timeout=15, on_error=None,
     )
     if ok is None:
@@ -108,33 +108,33 @@ def _can_import_hermes_cli(interpreter: Path) -> bool:
 
 
 def _running_interpreter_fallback() -> str:
-    """The RUNNING interpreter — it has ``hermes_cli`` importable by definition."""
+    """The RUNNING interpreter — it has ``eir_cli`` importable by definition."""
     return os.path.abspath(sys.executable)
 
 
 def resolve_exec_command(project_root: Optional[Path] = None) -> str:
-    """Build the absolute ``Exec=`` command line for ``hermes desktop``.
+    """Build the absolute ``Exec=`` command line for ``eir desktop``.
 
-    Prefer the real ``hermes`` launcher; fall back to ``<python> -m hermes_cli.main desktop``.
+    Prefer the real ``eir`` launcher; fall back to ``<python> -m eir_cli.main desktop``.
     """
-    from hermes_cli.relaunch import resolve_hermes_bin
+    from eir_cli.relaunch import resolve_eir_bin
 
-    bin_path = _resolve_hermes_bin_for_desktop_entry(resolve_hermes_bin, checkout_root=project_root)
+    bin_path = _resolve_eir_bin_for_desktop_entry(resolve_eir_bin, checkout_root=project_root)
     interpreter = _running_interpreter()
-    if not _can_import_hermes_cli(Path(interpreter)):
+    if not _can_import_eir_cli(Path(interpreter)):
         # Persisting an interpreter that can't import the CLI writes a dead entry (the DE spawns
         # Exec in a cold environment where exactly this import must succeed).
-        # The candidate interpreter cannot actually import hermes_cli.main (checked in isolated mode from a
+        # The candidate interpreter cannot actually import eir_cli.main (checked in isolated mode from a
         # neutral cwd — so the probe can't be fooled by a checkout cwd or an inherited PYTHONPATH). Fall
         # back to the module form under the RUNNING interpreter, which by definition has the CLI importable.
         # Probe design follows the isolated-mode capability check proposed by @nosliwhtes (#92122 review
         # lineage, commit 4150501f641) — cached here per-process so a desktop launch pays the subprocess
         # cost at most once.
         interpreter = _running_interpreter_fallback()
-    argv = [interpreter, "-m", "hermes_cli.main", *_desktop_argv_tail(project_root)]
+    argv = [interpreter, "-m", "eir_cli.main", *_desktop_argv_tail(project_root)]
     if bin_path:
         resolved = Path(bin_path).resolve()
-        # A Python launcher whose shebang points OUTSIDE the venv (e.g. the repo's `hermes` script
+        # A Python launcher whose shebang points OUTSIDE the venv (e.g. the repo's `eir` script
         # with `#!/usr/bin/env python3`) would die silently on the first third-party import under
         # Terminal=false — run it under the venv interpreter explicitly.
         prefix = [interpreter] if _needs_interpreter(resolved) else []
@@ -160,7 +160,7 @@ def _desktop_argv_tail(project_root: Optional[Path]) -> list[str]:
     packaged = any(
         (release / dist / name).exists()
         for dist in ("linux-unpacked", "linux-arm64-unpacked")
-        for name in ("hermes", "Hermes")
+        for name in ("eir", "Eir")
     )
     return ["desktop", "--skip-build"] if packaged else ["desktop"]
 
@@ -184,7 +184,7 @@ def _inside_checkout(candidate: str, checkout_root: Path, original_argv0: str) -
         path = Path(candidate).resolve()
     except OSError:
         return False
-    # Anything shipped in the tree (e.g. the repo `hermes` script) is checkout-internal. Compare
+    # Anything shipped in the tree (e.g. the repo `eir` script) is checkout-internal. Compare
     # against BOTH the lexical and resolved roots: candidates resolve, so a symlinked home needs
     # the resolved comparison too.
     try:
@@ -194,7 +194,7 @@ def _inside_checkout(candidate: str, checkout_root: Path, original_argv0: str) -
     for root in {checkout_root, resolved_root}:
         if root is not None and (path == root or root in path.parents):
             return True
-    # The `python -m hermes_cli.main` relaunch context surfaces the invoking interpreter as
+    # The `python -m eir_cli.main` relaunch context surfaces the invoking interpreter as
     # argv[0]; an interpreter is never a launchable entry target (it would persist a bare
     # `<python> desktop`). Compare against argv[0]'s own file, not sys.executable — under test
     # harnesses they differ.
@@ -225,24 +225,24 @@ def _is_this_checkout_managed_cli(candidate: str, checkout_root: Path) -> bool:
     return path == generations or generations in path.parents
 
 
-def _resolve_hermes_bin_for_desktop_entry(
+def _resolve_eir_bin_for_desktop_entry(
     resolve_fn=None,
     checkout_root: Optional[Path] = None,
 ) -> Optional[str]:
     """Resolve the launcher binary for the persisted ``.desktop`` entry.
 
-    Wraps :func:`hermes_cli.relaunch.resolve_hermes_bin` with one rule: an ``argv[0]`` inside this
+    Wraps :func:`eir_cli.relaunch.resolve_eir_bin` with one rule: an ``argv[0]`` inside this
     checkout is a launch-context artifact, not a durable installed launcher — persisting it makes
     the entry depend on how the previous launch happened (a bootstrap loop). Skip such candidates
     and fall through to PATH, then to the installer's known wrapper locations. A candidate that
-    provably cannot serve ``hermes desktop`` (a code tree carrying ``hermes_cli`` but no desktop
+    provably cannot serve ``eir desktop`` (a code tree carrying ``eir_cli`` but no desktop
     app beside it — a managed runtime env's console script) is skipped the same way: its entry
     would only ever die with "Desktop GUI source not found". ``resolve_fn`` is injectable for tests.
 
     See #90492.
     """
     if resolve_fn is None:
-        from hermes_cli.relaunch import resolve_hermes_bin as resolve_fn
+        from eir_cli.relaunch import resolve_eir_bin as resolve_fn
 
     if checkout_root is None:
         checkout_root = _project_root()
@@ -253,14 +253,14 @@ def _resolve_hermes_bin_for_desktop_entry(
     module_lexical_root = _project_root()
     original_argv0 = sys.argv[0]
 
-    # An external primary (another install's /opt/.../bin/hermes, a venv console script) wins
+    # An external primary (another install's /opt/.../bin/eir, a venv console script) wins
     # BEFORE any known-location probing, which could silently switch the entry to a different
     # installation. Only rerun the resolver with argv[0] hidden when the primary could actually
     # be checkout-internal (also shortens the window a concurrent reader sees mutated sys.argv).
     primary = resolve_fn()
     # A managed-environment console script is outside the checkout but is not a durable desktop
     # launcher: its workspace has no apps/desktop (#122438). The same holds for any launcher
-    # that provably cannot serve `hermes desktop` (another install's managed env, #122485).
+    # that provably cannot serve `eir desktop` (another install's managed env, #122485).
     # Fall through so the durable-wrapper probe below can still find a working one.
     if (
         primary
@@ -272,7 +272,7 @@ def _resolve_hermes_bin_for_desktop_entry(
         return primary
 
     # A primary that is NOT checkout-internal and not the invoking interpreter is an external launcher (e.g.
-    # /opt/.../bin/hermes from another install method, or a venv console script). It must be evaluated
+    # /opt/.../bin/eir from another install method, or a venv console script). It must be evaluated
     # BEFORE any known-location probing: probing first could silently switch the entry to a different
     # installation (#94443 review case 3).
     # Only reroute when argv[0] actually drove the resolution: re-run the resolver with argv[0] hidden and
@@ -285,7 +285,7 @@ def _resolve_hermes_bin_for_desktop_entry(
         sys.argv[0] = original_argv0
 
     # A resolver miss (argv[0] is ``-c`` under ``python -m`` on a cold relaunch AND PATH has no
-    # ``hermes``) must NOT return None here: that skipped the durable-wrapper probe below and persisted
+    # ``eir``) must NOT return None here: that skipped the durable-wrapper probe below and persisted
     # the module form, so the entry's bytes flipped on every alternating launch context — and
     # gnome-shell 50.x crashes when the entry changes while its ShellApp is STARTING (#110885).
     # ``primary is None`` implies ``rerouted is None`` (the rerun only hides argv[0]), so only the
@@ -407,7 +407,7 @@ def _wrapper_targets_checkout(wrapper: Path, checkout_root: Path) -> bool:
     )
 
 
-_HERMES_CODE_MARKERS = ("hermes_cli", "workspace/hermes_cli")
+_EIR_CODE_MARKERS = ("eir_cli", "workspace/eir_cli")
 _DESKTOP_APP_ENTRIES = ("apps/desktop/package.json", "workspace/apps/desktop/package.json")
 
 
@@ -421,20 +421,20 @@ def _launcher_tree(path: Path) -> Path:
 
 
 def _tree_desktop_state(tree: Path) -> Optional[bool]:
-    """``True`` when *tree* can serve ``hermes desktop``, ``False`` when it provably cannot, else ``None``.
+    """``True`` when *tree* can serve ``eir desktop``, ``False`` when it provably cannot, else ``None``.
 
-    ``False`` is reserved for a tree that IS a hermes code tree (carries ``hermes_cli``) yet has no
+    ``False`` is reserved for a tree that IS a eir code tree (carries ``eir_cli``) yet has no
     desktop app beside it — the managed runtime env layout, whose launcher runs but dies with
     "Desktop GUI source not found". Unfamiliar shapes stay ``None`` (accepted) so no install
     method is rejected for looking exotic.
     """
     if any((tree / entry).is_file() for entry in _DESKTOP_APP_ENTRIES):
         return True
-    from hermes_cli.steward import is_bundled_payload
+    from eir_cli.steward import is_bundled_payload
 
     if is_bundled_payload(tree):
         return True
-    if any((tree / marker).is_dir() for marker in _HERMES_CODE_MARKERS):
+    if any((tree / marker).is_dir() for marker in _EIR_CODE_MARKERS):
         return False
     return None
 
@@ -480,7 +480,7 @@ def _persisted_exec_serves_desktop(exec_command: str) -> Optional[bool]:
     """Desktop-capability of a rendered ``Exec`` line, ignoring an interpreter prefix.
 
     ``[<interpreter>, <launcher>, desktop]`` is judged by the launcher. The module fallback
-    ``[<interpreter>, -m, hermes_cli.main, desktop]`` passes: it is only ever written by a
+    ``[<interpreter>, -m, eir_cli.main, desktop]`` passes: it is only ever written by a
     process that already passed the desktop launch checks.
     """
     try:
@@ -494,7 +494,7 @@ def _persisted_exec_serves_desktop(exec_command: str) -> Optional[bool]:
         if len(tokens) > 1 and tokens[1] != "-m":
             candidate = tokens[1]  # `[<interpreter>, <launcher>, desktop]` prefix form
         else:
-            # Module fallback `[<interpreter>, -m, hermes_cli.main, desktop]`: only a process
+            # Module fallback `[<interpreter>, -m, eir_cli.main, desktop]`: only a process
             # that already passed the desktop launch checks writes it, so it is not
             # second-guessed here.
             return None
@@ -505,15 +505,15 @@ def _known_wrapper_candidates():
     """Durable installed-launcher locations, most likely first.
 
     Mirrors the installer's ``get_command_link_dir()`` layouts: Termux (``$PREFIX/bin``), root FHS
-    (``/usr/local/bin``), and user (``~/.local/bin``). The wrapper is always named ``hermes``.
+    (``/usr/local/bin``), and user (``~/.local/bin``). The wrapper is always named ``eir``.
     """
     candidates = []
     prefix = os.environ.get("PREFIX")
     if prefix:
-        candidates.append(Path(prefix) / "bin" / "hermes")
+        candidates.append(Path(prefix) / "bin" / "eir")
     if hasattr(os, "geteuid") and os.geteuid() == 0:
-        candidates.append(Path("/usr/local/bin/hermes"))
-    candidates.append(Path.home() / ".local" / "bin" / "hermes")
+        candidates.append(Path("/usr/local/bin/eir"))
+    candidates.append(Path.home() / ".local" / "bin" / "eir")
     return candidates
 
 
@@ -582,9 +582,9 @@ def render_desktop_entry(exec_command: str, icon: str) -> str:
     return (
         "[Desktop Entry]\n"
         "Type=Application\n"
-        "Name=Hermes\n"
-        "GenericName=Hermes Desktop\n"
-        "Comment=Launch Hermes Desktop\n"
+        "Name=Eir\n"
+        "GenericName=Eir Desktop\n"
+        "Comment=Launch Eir Desktop\n"
         f"Exec={exec_command}\n"
         f"Icon={icon}\n"
         "Terminal=false\n"
@@ -663,7 +663,7 @@ def _hicolor_subdir(dimensions: Optional[tuple[int, int]]) -> str:
 
 
 def _hicolor_icon_dest(subdir: str) -> Path:
-    return _xdg_data_home() / "icons" / "hicolor" / subdir / "apps" / "hermes.png"
+    return _xdg_data_home() / "icons" / "hicolor" / subdir / "apps" / "eir.png"
 
 
 def _remove_stale_scalable_icon() -> bool:
@@ -723,7 +723,7 @@ def _write_hicolor_pngs(files: dict[str, bytes]) -> bool:
 
 
 def _install_icon_to_hicolor(icon: Path) -> bool:
-    """Install the app icon into the user's hicolor tree so ``Icon=hermes`` resolves without an
+    """Install the app icon into the user's hicolor tree so ``Icon=eir`` resolves without an
     absolute checkout path. Raster PNGs go to indexed fixed-size dirs, never ``scalable``."""
     try:
         raw = icon.read_bytes()
@@ -754,7 +754,7 @@ def _launcher_entry_management_enabled() -> bool:
     not first-run presence. Any config error reads as enabled (default).
     """
     try:
-        from hermes_cli.config import load_config_readonly
+        from eir_cli.config import load_config_readonly
 
         desktop_cfg = (load_config_readonly() or {}).get("desktop") or {}
         raw = desktop_cfg.get("manage_launcher_entry", True)
@@ -768,11 +768,11 @@ def _launcher_entry_management_enabled() -> bool:
 
 
 def _alias_legacy_desktop_entry(applications_dir: Path, exec_command: str, icon: str) -> bool:
-    """Keep the pre-rename ``hermes.desktop`` as a hidden alias of the app-id entry.
+    """Keep the pre-rename ``eir.desktop`` as a hidden alias of the app-id entry.
 
     Shells resolve a taskbar pin by the entry file name it was pinned against: deleting the
     file makes GNOME drop the favourite and Plasma leave an inert item, and nothing can
-    re-pin for the user. The alias stays launchable for old pins without listing Hermes
+    re-pin for the user. The alias stays launchable for old pins without listing Eir
     twice. Only a file that still names this app is converted; anything else at that path
     is left alone. True when the legacy file was (re)written.
     """
@@ -781,7 +781,7 @@ def _alias_legacy_desktop_entry(applications_dir: Path, exec_command: str, icon:
         text = legacy.read_text(encoding="utf-8-sig")
     except OSError:
         return False
-    if not any(line.strip() == "Name=Hermes" for line in text.splitlines()):
+    if not any(line.strip() == "Name=Eir" for line in text.splitlines()):
         return False
     alias_contents = _render_legacy_alias_entry(exec_command, icon)
     if text == alias_contents:
@@ -799,11 +799,11 @@ def _alias_legacy_desktop_entry(applications_dir: Path, exec_command: str, icon:
 def install_desktop_entry(project_root: Path) -> Optional[Path]:
     """Create or refresh the app-id entry, respecting the opt-out for existing entries.
 
-    Only the app-id entry is written; a pre-rename ``hermes.desktop`` beside it is converted
+    Only the app-id entry is written; a pre-rename ``eir.desktop`` beside it is converted
     into a hidden alias once the new entry exists, and only while launcher management is
     enabled — deleting it instead would silently kill existing taskbar pins (#124492).
     ``None`` on non-Linux platforms, when the write fails, or when the resolved ``Exec``
-    provably cannot serve ``hermes desktop`` — a convenience, never a reason to fail a launch.
+    provably cannot serve ``eir desktop`` — a convenience, never a reason to fail a launch.
     """
     if not is_supported():
         return None
@@ -827,9 +827,9 @@ def install_desktop_entry(project_root: Path) -> Optional[Path]:
     # Prefer the themed name: the icon is COPIED into the hicolor tree, so the entry outlives the
     # checkout (an absolute Icon= path breaks when the checkout moves). Absolute path only when
     # the copy is impossible (read-only tree); themed name when the checkout has no icon at all.
-    icon_value = str(icon) if icon.is_file() else "hermes"
+    icon_value = str(icon) if icon.is_file() else "eir"
     if icon.is_file() and _install_icon_to_hicolor(icon):
-        icon_value = "hermes"
+        icon_value = "eir"
     contents = render_desktop_entry(exec_command, icon_value)
 
     try:
@@ -875,7 +875,7 @@ class DeferredDesktopEntryInstall:
     """Install the entry once the desktop window is on screen — never while the shell's
     ShellApp is STARTING.
 
-    The launcher hands Electron the write end of a pipe (``HERMES_DESKTOP_READY_FD``); Electron
+    The launcher hands Electron the write end of a pipe (``EIR_DESKTOP_READY_FD``); Electron
     writes one byte when the main window is revealed and a worker thread then installs the entry.
     An exit without a reveal (boot crash, early quit) does NOT heal: gnome-shell keeps the ShellApp
     in STARTING until the startup-notification sequence completes or times out (mutter, ~15 s),

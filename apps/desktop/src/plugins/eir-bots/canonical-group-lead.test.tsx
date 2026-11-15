@@ -5,7 +5,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 const request = vi.hoisted(() => vi.fn())
 
 // A native <select> stands in for the Radix one: same value/onValueChange contract.
-vi.mock('@hermes/plugin-sdk', () => ({
+vi.mock('@eir/plugin-sdk', () => ({
   Button: (props: ComponentProps<'button'>) => <button {...props} />,
   Dialog: ({ children, open }: { children: ReactNode; open: boolean }) => (open ? <div>{children}</div> : null),
   DialogContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,

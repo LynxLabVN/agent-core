@@ -8,7 +8,7 @@
  * controls without either surface importing the other.
  */
 
-import { Button, cn, Codicon, host, Input, RowButton, Textarea, useI18n, useValue } from '@hermes/plugin-sdk'
+import { Button, cn, Codicon, host, Input, RowButton, Textarea, useI18n, useValue } from '@eir/plugin-sdk'
 import type { ClipboardEvent, Ref, RefObject } from 'react'
 import { useImperativeHandle, useRef, useState } from 'react'
 

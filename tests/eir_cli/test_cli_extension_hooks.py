@@ -1,4 +1,4 @@
-"""Tests for protected HermesCLI TUI extension hooks.
+"""Tests for protected EirCLI TUI extension hooks.
 
 Verifies that wrapper CLIs can extend the TUI via:
   - _get_extra_tui_widgets()
@@ -10,10 +10,10 @@ without overriding run().
 from __future__ import annotations
 
 def _make_cli():
-    """Bare HermesCLI (no __init__): the layout hooks need no init state."""
-    from cli import HermesCLI
+    """Bare EirCLI (no __init__): the layout hooks need no init state."""
+    from cli import EirCLI
 
-    return HermesCLI.__new__(HermesCLI)
+    return EirCLI.__new__(EirCLI)
 
 class TestExtensionHookSubclass:
     def test_extra_widgets_inserted_before_status_bar(self):

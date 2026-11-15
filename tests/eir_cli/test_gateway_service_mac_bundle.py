@@ -1,7 +1,7 @@
-"""`hermes gateway install` from a macOS bundle leaves the signed app untouched.
+"""`eir gateway install` from a macOS bundle leaves the signed app untouched.
 
-Anything written into ``Hermes.app`` breaks its code seal, and macOS then holds the next update
-on a Gatekeeper prompt. The service runs the app's own signed ``bin/hermes`` instead.
+Anything written into ``Eir.app`` breaks its code seal, and macOS then holds the next update
+on a Gatekeeper prompt. The service runs the app's own signed ``bin/eir`` instead.
 """
 import json
 import os
@@ -14,20 +14,20 @@ from pathlib import Path
 import pytest
 
 from scripts.build.launchers import posix_launcher
-from tests.hermes_cli.test_gateway_service import _osascript_exec_argv
+from tests.eir_cli.test_gateway_service import _osascript_exec_argv
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 def _mac_bundle(tmp_path: Path) -> tuple[Path, Path, Path]:
-    """The payload a macOS app ships (scripts/build/agent.py) around a stub CLI: app, repo, bin/hermes."""
-    app = tmp_path / "Hermes.app"
+    """The payload a macOS app ships (scripts/build/agent.py) around a stub CLI: app, repo, bin/eir."""
+    app = tmp_path / "Eir.app"
     payload = app / "Contents" / "Resources" / "agent-payload"
-    repo = payload / "hermes-agent"
-    (repo / "hermes_cli").mkdir(parents=True)
-    for relative in ("hermes_cli/__init__.py", "hermes_cli/stderr_timestamp.py"):
+    repo = payload / "eir-agent"
+    (repo / "eir_cli").mkdir(parents=True)
+    for relative in ("eir_cli/__init__.py", "eir_cli/stderr_timestamp.py"):
         shutil.copy2(ROOT / relative, repo / relative)
-    (repo / "hermes_cli" / "main.py").write_text(
+    (repo / "eir_cli" / "main.py").write_text(
         "import json, sys\ndef main():\n    print(json.dumps(sys.argv[1:]), flush=True)\n    return 7\n", encoding="utf-8")
     (repo / "install-stamp.json").write_text(json.dumps({
         "commit": "a" * 40, "distribution": "desktop-app", "updateMechanism": "electron-updater",
@@ -40,12 +40,12 @@ def _mac_bundle(tmp_path: Path) -> tuple[Path, Path, Path]:
     site = "venv/lib/site-packages"
     (payload / site).mkdir(parents=True)
     (payload / "manifest.json").write_text(json.dumps({
-        "schema": 1, "target": "darwin-arm64", "repo": "hermes-agent", "venv": "venv", "store": "tools",
-        "launchers": ["hermes"], "runtime": {"sitePackages": site, "commands": {"hermes": "bin/hermes"}}}),
+        "schema": 1, "target": "darwin-arm64", "repo": "eir-agent", "venv": "venv", "store": "tools",
+        "launchers": ["eir"], "runtime": {"sitePackages": site, "commands": {"eir": "bin/eir"}}}),
         encoding="utf-8")
-    launcher = payload / "bin" / "hermes"
+    launcher = payload / "bin" / "eir"
     launcher.parent.mkdir()
-    launcher.write_text(posix_launcher("hermes", "hermes_cli.main:main", python=str(interpreter), repo="hermes-agent",
+    launcher.write_text(posix_launcher("eir", "eir_cli.main:main", python=str(interpreter), repo="eir-agent",
                                        site=site, target="darwin-arm64"), encoding="utf-8")
     launcher.chmod(0o755)
     return app, repo, launcher
@@ -54,15 +54,15 @@ def _mac_bundle(tmp_path: Path) -> tuple[Path, Path, Path]:
 @pytest.mark.platforms("macos")
 @pytest.mark.spawns_gateway_lookalike
 def test_gateway_service_runs_the_apps_own_launcher_and_writes_nothing_into_it(tmp_path, monkeypatch):
-    from hermes_cli import gateway
-    from hermes_cli.gateway_runtime_service_identity import verify_launchd_plist
+    from eir_cli import gateway
+    from eir_cli.gateway_runtime_service_identity import verify_launchd_plist
 
     app, repo, launcher = _mac_bundle(tmp_path)
-    home = tmp_path / "home" / ".hermes"
+    home = tmp_path / "home" / ".eir"
     home.mkdir(parents=True)
     monkeypatch.setenv("HOME", str(home.parent))
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.delenv("HERMES_RUNTIME_DIR", raising=False)
+    monkeypatch.setenv("EIR_HOME", str(home))
+    monkeypatch.delenv("EIR_RUNTIME_DIR", raising=False)
     monkeypatch.delenv("PYTHONPYCACHEPREFIX", raising=False)
     monkeypatch.delenv("XDG_CACHE_HOME", raising=False)
     monkeypatch.setattr(gateway, "PROJECT_ROOT", repo)

@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 def _import_cli():
-    import hermes_cli.config as config_mod
+    import eir_cli.config as config_mod
 
     if not hasattr(config_mod, "save_env_value_secure"):
         config_mod.save_env_value_secure = lambda key, value: {
@@ -32,7 +32,7 @@ class TestHandleBusyCommand(unittest.TestCase):
             patch.object(cli_mod, "_cprint") as mock_cprint,
             patch.object(cli_mod, "save_config_value") as mock_save,
         ):
-            cli_mod.HermesCLI._handle_busy_command(stub, "/busy")
+            cli_mod.EirCLI._handle_busy_command(stub, "/busy")
 
         mock_save.assert_not_called()
         printed = " ".join(str(c) for c in mock_cprint.call_args_list)
@@ -46,7 +46,7 @@ class TestHandleBusyCommand(unittest.TestCase):
             patch.object(cli_mod, "_cprint"),
             patch.object(cli_mod, "save_config_value", return_value=True) as mock_save,
         ):
-            cli_mod.HermesCLI._handle_busy_command(stub, "/busy queue")
+            cli_mod.EirCLI._handle_busy_command(stub, "/busy queue")
 
         self.assertEqual(stub.busy_input_mode, "queue")
         mock_save.assert_called_once_with("display.busy_input_mode", "queue")
@@ -58,7 +58,7 @@ class TestHandleBusyCommand(unittest.TestCase):
             patch.object(cli_mod, "_cprint") as mock_cprint,
             patch.object(cli_mod, "save_config_value", return_value=True) as mock_save,
         ):
-            cli_mod.HermesCLI._handle_busy_command(stub, "/busy steer")
+            cli_mod.EirCLI._handle_busy_command(stub, "/busy steer")
 
         self.assertEqual(stub.busy_input_mode, "steer")
         mock_save.assert_called_once_with("display.busy_input_mode", "steer")
@@ -72,7 +72,7 @@ class TestHandleBusyCommand(unittest.TestCase):
             patch.object(cli_mod, "_cprint") as mock_cprint,
             patch.object(cli_mod, "save_config_value") as mock_save,
         ):
-            cli_mod.HermesCLI._handle_busy_command(stub, "/busy nonsense")
+            cli_mod.EirCLI._handle_busy_command(stub, "/busy nonsense")
 
         mock_save.assert_not_called()
         printed = " ".join(str(c) for c in mock_cprint.call_args_list)

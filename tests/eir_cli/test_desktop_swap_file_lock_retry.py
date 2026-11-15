@@ -11,15 +11,15 @@ import os
 import sys
 from pathlib import Path
 
-from hermes_cli import main_desktop
+from eir_cli import main_desktop
 
 
 def _packaged_exe_rel() -> Path:
     if sys.platform == "darwin":
-        return Path("mac-arm64") / "Hermes.app" / "Contents" / "MacOS" / "Hermes"
+        return Path("mac-arm64") / "Eir.app" / "Contents" / "MacOS" / "Eir"
     if sys.platform == "win32":
-        return Path("win-unpacked") / "Hermes.exe"
-    return Path("linux-unpacked") / "hermes"
+        return Path("win-unpacked") / "Eir.exe"
+    return Path("linux-unpacked") / "eir"
 
 
 def _staged_over_live(tmp_path: Path, monkeypatch):

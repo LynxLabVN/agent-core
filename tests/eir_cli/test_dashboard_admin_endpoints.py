@@ -8,9 +8,9 @@ visible to the CLI data layer), not specific catalog values.
 """
 
 import pytest
-import hermes_cli.config as _cfg_mod
-import hermes_cli.web_server_files as _web_server_files
-import hermes_cli.web_server_gateway as _web_server_gateway
+import eir_cli.config as _cfg_mod
+import eir_cli.web_server_files as _web_server_files
+import eir_cli.web_server_gateway as _web_server_gateway
 
 
 def _client():
@@ -18,21 +18,21 @@ def _client():
         from starlette.testclient import TestClient
     except ImportError:
         pytest.skip("fastapi/starlette not installed")
-    import hermes_state
-    from hermes_constants import get_hermes_home
-    from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
+    import eir_state
+    from eir_constants import get_eir_home
+    from eir_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
 
     client = TestClient(app)
     client.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
-    # Keep the state DB under the isolated HERMES_HOME for any handler that
+    # Keep the state DB under the isolated EIR_HOME for any handler that
     # touches it.
-    hermes_state.DEFAULT_DB_PATH = get_hermes_home() / "state.db"
+    eir_state.DEFAULT_DB_PATH = get_eir_home() / "state.db"
     return client, _SESSION_HEADER_NAME
 
 
 class TestMcpEndpoints:
     @pytest.fixture(autouse=True)
-    def _setup(self, _isolate_hermes_home):
+    def _setup(self, _isolate_eir_home):
         self.client, self.header = _client()
 
 
@@ -50,9 +50,9 @@ class TestMcpEndpoints:
         assert srv["env"]["API_KEY"] != "sk-secret-1234567890"
 
     def test_http_bearer_auth_separates_secret_from_config(
-        self, _isolate_hermes_home
+        self, _isolate_eir_home
     ):
-        from hermes_constants import get_hermes_home
+        from eir_constants import get_eir_home
 
         secret = "dashboard-secret-value"
         response = self.client.post(
@@ -69,9 +69,9 @@ class TestMcpEndpoints:
         assert response.json()["auth"] == "header"
         assert "bearer_token" not in response.json()
 
-        hermes_home = get_hermes_home()
-        config_text = (hermes_home / "config.yaml").read_text()
-        env_text = (hermes_home / ".env").read_text()
+        eir_home = get_eir_home()
+        config_text = (eir_home / "config.yaml").read_text()
+        env_text = (eir_home / ".env").read_text()
         assert secret not in config_text
         assert "Bearer ${MCP_BEARER_SERVER_API_KEY}" in config_text
         assert f"MCP_BEARER_SERVER_API_KEY={secret}" in env_text
@@ -89,7 +89,7 @@ class TestMcpEndpoints:
         assert response.status_code == 200
         assert response.json()["auth"] == "oauth"
 
-        from hermes_cli.mcp_config import _get_mcp_servers
+        from eir_cli.mcp_config import _get_mcp_servers
 
         assert _get_mcp_servers()["oauth-server"]["auth"] == "oauth"
 
@@ -144,21 +144,21 @@ class TestMcpEndpoints:
 
 class TestCredentialPoolEndpoints:
     @pytest.fixture(autouse=True)
-    def _setup(self, _isolate_hermes_home):
+    def _setup(self, _isolate_eir_home):
         self.client, _ = _client()
 
 
     def test_env_seeded_delete_stays_deleted(self):
         """#55217: DELETE must suppress the source or load_pool() resurrects it.
 
-        load_pool() re-seeds from ~/.hermes/.env on every call, so removing
+        load_pool() re-seeds from ~/.eir/.env on every call, so removing
         just the pool row silently reverts on the next dashboard refresh.
-        The endpoint must mirror `hermes auth remove`: clean up the backing
+        The endpoint must mirror `eir auth remove`: clean up the backing
         source and suppress (provider, source).
         """
         from agent.credential_pool import load_pool
-        from hermes_cli.auth import is_source_suppressed
-        from hermes_cli.config import save_env_value
+        from eir_cli.auth import is_source_suppressed
+        from eir_cli.config import save_env_value
 
         fake_key = "sk-or-" + "x" * 20  # constructed, never a real key shape
         save_env_value("OPENROUTER_API_KEY", fake_key)
@@ -181,13 +181,13 @@ class TestCredentialPoolEndpoints:
     def test_post_readd_lifts_suppression(self):
         """Re-adding via POST is an explicit re-engagement — suppressions lift.
 
-        Mirrors `hermes auth add`, which clears every suppression for the
+        Mirrors `eir auth add`, which clears every suppression for the
         provider so a user who deleted a credential and re-adds one isn't
         silently blocked from env re-seeding.
         """
         from agent.credential_pool import load_pool
-        from hermes_cli.auth import is_source_suppressed
-        from hermes_cli.config import save_env_value
+        from eir_cli.auth import is_source_suppressed
+        from eir_cli.config import save_env_value
 
         fake_key = "sk-or-" + "y" * 20
         save_env_value("OPENROUTER_API_KEY", fake_key)
@@ -211,11 +211,11 @@ class TestCredentialPoolEndpoints:
 
 class TestMemoryEndpoints:
     @pytest.fixture(autouse=True)
-    def _setup(self, _isolate_hermes_home):
+    def _setup(self, _isolate_eir_home):
         self.client, _ = _client()
-        from hermes_constants import get_hermes_home
+        from eir_constants import get_eir_home
 
-        (get_hermes_home() / "memories").mkdir(parents=True, exist_ok=True)
+        (get_eir_home() / "memories").mkdir(parents=True, exist_ok=True)
 
     def test_status_and_select(self):
         data = self.client.get("/api/memory").json()
@@ -230,9 +230,9 @@ class TestMemoryEndpoints:
         assert r.status_code == 400
 
     def test_reset_targets(self):
-        from hermes_constants import get_hermes_home
+        from eir_constants import get_eir_home
 
-        mem = get_hermes_home() / "memories"
+        mem = get_eir_home() / "memories"
         (mem / "MEMORY.md").write_text("notes")
         (mem / "USER.md").write_text("user")
 
@@ -271,11 +271,11 @@ class ScopedProvMemoryProvider(MemoryProvider):
         ``is_available`` reads the launch profile's credential must still resolve it from the
         launch home's ``.env`` instead of rendering "unavailable" with no visible error
         (``probe_availability`` swallows the ``UnscopedSecretError``)."""
-        from hermes_constants import get_hermes_home
-        from hermes_cli.web_server_dashboard import _invalidate_plugins_hub_cache
+        from eir_constants import get_eir_home
+        from eir_cli.web_server_dashboard import _invalidate_plugins_hub_cache
         from tui_gateway.launch_profile_policy import activate_multi_profile_hosting
 
-        home = get_hermes_home()
+        home = get_eir_home()
         (home / ".env").write_text("SCOPEDPROV_API_KEY=launch-key\n", encoding="utf-8")
         plugin_dir = home / "plugins" / "scopedprov"
         plugin_dir.mkdir(parents=True)
@@ -292,7 +292,7 @@ class ScopedProvMemoryProvider(MemoryProvider):
 
 class TestPairingEndpoints:
     @pytest.fixture(autouse=True)
-    def _setup(self, _isolate_hermes_home):
+    def _setup(self, _isolate_eir_home):
         self.client, _ = _client()
 
     def test_approve_pending_request_id(self):
@@ -324,10 +324,10 @@ class TestPairingEndpoints:
         as approved.
         """
         from gateway.pairing import PairingStore
-        from hermes_constants import get_hermes_home
+        from eir_constants import get_eir_home
 
-        (get_hermes_home() / "profiles" / "work").mkdir(parents=True, exist_ok=True)
-        (get_hermes_home() / "profiles" / "work" / "config.yaml").write_text("{}\n")  # identity marker
+        (get_eir_home() / "profiles" / "work").mkdir(parents=True, exist_ok=True)
+        (get_eir_home() / "profiles" / "work" / "config.yaml").write_text("{}\n")  # identity marker
         PairingStore().generate_code("telegram", "global-1", "GlobalGuy")
         PairingStore(profile="work").generate_code("telegram", "work-1", "WorkGal")
 
@@ -362,12 +362,12 @@ class TestPairingEndpoints:
 
 class TestWebhookEndpoints:
     @pytest.fixture(autouse=True)
-    def _setup(self, _isolate_hermes_home):
+    def _setup(self, _isolate_eir_home):
         self.client, _ = _client()
 
 
     def test_create_webhook_persists_script(self):
-        from hermes_cli.config import load_config, save_config
+        from eir_cli.config import load_config, save_config
 
         cfg = load_config()
         cfg.setdefault("platforms", {})["webhook"] = {
@@ -393,15 +393,15 @@ class TestWebhookEndpoints:
         # A re-POST is a general update, not an enable: an explicit disable must survive it.
         assert self.client.put("/api/webhooks/todoist/enabled", json={"enabled": False}).status_code == 200
         assert self.client.post("/api/webhooks", json={"name": "todoist", "deliver": "log"}).status_code == 200
-        from hermes_cli.webhook import _load_subscriptions
+        from eir_cli.webhook import _load_subscriptions
         assert _load_subscriptions()["todoist"]["enabled"] is False
 
     @pytest.mark.parametrize("pin", ["github", False, ""])  # the gateway refuses an invalid pin; dropping it unpins
     def test_re_post_keeps_the_route_signature_pin(self, pin):
         """A re-POST replaces the record; losing the pin would republish the route accepting body-only
         GitHub/Linear MACs again (#84265)."""
-        from hermes_cli.config import load_config, save_config
-        from hermes_cli.webhook import _load_subscriptions, _mutate_subscriptions
+        from eir_cli.config import load_config, save_config
+        from eir_cli.webhook import _load_subscriptions, _mutate_subscriptions
 
         cfg = load_config()
         cfg.setdefault("platforms", {})["webhook"] = {"enabled": True, "extra": {"host": "0.0.0.0", "port": 8644}}
@@ -415,7 +415,7 @@ class TestWebhookEndpoints:
         assert _load_subscriptions()["gh"]["signature"] == pin
 
     def test_enable_platform_starts_gateway_restart(self, monkeypatch):
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
 
         _web_server_gateway._ACTION_PROCS.pop("gateway-restart", None)
         restart_calls = []
@@ -427,7 +427,7 @@ class TestWebhookEndpoints:
             restart_calls.append((subcommand, name))
             return FakeRestartProc()
 
-        monkeypatch.setattr(_web_server_gateway, "_spawn_hermes_action", fake_spawn_action)
+        monkeypatch.setattr(_web_server_gateway, "_spawn_eir_action", fake_spawn_action)
 
         r = self.client.post("/api/webhooks/enable")
 
@@ -448,7 +448,7 @@ class TestWebhookEndpoints:
 
 
     def test_enable_platform_reuses_inflight_gateway_restart(self, monkeypatch):
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
 
         _web_server_gateway._ACTION_PROCS.pop("gateway-restart", None)
 
@@ -463,7 +463,7 @@ class TestWebhookEndpoints:
         def fail_spawn_action(subcommand, name):
             raise AssertionError("must not spawn a second concurrent restart")
 
-        monkeypatch.setattr(_web_server_gateway, "_spawn_hermes_action", fail_spawn_action)
+        monkeypatch.setattr(_web_server_gateway, "_spawn_eir_action", fail_spawn_action)
 
         r = self.client.post("/api/webhooks/enable")
 
@@ -477,12 +477,12 @@ class TestWebhookEndpoints:
 
 class TestOpsEndpoints:
     @pytest.fixture(autouse=True)
-    def _setup(self, _isolate_hermes_home):
+    def _setup(self, _isolate_eir_home):
         self.client, _ = _client()
 
 
     def test_hooks_list_reads_config(self):
-        from hermes_cli.config import load_config, save_config
+        from eir_cli.config import load_config, save_config
 
         cfg = load_config()
         cfg["hooks"] = {
@@ -531,9 +531,9 @@ class TestOpsEndpoints:
 
 class TestSessionManagementEndpoints:
     @pytest.fixture(autouse=True)
-    def _setup(self, _isolate_hermes_home):
+    def _setup(self, _isolate_eir_home):
         self.client, _ = _client()
-        from hermes_state import SessionDB
+        from eir_state import SessionDB
 
         db = SessionDB()
         db.create_session(session_id="sess-x", source="cli")
@@ -545,7 +545,7 @@ class TestSessionManagementEndpoints:
         # ages (mirrors the CLI: any filter disables the implicit 90-day
         # default). dry_run so nothing is deleted; the seeded session is
         # recent + ended, so it would be invisible under a 90-day cutoff.
-        from hermes_state import SessionDB
+        from eir_state import SessionDB
 
         db = SessionDB()
         db.create_session(session_id="sess-recent-ended", source="cli")
@@ -565,7 +565,7 @@ class TestSessionManagementEndpoints:
         assert all("last_active" in session for session in body["sessions"])
 
     def test_prune_reports_open_sessions_excluded_by_safety_guard(self):
-        from hermes_state import SessionDB
+        from eir_state import SessionDB
 
         db = SessionDB()
         db.create_session(session_id="sess-old-open", source="skip-test")
@@ -625,7 +625,7 @@ class _FakeBundle:
 
 class TestSkillsHubSourcesEndpoint:
     @pytest.fixture(autouse=True)
-    def _setup(self, _isolate_hermes_home):
+    def _setup(self, _isolate_eir_home):
         self.client, _ = _client()
 
     def test_sources_lists_configured_hubs(self, monkeypatch):
@@ -641,12 +641,12 @@ class TestSkillsHubSourcesEndpoint:
                 return self._sid
 
             def search(self, q, limit=10):
-                return [_FakeMeta("hermes-index/featured-skill", "trusted")]
+                return [_FakeMeta("eir-index/featured-skill", "trusted")]
 
         def _fake_router():
             srcs = [_Src("official"), _Src("github")]
-            # hermes-index source advertises availability + featured search.
-            idx = _Src("hermes-index")
+            # eir-index source advertises availability + featured search.
+            idx = _Src("eir-index")
             idx.is_available = True
             srcs.insert(1, idx)
             return srcs
@@ -658,7 +658,7 @@ class TestSkillsHubSourcesEndpoint:
         assert r.status_code == 200
         body = r.json()
         ids = {s["id"] for s in body["sources"]}
-        assert {"official", "github", "hermes-index"} <= ids
+        assert {"official", "github", "eir-index"} <= ids
         # Every source carries a human label.
         assert all(s.get("label") for s in body["sources"])
         assert body["index_available"] is True
@@ -670,7 +670,7 @@ class TestSkillsHubSourcesEndpoint:
 
 class TestOfficialSkillsCatalogEndpoint:
     @pytest.fixture(autouse=True)
-    def _setup(self, _isolate_hermes_home):
+    def _setup(self, _isolate_eir_home):
         self.client, _ = _client()
 
     def test_lists_full_catalog_with_installed_flags(self, monkeypatch):
@@ -685,7 +685,7 @@ class TestOfficialSkillsCatalogEndpoint:
             lambda self: metas,
         )
         monkeypatch.setattr(
-            "hermes_cli.web_routers.skills._installed_hub_identifiers",
+            "eir_cli.web_routers.skills._installed_hub_identifiers",
             lambda profile=None: {"official/gifs/gif-search": {"name": "gif-search"}},
         )
         r = self.client.get("/api/skills/hub/official")
@@ -706,7 +706,7 @@ class TestOfficialSkillsCatalogEndpoint:
 
 class TestSkillsHubPreviewEndpoint:
     @pytest.fixture(autouse=True)
-    def _setup(self, _isolate_hermes_home):
+    def _setup(self, _isolate_eir_home):
         self.client, _ = _client()
 
 
@@ -717,7 +717,7 @@ class TestSkillsHubPreviewEndpoint:
         bundle = _FakeBundle("github/owner/repo/x")
         meta = _FakeMeta("github/owner/repo/x")
         monkeypatch.setattr(
-            "hermes_cli.skills_hub._resolve_source_meta_and_bundle",
+            "eir_cli.skills_hub._resolve_source_meta_and_bundle",
             lambda ident, sources: (meta, bundle, None),
         )
         r = self.client.get(
@@ -736,7 +736,7 @@ class TestSkillsHubPreviewEndpoint:
             "tools.skills_hub_search.create_source_router", list
         )
         monkeypatch.setattr(
-            "hermes_cli.skills_hub._resolve_source_meta_and_bundle",
+            "eir_cli.skills_hub._resolve_source_meta_and_bundle",
             lambda ident, sources: (None, None, None),
         )
         r = self.client.get("/api/skills/hub/preview?identifier=nope/x")
@@ -745,7 +745,7 @@ class TestSkillsHubPreviewEndpoint:
 
 class TestSkillsHubScanEndpoint:
     @pytest.fixture(autouse=True)
-    def _setup(self, _isolate_hermes_home):
+    def _setup(self, _isolate_eir_home):
         self.client, _ = _client()
 
 
@@ -757,7 +757,7 @@ class TestSkillsHubScanEndpoint:
         )
         bundle = _FakeBundle("github/owner/repo/x", trust_level="community")
         monkeypatch.setattr(
-            "hermes_cli.skills_hub._resolve_source_meta_and_bundle",
+            "eir_cli.skills_hub._resolve_source_meta_and_bundle",
             lambda ident, sources: (None, bundle, None),
         )
 
@@ -807,26 +807,26 @@ class TestSkillsHubScanEndpoint:
 
 
 class TestUpdateCheckEndpoint:
-    """``GET /api/hermes/update/check`` reports availability without applying.
+    """``GET /api/eir/update/check`` reports availability without applying.
 
     Powers the dashboard's check-before-you-update flow: the System page
     shows the commit-behind count and asks the user to confirm before
-    ``POST /api/hermes/update`` runs ``hermes update``.
+    ``POST /api/eir/update`` runs ``eir update``.
     """
 
     @pytest.fixture(autouse=True)
-    def _setup(self, _isolate_hermes_home):
+    def _setup(self, _isolate_eir_home):
         self.client, _ = _client()
 
     def test_git_install_reports_behind_count(self, monkeypatch):
 
         monkeypatch.setattr(_cfg_mod, "detect_install_method", lambda *a, **k: "git")
         # Stub the shared checker so the contract is deterministic (no network).
-        from hermes_cli import banner
+        from eir_cli import banner
 
-        monkeypatch.setattr("hermes_cli.source_check.check_for_updates", lambda **kw: {"behind": 5, "commits": []})
+        monkeypatch.setattr("eir_cli.source_check.check_for_updates", lambda **kw: {"behind": 5, "commits": []})
 
-        r = self.client.get("/api/hermes/update/check")
+        r = self.client.get("/api/eir/update/check")
         assert r.status_code == 200
         body = r.json()
         assert {
@@ -849,12 +849,12 @@ class TestUpdateCheckEndpoint:
     @pytest.mark.parametrize("held", [True, False], ids=["held", "rollback"])
     def test_release_message_names_only_a_known_version(self, monkeypatch, version, held):
         monkeypatch.setattr(_cfg_mod, "detect_install_method", lambda *a, **k: "git")
-        monkeypatch.setattr("hermes_cli.source_check.check_for_updates", lambda **kw: {
+        monkeypatch.setattr("eir_cli.source_check.check_for_updates", lambda **kw: {
             "behind": 0 if held else -1, "held": "downgrade" if held else None,
             "rollback": not held, "sourceVersion": version, "channel": "preview", "commits": [],
         })
 
-        response = self.client.get("/api/hermes/update/check")
+        response = self.client.get("/api/eir/update/check")
         assert response.status_code == 200
         body = response.json()
         release = "preview release" + (f" v{version}" if version else "")
@@ -878,7 +878,7 @@ class TestUpdateCheckEndpoint:
             ),
         )
 
-        body = self.client.get("/api/hermes/update/check").json()
+        body = self.client.get("/api/eir/update/check").json()
         assert body["install_method"] == "managed-runtime"
         assert body["can_apply"] is False
         assert body["update_available"] is False
@@ -888,7 +888,7 @@ class TestUpdateCheckEndpoint:
         # as a copyable shell line, so prose here is a fake command.
         assert body["update_command"] == ""
 
-        refused = self.client.post("/api/hermes/update").json()
+        refused = self.client.post("/api/eir/update").json()
         assert refused["ok"] is False
         assert refused["error"] == "dashboard_update_managed_externally"
         assert refused["update_command"] == ""
@@ -899,11 +899,11 @@ class TestDebugShareEndpoint:
     dashboard can render them as copyable links (not a backgrounded log tail)."""
 
     @pytest.fixture(autouse=True)
-    def _setup(self, _isolate_hermes_home):
+    def _setup(self, _isolate_eir_home):
         self.client, self.header = _client()
-        from hermes_constants import get_hermes_home
+        from eir_constants import get_eir_home
 
-        logs = get_hermes_home() / "logs"
+        logs = get_eir_home() / "logs"
         logs.mkdir(parents=True, exist_ok=True)
         (logs / "agent.log").write_text("agent line\n")
         (logs / "errors.log").write_text("err line\n")
@@ -913,7 +913,7 @@ class TestDebugShareEndpoint:
     def test_redact_false_cannot_publish_log_text(self, monkeypatch):
         """The public paste is an allowlisted summary (#46006): redact=false has no log text to
         leave raw, so the endpoint reports redacted and the upload carries no log line."""
-        import hermes_cli.debug as dbg
+        import eir_cli.debug as dbg
 
         uploaded = []
         monkeypatch.setattr(
@@ -930,14 +930,14 @@ class TestDebugShareEndpoint:
         assert "agent line" not in uploaded[0] and "err line" not in uploaded[0]
 
     def test_default_body_redacts(self, monkeypatch):
-        import hermes_cli.debug as dbg
+        import eir_cli.debug as dbg
 
         monkeypatch.setattr(
             dbg, "upload_to_pastebin", lambda c, expiry_days=7: "https://paste.rs/x"
         )
         monkeypatch.setattr(dbg, "_schedule_auto_delete", lambda *a, **k: None)
         monkeypatch.setattr(dbg, "_best_effort_sweep_expired_pastes", lambda: None)
-        monkeypatch.setattr("hermes_cli.dump.run_dump", lambda a: None)
+        monkeypatch.setattr("eir_cli.dump.run_dump", lambda a: None)
 
         r = self.client.post("/api/ops/debug-share", json={"consent": True})
         assert r.status_code == 200
@@ -946,14 +946,14 @@ class TestDebugShareEndpoint:
     @pytest.mark.parametrize("body", [None, {}, {"redact": True}, {"consent": False}])
     def test_missing_consent_is_refused_without_uploading(self, monkeypatch, body):
         """An empty/unconfirmed POST must never publish logs (#94876)."""
-        import hermes_cli.debug as dbg
+        import eir_cli.debug as dbg
 
         uploads = []
         monkeypatch.setattr(dbg, "upload_to_pastebin",
                             lambda c, expiry_days=7: uploads.append(c) or "https://paste.rs/x")
         monkeypatch.setattr(dbg, "_schedule_auto_delete", lambda *a, **k: None)
         monkeypatch.setattr(dbg, "_best_effort_sweep_expired_pastes", lambda: None)
-        monkeypatch.setattr("hermes_cli.dump.run_dump", lambda a: None)
+        monkeypatch.setattr("eir_cli.dump.run_dump", lambda a: None)
 
         r = (self.client.post("/api/ops/debug-share") if body is None
              else self.client.post("/api/ops/debug-share", json=body))
@@ -961,7 +961,7 @@ class TestDebugShareEndpoint:
         assert uploads == []
 
     def test_upload_failure_returns_502(self, monkeypatch):
-        import hermes_cli.debug as dbg
+        import eir_cli.debug as dbg
 
         monkeypatch.setattr(
             dbg,
@@ -970,7 +970,7 @@ class TestDebugShareEndpoint:
         )
         monkeypatch.setattr(dbg, "_schedule_auto_delete", lambda *a, **k: None)
         monkeypatch.setattr(dbg, "_best_effort_sweep_expired_pastes", lambda: None)
-        monkeypatch.setattr("hermes_cli.dump.run_dump", lambda a: None)
+        monkeypatch.setattr("eir_cli.dump.run_dump", lambda a: None)
 
         r = self.client.post("/api/ops/debug-share", json={"consent": True, "redact": True})
         assert r.status_code == 502
@@ -978,15 +978,15 @@ class TestDebugShareEndpoint:
 
 class TestToolsConfigEndpoints:
     """Provider selection, API-key save, and post-setup spawn for toolsets —
-    the dashboard surface that replicates the `hermes tools` configurator."""
+    the dashboard surface that replicates the `eir tools` configurator."""
 
     @pytest.fixture(autouse=True)
-    def _setup(self, _isolate_hermes_home):
+    def _setup(self, _isolate_eir_home):
         self.client, self.header = _client()
 
 
     def test_save_env_writes_key_and_validates_allowlist(self):
-        from hermes_cli.config import get_env_value
+        from eir_cli.config import get_env_value
 
         cfg = self.client.get("/api/tools/toolsets/web/config").json()
         # Find a real env-var key from the visible provider matrix.
@@ -1020,21 +1020,21 @@ class TestToolsConfigEndpoints:
 
 
 # ---------------------------------------------------------------------------
-# _spawn_hermes_action env scrubbing (#52470)
+# _spawn_eir_action env scrubbing (#52470)
 # ---------------------------------------------------------------------------
 
-def test_spawn_hermes_action_scrubs_gateway_loop_guard_env(monkeypatch, tmp_path):
+def test_spawn_eir_action_scrubs_gateway_loop_guard_env(monkeypatch, tmp_path):
     """The dashboard runs inside the gateway, so os.environ has
-    _HERMES_GATEWAY=1. Spawned actions (e.g. `gateway restart`) must NOT inherit
+    _EIR_GATEWAY=1. Spawned actions (e.g. `gateway restart`) must NOT inherit
     it, or the in-process restart-loop guard rejects the restart and it silently
     fails (#52470).
     """
-    import hermes_cli.web_server as ws
+    import eir_cli.web_server as ws
 
-    monkeypatch.setenv("_HERMES_GATEWAY", "1")
+    monkeypatch.setenv("_EIR_GATEWAY", "1")
     monkeypatch.setenv("OPENAI_API_KEY", "default-action-provider-key")
     monkeypatch.setattr(_web_server_gateway, "_ACTION_LOG_DIR", tmp_path)
-    # Isolate the module-global proc registry: _spawn_hermes_action stores
+    # Isolate the module-global proc registry: _spawn_eir_action stores
     # _FakeProc (no poll()) in _ACTION_PROCS, and later tests' lifespan
     # shutdown (_terminate_desktop_managed_gateway) would trip over it.
     monkeypatch.setattr(_web_server_gateway, "_ACTION_PROCS", {})
@@ -1050,27 +1050,27 @@ def test_spawn_hermes_action_scrubs_gateway_loop_guard_env(monkeypatch, tmp_path
 
     monkeypatch.setattr(ws.subprocess, "Popen", _fake_popen)
 
-    _web_server_gateway._spawn_hermes_action(["gateway", "restart"], "gateway-restart")
+    _web_server_gateway._spawn_eir_action(["gateway", "restart"], "gateway-restart")
 
-    assert "_HERMES_GATEWAY" not in captured["env"]
-    assert captured["env"]["HERMES_NONINTERACTIVE"] == "1"
+    assert "_EIR_GATEWAY" not in captured["env"]
+    assert captured["env"]["EIR_NONINTERACTIVE"] == "1"
     # Default-profile actions preserve the historical process environment.
     assert captured["env"]["OPENAI_API_KEY"] == "default-action-provider-key"
 
 
 # ---------------------------------------------------------------------------
-# _spawn_hermes_action breakaway fallback (#139592)
+# _spawn_eir_action breakaway fallback (#139592)
 # ---------------------------------------------------------------------------
 
 @pytest.mark.platforms("windows")
-def test_spawn_hermes_action_retries_without_breakaway_when_job_denies(monkeypatch, tmp_path):
+def test_spawn_eir_action_retries_without_breakaway_when_job_denies(monkeypatch, tmp_path):
     """A parent job object that forbids breakaway (an Electron/Tauri-launched dashboard, some
     Windows Terminal configs) refuses CREATE_BREAKAWAY_FROM_JOB with access-denied. The action
     must still spawn — retried without the flag — and the refusal must land in the action log,
     which otherwise shows a bare started-header and no reason (#139592).
     """
-    import hermes_cli.web_server as ws
-    from hermes_cli import _subprocess_compat
+    import eir_cli.web_server as ws
+    from eir_cli import _subprocess_compat
 
     monkeypatch.setattr(_web_server_gateway, "_ACTION_LOG_DIR", tmp_path)
     monkeypatch.setattr(_web_server_gateway, "_ACTION_PROCS", {})
@@ -1090,7 +1090,7 @@ def test_spawn_hermes_action_retries_without_breakaway_when_job_denies(monkeypat
 
     monkeypatch.setattr(ws.subprocess, "Popen", _fake_popen)
 
-    proc = _web_server_gateway._spawn_hermes_action(["gateway", "restart"], "gateway-restart")
+    proc = _web_server_gateway._spawn_eir_action(["gateway", "restart"], "gateway-restart")
 
     assert proc.pid == 4321
     assert flags_seen == [
@@ -1101,10 +1101,10 @@ def test_spawn_hermes_action_retries_without_breakaway_when_job_denies(monkeypat
     assert "retrying without CREATE_BREAKAWAY_FROM_JOB" in log
 
 
-def test_spawn_hermes_action_records_a_failed_spawn_and_reraises(monkeypatch, tmp_path):
+def test_spawn_eir_action_records_a_failed_spawn_and_reraises(monkeypatch, tmp_path):
     """A spawn that never happened leaves the reason in the action log (previously a bare
     started-header) and still raises to the endpoint (#139592)."""
-    import hermes_cli.web_server as ws
+    import eir_cli.web_server as ws
 
     monkeypatch.setattr(_web_server_gateway, "_ACTION_LOG_DIR", tmp_path)
     monkeypatch.setattr(_web_server_gateway, "_ACTION_PROCS", {})
@@ -1115,7 +1115,7 @@ def test_spawn_hermes_action_records_a_failed_spawn_and_reraises(monkeypatch, tm
     monkeypatch.setattr(ws.subprocess, "Popen", _fake_popen)
 
     with pytest.raises(FileNotFoundError):
-        _web_server_gateway._spawn_hermes_action(["gateway", "restart"], "gateway-restart")
+        _web_server_gateway._spawn_eir_action(["gateway", "restart"], "gateway-restart")
 
     log = (tmp_path / _web_server_gateway._ACTION_LOG_FILES["gateway-restart"]).read_text()
     assert "spawn failed" in log
@@ -1129,11 +1129,11 @@ def test_named_profile_action_isolates_parent_env_and_loads_target_env(monkeypat
     import sys
     from pathlib import Path
 
-    from hermes_cli import env_loader
-    import hermes_cli.web_server as ws
+    from eir_cli import env_loader
+    import eir_cli.web_server as ws
 
     user_home = tmp_path / "user"
-    default_home = user_home / ".hermes"
+    default_home = user_home / ".eir"
     target_home = default_home / "profiles" / "verifier"
     target_home.mkdir(parents=True)
 
@@ -1159,7 +1159,7 @@ def test_named_profile_action_isolates_parent_env_and_loads_target_env(monkeypat
     )
 
     monkeypatch.setattr(Path, "home", lambda: user_home)
-    monkeypatch.setenv("HERMES_HOME", str(default_home))
+    monkeypatch.setenv("EIR_HOME", str(default_home))
     for key, value in {
         "DISCORD_BOT_TOKEN": "default-discord",
         "API_SERVER_ENABLED": "true",
@@ -1172,7 +1172,7 @@ def test_named_profile_action_isolates_parent_env_and_loads_target_env(monkeypat
         "ZAI_API_KEY": "default-zai",
         "A2A_AUTH_MINI": "default-a2a-auth",
         "EXTERNAL_PROFILE_AUTH": "default-secret-source-auth",
-        "HERMES_ACP_AUTH_METHOD": "default-acp",
+        "EIR_ACP_AUTH_METHOD": "default-acp",
         "PROFILE_ENV_TEST_BENIGN": "keep-me",
     }.items():
         monkeypatch.setenv(key, value)
@@ -1199,17 +1199,17 @@ def test_named_profile_action_isolates_parent_env_and_loads_target_env(monkeypat
         return _FakeProc()
 
     monkeypatch.setattr(ws.subprocess, "Popen", _fake_popen)
-    _web_server_gateway._spawn_hermes_action(["-p", "verifier", "gateway", "restart"], "gateway-restart")
+    _web_server_gateway._spawn_eir_action(["-p", "verifier", "gateway", "restart"], "gateway-restart")
 
     child_env = captured["env"]
     assert captured["cmd"][-4:] == ["-p", "verifier", "gateway", "restart"]
-    assert child_env["HERMES_HOME"] == str(target_home)
-    assert child_env["HERMES_NONINTERACTIVE"] == "1"
+    assert child_env["EIR_HOME"] == str(target_home)
+    assert child_env["EIR_NONINTERACTIVE"] == "1"
     assert child_env["PROFILE_ENV_TEST_BENIGN"] == "keep-me"
     for leaked_key in (
         "DISCORD_BOT_TOKEN", "API_SERVER_ENABLED", "API_SERVER_KEY", "BLUEBUBBLES_SERVER_URL",
         "BLUEBUBBLES_PASSWORD", "NTFY_TOPIC", "NTFY_TOKEN", "OPENAI_API_KEY", "ZAI_API_KEY",
-        "A2A_AUTH_MINI", "EXTERNAL_PROFILE_AUTH", "HERMES_ACP_AUTH_METHOD",
+        "A2A_AUTH_MINI", "EXTERNAL_PROFILE_AUTH", "EIR_ACP_AUTH_METHOD",
     ):
         assert leaked_key not in child_env, leaked_key
 
@@ -1221,8 +1221,8 @@ def test_named_profile_action_isolates_parent_env_and_loads_target_env(monkeypat
         [
             sys.executable, "-c",
             "import json, os; "
-            "from hermes_cli.env_loader import load_hermes_dotenv; "
-            "load_hermes_dotenv(hermes_home=os.environ['HERMES_HOME']); "
+            "from eir_cli.env_loader import load_eir_dotenv; "
+            "load_eir_dotenv(eir_home=os.environ['EIR_HOME']); "
             "keys=['A2A_PORT','OPENAI_API_KEY','TARGET_ONLY_TOKEN','DISCORD_BOT_TOKEN',"
             "'API_SERVER_ENABLED','API_SERVER_KEY','BLUEBUBBLES_SERVER_URL','BLUEBUBBLES_PASSWORD',"
             "'NTFY_TOPIC','NTFY_TOKEN','ZAI_API_KEY','A2A_AUTH_MINI','EXTERNAL_PROFILE_AUTH']; "
@@ -1255,7 +1255,7 @@ def test_named_profile_action_isolates_parent_env_and_loads_target_env(monkeypat
 
 def test_desktop_lifespan_terminates_managed_gateway_restart(monkeypatch):
     """A Desktop-owned gateway child must not survive its serve backend."""
-    import hermes_cli.web_server as ws
+    import eir_cli.web_server as ws
 
     calls = []
 
@@ -1266,8 +1266,8 @@ def test_desktop_lifespan_terminates_managed_gateway_restart(monkeypatch):
         def terminate(self):
             calls.append("terminate")
 
-    monkeypatch.setenv("HERMES_DESKTOP", "1")
-    monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", "desktop-spawn-token")
+    monkeypatch.setenv("EIR_DESKTOP", "1")
+    monkeypatch.setenv("EIR_DASHBOARD_SESSION_TOKEN", "desktop-spawn-token")
     monkeypatch.setattr(ws, "_warm_gateway_module", lambda: None)
     monkeypatch.setattr(ws, "_start_desktop_cron_ticker", lambda *_args: None)
     monkeypatch.setitem(_web_server_gateway._ACTION_PROCS, "gateway-restart", _FakeRunningProc())
@@ -1285,8 +1285,8 @@ def test_desktop_lifespan_reaps_orphans_with_a_startup_grace(monkeypatch):
     Asserting only "the reaper ran" would not catch a revert to the bare
     ``_reap_unsupervised_gateway_orphans()`` call, which is exactly the regression.
     """
-    import hermes_cli.web_server as ws
-    from hermes_cli.dashboard_procs import _REAP_MIN_AGE_SECONDS
+    import eir_cli.web_server as ws
+    from eir_cli.dashboard_procs import _REAP_MIN_AGE_SECONDS
 
     seen = {}
 
@@ -1294,11 +1294,11 @@ def test_desktop_lifespan_reaps_orphans_with_a_startup_grace(monkeypatch):
         seen["min_age_s"] = min_age_s
         return False
 
-    monkeypatch.setenv("HERMES_DESKTOP", "1")
-    monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", "desktop-spawn-token")
+    monkeypatch.setenv("EIR_DESKTOP", "1")
+    monkeypatch.setenv("EIR_DASHBOARD_SESSION_TOKEN", "desktop-spawn-token")
     monkeypatch.setattr(ws, "_warm_gateway_module", lambda: None)
     monkeypatch.setattr(ws, "_start_desktop_cron_ticker", lambda *_args: None)
-    monkeypatch.setattr("hermes_cli.gateway._reap_unsupervised_gateway_orphans", _fake_reap)
+    monkeypatch.setattr("eir_cli.gateway._reap_unsupervised_gateway_orphans", _fake_reap)
 
     client, _header = _client()
     with client:
@@ -1309,7 +1309,7 @@ def test_desktop_lifespan_reaps_orphans_with_a_startup_grace(monkeypatch):
 
 class TestSkillHubUpdatesEndpoint:
     @pytest.fixture(autouse=True)
-    def _setup(self, _isolate_hermes_home):
+    def _setup(self, _isolate_eir_home):
         self.client, _ = _client()
 
     def test_lists_only_skills_with_an_upstream_update(self, monkeypatch):

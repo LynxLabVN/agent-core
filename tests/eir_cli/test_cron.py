@@ -1,4 +1,4 @@
-"""Tests for hermes_cli.cron command handling."""
+"""Tests for eir_cli.cron command handling."""
 
 import argparse
 import time
@@ -9,9 +9,9 @@ from types import SimpleNamespace
 import pytest
 
 from cron.jobs import create_job, get_job, list_jobs, load_jobs, pause_job, save_jobs
-from hermes_cli import cron as cron_cli
-from hermes_cli.cron import cron_command
-from hermes_cli.subcommands.cron import build_cron_parser
+from eir_cli import cron as cron_cli
+from eir_cli.cron import cron_command
+from eir_cli.subcommands.cron import build_cron_parser
 
 
 @pytest.fixture()
@@ -26,7 +26,7 @@ class TestCronCommandLifecycle:
 
     def test_edit_persists_user_owned_inference_pins(self, tmp_cron_dir, capsys):
         job = create_job(prompt="Daily report", schedule="every 1h")
-        parser = argparse.ArgumentParser(prog="hermes")
+        parser = argparse.ArgumentParser(prog="eir")
         subparsers = parser.add_subparsers(dest="command")
         build_cron_parser(subparsers, cmd_cron=cron_command)
 
@@ -134,7 +134,7 @@ class TestCronCommandLifecycle:
 class TestUnverifiedDeliveryVisibility:
     """An evidence-free live-adapter ack (Slack/Matrix/Mattermost bare
     ``SendResult(success=True)``) is accepted as delivered, but the UNVERIFIED
-    state must be visible in ``hermes cron list`` and ``hermes cron doctor``,
+    state must be visible in ``eir cron list`` and ``eir cron doctor``,
     not only in a WARNING log line."""
 
     def _seed(self):
@@ -186,7 +186,7 @@ class TestCronDoctor:
         assert job["id"] in out
         assert "last run failed: Provider returned error" in out
         assert "was not delivered (telegram timeout)" in out
-        assert "hermes cron edit" in out
+        assert "eir cron edit" in out
         assert "script not found" in out
 
     def test_doctor_reports_healthy_jobs(self, tmp_cron_dir, capsys):
@@ -220,7 +220,7 @@ class TestCronDoctor:
         out = capsys.readouterr().out
         assert rc == 1
         assert "was not delivered (telegram timeout)" in out
-        assert "hermes cron edit" in out
+        assert "eir cron edit" in out
         assert "last run failed" not in out
         assert "unknown error" not in out
 
@@ -261,7 +261,7 @@ class TestCronListStatusRendering:
     """`cron list` must never paint an undelivered run as a success (#83993)."""
 
     def test_default_list_includes_paused_jobs(self, tmp_cron_dir, capsys, monkeypatch):
-        monkeypatch.setattr("hermes_cli.gateway.find_gateway_pids", lambda: [1])
+        monkeypatch.setattr("eir_cli.gateway.find_gateway_pids", lambda: [1])
         job = create_job(prompt="Paused digest", schedule="every 1h")
         pause_job(job["id"])
 
@@ -273,9 +273,9 @@ class TestCronListStatusRendering:
         assert "No scheduled jobs" not in out
 
     def test_delivery_failed_is_not_green_ok(self, tmp_cron_dir, capsys, monkeypatch):
-        monkeypatch.setattr("hermes_cli.gateway.find_gateway_pids", lambda: [1])
+        monkeypatch.setattr("eir_cli.gateway.find_gateway_pids", lambda: [1])
         # capsys is not a tty, so force colors on to check the paint itself.
-        monkeypatch.setattr("hermes_cli.colors.should_use_color", lambda: True)
+        monkeypatch.setattr("eir_cli.colors.should_use_color", lambda: True)
         create_job(prompt="Daily digest", schedule="every 1h")
         jobs = load_jobs()
         jobs[0]["last_run_at"] = "2026-09-01T09:00:00+00:00"
@@ -295,8 +295,8 @@ class TestCronListStatusRendering:
         assert cron_cli.Colors.GREEN not in last_run_line
 
     def test_ok_run_still_green(self, tmp_cron_dir, capsys, monkeypatch):
-        monkeypatch.setattr("hermes_cli.gateway.find_gateway_pids", lambda: [1])
-        monkeypatch.setattr("hermes_cli.colors.should_use_color", lambda: True)
+        monkeypatch.setattr("eir_cli.gateway.find_gateway_pids", lambda: [1])
+        monkeypatch.setattr("eir_cli.colors.should_use_color", lambda: True)
         create_job(prompt="Daily digest", schedule="every 1h")
         jobs = load_jobs()
         jobs[0]["last_run_at"] = "2026-09-01T09:00:00+00:00"
@@ -321,7 +321,7 @@ class TestGatewayNotRunningWarning:
 
     def test_list_warns_when_gateway_absent(self, tmp_cron_dir, capsys, monkeypatch):
         create_job(prompt="Daily report", schedule="0 11 * * *")
-        monkeypatch.setattr("hermes_cli.gateway.find_gateway_pids", list)
+        monkeypatch.setattr("eir_cli.gateway.find_gateway_pids", list)
         cron_command(Namespace(cron_command="list", all=True))
         out = capsys.readouterr().out
         assert "Scheduler is not ready" in out
@@ -341,11 +341,11 @@ class TestExternalCronProviderStatus:
     ):
         create_job(prompt="Ping", schedule="every 2m")
         monkeypatch.setattr(
-            "hermes_cli.cron._active_cron_provider_name", lambda: "chronos"
+            "eir_cli.cron._active_cron_provider_name", lambda: "chronos"
         )
         # Even with NO gateway process and NO ticker heartbeat, Chronos status
         # must NOT report a stall / "not firing".
-        monkeypatch.setattr("hermes_cli.gateway.find_gateway_pids", list)
+        monkeypatch.setattr("eir_cli.gateway.find_gateway_pids", list)
         cron_command(Namespace(cron_command="status"))
         out = capsys.readouterr().out
         assert "chronos" in out
@@ -363,9 +363,9 @@ class TestExternalCronProviderStatus:
         # The create-time "gateway not running" nag is a ticker-only concern;
         # an external provider doesn't depend on a live in-process ticker.
         monkeypatch.setattr(
-            "hermes_cli.cron._active_cron_provider_name", lambda: "chronos"
+            "eir_cli.cron._active_cron_provider_name", lambda: "chronos"
         )
-        monkeypatch.setattr("hermes_cli.gateway.find_gateway_pids", list)
+        monkeypatch.setattr("eir_cli.gateway.find_gateway_pids", list)
         cron_command(
             Namespace(
                 cron_command="create",
@@ -424,7 +424,7 @@ def test_cron_create_failure_returns_nonzero(monkeypatch, capsys):
 
 
 class TestCronRunBackgroundDispatch:
-    """`hermes cron run` must not report 'failed' when the run was dispatched
+    """`eir cron run` must not report 'failed' when the run was dispatched
     to the background delegation worker.
 
     The CLI process inherits the gateway/desktop session env, so a manual run
@@ -569,7 +569,7 @@ class TestSlashCronListLastStatus:
     literal next to a run that looks otherwise fine."""
 
     def _run_list(self, tmp_cron_dir, capsys):
-        from hermes_cli.cli_commands_mixin import CLICommandsMixin
+        from eir_cli.cli_commands_mixin import CLICommandsMixin
 
         class _Host(CLICommandsMixin):
             pass
@@ -601,10 +601,10 @@ class TestStatusSurfacesDeadScheduler:
         # so an unrelated host record can never make this profile look served. (Superseded by the
         # tests/conftest.py hook in #118097 once that lands.)
         lock_dir.mkdir(exist_ok=True)
-        monkeypatch.setenv("HERMES_GATEWAY_LOCK_DIR", str(lock_dir))
-        monkeypatch.setattr("hermes_cli.gateway.find_gateway_pids", list)
+        monkeypatch.setenv("EIR_GATEWAY_LOCK_DIR", str(lock_dir))
+        monkeypatch.setattr("eir_cli.gateway.find_gateway_pids", list)
         monkeypatch.setattr(
-            "hermes_cli.gateway.named_profile_served_by_running_multiplexer", lambda: None
+            "eir_cli.gateway.named_profile_served_by_running_multiplexer", lambda: None
         )
         monkeypatch.setattr("gateway.status.is_gateway_runtime_lock_active", lambda: False)
 
@@ -654,7 +654,7 @@ class TestStatusSurfacesDeadScheduler:
         # The in-chat `/cron` overview and `/cron list` (classic CLI + Ink TUI forward to the
         # same handler) read the same rows; a 7h-past stamp must not read as an upcoming run,
         # while a paused job keeps its plain label — pausing is why it did not fire.
-        from hermes_cli.cli_commands_mixin import CLICommandsMixin
+        from eir_cli.cli_commands_mixin import CLICommandsMixin
 
         class _Host(CLICommandsMixin):
             pass
@@ -685,7 +685,7 @@ class TestSlashCronRunSkipped:
     run is the same shape) must print the refusal, never ``Triggered … next scheduler tick``."""
 
     def test_refused_run_prints_reason_not_triggered(self, tmp_cron_dir, capsys):
-        from hermes_cli.cli_commands_mixin import CLICommandsMixin
+        from eir_cli.cli_commands_mixin import CLICommandsMixin
 
         class _Host(CLICommandsMixin):
             pass

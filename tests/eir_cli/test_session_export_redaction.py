@@ -52,14 +52,14 @@ class TestRedactSessionData:
     def test_title_token_is_redacted(self):
         """The title quotes the first user message — a credential there must
         not ride into the export header in plaintext (#90361)."""
-        from hermes_cli.session_export_md import redact_session_data
+        from eir_cli.session_export_md import redact_session_data
 
         token = _fake_botfather_token()
         out = redact_session_data(_session_fixture())
         assert token not in out["title"]
 
     def test_message_content_and_tool_args_still_redacted(self):
-        from hermes_cli.session_export_md import redact_session_data
+        from eir_cli.session_export_md import redact_session_data
 
         token = _fake_botfather_token()
         out = redact_session_data(_session_fixture())
@@ -68,7 +68,7 @@ class TestRedactSessionData:
         assert token not in out["messages"][2]["content"]
 
     def test_non_string_scalars_preserved(self):
-        from hermes_cli.session_export_md import redact_session_data
+        from eir_cli.session_export_md import redact_session_data
 
         out = redact_session_data(_session_fixture())
         assert out["id"] == "s1"
@@ -76,7 +76,7 @@ class TestRedactSessionData:
         assert out["started_at"] == 1710000000
 
     def test_api_key_in_top_level_field_redacted(self):
-        from hermes_cli.session_export_md import redact_session_data
+        from eir_cli.session_export_md import redact_session_data
 
         session = _session_fixture()
         session["summary"] = f"rotated to {_fake_api_key()} today"
@@ -86,7 +86,7 @@ class TestRedactSessionData:
     def test_credential_shaped_dict_key_redacted(self):
         """Dict KEYS are strings too — a misbehaving emitter writing the
         credential as a key must not pass through verbatim (review #90361)."""
-        from hermes_cli.session_export_md import redact_session_data
+        from eir_cli.session_export_md import redact_session_data
 
         session = _session_fixture()
         key = _fake_api_key()
@@ -96,7 +96,7 @@ class TestRedactSessionData:
         assert "payload" in str(out["tool_result"])
 
     def test_original_session_not_mutated(self):
-        from hermes_cli.session_export_md import redact_session_data
+        from eir_cli.session_export_md import redact_session_data
 
         session = _session_fixture()
         token = _fake_botfather_token()
@@ -108,7 +108,7 @@ class TestRenderedExportIsClean:
     def test_markdown_render_contains_no_token(self):
         """End-to-end: --redact output file must not contain the token
         anywhere — header included."""
-        from hermes_cli.session_export_md import (
+        from eir_cli.session_export_md import (
             redact_session_data,
             render_session_markdown,
         )
@@ -120,7 +120,7 @@ class TestRenderedExportIsClean:
 
 def test_keys_that_redact_to_the_same_mask_keep_every_entry():
     """Two credential-shaped keys masking to the same text must not collapse into one entry."""
-    from hermes_cli.session_export_md import redact_session_data
+    from eir_cli.session_export_md import redact_session_data
 
     first, second = "sk-" + "A" * 12, "sk-" + "B" * 12
     out = redact_session_data({"tool_result": {first: "one", second: "two"}})["tool_result"]

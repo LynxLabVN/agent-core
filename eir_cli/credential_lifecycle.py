@@ -1,4 +1,4 @@
-"""Unified provider-credential lifecycle across every store Hermes reads.
+"""Unified provider-credential lifecycle across every store Eir reads.
 
 Deleting a key from ``.env`` alone leaves the stale ``credential_pool`` entry (and the
 ``provider_models_cache.json`` row) behind, so the provider keeps appearing in the model picker
@@ -21,7 +21,7 @@ __all__ = [
 def _providers_for_env_var(env_var: str) -> list[str]:
     """Provider ids whose registered api_key_env_vars include ``env_var``."""
     try:
-        from hermes_cli.auth_plugin_providers import canonical_registry_rows
+        from eir_cli.auth_plugin_providers import canonical_registry_rows
         rows = canonical_registry_rows()
     except Exception:
         return []
@@ -54,7 +54,7 @@ def _prune_env_pool_entries(env_var: str) -> list[str]:
     Spans ALL providers (shared vars like GITHUB_TOKEN seed several). Entries with any other
     source (OAuth, device-code, manual, borrowed-CLI) are preserved verbatim.
     """
-    from hermes_cli.auth import _auth_store_lock, _load_auth_store, _save_auth_store
+    from eir_cli.auth import _auth_store_lock, _load_auth_store, _save_auth_store
 
     source = f"env:{env_var}"
     pruned: list[str] = []
@@ -87,10 +87,10 @@ def _scrub_config_yaml_mirrors(old_value: str, new_value: str | None) -> list[st
     ``.env`` is touched. ``new_value=None`` removes the field. Operates on the RAW user config
     so defaults are never baked into the user's file.
     """
-    from hermes_cli.config_backend import config_exists
+    from eir_cli.config_backend import config_exists
     if not old_value:
         return []
-    from hermes_cli.config import atomic_config_replace, get_config_path, read_user_config_raw
+    from eir_cli.config import atomic_config_replace, get_config_path, read_user_config_raw
 
     config_path = get_config_path()
     if not config_exists(config_path):
@@ -153,13 +153,13 @@ def purge_env_credential_references(
     """
     pruned = _prune_env_pool_entries(env_var)
     providers = sorted(set(pruned) | set(_providers_for_env_var(env_var)))
-    # Make the removal sticky the same way `hermes auth remove` does: a lingering shell export (or
+    # Make the removal sticky the same way `eir auth remove` does: a lingering shell export (or
     # another live process's os.environ) would otherwise re-seed the pool entry on the next
     # load_pool(). The save path lifts the suppression on an explicit re-add.
-    _for_each_provider(providers, "hermes_cli.auth.suppress_credential_source", f"env:{env_var}")
+    _for_each_provider(providers, "eir_cli.auth.suppress_credential_source", f"env:{env_var}")
     if clear_models_cache and providers:
         # Best-effort — a cache failure must not block the credential removal itself.
-        _for_each_provider(providers, "hermes_cli.models.clear_provider_models_cache")
+        _for_each_provider(providers, "eir_cli.models.clear_provider_models_cache")
     return {"pool_pruned": pruned, "providers": providers}
 
 
@@ -171,15 +171,15 @@ def save_provider_env_credential(env_var: str, value: str) -> dict[str, Any]:
     lands in ``auth.json`` (a ``.env``-only write left env-backed providers 401'ing).
 
     Suppressed ``env:<VAR>`` pool sources are re-enabled so a deliberate re-add through the UI behaves like
-    ``hermes auth add``. See #62269.
+    ``eir auth add``. See #62269.
     The save also forces an immediate ``load_pool()`` for every provider registered against this env var so
     the env-seeded ``credential_pool`` entry is materialized to ``auth.json`` right now — the live runtime
     reads from the pool, and before #96058 the Desktop "Save" action only touched ``.env`` while
     ``auth.json``'s mtime stayed unchanged, so an OpenCode Go (or any other env-backed provider) request
-    kept 401'ing until the user ran ``hermes auth add <provider> --type api-key`` separately. This makes the
-    Desktop save's effect on disk match what ``hermes auth add`` does.
+    kept 401'ing until the user ran ``eir auth add <provider> --type api-key`` separately. This makes the
+    Desktop save's effect on disk match what ``eir auth add`` does.
     """
-    from hermes_cli.config import load_env, require_env_writable, save_env_value
+    from eir_cli.config import load_env, require_env_writable, save_env_value
 
     # A locked key must fail here: save_env_value's refusal returns like a success, and the mirror
     # scrub below would still move the new value into config.yaml.
@@ -193,7 +193,7 @@ def save_provider_env_credential(env_var: str, value: str) -> dict[str, Any]:
 
     # A prior removal may have suppressed this env source; a fresh save is an explicit re-add.
     providers = _providers_for_env_var(env_var)
-    _for_each_provider(providers, "hermes_cli.auth.unsuppress_credential_source", f"env:{env_var}")
+    _for_each_provider(providers, "eir_cli.auth.unsuppress_credential_source", f"env:{env_var}")
 
     # ``load_pool`` is idempotent and additive-only for env sources, so re-running is safe even when
     # the pool already had this entry. Best-effort: never masks the successful .env write above.
@@ -205,7 +205,7 @@ def save_provider_env_credential(env_var: str, value: str) -> dict[str, Any]:
 def remove_provider_env_credential(env_var: str) -> dict[str, Any]:
     """Remove a credential from EVERY store: ``.env`` (and process env), env-seeded
     ``credential_pool`` entries, model-cache rows, config.yaml mirrors of the same value."""
-    from hermes_cli.config import load_env, remove_env_value, require_env_writable
+    from eir_cli.config import load_env, remove_env_value, require_env_writable
 
     # Before the pool prune and mirror scrub: a refused remove must not strip the other stores.
     require_env_writable(env_var, "remove")

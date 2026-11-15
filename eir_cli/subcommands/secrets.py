@@ -1,4 +1,4 @@
-"""``hermes secrets`` subcommand parser."""
+"""``eir secrets`` subcommand parser."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ def build_secrets_parser(subparsers) -> None:
     secrets_parser = subparsers.add_parser(
         "secrets", help="Manage external secret sources (Bitwarden, 1Password)",
         description="Pull API keys from an external secret manager at process startup "
-            "instead of storing them in ~/.hermes/.env.  Supports Bitwarden "
+            "instead of storing them in ~/.eir/.env.  Supports Bitwarden "
             "Secrets Manager and 1Password.  See: "
             "https://hermes-agent.nousresearch.com/docs/user-guide/secrets/")
     secrets_subparsers = secrets_parser.add_subparsers(dest="secrets_command")
@@ -24,8 +24,8 @@ def build_secrets_parser(subparsers) -> None:
     # defers its backend import to first use, so register_cli here costs no crypto load.
     # Lazy-import secrets_cli: the module imports agent.secret_sources.bitwarden which loads
     # cryptography._rust.pyd. See #86781.
-    from hermes_cli import secrets_cli as _secrets_cli
-    from hermes_cli import onepassword_secrets_cli as _op_secrets_cli
+    from eir_cli import secrets_cli as _secrets_cli
+    from eir_cli import onepassword_secrets_cli as _op_secrets_cli
 
     _secrets_cli.register_cli(secrets_bw)
     _op_secrets_cli.register_cli(secrets_op)

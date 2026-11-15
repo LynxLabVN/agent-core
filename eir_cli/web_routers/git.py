@@ -2,7 +2,7 @@
 
 The desktop runs these as Electron-local git; over a remote gateway that's the wrong
 filesystem, so they are mirrored here with the same auth gate + path hardening as
-/api/fs. Logic lives in ``hermes_cli.web_git``; these are thin executor-offloaded
+/api/fs. Logic lives in ``eir_cli.web_git``; these are thin executor-offloaded
 wrappers (git/gh can block).
 """
 
@@ -15,11 +15,11 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request
 
-from hermes_cli import web_git as _web_git
-from hermes_cli._subprocess_compat import bounded_probe_run
-from hermes_cli.web_deps import late
-from hermes_cli.web_server_files import _fs_path, _hosted_fs_path_allowed, _hosted_fs_read_guard
-from hermes_cli.web_models import (
+from eir_cli import web_git as _web_git
+from eir_cli._subprocess_compat import bounded_probe_run
+from eir_cli.web_deps import late
+from eir_cli.web_server_files import _fs_path, _hosted_fs_path_allowed, _hosted_fs_read_guard
+from eir_cli.web_models import (
     GitBranchSwitchBody,
     GitCommitBody,
     GitFileBody,

@@ -1,12 +1,12 @@
-"""``hermes peer`` — bot-to-bot DMs across machines/gateways.
+"""``eir peer`` — bot-to-bot DMs across machines/gateways.
 
-A *peer* is another Hermes gateway running the ``api_server`` platform; its stock
+A *peer* is another Eir gateway running the ``api_server`` platform; its stock
 API is the transport (no new server surface). ``dm`` resolves the remote canonical
 "Bot Chat" session (creating it when missing) and runs ONE synchronous turn — the
-cross-machine twin of ``hermes -p <bot> chat --in ~ -c "Bot Chat"``. ``run``/``status``
+cross-machine twin of ``eir -p <bot> chat --in ~ -c "Bot Chat"``. ``run``/``status``
 /``stop`` do the same turn through the async Runs API. Peer labels/URLs live in
-config.yaml (``bot_peers``); the key lives in ``~/.hermes/.env`` as
-``HERMES_PEER_<NAME>_KEY``. ``<peer>/<profile>`` targets the ``/p/<profile>/`` mirror.
+config.yaml (``bot_peers``); the key lives in ``~/.eir/.env`` as
+``EIR_PEER_<NAME>_KEY``. ``<peer>/<profile>`` targets the ``/p/<profile>/`` mirror.
 """
 
 from __future__ import annotations
@@ -28,8 +28,8 @@ _PROFILE_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$")
 
 # The @handle Bot Mode shows for a host's default profile, and the 404 a peer returns for a
 # /p/<profile>/ prefix naming no profile it has (UNKNOWN_PROFILE_CODE / UNKNOWN_PROFILE_ERROR in
-# gateway/platforms/api_server_profile_prefix.py; a 'hermes' profile it has but does not serve differs).
-DEFAULT_PROFILE_HANDLE = "hermes"
+# gateway/platforms/api_server_profile_prefix.py; a 'eir' profile it has but does not serve differs).
+DEFAULT_PROFILE_HANDLE = "eir"
 _UNKNOWN_PROFILE_CODE = "profile_unknown"
 _UNKNOWN_PROFILE_ERROR = "Unknown or unconfigured profile"
 
@@ -39,11 +39,11 @@ LIST_TIMEOUT_S = 30
 
 
 def _peer_key_env(name: str) -> str:
-    return f"HERMES_PEER_{name.upper().replace('-', '_')}_KEY"
+    return f"EIR_PEER_{name.upper().replace('-', '_')}_KEY"
 
 
 def _load_peers() -> dict:
-    from hermes_cli.config import load_config
+    from eir_cli.config import load_config
 
     cfg = load_config() or {}
     peers = cfg.get("bot_peers")
@@ -51,7 +51,7 @@ def _load_peers() -> dict:
 
 
 def _save_peers(peers: dict) -> None:
-    from hermes_cli.config import load_config, save_config
+    from eir_cli.config import load_config, save_config
 
     cfg = load_config() or {}
     cfg["bot_peers"] = peers
@@ -74,15 +74,15 @@ def _peer_secret(name: str) -> str:
 def _request(
     url: str, key: str, *, method: str = "GET", body: dict | None = None,
     timeout: int = LIST_TIMEOUT_S, headers: dict[str, str] | None = None) -> dict:
-    from hermes_cli.urllib_security import open_credentialed_url
+    from eir_cli.urllib_security import open_credentialed_url
     data = json.dumps(body).encode("utf-8") if body is not None else None
     request_headers = {
         "Authorization": f"Bearer {key}", "Content-Type": "application/json",
-        "User-Agent": "hermes-peer-dm"}
+        "User-Agent": "eir-peer-dm"}
     if headers:
         request_headers.update(headers)
     req = urllib.request.Request(url, data=data, method=method, headers=request_headers)
-    # The peer URL is user-registered (``hermes peer add``); a redirect to a
+    # The peer URL is user-registered (``eir peer add``); a redirect to a
     # different origin must not carry the Authorization: Bearer key with it —
     # a compromised/MITM'd peer could otherwise harvest it. open_credentialed_url
     # strips non-safelisted headers across a cross-origin redirect.
@@ -132,11 +132,11 @@ def _peer_lacks_profile(exc: Exception) -> bool:
 
 
 def _resolve_base(peer: dict, profile: str | None, key: str, peer_name: str = "") -> str:
-    """The mirror a target addresses. Bot Mode shows a peer's default profile as @hermes
-    (#118076); an upgraded peer aliases ``/p/hermes`` to its default itself, unless it has a real
-    pre-reservation profile named ``hermes``, which keeps the handle. The client never reroutes on
+    """The mirror a target addresses. Bot Mode shows a peer's default profile as @eir
+    (#118076); an upgraded peer aliases ``/p/eir`` to its default itself, unless it has a real
+    pre-reservation profile named ``eir``, which keeps the handle. The client never reroutes on
     its own: an older peer answers the same generic 404 for "no such profile" and for a real
-    ``hermes`` profile it does not serve (parked, standalone), so guessing ``/p/default`` there
+    ``eir`` profile it does not serve (parked, standalone), so guessing ``/p/default`` there
     delivers into the wrong agent. That ambiguous answer becomes an error naming the explicit
     ``<peer>/default`` address instead."""
     base = _base_url(peer, profile)
@@ -191,10 +191,10 @@ def _ensure_bot_chat(base: str, key: str) -> str:
             raise RuntimeError(
                 f"Peer already has a '{BOT_CHAT_TITLE}' session but it is hidden and the "
                 f"peer's gateway is too old to expose hidden sessions to this lookup "
-                f"(HTTP 400: {detail}). Update the peer's hermes-agent, or unhide the "
+                f"(HTTP 400: {detail}). Update the peer's eir-agent, or unhide the "
                 f"session there: PATCH /api/sessions/<id> {{\"hidden\": false}}.") from exc
         raise
-    # Real api_server wraps the row: {"object": "hermes.session", "session": {...}}.
+    # Real api_server wraps the row: {"object": "eir.session", "session": {...}}.
     session = created.get("session") if isinstance(created.get("session"), dict) else created
     session_id = str(session.get("id") or session.get("session_id") or "")
     if not session_id:
@@ -209,13 +209,13 @@ def _parse_target(target: str) -> tuple[str, str | None]:
     peer = peer.strip()
     profile = profile.strip() or None
     if not peer:
-        raise ValueError("Peer name required (hermes peer dm <peer>[/<agent>] ...)")
+        raise ValueError("Peer name required (eir peer dm <peer>[/<agent>] ...)")
     if profile and not _PROFILE_RE.match(profile):
         raise ValueError(f"Invalid agent/profile name: {profile!r}")
     if profile:
-        # Profile ids are lowercase (normalize_profile_name); 'box/Hermes' must address the
-        # peer's real 'hermes' profile on every peer, including those that compare prefixes exactly.
-        from hermes_cli.profiles import normalize_profile_name
+        # Profile ids are lowercase (normalize_profile_name); 'box/Eir' must address the
+        # peer's real 'eir' profile on every peer, including those that compare prefixes exactly.
+        from eir_cli.profiles import normalize_profile_name
         profile = normalize_profile_name(profile)
     return peer, profile
 
@@ -235,12 +235,12 @@ def _resolve_peer_target(target: str) -> tuple[str, str | None, dict, str]:
     peer_name, profile = _parse_target(target)
     peer = _load_peers().get(peer_name)
     if not isinstance(peer, dict) or not peer.get("url"):
-        raise LookupError(f"No peer named '{peer_name}'. Run: hermes peer list")
+        raise LookupError(f"No peer named '{peer_name}'. Run: eir peer list")
     key = _peer_secret(peer_name)
     if not key:
         raise PermissionError(
-            f"No API key for peer '{peer_name}'. Set it: hermes peer add {peer_name} "
-            f"--url <url> --key <key> (or add {_peer_key_env(peer_name)}=<key> to ~/.hermes/.env)")
+            f"No API key for peer '{peer_name}'. Set it: eir peer add {peer_name} "
+            f"--url <url> --key <key> (or add {_peer_key_env(peer_name)}=<key> to ~/.eir/.env)")
     return peer_name, profile, peer, key
 
 
@@ -300,15 +300,15 @@ def _peer_add(args) -> int:
     _save_peers(peers)
     key = (getattr(args, "key", "") or "").strip()
     if key:
-        from hermes_cli.config import save_env_value
+        from eir_cli.config import save_env_value
 
         save_env_value(_peer_key_env(name), key)
-        print(f"Peer '{name}' saved ({url}) — key stored as {_peer_key_env(name)} in ~/.hermes/.env")
+        print(f"Peer '{name}' saved ({url}) — key stored as {_peer_key_env(name)} in ~/.eir/.env")
     else:
         print(
             f"Peer '{name}' saved ({url}). No key given — set the peer's API_SERVER_KEY with:\n"
-            f"  hermes peer add {name} --url {url} --key <key>\n"
-            f"  (or add {_peer_key_env(name)}=<key> to ~/.hermes/.env)")
+            f"  eir peer add {name} --url {url} --key <key>\n"
+            f"  (or add {_peer_key_env(name)}=<key> to ~/.eir/.env)")
     return 0
 
 
@@ -327,7 +327,7 @@ def _peer_remove(args) -> int:
 def _peer_list(args) -> int:
     peers = _load_peers()
     if not peers:
-        print("No peers registered. Add one: hermes peer add <name> --url http://host:port --key <API_SERVER_KEY>")
+        print("No peers registered. Add one: eir peer add <name> --url http://host:port --key <API_SERVER_KEY>")
         return 0
     for name in sorted(peers):
         entry = peers[name] if isinstance(peers[name], dict) else {}
@@ -363,7 +363,7 @@ def _peer_run_ctl(args, action: str, peer_name: str, profile: str | None, base: 
 
 
 def _turn_body(message: str, *, message_key: str, **extra) -> dict:
-    """Request body for one turn. ``author`` is added only when a dispatcher set HERMES_TURN_AUTHOR."""
+    """Request body for one turn. ``author`` is added only when a dispatcher set EIR_TURN_AUTHOR."""
     from agent.turn_author import turn_author_from_env
 
     body = {message_key: message, **extra}
@@ -430,7 +430,7 @@ def _peer_dm(args, message: str, peer_name: str, profile: str | None, base: str,
                   file=sys.stderr)
             return 1
         return _peer_failure(peer_name, exc)
-    if result.get("object") == "hermes.session.chat.queued":
+    if result.get("object") == "eir.session.chat.queued":
         # The peer's Bot Chat is open in its Desktop and that turn outlasted the peer's wait: the
         # message is in the open chat and is answered there, so a resend would run it twice.
         queued_in = result.get("session_id") or session_id
@@ -444,7 +444,7 @@ def _peer_dm(args, message: str, peer_name: str, profile: str | None, base: str,
     # the turn stays in the peer's own transcript, the sending agent never
     # sees NO_REPLY/[SILENT] as a real reply. Same rule as the gateway's live
     # Bot Chat completion, the Desktop bot_relay.deliver RPC and the one-shot
-    # local `hermes chat -Q` transport (tools/bot_mode_dm.py) — this is the
+    # local `eir chat -Q` transport (tools/bot_mode_dm.py) — this is the
     # 4th Bot Mode delivery door and was missing the same check.
     from gateway.response_filters import is_intentional_silence_response, strip_trailing_silence_marker
     reply = "" if is_intentional_silence_response(reply) else strip_trailing_silence_marker(reply)
@@ -463,7 +463,7 @@ def cmd_peer(args) -> int:
     if action in _REGISTRY_ACTIONS:
         return _REGISTRY_ACTIONS[action](args)
     if action not in {"dm", "run", "status", "stop"}:
-        print("Unknown peer action. See: hermes peer --help", file=sys.stderr)
+        print("Unknown peer action. See: eir peer --help", file=sys.stderr)
         return 2
     try:
         peer_name, profile, peer, key = _resolve_peer_target(args.target)
@@ -491,23 +491,23 @@ def cmd_peer(args) -> int:
 def build_peer_parser(subparsers) -> None:
     """Attach the ``peer`` subcommand to ``subparsers``."""
     parser = subparsers.add_parser(
-        "peer", help="Bot-to-bot DMs across machines (peer Hermes gateways)",
-        description="Register other Hermes gateways as peers and message their agents. "
-            "'hermes peer dm <peer>[/<agent>] \"...\"' delivers into the remote "
+        "peer", help="Bot-to-bot DMs across machines (peer Eir gateways)",
+        description="Register other Eir gateways as peers and message their agents. "
+            "'eir peer dm <peer>[/<agent>] \"...\"' delivers into the remote "
             "agent's canonical Bot Chat over the peer's API server and prints "
-            "the reply — the cross-machine twin of 'hermes -p <bot> chat'. "
+            "the reply — the cross-machine twin of 'eir -p <bot> chat'. "
             "The peer must run the api_server platform; its API_SERVER_KEY is "
-            "stored locally as a credential in ~/.hermes/.env.",
+            "stored locally as a credential in ~/.eir/.env.",
         epilog=(
             "Examples:\n"
-            "  hermes peer add spark --url http://spark.lan:8377 --key <API_SERVER_KEY>\n"
-            "  hermes peer list\n"
-            '  hermes peer dm spark "Message from 🤖 dixie (@dixie): disk status?"\n'
-            '  hermes peer dm spark/researcher "..."   # named profile on a multiplexed peer\n'
-            "  hermes peer run spark --idempotency-key ticket-123 < long-task.txt\n"
-            "  hermes peer status spark run_abc123\n"
-            "  hermes peer stop spark run_abc123\n"
-            "  hermes peer remove spark\n"
+            "  eir peer add spark --url http://spark.lan:8377 --key <API_SERVER_KEY>\n"
+            "  eir peer list\n"
+            '  eir peer dm spark "Message from 🤖 dixie (@dixie): disk status?"\n'
+            '  eir peer dm spark/researcher "..."   # named profile on a multiplexed peer\n'
+            "  eir peer run spark --idempotency-key ticket-123 < long-task.txt\n"
+            "  eir peer status spark run_abc123\n"
+            "  eir peer stop spark run_abc123\n"
+            "  eir peer remove spark\n"
             "\n"
             "Exit codes: 0 ok, 1 delivery/peer error, 2 usage error."),
         formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -516,7 +516,7 @@ def build_peer_parser(subparsers) -> None:
     add_p = peer_sub.add_parser("add", aliases=["set"], help="Register (or update) a peer gateway")
     add_p.add_argument("name", help="Peer name (lowercase slug, e.g. spark, homelab)")
     add_p.add_argument("--url", required=True, help="Peer gateway base URL, e.g. http://spark.lan:8377")
-    add_p.add_argument("--key", default="", help="The peer's API_SERVER_KEY (stored in ~/.hermes/.env)")
+    add_p.add_argument("--key", default="", help="The peer's API_SERVER_KEY (stored in ~/.eir/.env)")
     add_p.add_argument("--note", default="", help="Optional description")
 
     peer_sub.add_parser("list", aliases=["ls"], help="List registered peers")
@@ -528,7 +528,7 @@ def build_peer_parser(subparsers) -> None:
         sp = peer_sub.add_parser(name, help=help)
         sp.add_argument("target", help="<peer> or <peer>/<agent> (named profile on a multiplexed peer)")
         if run_id:
-            sp.add_argument("run_id", help="Run ID returned by 'hermes peer run'")
+            sp.add_argument("run_id", help="Run ID returned by 'eir peer run'")
         else:
             sp.add_argument("message", nargs="?", default=None, help="Message text (or stdin)")
             if name == "run":

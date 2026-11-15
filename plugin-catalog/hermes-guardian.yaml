@@ -1,23 +1,23 @@
 # Native plugin.yaml and catalog entry schemas differ: this nesting is intentional.
 name: hermes-guardian
-title: Hermes Guardian
+title: Eir Guardian
 repo: "https://github.com/Oluseyix/hermes-guardian"
 sha: "bde45f63859985440c8ee4763e365073e659d4c1"
 version: "0.2.0"
 maintainer: "Oluseyix"
 tier: community
 category: tools
-requires_hermes: ">=0.23.1"
+requires_eir: ">=0.23.1"
 platforms: [linux, macos]
 readme: true
 description: >-
-  Deterministic allow/approve/block policies for Hermes tool calls, with read-only
+  Deterministic allow/approve/block policies for Eir tool calls, with read-only
   Policy Lab regression simulation and operator-reviewed policy proposals. Exact tool-name
   rules, explicit protected local paths, a deliberately limited shell grammar,
   and payload-free persistent decision audits. Unknown tools default to block;
   ambiguous recognized-tool arguments, invalid policy, and audit failures block.
-  Uses the public pre_tool_call hook and native Hermes approval directives.
-  Disclosure: reads its own settings through Hermes and filesystem metadata and
+  Uses the public pre_tool_call hook and native Eir approval directives.
+  Disclosure: reads its own settings through Eir and filesystem metadata and
   symlink targets for path comparisons; writes redacted JSONL under the active
   profile's plugin-data/hermes-guardian directory. No protected file-content reads,
   enforcement-hook network calls, subprocesses, model calls, credential storage, telemetry,

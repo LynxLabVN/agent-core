@@ -3,7 +3,7 @@
 Every set here is something Nous itself publishes (slash-command registry, bundled and optional
 skills, optional-mcps/ and plugin-catalog/ entries, built-in auxiliary tasks, shipped locales).
 A name outside its set is reported as ``custom`` so user-defined identities never leave the machine.
-Loaders are cached: the catalogs only change with the installed Hermes version.
+Loaders are cached: the catalogs only change with the installed Eir version.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ import logging
 import re
 from pathlib import Path
 
-from hermes_cli._startup_fast import project_root_str
+from eir_cli._startup_fast import project_root_str
 
 logger = logging.getLogger(__name__)
 
@@ -38,14 +38,14 @@ def _yaml_stems(root: Path) -> frozenset[str]:
 
 @functools.cache
 def slash_command_names() -> frozenset[str]:
-    from hermes_cli.commands import COMMAND_REGISTRY
+    from eir_cli.commands import COMMAND_REGISTRY
 
     return frozenset(command.name for command in COMMAND_REGISTRY)
 
 
 @functools.cache
 def bundled_skill_names() -> frozenset[str]:
-    from hermes_constants import get_bundled_skills_dir, get_optional_skills_dir
+    from eir_constants import get_bundled_skills_dir, get_optional_skills_dir
 
     return _skill_dir_names(get_bundled_skills_dir(_REPO_ROOT / "skills")) | _skill_dir_names(
         get_optional_skills_dir(_REPO_ROOT / "optional-skills")
@@ -54,7 +54,7 @@ def bundled_skill_names() -> frozenset[str]:
 
 @functools.cache
 def mcp_catalog_names() -> frozenset[str]:
-    from hermes_constants import get_optional_mcps_dir
+    from eir_constants import get_optional_mcps_dir
 
     root = get_optional_mcps_dir(_REPO_ROOT / "optional-mcps")
     try:
@@ -70,7 +70,7 @@ def plugin_catalog_names() -> frozenset[str]:
 
 @functools.cache
 def aux_task_names() -> frozenset[str]:
-    from hermes_cli.main_provider_setup import _AUX_TASKS
+    from eir_cli.main_provider_setup import _AUX_TASKS
 
     return frozenset(key for key, _name, _desc in _AUX_TASKS)
 
@@ -82,13 +82,13 @@ def display_languages() -> frozenset[str]:
 
 @functools.cache
 def provider_names() -> frozenset[str]:
-    """Provider ids Hermes itself ships: built-in auth rows, overlays, alias tables and the
+    """Provider ids Eir itself ships: built-in auth rows, overlays, alias tables and the
     in-tree ``plugins/model-providers`` profiles. Never the live registries (``PROVIDER_REGISTRY``,
-    picker labels): ``$HERMES_HOME`` and pip provider plugins add their user-chosen names there."""
+    picker labels): ``$EIR_HOME`` and pip provider plugins add their user-chosen names there."""
     import providers
-    from hermes_cli.auth import _PROVIDER_ALIASES, BUILTIN_PROVIDER_IDS
-    from hermes_cli.models_catalog_static import _PROVIDER_ALIASES as _CATALOG_ALIASES
-    from hermes_cli.providers import ALIASES, HERMES_OVERLAYS
+    from eir_cli.auth import _PROVIDER_ALIASES, BUILTIN_PROVIDER_IDS
+    from eir_cli.models_catalog_static import _PROVIDER_ALIASES as _CATALOG_ALIASES
+    from eir_cli.providers import ALIASES, EIR_OVERLAYS
 
     providers.list_providers()  # runs discovery; bundled profiles land in the process-wide layer
     bundled = {
@@ -96,7 +96,7 @@ def provider_names() -> frozenset[str]:
         for alias in (name, *profile.aliases)
     }
     return BUILTIN_PROVIDER_IDS.union(
-        HERMES_OVERLAYS, ALIASES, _PROVIDER_ALIASES, _CATALOG_ALIASES, bundled, ("openrouter", CUSTOM)
+        EIR_OVERLAYS, ALIASES, _PROVIDER_ALIASES, _CATALOG_ALIASES, bundled, ("openrouter", CUSTOM)
     )
 
 
@@ -105,8 +105,8 @@ def user_named_model_providers() -> frozenset[str]:
     """Providers whose model ids the user names: custom endpoints and loopback servers."""
     from urllib.parse import urlparse
 
-    from hermes_cli import auth, models, providers
-    from hermes_cli.auth import PROVIDER_REGISTRY
+    from eir_cli import auth, models, providers
+    from eir_cli.auth import PROVIDER_REGISTRY
 
     hosts = {"localhost", "127.0.0.1", "::1", "0.0.0.0"}
     loopback = {
@@ -121,9 +121,9 @@ def user_named_model_providers() -> frozenset[str]:
 
 @functools.cache
 def custom_provider_aliases() -> frozenset[str]:
-    """Provider ids Hermes routes through the generic ``custom`` provider (``ollama``, ``vllm``,
+    """Provider ids Eir routes through the generic ``custom`` provider (``ollama``, ``vllm``,
     ``llamacpp``...): shipped names, but the server and its model ids are the user's own."""
-    from hermes_cli import auth, models, providers
+    from eir_cli import auth, models, providers
 
     tables = (providers.ALIASES, getattr(auth, "_PROVIDER_ALIASES", {}), getattr(models, "_PROVIDER_ALIASES", {}))
     return frozenset(alias for table in tables for alias, canon in table.items() if canon == CUSTOM)
@@ -132,8 +132,8 @@ def custom_provider_aliases() -> frozenset[str]:
 # ---- v4 gateway ----
 @functools.cache
 def bundled_platform_names() -> frozenset[str]:
-    """Messaging platforms Hermes ships as ``plugins/platforms/<name>`` (the dir is the registered name)."""
-    from hermes_cli.plugins import get_bundled_plugins_dir
+    """Messaging platforms Eir ships as ``plugins/platforms/<name>`` (the dir is the registered name)."""
+    from eir_cli.plugins import get_bundled_plugins_dir
 
     root = get_bundled_plugins_dir() / "platforms"
     try:
@@ -145,7 +145,7 @@ def bundled_platform_names() -> frozenset[str]:
 @functools.cache
 def catalog_platform_names() -> frozenset[str]:
     """``plugin-catalog/`` entries whose category is ``platform`` (in-tree only: never a network fetch)."""
-    from hermes_cli.plugin_catalog import CATALOG_TIERS, load_catalog
+    from eir_cli.plugin_catalog import CATALOG_TIERS, load_catalog
 
     return frozenset(e.name for e in load_catalog() if e.category == "platform" and e.tier in CATALOG_TIERS)
 
@@ -159,9 +159,9 @@ def platform_metric_name(raw: object, core: frozenset[str]) -> str:
         return name
     if not name:
         return "plugin"
-    from hermes_constants import get_hermes_home
+    from eir_constants import get_eir_home
 
-    return _catalog_platform_owner(str(get_hermes_home()), name) or "plugin"
+    return _catalog_platform_owner(str(get_eir_home()), name) or "plugin"
 
 
 @functools.lru_cache(maxsize=64)
@@ -174,7 +174,7 @@ def _catalog_platform_owner(home: str, platform: str) -> str | None:
         import inspect
 
         from gateway.platform_registry import platform_registry
-        from hermes_cli.plugins_provenance import read_sidecar_rows
+        from eir_cli.plugins_provenance import read_sidecar_rows
 
         entry = platform_registry.get(platform)
         if entry is None or getattr(entry, "source", "") != "plugin":
@@ -211,7 +211,7 @@ def slash_command_metric_name(raw: object) -> str:
     if not name:
         return "unknown"
     try:
-        from hermes_cli.commands import resolve_command
+        from eir_cli.commands import resolve_command
 
         command = resolve_command(name)
     except Exception:
@@ -223,7 +223,7 @@ def slash_command_metric_name(raw: object) -> str:
 
         if resolve_skill_command_key(name):
             return "skill"
-        from hermes_cli.plugins import get_plugin_command_handler
+        from eir_cli.plugins import get_plugin_command_handler
 
         if get_plugin_command_handler(name) is not None:
             return "plugin"
@@ -303,10 +303,10 @@ def model_metric_name(raw: object, provider: str, *, max_length: int) -> str:
 
 @functools.cache
 def public_model_ids() -> frozenset[str]:
-    """Model ids Hermes ships in its static catalogs plus every id in the local models.dev cache
+    """Model ids Eir ships in its static catalogs plus every id in the local models.dev cache
     (never a network call), with and without a ``vendor/`` prefix."""
     from agent.models_dev import fetch_models_dev
-    from hermes_cli.models_catalog_static import _PROVIDER_MODELS
+    from eir_cli.models_catalog_static import _PROVIDER_MODELS
 
     ids = {model for models in _PROVIDER_MODELS.values() for model in models}
     for entry in fetch_models_dev(allow_network=False).values():

@@ -1,6 +1,6 @@
 """Tests for the kanban dispatcher single-writer lock (issue #35240).
 
-A ``hermes gateway run --replace`` / ``gateway restart`` from a shell on a
+A ``eir gateway run --replace`` / ``gateway restart`` from a shell on a
 systemd/launchd host can leave an orphan dispatcher that escapes the
 service cgroup, survives ``systemctl restart``, and becomes a second
 long-lived writer on the same ``kanban.db`` — the documented root cause of
@@ -16,17 +16,17 @@ from pathlib import Path
 
 import pytest
 
-from hermes_cli import kanban_db as kb
-from hermes_cli import kanban_db_connect as kbc
-from hermes_cli import kanban_db_dispatch as kbd
+from eir_cli import kanban_db as kb
+from eir_cli import kanban_db_connect as kbc
+from eir_cli import kanban_db_dispatch as kbd
 
 
 @pytest.fixture
 def kanban_home(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
+    monkeypatch.setenv("EIR_KANBAN_HOME", str(home))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     db_path = kb.kanban_db_path(board="default")
     kb._INITIALIZED_PATHS.discard(str(db_path.resolve()))

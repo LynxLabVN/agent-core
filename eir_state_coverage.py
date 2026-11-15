@@ -11,9 +11,9 @@ from collections import Counter
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from agent.message_metadata import DB_ROW_SNAPSHOT, MESSAGE_UID, message_uid_or_none
-from hermes_cli.timefmt import coerce_epoch
-from hermes_state_common import _id_chunks, _placeholders
-from hermes_state_messages import _parse_tool_calls
+from eir_cli.timefmt import coerce_epoch
+from eir_state_common import _id_chunks, _placeholders
+from eir_state_messages import _parse_tool_calls
 
 
 def _text_of(content: Any) -> str:
@@ -183,7 +183,7 @@ class SessionCoverageMixin:
         mismatch means the row was rewritten after the copy. A copy without one (a bare uid copy, or a
         row-addressed load, which omits the digest by design) may predate any number of rewrites, so the row
         is cloned: a duplicate, never an older instruction in place of the current one."""
-        # Runtime import avoids the transcript_repair -> hermes_state_messages module cycle.
+        # Runtime import avoids the transcript_repair -> eir_state_messages module cycle.
         from agent.transcript_repair import transcript_row_snapshot
 
         snapshot = held.get(DB_ROW_SNAPSHOT)

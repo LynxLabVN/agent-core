@@ -6,7 +6,7 @@
  * it reaches back into neither.
  */
 
-import { Button, Codicon, host, Input, useI18n } from '@hermes/plugin-sdk'
+import { Button, Codicon, host, Input, useI18n } from '@eir/plugin-sdk'
 import { useEffect, useRef, useState } from 'react'
 
 import { useBots } from './i18n'
@@ -16,14 +16,14 @@ import type { RosterRow } from './types'
 // ── skills hub section: the REAL hub page (docs) embedded as a picker ──────
 // https://hermes-agent.nousresearch.com/docs/skills?embed=picker hides the
 // docs chrome and adds "+ Add to this Agent" per card, posting
-// {type: 'hermes-skill-pick', ...} to us (hermes-agent#86243). We validate
+// {type: 'eir-skill-pick', ...} to us (eir-agent#86243). We validate
 // the origin, install via skills.manage, and bubble onInstalled so the
 // checklist above gains the row. Search-box fallback kept for offline use.
 
 const HUB_ORIGIN = 'https://hermes-agent.nousresearch.com'
 const FALLBACK_HUB_ORIGIN = 'https://nousresearch.github.io'
 const HUB_PICKER_URL = HUB_ORIGIN + '/docs/skills?embed=picker'
-const FALLBACK_HUB_PICKER_URL = FALLBACK_HUB_ORIGIN + '/hermes-agent/docs/skills?embed=picker'
+const FALLBACK_HUB_PICKER_URL = FALLBACK_HUB_ORIGIN + '/eir-agent/docs/skills?embed=picker'
 // A WAF-blocked or unreachable docs host must not delay the fallback longer
 // than this — the probe only decides which origin to embed, never blocks it.
 const HUB_PROBE_TIMEOUT_MS = 8_000
@@ -110,7 +110,7 @@ export function HubSkillsSection({ bot, onInstalled }: HubSkillsSectionProps) {
 
       const data = event.data
 
-      if (!data || data.type !== 'hermes-skill-pick' || !data.name) {
+      if (!data || data.type !== 'eir-skill-pick' || !data.name) {
         return
       }
 

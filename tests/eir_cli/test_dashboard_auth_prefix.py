@@ -1,23 +1,23 @@
 """Path-prefix (X-Forwarded-Prefix) awareness for the dashboard-auth gate.
 
 Mission-control style deployments reverse-proxy the dashboard at a path
-prefix (e.g. ``mission-control.tilos.com/hermes/*`` -> local Caddy ->
-:9119), injecting ``X-Forwarded-Prefix: /hermes`` on every request.
+prefix (e.g. ``mission-control.tilos.com/eir/*`` -> local Caddy ->
+:9119), injecting ``X-Forwarded-Prefix: /eir`` on every request.
 
 The dashboard already honours this for the SPA bundle (rewriting asset
-URLs and the bootstrap ``__HERMES_BASE_PATH__``). The OAuth gate must
+URLs and the bootstrap ``__EIR_BASE_PATH__``). The OAuth gate must
 honour it too:
 
   1. The gate's ``Location:`` redirect to /login (in
-     ``_unauth_response``) needs to be ``/hermes/login`` so the browser
+     ``_unauth_response``) needs to be ``/eir/login`` so the browser
      follows it through the proxy.
   2. The 401 JSON envelope's ``login_url`` needs the same prefix so the
      SPA's full-page navigation lands at the proxied login page.
   3. ``_redirect_uri`` (the OAuth callback URL handed to the IDP) must
      reconstruct the public URL including the prefix, otherwise the IDP
      redirects back to ``/auth/callback`` instead of
-     ``/hermes/auth/callback`` and the user gets 404.
-  4. Cookies must use ``Path=/hermes`` when behind a prefix so they
+     ``/eir/auth/callback`` and the user gets 404.
+  4. Cookies must use ``Path=/eir`` when behind a prefix so they
      don't leak to other apps on the same origin AND so they get sent
      back to the dashboard on subsequent requests under the prefix.
   5. The ``__Host-`` cookie prefix requires ``Path=/`` — when behind an
@@ -36,10 +36,10 @@ import pytest
 
 from fastapi.testclient import TestClient
 
-from hermes_cli import web_server
-from hermes_cli.dashboard_auth import clear_providers, register_provider
-from hermes_cli.dashboard_auth import prefix as prefix_mod
-from tests.hermes_cli.conftest_dashboard_auth import StubAuthProvider
+from eir_cli import web_server
+from eir_cli.dashboard_auth import clear_providers, register_provider
+from eir_cli.dashboard_auth import prefix as prefix_mod
+from tests.eir_cli.conftest_dashboard_auth import StubAuthProvider
 
 
 HA_INGRESS_DASHBOARD_PREFIX = (
@@ -112,7 +112,7 @@ class TestForwardedPrefixNormalisation:
     ):
         """Home Assistant Supervisor ingress prefixes are 63 chars before
         add-ons append their own mount path. They must survive validation so
-        the SPA receives the correct __HERMES_BASE_PATH__ and asset prefix."""
+        the SPA receives the correct __EIR_BASE_PATH__ and asset prefix."""
         prefix_mod._warned_malformed_prefixes.clear()
         assert len(HA_INGRESS_DASHBOARD_PREFIX) > 64
 
@@ -157,7 +157,7 @@ class TestGateRedirectsCarryPrefix:
     def test_html_redirect_to_login_carries_prefix(self, gated_app_proxied):
         r = gated_app_proxied.get(
             "/sessions",
-            headers={"x-forwarded-prefix": "/hermes"},
+            headers={"x-forwarded-prefix": "/eir"},
             follow_redirects=False,
         )
         assert r.status_code == 302
@@ -167,21 +167,21 @@ class TestGateRedirectsCarryPrefix:
         # mission-control.tilos.com/auth/login (which the proxy doesn't route
         # to the dashboard). The prefix-carrying invariant is what's under
         # test; only the target path moved from /login to /auth/login.
-        assert r.headers["location"].startswith("/hermes/auth/login"), (
+        assert r.headers["location"].startswith("/eir/auth/login"), (
             f"Location header lost prefix: {r.headers['location']!r}"
         )
 
     def test_api_401_envelope_login_url_carries_prefix(self, gated_app_proxied):
         r = gated_app_proxied.get(
             "/api/sessions",
-            headers={"x-forwarded-prefix": "/hermes"},
+            headers={"x-forwarded-prefix": "/eir"},
             follow_redirects=False,
         )
         assert r.status_code == 401
         body = r.json()
         # SPA does window.location.assign(body.login_url); this MUST
         # include the prefix.
-        assert body["login_url"].startswith("/hermes/login"), (
+        assert body["login_url"].startswith("/eir/login"), (
             f"401 envelope login_url lost prefix: {body['login_url']!r}"
         )
 
@@ -218,7 +218,7 @@ class TestOAuthRedirectUriRespectsPrefix:
         user gets 404."""
         r = gated_app_proxied.get(
             "/auth/login?provider=stub",
-            headers={"x-forwarded-prefix": "/hermes"},
+            headers={"x-forwarded-prefix": "/eir"},
             follow_redirects=False,
         )
         assert r.status_code == 302
@@ -234,7 +234,7 @@ class TestOAuthRedirectUriRespectsPrefix:
         parsed = urlparse(redirect_uri)
         assert parsed.scheme == "https"
         assert parsed.netloc == "mission-control.tilos.com"
-        assert parsed.path == "/hermes/auth/callback", (
+        assert parsed.path == "/eir/auth/callback", (
             f"redirect_uri dropped prefix: {redirect_uri!r}"
         )
 
@@ -253,13 +253,13 @@ class TestOAuthRedirectUriRespectsPrefix:
 
 
 # ---------------------------------------------------------------------------
-# HERMES_DASHBOARD_PUBLIC_URL / dashboard.public_url override
+# EIR_DASHBOARD_PUBLIC_URL / dashboard.public_url override
 # ---------------------------------------------------------------------------
 
 
 class TestPublicUrlOverride:
     """``dashboard.public_url`` (env override:
-    ``HERMES_DASHBOARD_PUBLIC_URL``) lets an operator force the absolute
+    ``EIR_DASHBOARD_PUBLIC_URL``) lets an operator force the absolute
     base URL the OAuth ``redirect_uri`` is built from.
 
     When set, it is the *complete authority* — scheme + host + optional
@@ -283,7 +283,7 @@ class TestPublicUrlOverride:
 
     @pytest.fixture
     def patch_config(self, monkeypatch):
-        """Replace ``hermes_cli.config.load_config`` with a stub
+        """Replace ``eir_cli.config.load_config`` with a stub
         returning the given ``public_url``. Pass ``None`` to set no
         config-side value."""
 
@@ -292,7 +292,7 @@ class TestPublicUrlOverride:
             if public_url is not None:
                 cfg = {"dashboard": {"public_url": public_url}}
             monkeypatch.setattr(
-                "hermes_cli.config.load_config", lambda: cfg
+                "eir_cli.config.load_config", lambda: cfg
             )
 
         return _set
@@ -317,7 +317,7 @@ class TestPublicUrlOverride:
         """Precedence pin — env wins over config.yaml. Fly.io / CI
         secret injection depends on this ordering."""
         monkeypatch.setenv(
-            "HERMES_DASHBOARD_PUBLIC_URL", "https://from-env.example",
+            "EIR_DASHBOARD_PUBLIC_URL", "https://from-env.example",
         )
         patch_config("https://from-config.example")
         redirect_uri = self._redirect_uri(gated_app_direct)
@@ -347,7 +347,7 @@ class TestPublicUrlOverride:
             'https://example.com/"injected',       # quote char
             "https://example.com/\nhttps://evil",  # CRLF injection
         ]:
-            monkeypatch.setenv("HERMES_DASHBOARD_PUBLIC_URL", bad)
+            monkeypatch.setenv("EIR_DASHBOARD_PUBLIC_URL", bad)
             redirect_uri = self._redirect_uri(gated_app_direct)
             # Fell through to request reconstruction — netloc is the
             # bound host, NOT the hostile value.
@@ -363,18 +363,18 @@ class TestPublicUrlOverride:
         self, patch_config, monkeypatch, caplog
     ):
         """A non-empty env var that's missing its scheme (the #1 cause
-        of "I set HERMES_DASHBOARD_PUBLIC_URL but the callback is still
+        of "I set EIR_DASHBOARD_PUBLIC_URL but the callback is still
         http://") must emit an operator-facing WARNING rather than being
         silently discarded. Regression for #42780."""
         import logging
 
-        from hermes_cli.dashboard_auth import prefix as prefix_mod
+        from eir_cli.dashboard_auth import prefix as prefix_mod
 
         # Reset the per-value dedup cache so the warning fires in-test
         # regardless of test ordering.
         prefix_mod._warned_malformed_public_urls.clear()
         patch_config(None)
-        monkeypatch.setenv("HERMES_DASHBOARD_PUBLIC_URL", "hermes.domain.com")
+        monkeypatch.setenv("EIR_DASHBOARD_PUBLIC_URL", "eir.domain.com")
 
         with caplog.at_level(logging.WARNING, logger=prefix_mod.__name__):
             result = prefix_mod.resolve_public_url()
@@ -386,8 +386,8 @@ class TestPublicUrlOverride:
             if r.levelno == logging.WARNING
         ]
         assert any(
-            "HERMES_DASHBOARD_PUBLIC_URL" in m
-            and "hermes.domain.com" in m
+            "EIR_DASHBOARD_PUBLIC_URL" in m
+            and "eir.domain.com" in m
             and "scheme" in m
             for m in warnings
         ), f"expected a scheme warning, got: {warnings!r}"
@@ -424,14 +424,14 @@ class TestCookiePathRespectsPrefix:
         """
         r = gated_app_proxied.get(
             "/auth/login?provider=stub",
-            headers={"x-forwarded-prefix": "/hermes"},
+            headers={"x-forwarded-prefix": "/eir"},
             follow_redirects=False,
         )
         cookies = r.headers.get_list("set-cookie")
         # The PKCE cookie name carries the __Secure- prefix.
         pkce_candidates = [
             c for c in cookies
-            if c.startswith("__Secure-hermes_session_pkce=")
+            if c.startswith("__Secure-eir_session_pkce=")
         ]
         assert pkce_candidates, (
             f"PKCE cookie missing __Secure- prefix: {cookies!r}"
@@ -444,7 +444,7 @@ class TestCookiePathRespectsPrefix:
         spec-compatible without Secure."""
         from fastapi import FastAPI
         from fastapi.responses import Response
-        from hermes_cli.dashboard_auth.cookies import set_pkce_cookie
+        from eir_cli.dashboard_auth.cookies import set_pkce_cookie
 
         app = FastAPI()
 
@@ -458,7 +458,7 @@ class TestCookiePathRespectsPrefix:
         r = client.get("/set")
         cookies = r.headers.get_list("set-cookie")
         # Bare cookie name, no prefix.
-        assert any(c.startswith("hermes_session_pkce=") for c in cookies), (
+        assert any(c.startswith("eir_session_pkce=") for c in cookies), (
             f"Loopback cookie should be bare-named: {cookies!r}"
         )
         # And no __Host- / __Secure- variant accidentally emitted.
@@ -472,16 +472,16 @@ class TestCookiePathRespectsPrefix:
     ):
         """The end-to-end property: after a successful OAuth round
         trip via the proxy, the session-AT cookie carries the
-        __Secure- prefix AND Path=/hermes, so the next request under
+        __Secure- prefix AND Path=/eir, so the next request under
         the same prefix is authenticated.
 
         Note on TestClient semantics: starlette's TestClient sees the
         literal request path (``/auth/login``, ``/auth/callback``) —
         not the public path the proxy displays to the browser
-        (``/hermes/auth/login``, ``/hermes/auth/callback``). A cookie
-        set with ``Path=/hermes`` would therefore NOT be sent back on
+        (``/eir/auth/login``, ``/eir/auth/callback``). A cookie
+        set with ``Path=/eir`` would therefore NOT be sent back on
         the second request through TestClient even though it WOULD be
-        sent by a real browser hitting ``/hermes/auth/callback``. To
+        sent by a real browser hitting ``/eir/auth/callback``. To
         avoid baking that mismatch into the test, we inspect the
         ``Set-Cookie`` header on the callback's response WITHOUT
         depending on the PKCE cookie round-tripping through
@@ -491,24 +491,24 @@ class TestCookiePathRespectsPrefix:
         # /auth/login sets the PKCE cookie. Capture it from Set-Cookie.
         r1 = gated_app_proxied.get(
             "/auth/login?provider=stub",
-            headers={"x-forwarded-prefix": "/hermes"},
+            headers={"x-forwarded-prefix": "/eir"},
             follow_redirects=False,
         )
         pkce_set = next(
             c for c in r1.headers.get_list("set-cookie")
-            if "hermes_session_pkce" in c
+            if "eir_session_pkce" in c
         )
-        # Parse "__Secure-hermes_session_pkce=...; HttpOnly; ...".
-        pkce_kv = pkce_set.split(";", 1)[0]  # "__Secure-hermes_session_pkce=value"
+        # Parse "__Secure-eir_session_pkce=...; HttpOnly; ...".
+        pkce_kv = pkce_set.split(";", 1)[0]  # "__Secure-eir_session_pkce=value"
         state = r1.headers["location"].split("state=")[1]
 
         # Round-trip the cookie by hand because TestClient's jar won't
-        # automatically send a Path=/hermes cookie to a /auth/callback
+        # automatically send a Path=/eir cookie to a /auth/callback
         # request path.
         r2 = gated_app_proxied.get(
             f"/auth/callback?code=stub_code&state={state}",
             headers={
-                "x-forwarded-prefix": "/hermes",
+                "x-forwarded-prefix": "/eir",
                 "cookie": pkce_kv,
             },
             follow_redirects=False,
@@ -517,12 +517,12 @@ class TestCookiePathRespectsPrefix:
         cookies = r2.headers.get_list("set-cookie")
         at_cookies = [
             c for c in cookies
-            if c.startswith("__Secure-hermes_session_at=")
+            if c.startswith("__Secure-eir_session_at=")
         ]
         assert at_cookies, (
             f"session_at missing __Secure- prefix: {cookies!r}"
         )
-        assert "Path=/hermes" in at_cookies[0]
+        assert "Path=/eir" in at_cookies[0]
         assert "Secure" in at_cookies[0]
         assert "HttpOnly" in at_cookies[0]
 
@@ -536,49 +536,49 @@ class TestExternalizePostLoginTarget:
     """Unit tests for ``_externalize_post_login_target``."""
 
     def test_bare_slash_gets_prefix(self):
-        from hermes_cli.dashboard_auth.routes import (
+        from eir_cli.dashboard_auth.routes import (
             _externalize_post_login_target,
         )
 
-        assert _externalize_post_login_target("/", "/hermes") == "/hermes/"
+        assert _externalize_post_login_target("/", "/eir") == "/eir/"
 
     def test_prefixed_path_unchanged(self):
-        from hermes_cli.dashboard_auth.routes import (
+        from eir_cli.dashboard_auth.routes import (
             _externalize_post_login_target,
         )
 
         assert (
-            _externalize_post_login_target("/hermes/sessions", "/hermes")
-            == "/hermes/sessions"
+            _externalize_post_login_target("/eir/sessions", "/eir")
+            == "/eir/sessions"
         )
 
     def test_empty_target_returns_empty(self):
-        from hermes_cli.dashboard_auth.routes import (
+        from eir_cli.dashboard_auth.routes import (
             _externalize_post_login_target,
         )
 
-        assert _externalize_post_login_target("", "/hermes") == ""
+        assert _externalize_post_login_target("", "/eir") == ""
 
     def test_empty_prefix_returns_target_unchanged(self):
-        from hermes_cli.dashboard_auth.routes import (
+        from eir_cli.dashboard_auth.routes import (
             _externalize_post_login_target,
         )
 
         assert _externalize_post_login_target("/", "") == "/"
 
     def test_trailing_slash_on_prefix_stripped(self):
-        from hermes_cli.dashboard_auth.routes import (
+        from eir_cli.dashboard_auth.routes import (
             _externalize_post_login_target,
         )
 
-        assert _externalize_post_login_target("/", "/hermes/") == "/hermes/"
+        assert _externalize_post_login_target("/", "/eir/") == "/eir/"
 
     def test_exact_prefix_match_returns_target(self):
-        from hermes_cli.dashboard_auth.routes import (
+        from eir_cli.dashboard_auth.routes import (
             _externalize_post_login_target,
         )
 
-        assert _externalize_post_login_target("/hermes", "/hermes") == "/hermes"
+        assert _externalize_post_login_target("/eir", "/eir") == "/eir"
 
 
 class TestPostLoginLandingPrefix:
@@ -588,15 +588,15 @@ class TestPostLoginLandingPrefix:
         self, gated_app_proxied
     ):
         """After OAuth callback with prefix, the 302 Location must be
-        ``/hermes/`` not bare ``/``."""
+        ``/eir/`` not bare ``/``."""
         r1 = gated_app_proxied.get(
             "/auth/login?provider=stub",
-            headers={"x-forwarded-prefix": "/hermes"},
+            headers={"x-forwarded-prefix": "/eir"},
             follow_redirects=False,
         )
         pkce_set = next(
             c for c in r1.headers.get_list("set-cookie")
-            if "hermes_session_pkce" in c
+            if "eir_session_pkce" in c
         )
         pkce_kv = pkce_set.split(";", 1)[0]
         state = r1.headers["location"].split("state=")[1]
@@ -604,14 +604,14 @@ class TestPostLoginLandingPrefix:
         r2 = gated_app_proxied.get(
             f"/auth/callback?code=stub_code&state={state}",
             headers={
-                "x-forwarded-prefix": "/hermes",
+                "x-forwarded-prefix": "/eir",
                 "cookie": pkce_kv,
             },
             follow_redirects=False,
         )
         assert r2.status_code == 302, r2.text
         location = r2.headers["location"]
-        assert location.startswith("/hermes/"), (
+        assert location.startswith("/eir/"), (
             f"callback redirect should carry prefix, got {location!r}"
         )
 
@@ -625,7 +625,7 @@ class TestPostLoginLandingPrefix:
         )
         pkce_set = next(
             c for c in r1.headers.get_list("set-cookie")
-            if "hermes_session_pkce" in c
+            if "eir_session_pkce" in c
         )
         pkce_kv = pkce_set.split(";", 1)[0]
         state = r1.headers["location"].split("state=")[1]
@@ -655,10 +655,10 @@ class TestLoginPageWholeClassPrefix:
 
     def test_login_page_fonts_prefixed_behind_proxy(self, gated_app_proxied):
         r = gated_app_proxied.get(
-            "/login", headers={"X-Forwarded-Prefix": "/hermes"})
+            "/login", headers={"X-Forwarded-Prefix": "/eir"})
         assert r.status_code == 200
         assert "url('/fonts/" not in r.text
-        assert "url('/hermes/fonts/" in r.text
+        assert "url('/eir/fonts/" in r.text
 
     def test_login_page_byte_identical_without_prefix(self, gated_app_direct):
         # No X-Forwarded-Prefix: no data-prefix, no rewritten fonts,
@@ -674,15 +674,15 @@ class TestLoginPageWholeClassPrefix:
         emitted page must carry both the attribute and the JS that reads it
         (the PKCE cookie Path matches the mount, so a root-absolute POST
         would silently drop the cookie and break native login)."""
-        from hermes_cli.dashboard_auth import clear_providers, register_provider
-        from tests.hermes_cli.test_dashboard_auth_password_login import (
+        from eir_cli.dashboard_auth import clear_providers, register_provider
+        from tests.eir_cli.test_dashboard_auth_password_login import (
             PasswordProvider)
 
         clear_providers()
         register_provider(PasswordProvider())
         try:
             r = gated_app_proxied.get(
-                "/login", headers={"X-Forwarded-Prefix": "/hermes"})
+                "/login", headers={"X-Forwarded-Prefix": "/eir"})
             assert r.status_code == 200
             html = r.text
             assert "getAttribute('data-prefix')" in html
@@ -694,8 +694,8 @@ class TestLoginPageWholeClassPrefix:
         """The RFC 8252 desktop provider chooser shares the login template,
         so its font URLs must honour the prefix too (rendered when more
         than one interactive provider is registered)."""
-        from tests.hermes_cli.conftest_dashboard_auth import StubAuthProvider
-        from hermes_cli.dashboard_auth.login_page import (
+        from tests.eir_cli.conftest_dashboard_auth import StubAuthProvider
+        from eir_cli.dashboard_auth.login_page import (
             render_native_provider_choice_html)
 
         class _SecondStub(StubAuthProvider):
@@ -704,21 +704,21 @@ class TestLoginPageWholeClassPrefix:
 
         html = render_native_provider_choice_html(
             providers=[StubAuthProvider(), _SecondStub()],
-            authorize_path="/hermes/auth/native/authorize",
+            authorize_path="/eir/auth/native/authorize",
             code_challenge="challenge",
             code_challenge_method="S256",
             redirect_uri="http://127.0.0.1:53123/cb",
             state="cli-state",
-            prefix="/hermes",
+            prefix="/eir",
         )
         assert "url('/fonts/" not in html
-        assert "url('/hermes/fonts/" in html
+        assert "url('/eir/fonts/" in html
         # The chooser buttons re-enter the mount, not the origin root.
-        assert 'href="/hermes/auth/native/authorize?' in html
+        assert 'href="/eir/auth/native/authorize?' in html
 
     def test_native_chooser_bare_root_without_prefix(self):
-        from tests.hermes_cli.conftest_dashboard_auth import StubAuthProvider
-        from hermes_cli.dashboard_auth.login_page import (
+        from tests.eir_cli.conftest_dashboard_auth import StubAuthProvider
+        from eir_cli.dashboard_auth.login_page import (
             render_native_provider_choice_html)
 
         class _SecondStub(StubAuthProvider):

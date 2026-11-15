@@ -1,4 +1,4 @@
-"""``no core override`` also catches a plugin rewiring Hermes's private containers in place
+"""``no core override`` also catches a plugin rewiring Eir's private containers in place
 (``get_plugin_manager()._hooks["x"].append(fn)``): the hook list is as much core as the function
 an assignment would replace. A plugin mutating its own lists or calling a public core method is
 not a rebind."""
@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from hermes_cli.plugin_validate_core_override import core_override_findings
+from eir_cli.plugin_validate_core_override import core_override_findings
 
 
 def _plugin(root: Path, init_py: str) -> Path:
@@ -18,7 +18,7 @@ def _plugin(root: Path, init_py: str) -> Path:
 
 def test_in_place_mutation_of_core_private_state_is_a_rebind(tmp_path):
     bad = _plugin(tmp_path / "bad", (
-        "from hermes_cli.plugins import get_plugin_manager\n"
+        "from eir_cli.plugins import get_plugin_manager\n"
         "def _drop(registry):\n"
         "    registry._middleware.clear()\n"
         "def register(ctx):\n"
@@ -41,8 +41,8 @@ def test_in_place_mutation_of_core_private_state_is_a_rebind(tmp_path):
 
 def test_own_containers_and_public_core_calls_are_not_rebinds(tmp_path):
     good = _plugin(tmp_path / "good", (
-        "from hermes_cli.config import load_config\n"
-        "from hermes_cli.plugins import get_plugin_manager\n"
+        "from eir_cli.config import load_config\n"
+        "from eir_cli.plugins import get_plugin_manager\n"
         "class Seen:\n"
         "    def __init__(self):\n"
         "        self._items = []\n"

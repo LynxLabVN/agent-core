@@ -13,14 +13,14 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pytest
 
-from hermes_cli import gateway_connections as store
-from hermes_cli import gateway_connections_oauth as oauth
-from hermes_cli import gateway_connections_reach as reach
+from eir_cli import gateway_connections as store
+from eir_cli import gateway_connections_oauth as oauth
+from eir_cli import gateway_connections_reach as reach
 
 
 @pytest.fixture
 def home(monkeypatch, tmp_path):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     return tmp_path
 
 

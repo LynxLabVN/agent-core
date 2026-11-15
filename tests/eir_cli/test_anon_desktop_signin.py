@@ -3,7 +3,7 @@
 ``POST /api/providers/oauth/nous/start`` hands the renderer the device page and code; the poller
 takes the token grant, persists the account, moves a replaced free tier's apps, and settles the
 default model. Driven through the real FastAPI routes against a fake portal (the same fake
-``hermes auth upgrade`` is tested with).
+``eir auth upgrade`` is tested with).
 """
 
 from __future__ import annotations
@@ -13,15 +13,15 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
-from hermes_cli import anon_auth
-from hermes_cli.auth import _load_auth_store
-from hermes_cli.web_server import _SESSION_TOKEN, app
-from tests.hermes_cli.anon_portal import as_local_desktop_backend, claimed_trial
-from tests.hermes_cli.test_anon_upgrade import (
+from eir_cli import anon_auth
+from eir_cli.auth import _load_auth_store
+from eir_cli.web_server import _SESSION_TOKEN, app
+from tests.eir_cli.anon_portal import as_local_desktop_backend, claimed_trial
+from tests.eir_cli.test_anon_upgrade import (
     EMAIL, FREE_PICK, INFERENCE, PORTAL, WELCOME, _model_config, _write_model_config, free_account, portal)
 
 client = TestClient(app)
-HEADERS = {"X-Hermes-Session-Token": _SESSION_TOKEN}
+HEADERS = {"X-Eir-Session-Token": _SESSION_TOKEN}
 
 __all__ = ["free_account", "portal"]  # fixtures imported from the CLI test module
 
@@ -94,7 +94,7 @@ def test_a_sign_in_cancelled_while_waiting_stops_the_token_poll_and_persists_not
     """The poller is blocked on the token endpoint when the user cancels: the poll stops, and
     nothing reaches the auth store."""
     import threading
-    from hermes_cli import web_server_oauth
+    from eir_cli import web_server_oauth
     guest = anon_auth.ensure_portal_identity(explicit=True)
     portal.token_pending = True
 

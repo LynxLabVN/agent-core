@@ -1,9 +1,9 @@
 """Copy the model and its selected custom endpoint into a new profile, and merge that endpoint
 over same-identity entries the new profile already has."""
 
-from hermes_cli.config import _expand_env_vars
-from hermes_cli.providers import custom_provider_aliases
-from hermes_cli.runtime_provider_custom import (
+from eir_cli.config import _expand_env_vars
+from eir_cli.providers import custom_provider_aliases
+from eir_cli.runtime_provider_custom import (
     _get_named_custom_provider,
     _normalize_custom_provider_name,
     _shadowed_by_builtin,
@@ -98,7 +98,7 @@ def _aliases(entry, key: str = "") -> frozenset[str]:
 def merge_endpoint_seed(dst_cfg: dict, seed: dict, *, claimed: frozenset[str] | None = None) -> dict:
     """Return a copy of *dst_cfg* with the seeded endpoint written first; a same-key destination
     entry is replaced whole. When the seed is an endpoint (it resolves), destination entries that
-    claim any of its identities are dropped in both sections: Hermes has several name lookups with
+    claim any of its identities are dropped in both sections: Eir has several name lookups with
     different skip rules (URL validation, ``enabled``, keyed-first), so only removing every
     same-identity entry guarantees each of them lands on the inherited endpoint. A URL-less tuning
     seed (``providers.custom``) claims no identity and replaces only its own key. Dropped entries

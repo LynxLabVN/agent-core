@@ -1,4 +1,4 @@
-"""``hermes kanban notify-subscribe`` run from a gateway session records the caller as the sender.
+"""``eir kanban notify-subscribe`` run from a gateway session records the caller as the sender.
 
 An agent in a Telegram group runs the command through its terminal tool without ``--user-id``.
 Under ``group_sessions_per_user`` (the default) the wake rebuilds the session key from the row,
@@ -11,19 +11,19 @@ from pathlib import Path
 
 import pytest
 
-from hermes_cli import kanban as kc
-from hermes_cli import kanban_db as kb
-from hermes_cli import kanban_db_connect as kbc
-from hermes_cli import kanban_db_notify as kbn
+from eir_cli import kanban as kc
+from eir_cli import kanban_db as kb
+from eir_cli import kanban_db_connect as kbc
+from eir_cli import kanban_db_notify as kbn
 
 GROUP = "-1003333333333"
 
 
 @pytest.fixture
 def kanban_home(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     kb.init_db()
     with kbc.connect() as conn:
@@ -31,7 +31,7 @@ def kanban_home(tmp_path, monkeypatch):
     # What the terminal tool hands the CLI child of a group-chat turn (tools/environments/local.py).
     for name, value in (("PLATFORM", "telegram"), ("CHAT_ID", GROUP), ("CHAT_TYPE", "group"),
                         ("USER_ID", "111")):
-        monkeypatch.setenv(f"HERMES_SESSION_{name}", value)
+        monkeypatch.setenv(f"EIR_SESSION_{name}", value)
     return task
 
 
@@ -54,7 +54,7 @@ def test_subscribing_the_callers_own_group_records_the_caller(kanban_home):
 
 def test_another_topic_of_the_callers_group_is_left_alone(kanban_home, monkeypatch):
     """A turn in topic 77 subscribing topic 88 is not that topic's requester: no stamp."""
-    monkeypatch.setenv("HERMES_SESSION_THREAD_ID", "77")
+    monkeypatch.setenv("EIR_SESSION_THREAD_ID", "77")
     _subscribe(kanban_home, "--platform", "telegram", "--chat-id", GROUP, "--thread-id", "88")
     assert _row(kanban_home)["user_id"] is None
     with kbc.connect() as conn:
@@ -75,7 +75,7 @@ def test_another_chat_and_an_explicit_id_are_left_alone(kanban_home):
 def test_an_explicit_alternate_id_is_not_paired_with_the_callers_primary(kanban_home, monkeypatch):
     """``--user-id-alt`` alone names another recipient: the caller's primary id is not stamped
     beside it, or the row would pair two different people."""
-    monkeypatch.setenv("HERMES_SESSION_USER_ID_ALT", "caller-alt")
+    monkeypatch.setenv("EIR_SESSION_USER_ID_ALT", "caller-alt")
     _subscribe(kanban_home, "--platform", "telegram", "--chat-id", GROUP, "--user-id-alt", "other-alt")
     row = _row(kanban_home)
     assert (row["user_id"], row["user_id_alt"]) == (None, "other-alt")

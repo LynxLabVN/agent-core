@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-import hermes_yaml as yaml
+import eir_yaml as yaml
 
 
 def test_run_xai_oauth_login_from_setup_does_not_hijack_active_provider(
@@ -14,14 +14,14 @@ def test_run_xai_oauth_login_from_setup_does_not_hijack_active_provider(
 
     Regression: `_run_xai_oauth_login_from_setup` used to call
     `_update_config_for_provider("xai-oauth")` (and token save flipped
-    `active_provider`), so `hermes setup tts` OAuth login hijacked the main
+    `active_provider`), so `eir setup tts` OAuth login hijacked the main
     chat provider.
     """
-    hermes_home = tmp_path / "hermes"
-    hermes_home.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    eir_home = tmp_path / "eir"
+    eir_home.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("EIR_HOME", str(eir_home))
 
-    auth_path = hermes_home / "auth.json"
+    auth_path = eir_home / "auth.json"
     auth_path.write_text(
         json.dumps(
             {
@@ -32,7 +32,7 @@ def test_run_xai_oauth_login_from_setup_does_not_hijack_active_provider(
         ),
         encoding="utf-8",
     )
-    config_path = hermes_home / "config.yaml"
+    config_path = eir_home / "config.yaml"
     config_path.write_text(
         yaml.safe_dump(
             {
@@ -48,7 +48,7 @@ def test_run_xai_oauth_login_from_setup_does_not_hijack_active_provider(
     )
 
     monkeypatch.setattr(
-        "hermes_cli.auth._xai_oauth_device_code_login",
+        "eir_cli.auth._xai_oauth_device_code_login",
         lambda **kwargs: {
             "tokens": {
                 "access_token": "tts-xai-access",
@@ -62,10 +62,10 @@ def test_run_xai_oauth_login_from_setup_does_not_hijack_active_provider(
             "last_refresh": "2026-07-25T12:00:00Z",
         },
     )
-    monkeypatch.setattr("hermes_cli.auth._is_remote_session", lambda: True)
+    monkeypatch.setattr("eir_cli.auth._is_remote_session", lambda: True)
 
-    from hermes_cli.auth import is_source_suppressed, suppress_credential_source
-    from hermes_cli.setup_tts import _run_xai_oauth_login_from_setup
+    from eir_cli.auth import is_source_suppressed, suppress_credential_source
+    from eir_cli.setup_tts import _run_xai_oauth_login_from_setup
 
     suppress_credential_source("xai-oauth", "device_code")
     assert is_source_suppressed("xai-oauth", "device_code") is True
@@ -89,7 +89,7 @@ def test_run_xai_oauth_login_from_setup_does_not_hijack_active_provider(
 def test_tts_xai_step_prefers_existing_api_key_over_oauth(monkeypatch):
     """Wizard copy must match runtime: an explicit XAI_API_KEY wins over stored OAuth
     tokens (the subscription bearer 403s on metered /v1/tts — #87045, #113727)."""
-    from hermes_cli import setup_tts
+    from eir_cli import setup_tts
 
     messages = []
     monkeypatch.setattr(setup_tts, "_xai_oauth_logged_in_for_setup", lambda: True)

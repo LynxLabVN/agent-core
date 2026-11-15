@@ -418,19 +418,19 @@ export function durableGroupChatMembers(bots: RosterRow[]): GroupMember[] {
     // connection switch the live roster row may be gone, and renamed-tag
     // mentions must still resolve against the persisted member.
     const title = String(
-      botRosterMeta(bot, $botMeta.get())?.title || bot.ui_meta?.['hermes-bots']?.title || bot.title || ''
+      botRosterMeta(bot, $botMeta.get())?.title || bot.ui_meta?.['eir-bots']?.title || bot.title || ''
     ).trim()
 
     return {
       name: bot.name,
       handle: botHandle(bot.name, bot) || bot.handle || bot.name,
-      // The stored handle alone cannot say why a default is not @hermes, and
-      // botHandle re-derives 'hermes' for it: keep the claim, or a room whose
-      // live row is gone tells two bots they are both @hermes. A live row
+      // The stored handle alone cannot say why a default is not @eir, and
+      // botHandle re-derives 'eir' for it: keep the claim, or a room whose
+      // live row is gone tells two bots they are both @eir. A live row
       // (groupChatMemberBots prefers it) recomputes this from the roster.
-      ...(bot.hermesHandleTaken
+      ...(bot.eirHandleTaken
         ? {
-            hermesHandleTaken: true
+            eirHandleTaken: true
           }
         : {}),
       ...(title

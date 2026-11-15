@@ -4,14 +4,14 @@ from unittest.mock import patch
 
 from rich.console import Console
 
-from hermes_cli import banner
+from eir_cli import banner
 import model_tools
 import tools.mcp_tool_discovery
 
 def test_banner_snapshot_accepts_bom_without_weakening_freshness(tmp_path, monkeypatch):
     import json
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     monkeypatch.setattr(banner, "get_git_banner_state", lambda: None)
     monkeypatch.setattr(banner, "get_available_skills", lambda: {"notes": ["café"]})
     tools = [{"function": {"name": "read_file"}}]
@@ -37,8 +37,8 @@ def test_cprint_falls_back_to_plain_print_when_prompt_toolkit_has_no_console(cap
 
 def test_empty_model_shows_no_model_configured(tmp_path, monkeypatch):
     """The banner prints before credentials resolve; with no model it says so rather than guessing."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
-    (tmp_path / ".hermes").mkdir()
+    monkeypatch.setenv("EIR_HOME", str(tmp_path / ".eir"))
+    (tmp_path / ".eir").mkdir()
     with (
         patch.object(model_tools, "check_tool_availability", return_value=([], [])),
         patch.object(banner, "get_available_skills", return_value={}),
@@ -77,7 +77,7 @@ def test_build_welcome_banner_does_not_center_pad_hero_art():
 
 
 def test_baked_banner_uses_live_identity(monkeypatch):
-    from hermes_cli import banner, version_info
+    from eir_cli import banner, version_info
 
     monkeypatch.setattr(version_info, "get_code_identity", lambda: {"short_sha": "a1b2c3d4"})
     assert banner._baked_banner_state() == {"upstream": "a1b2c3d4", "local": "a1b2c3d4", "ahead": 0}

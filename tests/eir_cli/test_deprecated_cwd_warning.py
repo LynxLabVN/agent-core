@@ -2,11 +2,11 @@
 
 
 def _write_env(monkeypatch, tmp_path, content):
-    hermes_home = tmp_path / ".hermes"
-    hermes_home.mkdir()
-    (hermes_home / ".env").write_text(content, encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
-    return hermes_home
+    eir_home = tmp_path / ".eir"
+    eir_home.mkdir()
+    (eir_home / ".env").write_text(content, encoding="utf-8")
+    monkeypatch.setenv("EIR_HOME", str(eir_home))
+    return eir_home
 
 
 class TestDeprecatedCwdWarning:
@@ -19,7 +19,7 @@ class TestDeprecatedCwdWarning:
         monkeypatch.setenv("MESSAGING_CWD", "/process/message-path")
         monkeypatch.setenv("TERMINAL_CWD", "/process/terminal-path")
 
-        from hermes_cli.config import warn_deprecated_cwd_env_vars
+        from eir_cli.config import warn_deprecated_cwd_env_vars
 
         warn_deprecated_cwd_env_vars()
 
@@ -36,7 +36,7 @@ class TestDeprecatedCwdWarning:
         monkeypatch.delenv("MESSAGING_CWD", raising=False)
         monkeypatch.delenv("TERMINAL_CWD", raising=False)
 
-        from hermes_cli.config import warn_deprecated_cwd_env_vars
+        from eir_cli.config import warn_deprecated_cwd_env_vars
 
         warn_deprecated_cwd_env_vars()
 
@@ -49,14 +49,14 @@ class TestDeprecatedCwdWarning:
     def test_dotenv_terminal_cwd_warns_with_explicit_config(
         self, monkeypatch, tmp_path, capsys
     ):
-        hermes_home = _write_env(
+        eir_home = _write_env(
             monkeypatch, tmp_path, "TERMINAL_CWD=/legacy/path\n"
         )
-        (hermes_home / "config.yaml").write_text(
+        (eir_home / "config.yaml").write_text(
             "terminal:\n  cwd: /current/path\n", encoding="utf-8"
         )
 
-        from hermes_cli.config import warn_deprecated_cwd_env_vars
+        from eir_cli.config import warn_deprecated_cwd_env_vars
 
         warn_deprecated_cwd_env_vars()
 
@@ -72,14 +72,14 @@ class TestDeprecatedCwdWarning:
         )
         monkeypatch.setenv("TERMINAL_CWD", "/process/bridge")
 
-        from hermes_cli.config import warn_deprecated_cwd_env_vars
+        from eir_cli.config import warn_deprecated_cwd_env_vars
 
         warn_deprecated_cwd_env_vars()
 
         assert capsys.readouterr().err == ""
 
     def test_dotenv_read_failure_is_silent(self, monkeypatch, capsys):
-        import hermes_cli.config as config_module
+        import eir_cli.config as config_module
 
         def raise_read_error():
             raise OSError("permission denied")

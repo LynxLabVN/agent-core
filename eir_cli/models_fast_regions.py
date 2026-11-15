@@ -20,7 +20,7 @@ _FAST_REGION_MODELS: dict[str, Optional[frozenset[str]]] = {
 def openai_fast_region_allows(base_url: Optional[str], model_id: Optional[str]) -> bool:
     """True when a regional OpenAI host documents fast tiers for this model."""
     from agent.model_metadata import strip_codex_context_variant_suffix
-    from hermes_cli.models import _strip_vendor_prefix
+    from eir_cli.models import _strip_vendor_prefix
     from utils import base_url_hostname
 
     host = base_url_hostname(str(base_url or ""))

@@ -1,4 +1,4 @@
-"""``hermes browser`` subcommand parser."""
+"""``eir browser`` subcommand parser."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ def build_browser_parser(subparsers) -> None:
         "browser", help="Real-profile browsing helpers (close a browser locking its profile)",
         description="Helpers for real-profile browsing (browser.use_real_profile). "
             "close-profile terminates the browser process tree holding your "
-            "default profile so Hermes can copy it — DESTRUCTIVE (unsaved tabs "
+            "default profile so Eir can copy it — DESTRUCTIVE (unsaved tabs "
             "in that browser are lost). The agent runs this only after you "
             "approve closing the browser.")
     browser_subparsers = browser_parser.add_subparsers(dest="browser_action")
@@ -25,18 +25,18 @@ def build_browser_parser(subparsers) -> None:
         help="Override detected default browser (chrome/edge/brave/brave-origin/chromium)")
 
     # Desktop-only plumbing (help hidden): Electron main reads the real-profile browser's cookies through it
-    # to sign the in-app browser in (hermes_cli/browser_preview_signins.py).
+    # to sign the in-app browser in (eir_cli/browser_preview_signins.py).
     browser_export = browser_subparsers.add_parser("export-signins", help=argparse.SUPPRESS)
     browser_export.add_argument("--json", action="store_true")
 
     def _dispatch_browser(_args):
-        from hermes_cli.browser_connect import (
+        from eir_cli.browser_connect import (
             UNSUPPORTED_CHANNEL, close_browser_holding_profile, detect_default_chromium,
             real_profile_data_dir)
 
         action = getattr(_args, "browser_action", None)
         if action == "export-signins":
-            from hermes_cli.browser_preview_signins import run_export_signins
+            from eir_cli.browser_preview_signins import run_export_signins
             return run_export_signins(_args)
         if action != "close-profile":
             browser_parser.print_help()

@@ -9,8 +9,8 @@ from pathlib import Path
 
 import pytest
 
-from hermes_cli import post_update
-from hermes_cli.post_update import (
+from eir_cli import post_update
+from eir_cli.post_update import (
     HOME_STEPS,
     MACHINE_STEPS,
     run_steps,
@@ -63,7 +63,7 @@ def test_run_steps_isolates_failures():
 
 
 def test_migrate_config_noop_when_current(monkeypatch):
-    import hermes_cli.config as cfg
+    import eir_cli.config as cfg
 
     monkeypatch.setattr(cfg, "check_config_version", lambda: (34, 34))
     result = step_migrate_config()
@@ -73,8 +73,8 @@ def test_migrate_config_noop_when_current(monkeypatch):
 def test_migrate_config_restores_backup_when_version_does_not_advance(
     tmp_path, monkeypatch
 ):
-    import hermes_cli.config as cfg
-    import hermes_cli.config_migrations as mig
+    import eir_cli.config as cfg
+    import eir_cli.config_migrations as mig
 
     config_path = tmp_path / "config.yaml"
     config_path.write_text("_config_version: 20\n", encoding="utf-8")
@@ -106,14 +106,14 @@ def test_boot_keeps_the_steps_before_a_failing_one_and_retries_it_each_start(
 ):
     """A step that raises is partial progress at boot, not a failure to undo: the steps before it
     stay (no backup restore), the stamp stops at the last good one, the failing step is retried on
-    every start of the same revision, and ``hermes doctor`` says why the version is behind."""
+    every start of the same revision, and ``eir doctor`` says why the version is behind."""
     import json
 
-    import hermes_yaml as yaml
-    from hermes_cli import boot_bootstrap
-    from hermes_cli.config import DEFAULT_CONFIG
-    from hermes_cli.doctor_config import _drift_config_version
-    from hermes_cli.doctor_report import Finding
+    import eir_yaml as yaml
+    from eir_cli import boot_bootstrap
+    from eir_cli.config import DEFAULT_CONFIG
+    from eir_cli.doctor_config import _drift_config_version
+    from eir_cli.doctor_report import Finding
 
     home = tmp_path / "home"
     home.mkdir()
@@ -121,8 +121,8 @@ def test_boot_keeps_the_steps_before_a_failing_one_and_retries_it_each_start(
     root.mkdir()
     (root / "install-stamp.json").write_text(json.dumps({"commit": "abcdef012345", "payload": "full"}))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.setenv("HERMES_INSTALL_ROOT", str(root))
+    monkeypatch.setenv("EIR_HOME", str(home))
+    monkeypatch.setenv("EIR_INSTALL_ROOT", str(root))
     monkeypatch.setattr(post_update, "BOOT_HOME_STEPS", (("migrate_config", step_migrate_config),))
     config_path = home / "config.yaml"
     config_path.write_text(yaml.safe_dump({
@@ -156,9 +156,9 @@ def test_a_retry_that_raises_still_owes_the_step(tmp_path, monkeypatch):
     succeeded clears it."""
     import json
 
-    import hermes_yaml as yaml
-    from hermes_cli import boot_bootstrap
-    from hermes_cli.config import DEFAULT_CONFIG
+    import eir_yaml as yaml
+    from eir_cli import boot_bootstrap
+    from eir_cli.config import DEFAULT_CONFIG
 
     home = tmp_path / "home"
     home.mkdir()
@@ -166,8 +166,8 @@ def test_a_retry_that_raises_still_owes_the_step(tmp_path, monkeypatch):
     root.mkdir()
     (root / "install-stamp.json").write_text(json.dumps({"commit": "abcdef012345", "payload": "full"}))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.setenv("HERMES_INSTALL_ROOT", str(root))
+    monkeypatch.setenv("EIR_HOME", str(home))
+    monkeypatch.setenv("EIR_INSTALL_ROOT", str(root))
     monkeypatch.setattr(post_update, "BOOT_HOME_STEPS", (("migrate_config", step_migrate_config),))
     config_path = home / "config.yaml"
     config_path.write_text(yaml.safe_dump({"_config_version": 20, "plugins": {"disabled": [["x"]]}}),
@@ -200,12 +200,12 @@ def test_a_retry_that_raises_still_owes_the_step(tmp_path, monkeypatch):
 
 
 def test_state_db_guard_skips_missing_db(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     assert step_state_db_guard() == {"ok": True, "skipped": "no-state-db"}
 
 
 def test_state_db_guard_flags_corrupt_db(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     (tmp_path / "state.db").write_text("this is not sqlite", encoding="utf-8")
     result = step_state_db_guard()
     assert result["ok"] is False
@@ -215,7 +215,7 @@ def test_state_db_guard_flags_corrupt_db(tmp_path, monkeypatch):
 def test_state_db_guard_passes_valid_db(tmp_path, monkeypatch):
     import sqlite3
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     conn = sqlite3.connect(tmp_path / "state.db")
     conn.execute("CREATE TABLE t (x)")
     conn.commit()
@@ -227,8 +227,8 @@ def test_state_db_guard_passes_valid_db(tmp_path, monkeypatch):
 
 
 def test_boot_drops_the_live_plugin_catalog_cache(tmp_path, monkeypatch):
-    """Bundled-app updates skip `hermes update`'s tail; the boot step covers them (#119340)."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    """Bundled-app updates skip `eir update`'s tail; the boot step covers them (#119340)."""
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     cache = tmp_path / "cache" / "plugin-catalog.json"
     cache.parent.mkdir()
     cache.write_text("{}", encoding="utf-8")
@@ -266,7 +266,7 @@ def test_provisioning_does_not_use_human_diagnostics(tmp_path, monkeypatch):
     (runtime / "facts.json").write_text(json.dumps({"schema": 1, "packages": {}}))
     lock = tmp_path / "lock.json"
     lock.write_text(json.dumps({"schema": 1, "packages": {"node": {"version": "test"}}}))
-    monkeypatch.setenv("HERMES_RUNTIME_DIR", str(runtime))
+    monkeypatch.setenv("EIR_RUNTIME_DIR", str(runtime))
     monkeypatch.setattr(paths, "lockfile_path", lambda: lock)
     monkeypatch.setattr(engine, "sealed", lambda: False)
     monkeypatch.setattr(engine, "lazy_installs_allowed", lambda: True)
@@ -371,8 +371,8 @@ def test_scope_cli_rejects_unrelated_flags_without_running_steps(monkeypatch):
 @pytest.mark.platforms("posix")
 def test_migration_backups_are_owner_only_even_from_a_world_readable_source(tmp_path, monkeypatch):
     """copy2 keeps the source mode, and migration backups outlive a successful run (#148317)."""
-    monkeypatch.setattr("hermes_cli.config.is_managed", lambda: False)
-    monkeypatch.setattr("hermes_cli.config._container_or_chmod_skipped", lambda: False)
+    monkeypatch.setattr("eir_cli.config.is_managed", lambda: False)
+    monkeypatch.setattr("eir_cli.config._container_or_chmod_skipped", lambda: False)
     sources = []
     for name in ("config.yaml", ".env"):
         path = tmp_path / name

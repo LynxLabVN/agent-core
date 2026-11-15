@@ -1,4 +1,4 @@
-"""Text typed while a turn runs must not land in plaintext files under HERMES_HOME (#75461).
+"""Text typed while a turn runs must not land in plaintext files under EIR_HOME (#75461).
 
 Users paste credentials into the prompt (bot tokens during platform setup). The interrupt
 paths used to append the raw message to ``interrupt_debug.log`` with ``open().write()``,
@@ -11,7 +11,7 @@ import queue
 from unittest.mock import patch
 
 from agent.onboarding import BUSY_INPUT_FLAG
-from tests.hermes_cli.test_cli_interrupt_ack_race import _make_cli, _StubAgent
+from tests.eir_cli.test_cli_interrupt_ack_race import _make_cli, _StubAgent
 
 SECRET = "1234567890:" + "A" * 35  # Telegram bot-token shape, synthetic
 
@@ -30,7 +30,7 @@ def test_interrupt_fired_during_chat_does_not_persist_the_message(tmp_path):
 
     import cli as cli_mod
 
-    with patch.object(cli_mod, "_hermes_home", tmp_path), \
+    with patch.object(cli_mod, "_eir_home", tmp_path), \
          patch.object(cli, "_ensure_runtime_credentials", return_value=True), \
          patch.object(cli, "_resolve_turn_agent_config", return_value={
              "signature": cli._active_agent_route_signature,
@@ -46,14 +46,14 @@ def test_interrupt_fired_during_chat_does_not_persist_the_message(tmp_path):
 def test_enter_while_busy_interrupt_does_not_persist_the_message(tmp_path):
     import cli as cli_mod
 
-    shell = object.__new__(cli_mod.HermesCLI)
+    shell = object.__new__(cli_mod.EirCLI)
     shell.busy_input_mode = "interrupt"
     shell.agent = None  # no redirect support -> legacy interrupt queue
     shell._agent_running = True
     shell._pending_input, shell._interrupt_queue = queue.Queue(), queue.Queue()
     config = {"onboarding": {"seen": {BUSY_INPUT_FLAG: True}}}
 
-    with patch.object(cli_mod, "_hermes_home", tmp_path), patch.dict(cli_mod.__dict__, {"CLI_CONFIG": config}):
+    with patch.object(cli_mod, "_eir_home", tmp_path), patch.dict(cli_mod.__dict__, {"CLI_CONFIG": config}):
         shell._tui_enter_while_busy(SECRET, [], SECRET)
 
     assert shell._interrupt_queue.get_nowait() == SECRET
@@ -64,7 +64,7 @@ def test_no_tip_points_users_at_the_removed_debug_file():
     """The startup tips must not send users to ``interrupt_debug.log``: nothing writes it now."""
     from agent import i18n
     from agent.i18n import t
-    from hermes_cli import tips
+    from eir_cli import tips
 
     stale = [(lang, key) for lang in i18n.supported_languages() for key in tips.tip_keys()
              if "interrupt_debug.log" in t(key, lang=lang)]

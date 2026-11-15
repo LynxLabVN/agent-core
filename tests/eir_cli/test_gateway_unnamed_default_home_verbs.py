@@ -15,25 +15,25 @@ import pytest
 def default_home_process(tmp_path, monkeypatch):
     """Process whose own home is the DEFAULT one, with a sticky active_profile naming a
     named profile (the state that made the selector-less child resolve the wrong home)."""
-    root = tmp_path / "hermes"
+    root = tmp_path / "eir"
     (root / "profiles" / "coder").mkdir(parents=True)
     (root / "profiles" / "coder" / "config.yaml").write_text("{}\n")  # identity marker
     (root / "config.yaml").write_text("model: {default: x}\n")
     (root / "active_profile").write_text("coder")  # sticky: points at a named profile
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(root))
-    for var in ("HERMES_SUPERVISED_CHILD", "HERMES_S6_SUPERVISED_CHILD", "INVOCATION_ID",
-                "HERMES_GATEWAY_EXTERNAL_SUPERVISOR", "HERMES_UPDATE_POST_SWAP"):
+    monkeypatch.setenv("EIR_HOME", str(root))
+    for var in ("EIR_SUPERVISED_CHILD", "EIR_S6_SUPERVISED_CHILD", "INVOCATION_ID",
+                "EIR_GATEWAY_EXTERNAL_SUPERVISOR", "EIR_UPDATE_POST_SWAP"):
         monkeypatch.delenv(var, raising=False)
-    import hermes_constants
-    monkeypatch.setattr(hermes_constants, "_default_hermes_root_memo", None)
+    import eir_constants
+    monkeypatch.setattr(eir_constants, "_default_eir_root_memo", None)
     return root
 
 
 def test_unnamed_lifecycle_verbs_from_default_home_always_name_default(default_home_process):
     """Every unnamed verb pins ``-p default``: the child argv names a profile and the env
     pins the default home even though the sticky ``active_profile`` names ``coder``."""
-    from hermes_cli.web_server_gateway import (
+    from eir_cli.web_server_gateway import (
         _gateway_subcommand,
         _named_profile_from_action,
         _profile_action_environment,
@@ -44,4 +44,4 @@ def test_unnamed_lifecycle_verbs_from_default_home_always_name_default(default_h
         assert argv == ["-p", "default", "gateway", verb]
         assert _named_profile_from_action(argv) == "default"
     env = _profile_action_environment(_gateway_subcommand(None, "restart"))
-    assert env["HERMES_HOME"] == str(default_home_process)
+    assert env["EIR_HOME"] == str(default_home_process)

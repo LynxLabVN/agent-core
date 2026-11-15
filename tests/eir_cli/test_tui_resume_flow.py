@@ -4,7 +4,7 @@ from pathlib import Path
 import sys
 
 import pytest
-from hermes_cli import main_tui_launch, session_worktree
+from eir_cli import main_tui_launch, session_worktree
 
 
 def _args(**overrides):
@@ -27,7 +27,7 @@ def _raise_exit(rc):
 
 @pytest.fixture
 def main_mod(monkeypatch):
-    import hermes_cli.main as mod
+    import eir_cli.main as mod
 
     monkeypatch.setattr(mod, "_has_any_provider_configured", lambda: True)
     return mod
@@ -64,7 +64,7 @@ def test_exit_after_oneshot_flushes_stdio_and_calls_os_exit(
 
 
 def test_launch_tui_exports_model_provider_and_toolsets(monkeypatch, main_mod):
-    monkeypatch.setenv("HERMES_PYTHON", sys.executable)
+    monkeypatch.setenv("EIR_PYTHON", sys.executable)
     captured = {}
     active_path_during_call = None
 
@@ -75,7 +75,7 @@ def test_launch_tui_exports_model_provider_and_toolsets(monkeypatch, main_mod):
     def fake_call(argv, cwd=None, env=None):
         nonlocal active_path_during_call
         captured.update({"argv": argv, "cwd": cwd, "env": env})
-        active_path_during_call = Path(env["HERMES_TUI_ACTIVE_SESSION_FILE"])
+        active_path_during_call = Path(env["EIR_TUI_ACTIVE_SESSION_FILE"])
         assert active_path_during_call.exists()
         return 1
 
@@ -83,27 +83,27 @@ def test_launch_tui_exports_model_provider_and_toolsets(monkeypatch, main_mod):
 
     with pytest.raises(SystemExit):
         main_mod._launch_tui(
-            model="nous/hermes-test", provider="nous", toolsets="web, terminal"
+            model="nous/eir-test", provider="nous", toolsets="web, terminal"
         )
 
     env = captured["env"]
-    assert env["HERMES_MODEL"] == "nous/hermes-test"
-    assert env["HERMES_INFERENCE_MODEL"] == "nous/hermes-test"
-    assert env["HERMES_TUI_PROVIDER"] == "nous"
-    assert env["HERMES_INFERENCE_PROVIDER"] == "nous"
-    assert env["HERMES_TUI_TOOLSETS"] == "web,terminal"
-    active_path = Path(env["HERMES_TUI_ACTIVE_SESSION_FILE"])
-    assert active_path.name.startswith("hermes-tui-active-session-")
+    assert env["EIR_MODEL"] == "nous/eir-test"
+    assert env["EIR_INFERENCE_MODEL"] == "nous/eir-test"
+    assert env["EIR_TUI_PROVIDER"] == "nous"
+    assert env["EIR_INFERENCE_PROVIDER"] == "nous"
+    assert env["EIR_TUI_TOOLSETS"] == "web,terminal"
+    active_path = Path(env["EIR_TUI_ACTIVE_SESSION_FILE"])
+    assert active_path.name.startswith("eir-tui-active-session-")
     assert active_path.suffix == ".json"
     assert active_path_during_call == active_path
     assert not active_path.exists()
     assert env["NODE_ENV"] == "production"
 
 
-def test_launch_tui_prefers_launch_cwd_over_inherited_hermes_cwd(monkeypatch, main_mod, tmp_path):
-    """The directory `hermes --tui` was run from outranks an inherited HERMES_CWD.
+def test_launch_tui_prefers_launch_cwd_over_inherited_eir_cwd(monkeypatch, main_mod, tmp_path):
+    """The directory `eir --tui` was run from outranks an inherited EIR_CWD.
 
-    A shell export - or an outer `hermes --tui` - leaves HERMES_CWD naming a real but stale
+    A shell export - or an outer `eir --tui` - leaves EIR_CWD naming a real but stale
     directory, and the gateway Ink's client starts runs the session in whatever it names,
     so the session reads files and completions from the wrong project (#49637).
     """
@@ -111,8 +111,8 @@ def test_launch_tui_prefers_launch_cwd_over_inherited_hermes_cwd(monkeypatch, ma
     launch = tmp_path / "launch-project"
     stale.mkdir()
     launch.mkdir()
-    monkeypatch.setenv("HERMES_PYTHON", sys.executable)
-    monkeypatch.setenv("HERMES_CWD", str(stale))
+    monkeypatch.setenv("EIR_PYTHON", sys.executable)
+    monkeypatch.setenv("EIR_CWD", str(stale))
     monkeypatch.chdir(launch)
 
     captured = {}
@@ -126,7 +126,7 @@ def test_launch_tui_prefers_launch_cwd_over_inherited_hermes_cwd(monkeypatch, ma
     with pytest.raises(SystemExit):
         main_mod._launch_tui()
 
-    handed_to_tui = Path(captured["env"]["HERMES_CWD"]).resolve()
+    handed_to_tui = Path(captured["env"]["EIR_CWD"]).resolve()
     assert handed_to_tui == launch.resolve(), "the TUI gateway must start where the user launched"
     assert handed_to_tui != stale.resolve()
 
@@ -137,8 +137,8 @@ def test_launch_tui_worktree_still_outranks_the_launch_cwd(monkeypatch, main_mod
     launch = tmp_path / "launch-project"
     worktree.mkdir()
     launch.mkdir()
-    monkeypatch.setenv("HERMES_PYTHON", sys.executable)
-    monkeypatch.setenv("HERMES_CWD", str(tmp_path))
+    monkeypatch.setenv("EIR_PYTHON", sys.executable)
+    monkeypatch.setenv("EIR_CWD", str(tmp_path))
     monkeypatch.chdir(launch)
 
     captured = {}
@@ -153,9 +153,9 @@ def test_launch_tui_worktree_still_outranks_the_launch_cwd(monkeypatch, main_mod
     with pytest.raises(SystemExit):
         main_mod._launch_tui(worktree=True)
 
-    assert captured["env"]["HERMES_CWD"] == str(worktree)
+    assert captured["env"]["EIR_CWD"] == str(worktree)
     assert captured["env"]["TERMINAL_CWD"] == str(worktree)
-    assert Path(captured["env"]["HERMES_CWD"]).resolve() != launch.resolve()
+    assert Path(captured["env"]["EIR_CWD"]).resolve() != launch.resolve()
 
 
 @pytest.mark.parametrize("backend", ["local", "docker"])
@@ -168,12 +168,12 @@ def test_launch_tui_local_session_starts_in_launch_dir_not_terminal_cwd(monkeypa
     launch = tmp_path / "launch-project"
     configured.mkdir()
     launch.mkdir()
-    (Path(os.environ["HERMES_HOME"]) / "config.yaml").write_text(
+    (Path(os.environ["EIR_HOME"]) / "config.yaml").write_text(
         f"terminal:\n  backend: {backend}\n  cwd: {configured}\n", encoding="utf-8")
     monkeypatch.delenv("TERMINAL_ENV", raising=False)
     monkeypatch.delenv("TERMINAL_CWD", raising=False)
-    monkeypatch.setenv("HERMES_PYTHON", sys.executable)
-    monkeypatch.setenv("HERMES_TUI_CWD", str(tmp_path))  # stale, from an outer launcher
+    monkeypatch.setenv("EIR_PYTHON", sys.executable)
+    monkeypatch.setenv("EIR_TUI_CWD", str(tmp_path))  # stale, from an outer launcher
     monkeypatch.chdir(launch)
 
     captured = {}
@@ -189,21 +189,21 @@ def test_launch_tui_local_session_starts_in_launch_dir_not_terminal_cwd(monkeypa
 
     env = captured["env"]
     if backend == "local":
-        assert Path(env["HERMES_TUI_CWD"]).resolve() == launch.resolve()
+        assert Path(env["EIR_TUI_CWD"]).resolve() == launch.resolve()
         assert Path(env["TERMINAL_CWD"]).resolve() == launch.resolve()
     else:
-        assert "HERMES_TUI_CWD" not in env
+        assert "EIR_TUI_CWD" not in env
         assert Path(env["TERMINAL_CWD"]).resolve() == configured.resolve()
 
 
-@pytest.mark.parametrize("flag", ["HERMES_SAFE_MODE", "HERMES_IGNORE_USER_CONFIG"])
+@pytest.mark.parametrize("flag", ["EIR_SAFE_MODE", "EIR_IGNORE_USER_CONFIG"])
 def test_launch_tui_bypass_without_model_refuses_before_the_tui_starts(monkeypatch, main_mod, capsys, flag):
-    """`hermes --tui --safe-mode` (or an exported HERMES_IGNORE_USER_CONFIG=1) reads no profile
+    """`eir --tui --safe-mode` (or an exported EIR_IGNORE_USER_CONFIG=1) reads no profile
     default model: the owner refuses session.create with bare invalid_params, so the launcher must
     say "pass --model" before spawning the TUI, as classic chat does."""
     monkeypatch.setenv(flag, "1")
-    monkeypatch.delenv("HERMES_MODEL", raising=False)
-    monkeypatch.setenv("HERMES_PYTHON", sys.executable)  # never resolve a python over the real PATH
+    monkeypatch.delenv("EIR_MODEL", raising=False)
+    monkeypatch.setenv("EIR_PYTHON", sys.executable)  # never resolve a python over the real PATH
     monkeypatch.setattr(main_tui_launch, "_make_tui_argv",
                         lambda tui_dir, tui_dev, notices=None: (["node", "dist/entry.js"], Path(".")))
     spawned = []
@@ -214,4 +214,4 @@ def test_launch_tui_bypass_without_model_refuses_before_the_tui_starts(monkeypat
     assert "pass --model explicitly" in capsys.readouterr().err
     with pytest.raises(SystemExit):
         main_mod._launch_tui(model="stub-model")
-    assert spawned and spawned[-1][flag] == "1" and spawned[-1]["HERMES_MODEL"] == "stub-model"
+    assert spawned and spawned[-1][flag] == "1" and spawned[-1]["EIR_MODEL"] == "stub-model"

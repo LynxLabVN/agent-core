@@ -1,9 +1,9 @@
-"""``hermes sessions`` command.
+"""``eir sessions`` command.
 
 ``cmd_sessions`` routes ``args.sessions_action`` through ``_PRE_DB_HANDLERS`` (repair / recover /
 import — must run without opening ``SessionDB()``, which a malformed schema prevents) and
-``_DB_HANDLERS`` (everything else, sharing one ``SessionDB``). ``get_hermes_home`` is resolved through
-``hermes_cli.main`` at call time so monkeypatches keep working. Picker: :mod:`hermes_cli.sessions_cmd_browse`.
+``_DB_HANDLERS`` (everything else, sharing one ``SessionDB``). ``get_eir_home`` is resolved through
+``eir_cli.main`` at call time so monkeypatches keep working. Picker: :mod:`eir_cli.sessions_cmd_browse`.
 """
 
 import json
@@ -14,18 +14,18 @@ import sys
 from functools import partial
 from pathlib import Path
 
-from hermes_cli.cli_output import print_truncated
-from hermes_cli.sessions_cmd_browse import _relative_time, _session_browse_picker
-from hermes_state_errors import SessionActiveWriteGuardError
+from eir_cli.cli_output import print_truncated
+from eir_cli.sessions_cmd_browse import _relative_time, _session_browse_picker
+from eir_state_errors import SessionActiveWriteGuardError
 
 
-def get_hermes_home():
-    from hermes_cli import main
-    return main.get_hermes_home()
+def get_eir_home():
+    from eir_cli import main
+    return main.get_eir_home()
 
 
 def _sessions_dir() -> Path:
-    return get_hermes_home() / "sessions"
+    return get_eir_home() / "sessions"
 
 
 def _size_mb(path) -> float:
@@ -47,7 +47,7 @@ def _confirm_prompt(prompt: str) -> bool | None:
     except EOFError:
         print()
         # isatty() alone is True for Windows NUL; the console check keeps `< NUL` unattended (#113977).
-        from hermes_cli.gateway_windows import _stdin_console_mode_ok, _stdin_is_interactive
+        from eir_cli.gateway_windows import _stdin_console_mode_ok, _stdin_is_interactive
         return False if _stdin_is_interactive(isatty=sys.stdin.isatty(), console_mode_ok=_stdin_console_mode_ok()) else None
 
 
@@ -71,12 +71,12 @@ def _confirm_or_exit_code(prompt: str, *, declined: str = "Cancelled.", unattend
 
 
 def _not_found(session_id) -> int:
-    print(f"No session '{session_id}'. Run: hermes sessions list to find the id.")
+    print(f"No session '{session_id}'. Run: eir sessions list to find the id.")
     return 1
 
 
 def _print_dry_run_preview(candidates, filters) -> None:
-    from hermes_cli.session_filters import describe_filters
+    from eir_cli.session_filters import describe_filters
     print(f"Would export {len(candidates)} session(s) ({describe_filters(filters)}).")
     for row in candidates[:100]:
         print(f"  {row.get('id')}  {row.get('source', '')}")
@@ -96,8 +96,8 @@ def _any_filter_args(args) -> bool:
 
 
 def _export_dir(output) -> Path:
-    """``--output`` dir for multi-file exports; ``~/.hermes/session-exports`` when empty or ``-``."""
-    return Path(output).expanduser() if output and output != "-" else get_hermes_home() / "session-exports"
+    """``--output`` dir for multi-file exports; ``~/.eir/session-exports`` when empty or ``-``."""
+    return Path(output).expanduser() if output and output != "-" else get_eir_home() / "session-exports"
 
 
 def _output_file_in_dir(output, default_name: str):
@@ -124,12 +124,12 @@ def _write_output(output, text, summary) -> None:
 # -- handlers that must run BEFORE SessionDB() is opened ----------------------
 
 def _cmd_repair(args):
-    from hermes_state import DEFAULT_DB_PATH as db_path, SessionDB
-    from hermes_state_repair import HealthCheckUnavailable, _db_opens_cleanly, repair_state_db_schema
+    from eir_state import DEFAULT_DB_PATH as db_path, SessionDB
+    from eir_state_repair import HealthCheckUnavailable, _db_opens_cleanly, repair_state_db_schema
     if not db_path.exists():
         print(f"No session database at {db_path} (nothing to repair).")
         return
-    from hermes_state_reconcile import repair_declarative_schema, schema_drift_reason
+    from eir_state_reconcile import repair_declarative_schema, schema_drift_reason
     # A missing canonical sessions table is not additive upgrade drift: creating
     # an empty one could hide lost history. Preserve corruption/recovery routing.
     reason = _db_opens_cleanly(db_path)
@@ -176,11 +176,11 @@ def _cmd_repair(args):
     print(
         "  Keep state.db and the backup; do not delete them.\n"
         "\n  Next step — offline recovery (never modifies the source):\n"
-        f"    hermes sessions recover --source {source_hint} \\\n"
+        f"    eir sessions recover --source {source_hint} \\\n"
         "        --inspect-only\n"
         "  If that reports the data is recoverable, rebuild it into\n"
         "  a NEW database (the active one is left untouched):\n"
-        f"    hermes sessions recover --source {source_hint} \\\n"
+        f"    eir sessions recover --source {source_hint} \\\n"
         "        --output recovered-state.db"
     )
     return 1
@@ -189,7 +189,7 @@ def _cmd_repair(args):
 def _cmd_recover(args):
     """Offline recovery: works on a disposable copy of the source; never touches the active database."""
     import sqlite3
-    from hermes_cli.session_recovery import (
+    from eir_cli.session_recovery import (
         SessionRecoveryError, inspect_session_database, recover_session_database, write_recovery_report,
     )
     source, output = args.source, getattr(args, "output", None)
@@ -293,7 +293,7 @@ def _print_recovery_verdict(report, output, allow_partial) -> int:
 
 
 def _cmd_import(args):
-    from hermes_cli.foreign_sessions import run_sessions_import
+    from eir_cli.foreign_sessions import run_sessions_import
     # Explicit path but nothing imported -> non-zero for scripts. Picker cancel (no path) -> exit 0.
     if run_sessions_import(args) is None and getattr(args, "path", None):
         return 1
@@ -308,12 +308,12 @@ def _default_exclude(args):
 
 def _surface_reader(db):
     """``--source cli`` also matches a gateway row stored as ``local`` with that created surface."""
-    from hermes_cli.gateway_session_store import SurfaceLabelReader
+    from eir_cli.gateway_session_store import SurfaceLabelReader
     return SurfaceLabelReader(db)
 
 
 def _cmd_list(db, args):
-    from hermes_state_sessions import workspace_key as _ws_key
+    from eir_state_sessions import workspace_key as _ws_key
     # LIMIT lives in the query, so probe one row past the cap: it is the only way to know the
     # page was cut without a second COUNT query (``--limit 0`` is ``LIMIT 0``: no rows, no probe).
     limit = args.limit
@@ -370,7 +370,7 @@ def _cmd_list(db, args):
 # -- export -----------------------------------------------------------------
 
 def _cmd_export(db, args):
-    from hermes_cli.session_filters import build_prune_filters
+    from eir_cli.session_filters import build_prune_filters
     filters = None
     if _any_filter_args(args):
         try:
@@ -387,10 +387,10 @@ def _cmd_export(db, args):
     def _redact(data):
         if not args.redact or data is None:
             return data
-        from hermes_cli.session_export_md import redact_session_data
+        from eir_cli.session_export_md import redact_session_data
         return redact_session_data(data)
 
-    from hermes_cli.session_export import SAVE_TRANSCRIPT_FORMATS, export_projection
+    from eir_cli.session_export import SAVE_TRANSCRIPT_FORMATS, export_projection
     # --only is a transcript view too (md/jsonl of what the user saw); md/qmd without --only go to _export_markdown.
     shown = args.format in SAVE_TRANSCRIPT_FORMATS or bool(getattr(args, "only", None))
     projection = export_projection(shown)
@@ -399,7 +399,7 @@ def _cmd_export(db, args):
         """The transfer projection holds every stored row in memory: the console export's per-session
         ``sessions.max_export_messages`` guard (0 disables) runs before any is loaded. ``None`` = the
         sessions a bare export loads."""
-        from hermes_state import SessionExportTooLargeError, resolved_max_export_messages
+        from eir_state import SessionExportTooLargeError, resolved_max_export_messages
         if shown:
             return False
         limit = resolved_max_export_messages()
@@ -451,7 +451,7 @@ def _cmd_export(db, args):
 
 def _render_only(args, sessions):
     """--only user-prompts: one prompt record per line (jsonl) or headed sections (md)."""
-    from hermes_cli.session_export import export_record_count, render_sessions_export
+    from eir_cli.session_export import export_record_count, render_sessions_export
     rendered = render_sessions_export(sessions, fmt="markdown" if args.format == "md" else "jsonl", only=args.only)
     count, noun = export_record_count(sessions, only=args.only)
     return rendered, f"Exported {count} {noun}{'' if count == 1 else 's'} to {args.output}"
@@ -459,7 +459,7 @@ def _render_only(args, sessions):
 
 def _render_html(args, sessions):
     """One self-contained file (single session, or multi-session with sidebar)."""
-    from hermes_cli.session_export_html import generate_html_export, generate_multi_session_html_export
+    from eir_cli.session_export_html import generate_html_export, generate_multi_session_html_export
     single = len(sessions) == 1
     content = generate_html_export(sessions[0]) if single else generate_multi_session_html_export(sessions)
     return content, f"Exported {len(sessions)} {'session' if single else 'sessions'} to {args.output} (HTML)"
@@ -490,9 +490,9 @@ def _export_flat(kind, args, collect):
     if isinstance(sessions, int):
         return sessions
     if sessions is not None:
-        from hermes_cli.session_export import default_save_filename
+        from eir_cli.session_export import default_save_filename
         name = (default_save_filename(sessions[0].get("id", ""), args.format) if len(sessions) == 1
-                else f"hermes_sessions.{args.format}")
+                else f"eir_sessions.{args.format}")
         args.output = _output_file_in_dir(args.output, name)
         _write_output(args.output, *render(args, sessions))
 
@@ -556,7 +556,7 @@ def _export_trace(db, args, filters):
 
 def _export_markdown(db, args, filters, redact):
     """Markdown / QMD export: one file per session plus a manifest entry."""
-    from hermes_cli.session_export_md import append_manifest_entry, write_session_markdown
+    from eir_cli.session_export_md import append_manifest_entry, write_session_markdown
     if args.output == "-":
         print("Markdown/QMD export writes files; stdout (-) is only supported with --format jsonl.")
         return 1
@@ -607,7 +607,7 @@ def _export_markdown(db, args, filters, redact):
 
 def _export_markdown_single(db, args, export_one, output_dir, lineage_is_logical):
     """--session-id markdown export, optionally + verified delete of it and its delegates."""
-    from hermes_cli.session_export_md import verify_export_file
+    from eir_cli.session_export_md import verify_export_file
     resolved_session_id = db.resolve_session_id(args.session_id)
     delete_target_ids = (
         db.get_session_delete_targets(resolved_session_id) if args.delete_after_verified else [resolved_session_id]
@@ -670,7 +670,7 @@ def _cmd_delete(db, args):
             return refused
     elif _pinned_note:
         print(f"Warning: deleting a pinned session '{resolved_session_id}'.")
-    from hermes_state_runtime import RuntimeStoreError
+    from eir_state_runtime import RuntimeStoreError
     try:
         if not db.delete_session(resolved_session_id, sessions_dir=_sessions_dir(), exclude_active_write_guards=True):
             return _not_found(args.session_id)
@@ -681,7 +681,7 @@ def _cmd_delete(db, args):
         # The ledger refuses to delete a session with accepted, unfinished turns; say what to do.
         if exc.reason == 'unknown_execution':
             print(f"Cannot delete session '{resolved_session_id}': a turn was lost across a gateway restart. "
-                  f"Acknowledge it first with: hermes sessions discard {resolved_session_id}")
+                  f"Acknowledge it first with: eir sessions discard {resolved_session_id}")
         elif exc.reason == 'session_busy':
             print(f"Cannot delete session '{resolved_session_id}': it has a queued or running turn. "
                   "Wait for it to finish (or stop it), then retry.")
@@ -703,7 +703,7 @@ def _prune_never_active_keyed(db, args):
     The population is dominated by escaped test fixtures (#82770), which the hermetic-isolation guard can
     only stop from being *created* — rows already written to a developer's state.db need a sweep to leave.
     """
-    from hermes_cli.session_filters import format_epoch, parse_duration_seconds
+    from eir_cli.session_filters import format_epoch, parse_duration_seconds
     older_than = getattr(args, "older_than", None)
     days = _NEVER_ACTIVE_DEFAULT_DAYS
     if older_than is not None:
@@ -733,8 +733,8 @@ def _prune_never_active_keyed(db, args):
         return refused
     owner = getattr(args, "owner_endpoint", None)
     if owner is not None:
-        from hermes_cli.gateway_client import GatewayClientError
-        from hermes_cli.sessions_owner import owner_prune, report_owner_failure
+        from eir_cli.gateway_client import GatewayClientError
+        from eir_cli.sessions_owner import owner_prune, report_owner_failure
         try:
             result = owner_prune(owner, never_active_days=days)
         except (GatewayClientError, OSError, TimeoutError) as exc:
@@ -760,9 +760,9 @@ def _note_pinned_skipped(db, filters, action):
     suffix = "" if skipped == 1 else "s"
     if action == "prune":
         verb = "deleted"
-        optin = "Pass --include-pinned to delete them anyway, or unpin first with `hermes sessions unpin <id>`."
+        optin = "Pass --include-pinned to delete them anyway, or unpin first with `eir sessions unpin <id>`."
     else:
-        verb, optin = "archived", "Unpin first with `hermes sessions unpin <id>` to include them."
+        verb, optin = "archived", "Unpin first with `eir sessions unpin <id>` to include them."
     print(f"Note: {skipped} pinned session{suffix} also match these filters but will NOT be {verb} "
           f"(pin is a keep flag). {optin}")
 
@@ -771,7 +771,7 @@ def _cmd_prune_or_archive(db, args, action):
     prune = action == "prune"
     if prune and getattr(args, "never_active", False):
         return _prune_never_active_keyed(db, args)
-    from hermes_cli.session_filters import build_prune_filters, describe_filters, format_epoch
+    from eir_cli.session_filters import build_prune_filters, describe_filters, format_epoch
     # Bare `prune` keeps the historical "older than 90 days" default. ANY filter — including --source —
     # suppresses the implicit cutoff (`prune --source cron` matches ALL cron sessions); the preview +
     # confirmation below is the safety net.
@@ -807,7 +807,7 @@ def _cmd_prune_or_archive(db, args, action):
     skipped_open = db.count_open_prune_matches(**filters) if (prune or not include_open) else 0
     if skipped_open and prune:
         print(f"Note: {skipped_open} open session{'' if skipped_open == 1 else 's'} also match these filters but "
-              "will be skipped because prune only deletes ended sessions. Use `hermes sessions delete <id>` "
+              "will be skipped because prune only deletes ended sessions. Use `eir sessions delete <id>` "
               "to remove one explicitly.")
     elif skipped_open:
         print(f"Note: {skipped_open} matching session{'' if skipped_open == 1 else 's'} still open — "
@@ -840,8 +840,8 @@ def _cmd_prune_or_archive(db, args, action):
         return refused
     if prune and getattr(args, "owner_endpoint", None) is not None:
         # The live gateway owns the store: it deletes, through the housekeeping retirement path.
-        from hermes_cli.gateway_client import GatewayClientError
-        from hermes_cli.sessions_owner import owner_prune, report_owner_failure
+        from eir_cli.gateway_client import GatewayClientError
+        from eir_cli.sessions_owner import owner_prune, report_owner_failure
         try:
             print(f"Pruned {owner_prune(args.owner_endpoint, filters=filters)['deleted']} session(s).")
         except (GatewayClientError, OSError, TimeoutError) as exc:
@@ -903,7 +903,7 @@ def _cmd_pinned(db, args):
         print(json.dumps([{"id": s["id"], **{k: s.get(k) for k in keys}} for s in pinned_rows], indent=2))
         return
     if not pinned_rows:
-        print("No pinned sessions. Pin one with: hermes sessions pin <session_id>")
+        print("No pinned sessions. Pin one with: eir sessions pin <session_id>")
         return
     print(f"{'Title':<32} {'Last Active':<13} {'Src':<9} {'ID'}\n" + "─" * 100)
     for s in pinned_rows:
@@ -971,7 +971,7 @@ def _cmd_browse(db, args):
         print("Cancelled.")
         return
     print(f"Resuming session: {selected_id}")
-    from hermes_cli.relaunch import relaunch
+    from eir_cli.relaunch import relaunch
     relaunch(["--resume", selected_id])  # won't return after execvp
 
 
@@ -1114,10 +1114,10 @@ def _cmd_optimize_storage(db, args):
     print("✓ Search index optimized.")
     _print_size_change(db, before_mb, prefix="  ")
     if result.get("vacuum_skipped") == "in_use":
-        print("  (VACUUM skipped: another process is using the database. Re-run `hermes sessions optimize` "
+        print("  (VACUUM skipped: another process is using the database. Re-run `eir sessions optimize` "
               "with it closed to reclaim freed space.)")
     elif result.get("vacuumed") is False:
-        print("  (VACUUM was skipped or failed — run `hermes sessions optimize` later to reclaim freed space.)")
+        print("  (VACUUM was skipped or failed — run `eir sessions optimize` later to reclaim freed space.)")
 
 
 def _cmd_repair_routing(db, args):
@@ -1353,22 +1353,22 @@ def _cmd_stats(db, args):
 # -- dispatch -----------------------------------------------------------------
 
 def _cmd_repair_profiles(args):
-    from hermes_cli.sessions_cmd_repair_profiles import cmd_repair_profiles
+    from eir_cli.sessions_cmd_repair_profiles import cmd_repair_profiles
     return cmd_repair_profiles(args)
 
 
 def _cmd_set_journal_mode(args):
-    from hermes_cli.sessions_cmd_journal_mode import cmd_set_journal_mode
+    from eir_cli.sessions_cmd_journal_mode import cmd_set_journal_mode
     return cmd_set_journal_mode(args)
 
 
 def _cmd_discard(args):
-    from hermes_cli.sessions_discard import cmd_discard
+    from eir_cli.sessions_discard import cmd_discard
     return cmd_discard(args)
 
 
 def _cmd_adopt(args):
-    from hermes_cli.sessions_adopt import cmd_adopt
+    from eir_cli.sessions_adopt import cmd_adopt
     return cmd_adopt(args)
 
 
@@ -1396,7 +1396,7 @@ def _print_empty_store(action: str, args) -> None:
     if action == "stats":
         print("Total sessions: 0\nTotal messages: 0")
     elif action == "pinned":
-        print("[]" if getattr(args, "json", False) else "No pinned sessions. Pin one with: hermes sessions pin <session_id>")
+        print("[]" if getattr(args, "json", False) else "No pinned sessions. Pin one with: eir sessions pin <session_id>")
     else:
         print("No sessions found.")
 
@@ -1411,8 +1411,8 @@ def cmd_sessions(args, sessions_parser=None):
     pre = _PRE_DB_HANDLERS.get(action)
     if pre is not None:
         return pre(args)
-    from hermes_state import SessionDB
-    from hermes_constants import get_hermes_home
+    from eir_state import SessionDB
+    from eir_constants import get_eir_home
     # Verified deletion is an explicit mutation, not a read-only export.
     deleting_export = (
         action == "export" and getattr(args, "delete_after_verified", False)
@@ -1423,11 +1423,11 @@ def cmd_sessions(args, sessions_parser=None):
     if action == "prune":
         # The always-on gateway owns the store: this process only reads the preview, the owner
         # deletes. No gateway: the local prune below, behind the holder scan, as before.
-        from hermes_cli.sessions_owner import live_owner
+        from eir_cli.sessions_owner import live_owner
         args.owner_endpoint = live_owner()
         observational = args.owner_endpoint is not None
     # A served-profile process has no single default home: pass the store path explicitly.
-    path = get_hermes_home() / "state.db"
+    path = get_eir_home() / "state.db"
     try:
         db = SessionDB(db_path=path, read_only=observational)
     except Exception as e:
@@ -1435,7 +1435,7 @@ def cmd_sessions(args, sessions_parser=None):
         if observational and not path.exists():
             return _print_empty_store(action, args)
         print("Could not open your session history database. "
-              "Run: hermes sessions repair to fix it (a backup is made first).")
+              "Run: eir sessions repair to fix it (a backup is made first).")
         print(f"Details: {e}")
         return 1
     try:
@@ -1445,7 +1445,7 @@ def cmd_sessions(args, sessions_parser=None):
             return
         if (action in _HELD_STORE_ACTIONS and not getattr(args, "dry_run", False) and not getattr(args, "force", False)
                 and getattr(args, "owner_endpoint", None) is None):
-            from hermes_state_holders import held_store_refusal
+            from eir_state_holders import held_store_refusal
             # Same path the SessionDB above opened, so the scan never depends on the db object.
             refusal = held_store_refusal(path, command=action)
             if refusal:
@@ -1454,12 +1454,12 @@ def cmd_sessions(args, sessions_parser=None):
         try:
             return handler(db, args)
         except sqlite3.OperationalError as e:
-            from hermes_state_repair import _schema_not_built
+            from eir_state_repair import _schema_not_built
 
             if not observational or not _schema_not_built(e):
                 raise
             # A read-only opener skips schema migration, so a store from an older release can lack a column.
-            print(f"Error: session database needs migration — run any writing hermes command first ({e})")
+            print(f"Error: session database needs migration — run any writing eir command first ({e})")
             return 1
     finally:
         db.close()

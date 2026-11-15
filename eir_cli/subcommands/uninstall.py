@@ -1,18 +1,18 @@
-"""``hermes uninstall`` subcommand parser."""
+"""``eir uninstall`` subcommand parser."""
 
 from __future__ import annotations
 
 import argparse
 from typing import Callable
 
-from hermes_cli.subcommands._shared import add_yes_flag
+from eir_cli.subcommands._shared import add_yes_flag
 
 
 def build_uninstall_parser(subparsers, *, cmd_uninstall: Callable) -> None:
     """Attach the ``uninstall`` subcommand to ``subparsers``."""
     uninstall_parser = subparsers.add_parser(
-        "uninstall", help="Uninstall Hermes Agent",
-        description="Remove Hermes Agent from your system. Can keep configs/data for reinstall.")
+        "uninstall", help="Uninstall Eir Agent",
+        description="Remove Eir Agent from your system. Can keep configs/data for reinstall.")
     modes = uninstall_parser.add_mutually_exclusive_group()
     modes.add_argument(
         "--full", action="store_true",
@@ -23,7 +23,7 @@ def build_uninstall_parser(subparsers, *, cmd_uninstall: Callable) -> None:
     modes.add_argument(
         "--data",
         action="store_true",
-        help="Remove only the active Hermes home's user data, leaving installed code "
+        help="Remove only the active Eir home's user data, leaving installed code "
         "intact — the one mode that works on Nix / bundled-app / Docker installs",
     )
     uninstall_parser.add_argument(

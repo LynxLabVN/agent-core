@@ -8,7 +8,7 @@ import os
 import threading
 import time
 from contextlib import contextmanager
-import hermes_yaml as yaml
+import eir_yaml as yaml
 from fastapi import Depends, FastAPI, HTTPException, Request, WebSocket, WebSocketException
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -18,25 +18,25 @@ from starlette.requests import HTTPConnection
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from hermes_cli.config import cfg_get, get_process_hermes_home
+from eir_cli.config import cfg_get, get_process_eir_home
 from utils import env_var_enabled
 
 # Serve assets with explicit MIME types: the host's map (on Windows the
 # registry can map .js -> text/plain) must not decide the Content-Type of
 # dashboard bundles (#28987). Runs before any StaticFiles/FileResponse below
 # serves a request, and is idempotent.
-from hermes_cli.web_asset_mime_types import normalize_web_asset_mime_types
+from eir_cli.web_asset_mime_types import normalize_web_asset_mime_types
 
 normalize_web_asset_mime_types()
 
 # Same logger the code used before extraction (record parity).
-_log = logging.getLogger("hermes_cli.web_server")
+_log = logging.getLogger("eir_cli.web_server")
 
 
 def _normalise_prefix(raw: Optional[str]) -> str:
     """Normalise an X-Forwarded-Prefix header value (single source of truth lives in
-    ``hermes_cli.dashboard_auth.prefix`` so gate, OAuth, cookies and SPA mount agree)."""
-    from hermes_cli.dashboard_auth.prefix import normalise_prefix
+    ``eir_cli.dashboard_auth.prefix`` so gate, OAuth, cookies and SPA mount agree)."""
+    from eir_cli.dashboard_auth.prefix import normalise_prefix
     return normalise_prefix(raw)
 
 
@@ -47,7 +47,7 @@ def _layer_hex(palette: dict[str, Any], key: str, default: str) -> str:
 
 def _render_active_theme_bootstrap_css() -> str:
     """Critical-CSS ``<style>`` shim for the active *user* theme, so the first paint uses the
-    target palette instead of flashing the bundle's default Hermes Teal until
+    target palette instead of flashing the bundle's default Eir Teal until
     ``ThemeProvider.applyTheme()`` runs. Built-in themes return "" (the bundle owns them).
 
     Variable names MUST match what the bundle consumes (``layerVars()`` /
@@ -55,7 +55,7 @@ def _render_active_theme_bootstrap_css() -> str:
     references the variables rather than literals so runtime theme switches stay live:
     ``applyTheme()`` writes inline styles on ``documentElement`` which outrank this block.
     """
-    from hermes_cli.config import load_config
+    from eir_cli.config import load_config
     try:
         active = cfg_get(load_config(), "dashboard", "theme", default="default")
         if not active or not isinstance(active, str):
@@ -73,7 +73,7 @@ def _render_active_theme_bootstrap_css() -> str:
             def _esc(s: str) -> str:  # defensive ``</style>`` escape
                 return str(s).replace("</", "<\\/")
             return (
-                '<style id="hermes-theme-bootstrap">'
+                '<style id="eir-theme-bootstrap">'
                 ":root{"
                 f"--background-base:{_esc(_layer_hex(palette, 'background', '#0a0a0a'))};"
                 f"--midground-base:{_esc(_layer_hex(palette, 'midground', '#e5e5e5'))};"
@@ -97,8 +97,8 @@ def _render_active_theme_bootstrap_css() -> str:
 _IMMUTABLE_ASSET_CACHE_CONTROL = "public, max-age=31536000, immutable"
 _NO_STORE = {"Cache-Control": "no-store, no-cache, must-revalidate"}
 _HEADLESS_MSG = (
-    "Headless backend (hermes serve): web UI disabled — use "
-    "`hermes dashboard` for the browser UI."
+    "Headless backend (eir serve): web UI disabled — use "
+    "`eir dashboard` for the browser UI."
 )
 
 
@@ -111,17 +111,17 @@ def _bundle_unavailable(request: Request, message: str, status_code: int) -> Res
     if "text/html" not in request.headers.get("accept", ""):
         return JSONResponse({"error": message}, status_code=status_code, headers=_NO_STORE)
     from html import escape
-    from hermes_cli.webapp_page_policy import page_headers
+    from eir_cli.webapp_page_policy import page_headers
     html = (
         '<!doctype html><html lang="en"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
-        "<title>Hermes is unavailable</title><style>"
+        "<title>Eir is unavailable</title><style>"
         "body{font-family:system-ui,sans-serif;max-width:36rem;margin:15vh auto;padding:0 1rem;"
         "line-height:1.5;color:#1c1c1c;background:#fafafa}"
         "@media (prefers-color-scheme:dark){body{color:#e8e8e8;background:#141414}}"
-        "</style></head><body><h1>Hermes is unavailable</h1>"
+        "</style></head><body><h1>Eir is unavailable</h1>"
         f"<p>{escape(message)}</p>"
-        "<p>Ask whoever runs this Hermes host to run that command, then reload this page.</p>"
+        "<p>Ask whoever runs this Eir host to run that command, then reload this page.</p>"
         "</body></html>"
     )
     return HTMLResponse(html, status_code=status_code, headers=page_headers(request, html, _NO_STORE))
@@ -132,8 +132,8 @@ def mount_spa(application: FastAPI):
 
     Dashboard injects its session token into index.html; Webapp instead receives
     the same credential through an operator-only launch fragment. Behind a path-prefix reverse
-    proxy (``X-Forwarded-Prefix: /hermes``) the served index.html is rewritten so absolute
-    asset URLs and the runtime ``__HERMES_BASE_PATH__`` honour that prefix without a rebuild.
+    proxy (``X-Forwarded-Prefix: /eir``) the served index.html is rewritten so absolute
+    asset URLs and the runtime ``__EIR_BASE_PATH__`` honour that prefix without a rebuild.
 
     A missing WEB_DIST is deliberately NOT a mount-time terminal state: every route copes
     with a missing dist per-request (404 JSON / ``check_dir=False``), so a long-lived
@@ -142,20 +142,20 @@ def mount_spa(application: FastAPI):
     another renderer (the Webapp's ``dist-webapp``) records it on ``application.state.web_dist``
     later.
     """
-    from hermes_cli.web_server import WEB_DIST, _DASHBOARD_EMBEDDED_CHAT_ENABLED
-    from hermes_cli.web_deps import _server
-    from hermes_cli.web_server_surface import policy
-    from hermes_cli.web_server_static_assets import is_static_asset_path, public_font_file
+    from eir_cli.web_server import WEB_DIST, _DASHBOARD_EMBEDDED_CHAT_ENABLED
+    from eir_cli.web_deps import _server
+    from eir_cli.web_server_surface import policy
+    from eir_cli.web_server_static_assets import is_static_asset_path, public_font_file
 
-    # `hermes serve` is the headless backend: it must NEVER serve the browser SPA, even if a
+    # `eir serve` is the headless backend: it must NEVER serve the browser SPA, even if a
     # dist is lying around, so only the JSON-RPC/WS/API surface is reachable.
-    if os.environ.get("HERMES_SERVE_HEADLESS") == "1":
+    if os.environ.get("EIR_SERVE_HEADLESS") == "1":
 
         @application.get("/{full_path:path}")
         async def no_frontend(full_path: str):
             # Desktop token handshake: the Electron shell boots by fetching `/` and reading
-            # ``window.__HERMES_SESSION_TOKEN__`` for /api/ws auth. When headless 404'd every
-            # path, a renderer whose spawn token no longer matched (e.g. after `hermes update`)
+            # ``window.__EIR_SESSION_TOKEN__`` for /api/ws auth. When headless 404'd every
+            # path, a renderer whose spawn token no longer matched (e.g. after `eir update`)
             # white-screened. Serve a token-only page at the exact root, but ONLY when the auth
             # gate is off: on a gated serve the token must never be readable without auth.
             # See #94227, #95575.
@@ -164,15 +164,15 @@ def mount_spa(application: FastAPI):
             if full_path == "" and not withheld:
                 return HTMLResponse(
                     "<!doctype html><html><head><script>"
-                    f"window.__HERMES_SESSION_TOKEN__={json.dumps(_server()._SESSION_TOKEN)};"
-                    "window.__HERMES_AUTH_REQUIRED__=false;"
+                    f"window.__EIR_SESSION_TOKEN__={json.dumps(_server()._SESSION_TOKEN)};"
+                    "window.__EIR_AUTH_REQUIRED__=false;"
                     f"</script></head><body>{_HEADLESS_MSG}</body></html>",
                     headers=_NO_STORE,
                 )
             return JSONResponse({"error": _HEADLESS_MSG}, status_code=404)
         return
 
-    # A missing WEB_DIST is deliberately NOT a mount-time terminal state (#82614): a long-lived `hermes
+    # A missing WEB_DIST is deliberately NOT a mount-time terminal state (#82614): a long-lived `eir
     # dashboard --skip-build` process that survives a `git pull` (or starts before the first build) used to
     # install a permanent no_frontend catch-all here and could never recover — every route answered 404
     # "Frontend not built" until the process was restarted, even after `npm run build` completed. The SPA
@@ -188,21 +188,21 @@ def mount_spa(application: FastAPI):
 
         When the OAuth auth gate is active (``app.state.auth_required``), the legacy
         ``_SESSION_TOKEN`` is NOT injected — the SPA reads identity from ``/api/auth/me`` over
-        cookie auth; ``__HERMES_AUTH_REQUIRED__`` tells it which scheme to use for /api/pty
+        cookie auth; ``__EIR_AUTH_REQUIRED__`` tells it which scheme to use for /api/pty
         and /api/ws (ticket vs token).
         """
         try:
             html = (web_dist() / "index.html").read_text(encoding="utf-8-sig")
         except OSError:
             # Partial build / wiped dist / permissions: same JSON 404 as a fully-missing dist. The
-            # Webapp's bundle is built by `hermes webapp`, not by the dashboard's web project.
+            # Webapp's bundle is built by `eir webapp`, not by the dashboard's web project.
             webapp = getattr(application.state, "ui_surface", "dashboard") == "webapp"
-            missing = ("The Webapp is not built. Run: hermes webapp" if webapp
+            missing = ("The Webapp is not built. Run: eir webapp" if webapp
                        else "Frontend not built. Run: pnpm --dir web run build")
             return _bundle_unavailable(request, missing, 404)
         if getattr(application.state, "ui_surface", "dashboard") == "webapp":
-            # A bundle `hermes update` could not rebuild was built for the code before the update:
-            # refuse it until `hermes webapp` rebuilds it.
+            # A bundle `eir update` could not rebuild was built for the code before the update:
+            # refuse it until `eir webapp` rebuilds it.
             from gateway.webapp_listener import bundle_stale_reason
             stale = bundle_stale_reason(web_dist())
             if stale:
@@ -211,14 +211,14 @@ def mount_spa(application: FastAPI):
         gated = bool(getattr(application.state, "auth_required", False))
         # Only a host that records its surface (the gateway's Webapp) names it to the page.
         surface = getattr(application.state, "ui_surface", None)
-        surface_js = "" if surface is None else f"window.__HERMES_UI_SURFACE__={json.dumps(surface)};"
+        surface_js = "" if surface is None else f"window.__EIR_UI_SURFACE__={json.dumps(surface)};"
         # Webapp grants host files and shell.exec as well as PTYs: its existing
         # session token must come from the operator, never anonymous HTML. The
         # gateway-hosted listener (gateway/run_api.py) never publishes it either:
         # local clients use tickets.
         withheld = (gated or bool(getattr(_server().app.state, "withhold_session_token", False))
                     or not policy(application.state).html_token)
-        token_js = "" if withheld else f'window.__HERMES_SESSION_TOKEN__="{_server()._SESSION_TOKEN}";'
+        token_js = "" if withheld else f'window.__EIR_SESSION_TOKEN__="{_server()._SESSION_TOKEN}";'
         # Launcher-preselected profile (``--open-profile``): the SPA's fallback scope when the URL
         # omits ``?profile=`` (#73085). ``</`` escaped so a hostile name cannot close the script tag.
         initial_profile_js = json.dumps(str(getattr(application.state, "initial_profile", "") or "")).replace("</", "<\\/")
@@ -228,16 +228,16 @@ def mount_spa(application: FastAPI):
         # as the host serves more than one, and the switcher shows the same profile it writes. The
         # Webapp reads it as the profile its gateway socket and REST answer for when a request names
         # none, so a tab on any other profile names that profile on every request.
-        from hermes_cli.web_server_profiles import serving_profile_name as _serving_profile_name
+        from eir_cli.web_server_profiles import serving_profile_name as _serving_profile_name
         serving_profile_js = json.dumps(_serving_profile_name()).replace("</", "<\\/")
         bootstrap_script = (
             f"<script>{token_js}"
-            f"window.__HERMES_DASHBOARD_EMBEDDED_CHAT__={chat_js};"
-            f'window.__HERMES_BASE_PATH__="{prefix}";'
-            f"window.__HERMES_AUTH_REQUIRED__={'true' if gated else 'false'};"
-            f"window.__HERMES_INITIAL_PROFILE__={initial_profile_js};"
+            f"window.__EIR_DASHBOARD_EMBEDDED_CHAT__={chat_js};"
+            f'window.__EIR_BASE_PATH__="{prefix}";'
+            f"window.__EIR_AUTH_REQUIRED__={'true' if gated else 'false'};"
+            f"window.__EIR_INITIAL_PROFILE__={initial_profile_js};"
             f"{surface_js}"
-            f"window.__HERMES_DASHBOARD_PROFILE__={serving_profile_js};"
+            f"window.__EIR_DASHBOARD_PROFILE__={serving_profile_js};"
             f"</script>"
         )
         if prefix:
@@ -249,7 +249,7 @@ def mount_spa(application: FastAPI):
         if theme_bootstrap:
             html = html.replace("</head>", f"{theme_bootstrap}</head>", 1)
         html = html.replace("</head>", f"{bootstrap_script}</head>", 1)
-        from hermes_cli.webapp_page_policy import page_headers
+        from eir_cli.webapp_page_policy import page_headers
         return HTMLResponse(html, headers=page_headers(request, html, _NO_STORE))
 
     # Built CSS contains absolute ``url(/fonts/...)`` / ``url(/ds-assets/...)`` references that
@@ -289,7 +289,7 @@ def mount_spa(application: FastAPI):
             asset_files[directory] = _ImmutableAssetFiles(directory=directory, check_dir=False)
         await asset_files[directory](scope, receive, send)
 
-    from hermes_cli.webapp_previews import mount_preview_assets
+    from eir_cli.webapp_previews import mount_preview_assets
     mount_preview_assets(application)
     application.mount("/assets", serve_assets, name="assets")
 
@@ -329,8 +329,8 @@ def mount_spa(application: FastAPI):
 
 # Built-in themes — label + description only; colors live in web/src/themes/presets.ts.
 _BUILTIN_DASHBOARD_THEMES = [
-    {"name": "default",       "label": "Hermes Teal",         "description": "Classic dark teal — the canonical Hermes look"},
-    {"name": "default-large", "label": "Hermes Teal (Large)", "description": "Hermes Teal with bigger fonts and roomier spacing"},
+    {"name": "default",       "label": "Eir Teal",         "description": "Classic dark teal — the canonical Eir look"},
+    {"name": "default-large", "label": "Eir Teal (Large)", "description": "Eir Teal with bigger fonts and roomier spacing"},
     {"name": "nous-blue",     "label": "Nous Blue",           "description": "Light mode — vivid Nous-blue accents on cream canvas"},
     {"name": "midnight",      "label": "Midnight",            "description": "Deep blue-violet with cool accents"},
     {"name": "ember",     "label": "Ember",          "description": "Warm crimson and bronze — forge vibes"},
@@ -409,7 +409,7 @@ def _normalise_theme_definition(data: dict[str, Any]) -> Optional[dict[str, Any]
     unusable. Accepts the full schema and a loose form (top-level ``colors``, bare hex).
 
     customCSS is clipped but intentionally NOT sanitised — themes are user-authored YAML in
-    ~/.hermes/, the same trust level as config.yaml. Empty asset values are dropped so a
+    ~/.eir/, the same trust level as config.yaml. Empty asset values are dropped so a
     theme can explicitly clear a slot.
     """
     if not isinstance(data, dict):
@@ -504,10 +504,10 @@ def _normalise_theme_definition(data: dict[str, Any]) -> Optional[dict[str, Any]
 def _discover_user_themes() -> list:
     """Fully-normalised user themes from ``<launch home>/dashboard-themes/*.yaml``.
 
-    Uses the process launch home, not ``get_hermes_home()``, so a transient profile override
-    from embedded chat does not hide themes under the server's own ``HERMES_HOME``.
+    Uses the process launch home, not ``get_eir_home()``, so a transient profile override
+    from embedded chat does not hide themes under the server's own ``EIR_HOME``.
     """
-    themes_dir = get_process_hermes_home() / "dashboard-themes"
+    themes_dir = get_process_eir_home() / "dashboard-themes"
     if not themes_dir.is_dir():
         return []
     result = []
@@ -556,28 +556,28 @@ def _dashboard_plugin_search_dirs() -> list[tuple]:
 
     User dashboard plugins are a dashboard-owned asset (like theme YAML): resolved from the
     process launch home so they don't vanish when a request is scoped to another profile.
-    When the process itself is profile-scoped (``HERMES_HOME=<root>/profiles/<name>``) the
-    launch home has no ``plugins/`` — user plugins live in the hermes root — so the default
+    When the process itself is profile-scoped (``EIR_HOME=<root>/profiles/<name>``) the
+    launch home has no ``plugins/`` — user plugins live in the eir root — so the default
     root is scanned too; profile-local plugins stay authoritative over same-named root ones.
     The project source is gated on shared truthy semantics (``1``/``true``/``yes``/``on``):
     a bare non-empty check let ``=0``/``=false`` silently enable it (GHSA-5qr3-c538-wm9j).
     """
-    from hermes_cli.plugins import get_bundled_plugins_dir
-    from hermes_constants import get_default_hermes_root
+    from eir_cli.plugins import get_bundled_plugins_dir
+    from eir_constants import get_default_eir_root
 
     bundled_root = get_bundled_plugins_dir()
     # User dashboard plugins are a dashboard-owned asset (same category as theme YAML): resolve them from
     # the process launch home so they don't vanish when a request is scoped to another profile via a
-    # context-local HERMES_HOME override (e.g. embedded /chat under --open-profile). #87197: when the
-    # process itself is profile-scoped (``--profile <name>`` sets ``HERMES_HOME=<root>/profiles/<name>``),
+    # context-local EIR_HOME override (e.g. embedded /chat under --open-profile). #87197: when the
+    # process itself is profile-scoped (``--profile <name>`` sets ``EIR_HOME=<root>/profiles/<name>``),
     # the launch home is the profile directory, which has no ``plugins/`` — user plugins are installed in
-    # the hermes root (``~/.hermes/plugins``). Scan the default root as well (``get_default_hermes_root()``
-    # unwraps ``<root>/profiles/<name>`` → ``<root>`` and returns a custom ``HERMES_HOME`` unchanged when it
-    # *is* the root), mirroring how ``hermes_cli.plugins`` resolves plugin install locations. The
+    # the eir root (``~/.eir/plugins``). Scan the default root as well (``get_default_eir_root()``
+    # unwraps ``<root>/profiles/<name>`` → ``<root>`` and returns a custom ``EIR_HOME`` unchanged when it
+    # *is* the root), mirroring how ``eir_cli.plugins`` resolves plugin install locations. The
     # ``seen_names`` dedupe below keeps profile-local plugins (if any) authoritative over same-named root
     # plugins.
-    user_plugin_roots = [get_process_hermes_home() / "plugins"]
-    root_plugins = get_default_hermes_root() / "plugins"
+    user_plugin_roots = [get_process_eir_home() / "plugins"]
+    root_plugins = get_default_eir_root() / "plugins"
     if root_plugins.resolve(strict=False) != user_plugin_roots[0].resolve(strict=False):
         user_plugin_roots.append(root_plugins)
     search_dirs = [(d, "user") for d in user_plugin_roots]
@@ -587,10 +587,10 @@ def _dashboard_plugin_search_dirs() -> list[tuple]:
     # correctly read as "disabled" — silently *enabled* the untrusted project source in the web server.
     # Combined with the absolute-path RCE primitive on the manifest's ``api`` field (now patched below),
     # this turned the opt-in into a sticky always-on switch. Use the shared truthy semantics (``1`` /
-    # ``true`` / ``yes`` / ``on``) so the gate matches ``hermes_cli/plugins.py`` and the documented user
+    # ``true`` / ``yes`` / ``on``) so the gate matches ``eir_cli/plugins.py`` and the documented user
     # contract.
-    if env_var_enabled("HERMES_ENABLE_PROJECT_PLUGINS"):
-        search_dirs.append((Path.cwd() / ".hermes" / "plugins", "project"))
+    if env_var_enabled("EIR_ENABLE_PROJECT_PLUGINS"):
+        search_dirs.append((Path.cwd() / ".eir" / "plugins", "project"))
     return search_dirs
 
 
@@ -637,7 +637,7 @@ def _dashboard_plugin_entry(data: dict[str, Any], name: str, dashboard_dir: Path
 
 def _discover_dashboard_plugins(search_dirs: Optional[list] = None) -> list:
     """Scan ``<plugins root>/*/dashboard/manifest.json`` across user, bundled and (opt-in)
-    project plugin sources — same three sources as ``hermes_cli.plugins`` — or ``search_dirs``."""
+    project plugin sources — same three sources as ``eir_cli.plugins`` — or ``search_dirs``."""
     plugins = []
     seen_names: set = set()
     for plugins_root, source in (_dashboard_plugin_search_dirs() if search_dirs is None else search_dirs):
@@ -720,9 +720,9 @@ def _schedule_check_fn_probe(fn) -> Optional[threading.Thread]:
 
 
 def _plugin_login_command(name: str) -> str:
-    """A plugin that left core with its own login command (``hermes spotify login``), else ``hermes auth <name>``."""
-    from hermes_cli.left_core_migration import LEFT_CORE
-    return next((f"hermes {f.cli} login" for f in LEFT_CORE if f.plugin == name and f.cli), f"hermes auth {name}")
+    """A plugin that left core with its own login command (``eir spotify login``), else ``eir auth <name>``."""
+    from eir_cli.left_core_migration import LEFT_CORE
+    return next((f"eir {f.cli} login" for f in LEFT_CORE if f.plugin == name and f.cli), f"eir auth {name}")
 
 
 def _plugin_auth_hint(name: str, provides_tools: list) -> tuple:
@@ -760,12 +760,12 @@ def _merged_plugins_hub(force_refresh: bool = False) -> dict[str, Any]:
     event loop). Only cached availability is consumed and the payload is memoized briefly to
     collapse the dashboard's bursty duplicate fetches.
     """
-    from hermes_cli.web_server_memory import _discover_memory_provider_statuses, _normalize_memory_provider_name
-    from hermes_cli.web_server import _get_dashboard_plugins
-    from hermes_cli.config import get_hermes_home, load_config
-    from hermes_constants import hermes_home_key
+    from eir_cli.web_server_memory import _discover_memory_provider_statuses, _normalize_memory_provider_name
+    from eir_cli.web_server import _get_dashboard_plugins
+    from eir_cli.config import get_eir_home, load_config
+    from eir_constants import eir_home_key
 
-    cache_key = hermes_home_key(get_hermes_home())
+    cache_key = eir_home_key(get_eir_home())
     now = time.monotonic()
     if not force_refresh:
         with _plugins_hub_cache_lock:
@@ -774,7 +774,7 @@ def _merged_plugins_hub(force_refresh: bool = False) -> dict[str, Any]:
                 return cached
 
     started_at = time.monotonic()
-    from hermes_cli.plugins_cmd import (
+    from eir_cli.plugins_cmd import (
         _category_active_names,
         _discover_all_plugins,
         _get_current_context_engine,
@@ -785,15 +785,15 @@ def _merged_plugins_hub(force_refresh: bool = False) -> dict[str, Any]:
         _plugin_status,
         _read_manifest as _read_plugin_manifest_at,
     )
-    from hermes_cli.plugins_cmd_catalog import removed_annotation
-    from hermes_cli.plugin_catalog import resolved_removed_entries
+    from eir_cli.plugins_cmd_catalog import removed_annotation
+    from eir_cli.plugin_catalog import resolved_removed_entries
 
     dashboard_list = _get_dashboard_plugins()
     dash_by_name = {str(p["name"]): p for p in dashboard_list}
     disabled_set = _get_disabled_set()
     enabled_set = _get_enabled_set()
     hidden_plugins: list = cfg_get(load_config(), "dashboard", "hidden_plugins", default=[]) or []
-    plugins_root_resolved = (get_hermes_home() / "plugins").resolve()
+    plugins_root_resolved = (get_eir_home() / "plugins").resolve()
     rows: list[dict[str, Any]] = []
 
     # One kill-list resolution for the whole rebuild: resolving per row costs a live-catalog
@@ -802,7 +802,7 @@ def _merged_plugins_hub(force_refresh: bool = False) -> dict[str, Any]:
     active = _category_active_names()
 
     for name, version, description, source, dir_str, key in _discover_all_plugins():
-        # Same verdict as `hermes plugins list` / the TUI hub: name+key aliases for the lists, bundled
+        # Same verdict as `eir plugins list` / the TUI hub: name+key aliases for the lists, bundled
         # backends/platforms/providers and the live memory provider count as enabled without a list
         # entry (#73131, #82898).
         runtime_status = _plugin_status(
@@ -873,7 +873,7 @@ def _plugin_api_mount_skip_reason(plugin: dict[str, Any], enabled_set: set, disa
 
     User plugins must be in ``plugins.enabled`` and not ``plugins.disabled`` before their
     Python runs (GHSA-mcfc-hp25-cjv7); bundled plugins are trusted but respect an explicit
-    disable; project plugins (``./.hermes/plugins/``) ship with the CWD and are
+    disable; project plugins (``./.eir/plugins/``) ship with the CWD and are
     attacker-controlled when opening a malicious repo — never auto-imported (GHSA-5qr3-c538-wm9j).
     """
     source, plugin_name = plugin.get("source"), plugin.get("name", "")
@@ -889,20 +889,20 @@ def _launch_profile_scope():
     """Resolve config as the launch profile's, whichever profile the request is scoped to: home and
     secrets switch together, so the launch config's ``${VAR}`` refs (and its last-good copy) never
     expand through another profile's secrets."""
-    from hermes_constants import reset_hermes_home_override, set_hermes_home_override
-    from hermes_cli.web_server_profiles import _config_profile_scope
-    token = set_hermes_home_override(None)
+    from eir_constants import reset_eir_home_override, set_eir_home_override
+    from eir_cli.web_server_profiles import _config_profile_scope
+    token = set_eir_home_override(None)
     try:
         with _config_profile_scope(None):
             yield
     finally:
-        reset_hermes_home_override(token)
+        reset_eir_home_override(token)
 
 
 def _plugin_enable_sets_here() -> tuple[set, set]:
     """``(plugins.enabled, plugins.disabled)`` of the active profile scope from one cached read-only
     config read: the gates run on the event loop for every plugin request and upgrade."""
-    from hermes_cli.config import load_config_readonly
+    from eir_cli.config import load_config_readonly
     try:
         config = load_config_readonly()
     except Exception:  # health: allow BLE001 -- an unreadable config grants no consent (empty sets), as plugins_cmd reads it
@@ -916,7 +916,7 @@ def _plugin_consent_withheld(plugin: dict[str, Any]) -> bool:
     """Whether a request must not reach ``plugin``'s backend or assets (#46435, GHSA-mcfc-hp25-cjv7).
 
     ``plugin`` is the active scope's own copy (a secondary profile's plugins are discovered under
-    its home and run in its plugin host, :mod:`hermes_cli.web_server_plugin_profiles`), so the
+    its home and run in its plugin host, :mod:`eir_cli.web_server_plugin_profiles`), so the
     profile the request acts for decides alone: a native ticket's profile, a ``?profile=``
     selection, else the launch profile (#134889, PLG-3).
     """
@@ -937,8 +937,8 @@ async def _plugin_api_request_refused(name: str) -> bool:
     keeps its router mounted until restart, so every request is checked again. An unknown name
     counts as a user plugin (safe default: refused).
     """
-    from hermes_cli.web_server import _get_dashboard_plugins
-    from hermes_cli.web_server_plugin_profiles import rescanned_plugin, secondary_profile_home
+    from eir_cli.web_server import _get_dashboard_plugins
+    from eir_cli.web_server_plugin_profiles import rescanned_plugin, secondary_profile_home
     plugin = next((p for p in _get_dashboard_plugins() if p.get("name") == name), None)
     home = secondary_profile_home()
     if plugin is None and home is not None:  # installed since the last scan (rate-limited per name)
@@ -969,8 +969,8 @@ class PluginApiWebSocketGate:
         self.app = app
 
     async def __call__(self, scope, receive, send) -> None:
-        from hermes_cli.web_server_chat import _ws_request_is_allowed
-        from hermes_cli.web_server_plugin_profiles import plugin_request_scope, refuse_secondary_plugin_socket
+        from eir_cli.web_server_chat import _ws_request_is_allowed
+        from eir_cli.web_server_plugin_profiles import plugin_request_scope, refuse_secondary_plugin_socket
         name = _plugin_api_name(scope) if scope["type"] == "websocket" else ""
         if not name:
             await self.app(scope, receive, send)
@@ -988,15 +988,15 @@ class PluginApiWebSocketGate:
 
 @contextmanager
 def _native_ws_scope(scope):
-    """Yield whether a plugin socket's native grant (``X-Hermes-Gateway-Ticket``) was admitted,
+    """Yield whether a plugin socket's native grant (``X-Eir-Gateway-Ticket``) was admitted,
     with that grant's home and secret scope bound for the rest of the connection; without the
     header, True and the ambient scope. The grant is redeemed here only: the route's credential
     check reads the principal stamped on the connection, and its scope dependency resolves the
     same profile, so consent, home and ``get_secret`` all follow the grant, as on HTTP
     (``native_profile_scope``).
     """
-    from hermes_cli.dashboard_auth.native_http import HEADER, native_profile_scope, redeem_native_ws
-    from hermes_cli.web_server_profiles import _config_profile_scope
+    from eir_cli.dashboard_auth.native_http import HEADER, native_profile_scope, redeem_native_ws
+    from eir_cli.web_server_profiles import _config_profile_scope
     conn = HTTPConnection(scope)
     if HEADER not in conn.headers:
         yield True
@@ -1024,8 +1024,8 @@ async def _plugin_route_secret_scope(conn: HTTPConnection, profile: Optional[str
     a sync yield-dependency's setup and teardown run on different threadpool threads, so the
     scope token would be reset in a foreign context; sync handlers still see the scope because
     ``run_in_threadpool`` copies the request context into the worker."""
-    from hermes_cli.web_server_plugin_profiles import in_process_router_refused
-    from hermes_cli.web_server_profiles import _config_profile_scope, _is_current_profile
+    from eir_cli.web_server_plugin_profiles import in_process_router_refused
+    from eir_cli.web_server_profiles import _config_profile_scope, _is_current_profile
     name = _plugin_api_name(conn.scope)
     with _config_profile_scope(profile):
         # The plugin must not run on a profile that disabled it (#134889), and this router is the
@@ -1051,10 +1051,10 @@ def _mount_hosted_plugin_api(app, plugin: dict, api_file_name: str) -> None:
         if target is None:
             return JSONResponse({"detail": f"plugin {name!r} is not enabled in this profile"}, status_code=404)
         host, dashboard_dir, api_file = target
-        from hermes_cli.web_server_plugin_profiles import run_hosted_request
+        from eir_cli.web_server_plugin_profiles import run_hosted_request
         query, headers = request.url.query, [(k, v) for k, v in request.headers.items() if k.lower() != "host"]
         body = await request.body()
-        from hermes_cli.plugin_host_http_auth import admitted_for_sensitive_route
+        from eir_cli.plugin_host_http_auth import admitted_for_sensitive_route
         authenticated = admitted_for_sensitive_route(request)
         return await run_hosted_request(host.home, name, lambda timeout: host.asgi_request(
             name, dashboard_dir, api_file, request.method, "/" + path, query, headers, body,
@@ -1069,8 +1069,8 @@ def _mount_hosted_plugin_api(app, plugin: dict, api_file_name: str) -> None:
 def _hosted_plugin_for_request(name: str) -> Optional[tuple]:
     """``(plugin host, dashboard dir, api file)`` for plugin ``name`` in the active profile, or None
     when that profile has no enabled user copy of it."""
-    from hermes_cli.plugins import get_plugin_manager
-    from hermes_cli.plugins_cmd import _get_disabled_set, _get_enabled_set
+    from eir_cli.plugins import get_plugin_manager
+    from eir_cli.plugins_cmd import _get_disabled_set, _get_enabled_set
     for plugin in _discover_dashboard_plugins():
         if plugin.get("name") != name or not plugin.get("_api_file") or plugin.get("source") != "user":
             continue
@@ -1087,7 +1087,7 @@ def _mount_plugin_api_routes():
     ``/api/plugins/<name>/``. See ``_plugin_api_mount_skip_reason`` for the trust gates.
 
     Backend import is restricted to ``bundled`` and ``user`` sources. Project plugins
-    (``./.hermes/plugins/``) ship with the CWD and are therefore attacker-controlled in any threat model
+    (``./.eir/plugins/``) ship with the CWD and are therefore attacker-controlled in any threat model
     where the user opens a malicious repo; they can extend the dashboard UI via static JS/CSS but their
     Python ``api`` file is never auto-imported by the web server. See GHSA-5qr3-c538-wm9j (#29156).
     Additionally, user plugins must be explicitly enabled via the ``plugins.enabled`` allow-list in
@@ -1095,9 +1095,9 @@ def _mount_plugin_api_routes():
     plugin's Python code would execute at dashboard startup — a code execution vector that bypasses the
     user's intent. (#46435, GHSA-mcfc-hp25-cjv7)
     """
-    from hermes_cli.web_server import _get_dashboard_plugins, app
+    from eir_cli.web_server import _get_dashboard_plugins, app
     try:
-        from hermes_cli.plugins_cmd import _get_enabled_set, _get_disabled_set
+        from eir_cli.plugins_cmd import _get_enabled_set, _get_disabled_set
         enabled_set = _get_enabled_set()
         disabled_set = _get_disabled_set()
     except Exception:
@@ -1125,10 +1125,10 @@ def _try_hot_mount_plugin_api(name: str) -> bool:
     """
     if not name or any(c in name for c in "/\\{}") or name == "..":
         return False
-    from hermes_cli.plugins_cmd import _get_disabled_set, _get_enabled_set
-    from hermes_cli.web_server import _get_dashboard_plugins, app
-    from hermes_cli.web_server_plugin_profiles import plugin_api_path, secondary_plugin, secondary_profile_home
-    # A secondary profile reaches this router only for its own bundled copy (Hermes code), and its
+    from eir_cli.plugins_cmd import _get_disabled_set, _get_enabled_set
+    from eir_cli.web_server import _get_dashboard_plugins, app
+    from eir_cli.web_server_plugin_profiles import plugin_api_path, secondary_plugin, secondary_profile_home
+    # A secondary profile reaches this router only for its own bundled copy (Eir code), and its
     # own lists decide that one (PLG-3).
     secondary, own, requester_sets = secondary_profile_home() is not None, secondary_plugin(name), _plugin_enable_sets_here()
     with _launch_profile_scope(), _plugin_api_mount_lock:
@@ -1176,8 +1176,8 @@ class _PluginApiHotMount:
     """
 
     async def __call__(self, scope, receive, send) -> None:
-        from hermes_cli.web_server import app
-        from hermes_cli.web_server_plugin_profiles import plugin_request_scope
+        from eir_cli.web_server import app
+        from eir_cli.web_server_plugin_profiles import plugin_request_scope
         name = str(scope.get("path_params", {}).get("name", ""))
         with plugin_request_scope(scope):  # a ``?profile=`` selection decides its own cold mount (PLG-3)
             mounted = await asyncio.to_thread(_try_hot_mount_plugin_api, name)
@@ -1218,7 +1218,7 @@ def _mount_one_plugin_api(app, plugin: dict[str, Any], enabled_set: set, disable
         _log.debug("Plugin %s: skipping API mount (%s)", plugin.get("name", ""), skip)
         return False
     if plugin.get("source") not in ("bundled", "project"):
-        from hermes_cli.plugin_isolation import ISOLATION_HOST, isolation_mode
+        from eir_cli.plugin_isolation import ISOLATION_HOST, isolation_mode
         if isolation_mode() == ISOLATION_HOST:
             _mount_hosted_plugin_api(app, plugin, api_file_name)
             return True
@@ -1226,7 +1226,7 @@ def _mount_one_plugin_api(app, plugin: dict[str, Any], enabled_set: set, disable
         _log.warning(
             "Plugin %s: ignoring backend api=%s (project plugins may "
             "not auto-import Python code; move the plugin to "
-            "~/.hermes/plugins/ if you trust it)",
+            "~/.eir/plugins/ if you trust it)",
             plugin["name"], api_file_name,
         )
         return False
@@ -1246,10 +1246,10 @@ def _mount_one_plugin_api(app, plugin: dict[str, Any], enabled_set: set, disable
         _log.warning("Plugin %s declares api=%s but file not found", plugin["name"], api_file_name)
         return False
     try:
-        from hermes_cli.plugin_isolation import import_user_code
+        from eir_cli.plugin_isolation import import_user_code
         # Registered in sys.modules while the body runs so pydantic/FastAPI can resolve
         # string annotations (``from __future__ import annotations``) by module name.
-        mod = import_user_code(api_path, f"hermes_dashboard_plugin_{plugin['name']}")
+        mod = import_user_code(api_path, f"eir_dashboard_plugin_{plugin['name']}")
         if mod is None:
             return False
         router = getattr(mod, "router", None)

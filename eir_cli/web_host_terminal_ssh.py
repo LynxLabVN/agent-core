@@ -11,8 +11,8 @@ from pathlib import Path
 
 from fastapi import WebSocket
 
-from hermes_cli import gateway_connections as store
-from hermes_cli.web_host_terminal_sessions import HostOwner, TerminalExpired
+from eir_cli import gateway_connections as store
+from eir_cli.web_host_terminal_sessions import HostOwner, TerminalExpired
 
 
 def _entry(path: Path, connection_id: str) -> dict | None:
@@ -48,19 +48,19 @@ def warm_tunnel(ws: WebSocket) -> None:
     """Dial before the registry's spawn lock: a cold connect would hold up every new terminal.
 
     The dial inside ``prepare_shell`` then takes the reuse path and keeps its fingerprint re-check."""
-    from hermes_cli.gateway_connections_ssh import ensure_tunnel
+    from eir_cli.gateway_connections_ssh import ensure_tunnel
 
     connection, path = ws.state.ssh_terminal
     ensure_tunnel(connection, root=path.parent)
 
 
 def prepare_shell(ws: WebSocket, identity: tuple[str, str]):
-    from hermes_cli.gateway_connections_ssh import interactive_shell_argv
-    from hermes_cli.web_host_terminal import resolve_argv
-    from hermes_constants import get_process_hermes_home
+    from eir_cli.gateway_connections_ssh import interactive_shell_argv
+    from eir_cli.web_host_terminal import resolve_argv
+    from eir_constants import get_process_eir_home
 
     connection, path = ws.state.ssh_terminal
-    home = get_process_hermes_home().resolve()
+    home = get_process_eir_home().resolve()
     remote_cwd = (ws.query_params.get("cwd") or "").strip()
     owner = SshOwner(identity, home, "ssh", remote_cwd, path, connection, _profile(ws))
     owner.admit(lambda: None)
@@ -74,11 +74,11 @@ def prepare_shell(ws: WebSocket, identity: tuple[str, str]):
 
 async def serve_ssh_terminal(ws: WebSocket, connection_id: str, admitted: str) -> bool:
     """After relay admission, serve an SSH terminal; False leaves other transports to the relay."""
-    from hermes_cli.web_host_terminal import request_allowed
-    from hermes_cli.web_host_terminal_sessions import host_terminal
-    from hermes_cli.web_server_chat import _PTY_BRIDGE_AVAILABLE, PtyUnavailableError, _pty_fail
-    from hermes_cli.web_server_surface import policy
-    from hermes_cli.web_session_sockets import track
+    from eir_cli.web_host_terminal import request_allowed
+    from eir_cli.web_host_terminal_sessions import host_terminal
+    from eir_cli.web_server_chat import _PTY_BRIDGE_AVAILABLE, PtyUnavailableError, _pty_fail
+    from eir_cli.web_server_surface import policy
+    from eir_cli.web_session_sockets import track
 
     path = store.store_path()
     connection = await asyncio.to_thread(_entry, path, connection_id)

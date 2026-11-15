@@ -1,4 +1,4 @@
-"""v5 signals: hermes.tool_unavailable.count, hermes.provider_setup.count, hermes.feature_adoption.count."""
+"""v5 signals: eir.tool_unavailable.count, eir.provider_setup.count, eir.feature_adoption.count."""
 
 from __future__ import annotations
 
@@ -11,18 +11,18 @@ from types import SimpleNamespace
 
 import pytest
 
-from hermes_cli.observability import relay_shared_metrics
-from hermes_cli.observability import shared_metrics_contract as contract
-from hermes_cli.observability import shared_metrics_setup as setup_metrics
-from hermes_cli.observability import shared_metrics_signals as signals
-from hermes_cli.observability.shared_metrics import SharedMetricsStore
+from eir_cli.observability import relay_shared_metrics
+from eir_cli.observability import shared_metrics_contract as contract
+from eir_cli.observability import shared_metrics_setup as setup_metrics
+from eir_cli.observability import shared_metrics_signals as signals
+from eir_cli.observability.shared_metrics import SharedMetricsStore
 
 
 @pytest.fixture
 def marks(tmp_path, monkeypatch):
     captured: list[tuple[str, dict]] = []
     policy = {"on": True}
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path / "home"))
     monkeypatch.setattr(relay_shared_metrics, "enabled", lambda: policy["on"])
     monkeypatch.setattr(relay_shared_metrics, "record_process_mark", lambda mark, data: captured.append((mark, data)))
 
@@ -78,7 +78,7 @@ def test_deferred_builtins_and_cron_narrowing_are_not_unavailable(monkeypatch):
 
 
 def test_turn_validation_reports_disabled_builtin_once_and_unknown_names_never(marks, monkeypatch):
-    from hermes_cli.observability.shared_metrics_model import record_tool_call_quality
+    from eir_cli.observability.shared_metrics_model import record_tool_call_quality
 
     monkeypatch.setattr("tools.skill_provenance.is_background_review", lambda: False)
     agent = SimpleNamespace(provider="openrouter", model="anthropic/claude-sonnet-4", valid_tool_names={"memory"},
@@ -104,8 +104,8 @@ def test_counter_rows_map_to_features():
     assert signals.features_for(contract.FEATURE_USED_MARK, {"feature": "bot_mode"}) == ("bot_mode",)
 
 
-def test_hermes_internal_work_never_latches_adoption():
-    from hermes_cli.observability.shared_metrics_fields import milestones_for
+def test_eir_internal_work_never_latches_adoption():
+    from eir_cli.observability.shared_metrics_fields import milestones_for
 
     curator = {"archived_bucket": "0", "created_bucket": "0", "merged_bucket": "0", "patched_bucket": "0",
                "outcome": "success"}
@@ -123,7 +123,7 @@ def test_unreadable_first_session_reads_unknown(monkeypatch, tmp_path):
     def text_stamp(home):
         return float("yesterday")
 
-    monkeypatch.setattr("hermes_cli.observability.shared_metrics_snapshot._first_session_started_at", text_stamp)
+    monkeypatch.setattr("eir_cli.observability.shared_metrics_snapshot._first_session_started_at", text_stamp)
     assert signals.days_since_install_bucket(tmp_path) == "unknown"
 
 
@@ -132,13 +132,13 @@ def test_unreadable_first_session_reads_unknown(monkeypatch, tmp_path):
     (200 * 86_400, "gte_90d"),
 ])
 def test_days_since_install_bucket(monkeypatch, tmp_path, age_s, bucket):
-    monkeypatch.setattr("hermes_cli.observability.shared_metrics_snapshot._first_session_started_at",
+    monkeypatch.setattr("eir_cli.observability.shared_metrics_snapshot._first_session_started_at",
                         lambda home: time.time() - age_s)
     assert signals.days_since_install_bucket(tmp_path) == bucket
 
 
 def test_feature_adoption_latches_once_per_install(tmp_path):
-    resource = {"hermes_version": "1.0.0", "os_family": "linux", "architecture": "x86_64", "install_method": "git"}
+    resource = {"eir_version": "1.0.0", "os_family": "linux", "architecture": "x86_64", "install_method": "git"}
     store = SharedMetricsStore(tmp_path / "m.sqlite3", tmp_path / "outbox")
     assert store.record_feature_adoption("memory", "same_day", resource) is True
     again = SharedMetricsStore(tmp_path / "m.sqlite3", tmp_path / "outbox")
@@ -242,7 +242,7 @@ def test_cli_flow_classifies_landed_backed_out_failed_and_raised(marks, monkeypa
 
 
 def test_cli_setup_navigation_esc_cancels_and_back_resumes_one_flow(marks, monkeypatch):
-    from hermes_cli.setup import _SetupCancelled, _SetupGoBack
+    from eir_cli.setup import _SetupCancelled, _SetupGoBack
 
     monkeypatch.setattr(setup_metrics, "_model_route", lambda: ("openrouter", "a", None))
 
@@ -298,10 +298,10 @@ def test_cancel_or_lapsed_code_is_never_a_failure_and_poller_errors_keep_their_c
     poller's exception keeps its closed class instead of the bare session ``error`` -> ``other``."""
     import httpx
 
-    from hermes_cli.auth_constants import _codex_err, _xai_err
-    from hermes_cli.auth_device_flow import _poll_for_token
-    from hermes_cli.auth_error_copy import device_flow_error
-    from hermes_cli.web_server_oauth import _oauth_poller, _oauth_sessions
+    from eir_cli.auth_constants import _codex_err, _xai_err
+    from eir_cli.auth_device_flow import _poll_for_token
+    from eir_cli.auth_error_copy import device_flow_error
+    from eir_cli.web_server_oauth import _oauth_poller, _oauth_sessions
 
     monkeypatch.setattr(setup_metrics, "web_setup_surface", lambda: "desktop")
     with setup_metrics.provider_setup_surface("cli_model"):  # CLI: Ctrl-C mid sign-in
@@ -360,8 +360,8 @@ def _wire(status, body):
 def _poll(provider, status, body):
     """The real device-code poll loop on a fake clock (each sleep advances it)."""
     def run(monkeypatch):
-        from hermes_cli import auth_device_flow
-        from hermes_cli.auth_xai import _xai_oauth_poll_device_token
+        from eir_cli import auth_device_flow
+        from eir_cli.auth_xai import _xai_oauth_poll_device_token
 
         clock = [0.0]
         fake_time = SimpleNamespace(monotonic=lambda: clock[0], sleep=lambda s: clock.__setitem__(0, clock[0] + max(s, 1)))
@@ -379,8 +379,8 @@ def _guest_sign_in(token_status, token_body):
     def run(monkeypatch):
         import httpx
 
-        from hermes_cli import anon_auth, auth_device_flow
-        from hermes_cli.web_server_oauth import _record_sign_in_state
+        from eir_cli import anon_auth, auth_device_flow
+        from eir_cli.web_server_oauth import _record_sign_in_state
 
         clock = [0.0]
         fake_time = SimpleNamespace(monotonic=lambda: clock[0], sleep=lambda s: clock.__setitem__(0, clock[0] + max(s, 1)))
@@ -408,7 +408,7 @@ def _codex_start(status, body):
     def run(monkeypatch):
         import asyncio
 
-        import hermes_cli.web_routers.oauth as routes
+        import eir_cli.web_routers.oauth as routes
 
         client = _wire(status, body)
         monkeypatch.setattr(routes, "_codex_post", lambda _httpx, url, **kw: client.post(url, **kw))
@@ -435,7 +435,7 @@ def test_wire_failures_keep_the_producers_class_to_the_recorded_end(marks, monke
     sign-in state -> session boundaries too."""
     import asyncio
 
-    import hermes_cli.web_routers.oauth as routes
+    import eir_cli.web_routers.oauth as routes
 
     monkeypatch.setattr(setup_metrics, "web_setup_surface", lambda: "desktop")
     flow = setup_metrics.begin_oauth_setup("nous", None)
@@ -465,8 +465,8 @@ def test_api_key_env_maps_to_provider_only():
 
 
 def test_web_forms_count_only_a_new_provider_key_or_endpoint(marks, monkeypatch):
-    from hermes_cli.web_models import CustomEndpointUpdate
-    from hermes_cli.web_routers import config_env
+    from eir_cli.web_models import CustomEndpointUpdate
+    from eir_cli.web_routers import config_env
 
     done: list[str] = []
     monkeypatch.setattr(setup_metrics, "record_provider_setup_done", lambda _s, provider, **_k: done.append(provider))
@@ -486,7 +486,7 @@ def test_web_forms_count_only_a_new_provider_key_or_endpoint(marks, monkeypatch)
 
 # ---- feature disabled ----
 
-from hermes_cli.observability import shared_metrics_disabled as disabled_metrics
+from eir_cli.observability import shared_metrics_disabled as disabled_metrics
 
 
 def _settle_disabled() -> None:
@@ -494,7 +494,7 @@ def _settle_disabled() -> None:
     import threading
 
     for thread in threading.enumerate():
-        if thread.name == "hermes-feature-disabled":
+        if thread.name == "eir-feature-disabled":
             thread.join(10)
 
 
@@ -521,7 +521,7 @@ def test_settings_skills_plugins_transitions_only_count_moves_from_and_back_to_d
 
 
 def test_toolset_transitions_use_the_real_resolver():
-    from hermes_cli.tools_config import _get_platform_tools
+    from eir_cli.tools_config import _get_platform_tools
 
     default = sorted(_get_platform_tools({}, "cli", include_default_mcp_servers=False))
     assert "memory" in default
@@ -549,7 +549,7 @@ def test_record_config_saved_needs_a_surface_and_collection(marks, monkeypatch):
 
 
 def test_store_counts_feature_disabled_once_per_day(tmp_path):
-    resource = {"hermes_version": "1.0.0", "os_family": "linux", "architecture": "x86_64", "install_method": "git"}
+    resource = {"eir_version": "1.0.0", "os_family": "linux", "architecture": "x86_64", "install_method": "git"}
     store = SharedMetricsStore(tmp_path / "m.sqlite3", tmp_path / "outbox")
     dims = {"event": "disabled", "kind": "toolset", "name": "memory", "surface": "cli_tools"}
     assert store.record_counter_once_per_day(contract.FEATURE_DISABLED_METRIC, dims, resource) is True
@@ -560,7 +560,7 @@ def test_store_counts_feature_disabled_once_per_day(tmp_path):
 
 
 def test_real_config_writes_report_the_move_away_from_default(marks, monkeypatch):
-    from hermes_cli.config import load_config, save_config, set_config_value
+    from eir_cli.config import load_config, save_config, set_config_value
 
     marks.home.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(disabled_metrics, "_process_surface", "cli_config")
@@ -575,13 +575,13 @@ def test_real_config_writes_report_the_move_away_from_default(marks, monkeypatch
 
 
 def test_migrations_and_env_templates_are_not_user_disables(marks, monkeypatch):
-    from hermes_cli.config import _persist_migration, load_config, save_config
+    from eir_cli.config import _persist_migration, load_config, save_config
 
     marks.home.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(disabled_metrics, "_process_surface", "cli_config")
     config = load_config()
     config.setdefault("memory", {})["memory_enabled"] = False
-    _persist_migration(config)  # e.g. `hermes config migrate` / profile create in the dashboard
+    _persist_migration(config)  # e.g. `eir config migrate` / profile create in the dashboard
     # A ``${VAR}`` template on the raw side vs its expanded value: nothing moved.
     monkeypatch.setenv("MEM_ON", "false")
     (marks.home / "config.yaml").write_text("compression:\n  enabled: ${MEM_ON}\n")
@@ -595,7 +595,7 @@ def test_migrations_and_env_templates_are_not_user_disables(marks, monkeypatch):
 def test_diff_and_record_run_off_the_callers_lock_in_the_owning_profile(marks, monkeypatch, tmp_path):
     import threading
 
-    from hermes_constants import get_hermes_home, reset_hermes_home_override, set_hermes_home_override
+    from eir_constants import get_eir_home, reset_eir_home_override, set_eir_home_override
 
     monkeypatch.setattr(disabled_metrics, "_process_surface", "cli_config")
     gate, seen = threading.Event(), []
@@ -603,17 +603,17 @@ def test_diff_and_record_run_off_the_callers_lock_in_the_owning_profile(marks, m
 
     def slow(old, new):
         gate.wait(5)
-        seen.append(str(get_hermes_home()))
+        seen.append(str(get_eir_home()))
         return real(old, new)
 
     monkeypatch.setattr(disabled_metrics, "config_transitions", slow)
-    token = set_hermes_home_override(str(tmp_path / "b"))
+    token = set_eir_home_override(str(tmp_path / "b"))
     try:
         with threading.Lock():  # noqa: PLW2101 -- inert on purpose: a stand-in for the caller's config_backend.CONFIG_MUTATION_LOCK, which record_config_saved documents running outside of
             disabled_metrics.record_config_saved({}, {"memory": {"memory_enabled": False}})
             assert marks.rows == []  # returned without diffing
     finally:
-        reset_hermes_home_override(token)
+        reset_eir_home_override(token)
     gate.set()
     _settle_disabled()
     assert seen == [str(tmp_path / "b")] and [m for m, _ in marks.rows] == [contract.FEATURE_DISABLED_MARK]
@@ -622,10 +622,10 @@ def test_diff_and_record_run_off_the_callers_lock_in_the_owning_profile(marks, m
 def test_off_thread_setup_records_in_the_owning_profile(marks, tmp_path, monkeypatch):
     seen: list[str] = []
     monkeypatch.setattr(relay_shared_metrics, "record_process_marks_saved", lambda rows: (
-        seen.append(str(__import__("hermes_constants").get_hermes_home())), len(rows))[1])
+        seen.append(str(__import__("eir_constants").get_eir_home())), len(rows))[1])
     home_a, home_b = tmp_path / "a", tmp_path / "b"
     for home in (home_a, home_b, home_a):
-        flow = setup_metrics.begin_provider_setup("dashboard", "xai", hermes_home=home)
+        flow = setup_metrics.begin_provider_setup("dashboard", "xai", eir_home=home)
         assert flow.marker.parent == setup_metrics.markers_dir(home)
         setup_metrics.finish_provider_setup(flow, "completed")
     assert seen == [str(h) for h in (home_a, home_a, home_b, home_b, home_a, home_a)]

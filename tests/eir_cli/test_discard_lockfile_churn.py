@@ -1,4 +1,4 @@
-"""`hermes update` lockfile-churn cleanup reverts only npm's own rewrites (#112378).
+"""`eir update` lockfile-churn cleanup reverts only npm's own rewrites (#112378).
 
 The npm projects (``scripts/whatsapp-bridge``, the Photon sidecar) carry their own ``package-lock.json``;
 npm rewrites them non-deterministically, so a lock whose sibling manifest is clean is churn. A dirty
@@ -9,7 +9,7 @@ a change there is the user's and survives the cleanup.
 import os
 import subprocess
 
-from hermes_cli.update_cmd_git import _discard_lockfile_churn
+from eir_cli.update_cmd_git import _discard_lockfile_churn
 
 _GIT_ENV = {
     **os.environ,

@@ -6,7 +6,7 @@
  * Mode.
  */
 
-import { host } from '@hermes/plugin-sdk'
+import { host } from '@eir/plugin-sdk'
 
 import { botsText } from './i18n'
 import type { Attachment, AttachmentKind } from './types'

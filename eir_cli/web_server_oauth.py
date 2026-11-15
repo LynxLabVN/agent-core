@@ -12,7 +12,7 @@ from datetime import datetime, timezone, UTC
 from typing import Any, Dict, Optional
 
 # Same logger the code used before extraction (record parity).
-_log = logging.getLogger("hermes_cli.web_server")
+_log = logging.getLogger("eir_cli.web_server")
 
 
 _LOGGED_OUT: dict[str, Any] = {"logged_in": False, "source": None}
@@ -41,28 +41,28 @@ def _token_status(source: str, source_label: str, creds: dict[str, Any]) -> dict
 
 
 def _anthropic_oauth_status() -> dict[str, Any]:
-    """Status for the "Anthropic Account" card: Hermes-managed PKCE file first, then the
+    """Status for the "Anthropic Account" card: Eir-managed PKCE file first, then the
     registry-ordered env vars (process env — where Bitwarden-sourced secrets land — then .env).
 
     Claude Code's ``~/.claude/.credentials.json`` is deliberately NOT read here; it has its own
     ``claude-code`` entry, and counting it here would shadow a real ANTHROPIC_API_KEY.
     """
     try:
-        from agent.anthropic_credentials import read_hermes_oauth_credentials, _get_hermes_oauth_file
-        hermes_creds = read_hermes_oauth_credentials()
+        from agent.anthropic_credentials import read_eir_oauth_credentials, _get_eir_oauth_file
+        eir_creds = read_eir_oauth_credentials()
     except Exception:
-        hermes_creds = None
-    if hermes_creds and hermes_creds.get("accessToken"):
-        return _token_status("hermes_pkce", f"Hermes PKCE ({_get_hermes_oauth_file()})", hermes_creds)
+        eir_creds = None
+    if eir_creds and eir_creds.get("accessToken"):
+        return _token_status("eir_pkce", f"Eir PKCE ({_get_eir_oauth_file()})", eir_creds)
 
     env_var_order: tuple = ("ANTHROPIC_API_KEY", "ANTHROPIC_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN")
     try:
-        from hermes_cli.auth import PROVIDER_REGISTRY
+        from eir_cli.auth import PROVIDER_REGISTRY
         env_var_order = PROVIDER_REGISTRY["anthropic"].api_key_env_vars
     except (ImportError, KeyError):
         pass
-    from hermes_cli.config import get_env_value
-    from hermes_cli.env_loader import format_secret_source_suffix
+    from eir_cli.config import get_env_value
+    from eir_cli.env_loader import format_secret_source_suffix
     for var in env_var_order:
         value = get_env_value(var) or os.getenv(var)
         if value:
@@ -97,20 +97,20 @@ def _external_process_cli_command(provider_id: str, default: str) -> str:
     (its profile's ``process_command_env_vars`` override); others get ``default`` untouched.
 
     The first-token swap only fits defaults that are the provider CLI's own template (curated
-    rows like ``copilot login``). Plugin rows default to the *Hermes* command ``hermes auth add
+    rows like ``copilot login``). Plugin rows default to the *Eir* command ``eir auth add
     <slug>``; swapping its first token mints a command neither CLI understands (``agy auth add
-    <slug>``), so a ``hermes``-led default survives verbatim when the plugin ships an
+    <slug>``), so a ``eir``-led default survives verbatim when the plugin ships an
     ``auth_handler`` and otherwise becomes the re-login every other surface names for these
-    plugins: the CLI login the plugin declares, which changes no Hermes config (#136071)."""
+    plugins: the CLI login the plugin declares, which changes no Eir config (#136071)."""
     try:
-        from hermes_cli.auth import PROVIDER_REGISTRY, get_external_process_provider_status
+        from eir_cli.auth import PROVIDER_REGISTRY, get_external_process_provider_status
         pconfig = PROVIDER_REGISTRY.get(provider_id)
         if not pconfig or pconfig.auth_type != "external_process":
             return default
-        if default.split(" ", 1)[0] == "hermes":
-            # `hermes auth add <slug>` only works when the plugin owns an auth_handler; without
+        if default.split(" ", 1)[0] == "eir":
+            # `eir auth add <slug>` only works when the plugin owns an auth_handler; without
             # one the CLI exits with "ships no auth_handler" and no executable swap fixes that.
-            from hermes_cli.auth_plugin_providers import plugin_auth_handler
+            from eir_cli.auth_plugin_providers import plugin_auth_handler
             if plugin_auth_handler(provider_id) is not None:
                 return default
             from agent.turn_failure_copy import oauth_relogin_command
@@ -135,27 +135,27 @@ def _external_process_cli_command(provider_id: str, default: str) -> str:
 # ``flow``: ``device_code`` = show code + URL + poll; ``external`` = delegated to a terminal/CLI.
 _OAUTH_PROVIDER_CATALOG: tuple[dict[str, Any], ...] = (
     # status_fn None → dispatched via auth.get_<provider>_auth_status.
-    {"id": "nous", "name": "Nous Portal", "flow": "device_code", "cli_command": "hermes auth add nous",
+    {"id": "nous", "name": "Nous Portal", "flow": "device_code", "cli_command": "eir auth add nous",
      "docs_url": "https://portal.nousresearch.com", "status_fn": None},
     {"id": "openai-codex", "name": "ChatGPT or Codex Subscription", "flow": "device_code",
-     "cli_command": "hermes auth add openai-codex", "docs_url": "https://platform.openai.com/docs",
+     "cli_command": "eir auth add openai-codex", "docs_url": "https://platform.openai.com/docs",
      "status_fn": None},
     {"id": "qwen-oauth", "name": "Qwen (via Qwen CLI)", "flow": "external",
-     "cli_command": "hermes auth add qwen-oauth", "docs_url": "https://github.com/QwenLM/qwen-code",
+     "cli_command": "eir auth add qwen-oauth", "docs_url": "https://github.com/QwenLM/qwen-code",
      "status_fn": None},
     # Structurally device-code (verification URI + user code + token polling) with a PKCE
     # code-binding extension that doesn't change the operator UX.
     {"id": "minimax-oauth", "name": "MiniMax (OAuth)", "flow": "device_code",
-     "cli_command": "hermes auth add minimax-oauth", "docs_url": "https://www.minimax.io", "status_fn": None},
+     "cli_command": "eir auth add minimax-oauth", "docs_url": "https://www.minimax.io", "status_fn": None},
     # Device code works in remote shells/containers without a reachable 127.0.0.1 callback.
     {"id": "xai-oauth", "name": "xAI Grok OAuth (SuperGrok / Premium+)", "flow": "device_code",
-     "cli_command": "hermes auth add xai-oauth",
+     "cli_command": "eir auth add xai-oauth",
      "docs_url": "https://hermes-agent.nousresearch.com/docs/guides/xai-grok-oauth", "status_fn": None},
     # Anthropic / Claude entries sit at the bottom. Deliberately flow == "external": an
     # in-dashboard Connect button would let a scriptable HTTP endpoint mint Claude Pro/Max
     # subscription tokens outside Anthropic's own client, against its OAuth usage policies.
-    # Login works via the terminal (`hermes auth add anthropic`) or a plain API key.
-    {"id": "anthropic", "name": "Anthropic Account", "flow": "external", "cli_command": "hermes auth add anthropic",
+    # Login works via the terminal (`eir auth add anthropic`) or a plain API key.
+    {"id": "anthropic", "name": "Anthropic Account", "flow": "external", "cli_command": "eir auth add anthropic",
      "docs_url": "https://docs.claude.com/en/api/getting-started", "status_fn": _anthropic_oauth_status},
     {"id": "claude-code", "name": "Anthropic OAuth: Required Extra Usage Credits to Use Subscription",
      "flow": "external", "cli_command": "claude setup-token",
@@ -196,7 +196,7 @@ def _oauth_poller(label: str):
                 else:
                     _log.info("oauth/device: %s login completed (session=%s)", label, session_id)
             except Exception as e:
-                from hermes_cli.observability.shared_metrics_setup import note_oauth_failure
+                from eir_cli.observability.shared_metrics_setup import note_oauth_failure
                 _log.warning("%s device-code poll failed (session=%s): %s", label, session_id, e)
                 note_oauth_failure(sess, e)
                 with _oauth_sessions_lock:
@@ -267,10 +267,10 @@ def _nous_sign_in_poller(session_id: str, sess: dict[str, Any]) -> None:
 def _minimax_poller(session_id: str, sess: dict[str, Any]) -> None:
     """MiniMax poller: PKCE-style ``code_verifier`` + ``user_code`` instead of Nous's
     ``device_code``. Builds the same auth_state as the CLI's ``_minimax_oauth_login`` and persists
-    via ``_minimax_save_auth_state`` so the system ends up as after ``hermes auth add minimax-oauth``.
+    via ``_minimax_save_auth_state`` so the system ends up as after ``eir auth add minimax-oauth``.
     Region is fixed to "global" here; cn-region operators use the CLI's ``--region cn``."""
-    from hermes_cli.web_server_profiles import _profile_scope
-    from hermes_cli.auth import (
+    from eir_cli.web_server_profiles import _profile_scope
+    from eir_cli.auth import (
         _minimax_poll_token, _minimax_resolve_token_expiry_unix, _minimax_save_auth_state,
         MINIMAX_OAUTH_GLOBAL_INFERENCE, MINIMAX_OAUTH_SCOPE,
     )
@@ -314,9 +314,9 @@ def _minimax_poller(session_id: str, sess: dict[str, Any]) -> None:
 @_oauth_poller("xai")
 def _xai_device_poller(session_id: str, sess: dict[str, Any]) -> None:
     """Background poller for xAI's OAuth device-code flow."""
-    from hermes_cli.web_server_profiles import _profile_scope
+    from eir_cli.web_server_profiles import _profile_scope
     import httpx
-    from hermes_cli.auth import (
+    from eir_cli.auth import (
         _save_xai_oauth_tokens, _xai_oauth_discovery, _xai_oauth_poll_device_token,
         mark_provider_active_if_unset, unsuppress_credential_source,
     )
@@ -344,7 +344,7 @@ def _xai_device_poller(session_id: str, sess: dict[str, Any]) -> None:
             tokens, discovery=discovery, auth_mode="oauth_device_code", set_active=False,
             last_refresh=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         )
-        # Mirror `hermes auth add xai-oauth`: first credential may become active; never overwrite.
+        # Mirror `eir auth add xai-oauth`: first credential may become active; never overwrite.
         mark_provider_active_if_unset("xai-oauth")
         # The singleton write is the source of truth (the pool load seeds it as the canonical
         # ``device_code`` entry). Do NOT add a parallel ``manual:dashboard_*`` pool entry — it
@@ -374,7 +374,7 @@ def _profile_device_poller(session_id: str, sess: dict[str, Any]) -> None:
     """Drive a device-code login a provider profile owns (``ProviderProfile.start_device_login``):
     one ``poll_device_login`` per interval (each bound to the session's profile) until approved, then
     ``save_device_login`` under the session's profile scope, in one critical section with the cancel check like the built-in savers."""
-    from hermes_cli.web_server_profiles import _config_profile_scope, _profile_scope
+    from eir_cli.web_server_profiles import _config_profile_scope, _profile_scope
     profile, state, interval = sess["_provider_profile"], sess["_device_state"], int(sess["interval"])
     result: dict[str, Any] = {}
     while time.time() < sess["expires_at"]:

@@ -5,26 +5,26 @@ from threading import Thread
 from typing import Any
 from unittest.mock import Mock
 
-import hermes_yaml
+import eir_yaml
 import pytest
 
-from hermes_cli import config, models_validate, profiles
-from hermes_cli.config_backend import CONFIG_MUTATION_LOCK
-from hermes_cli.profile_provision import (
+from eir_cli import config, models_validate, profiles
+from eir_cli.config_backend import CONFIG_MUTATION_LOCK
+from eir_cli.profile_provision import (
     ProfileCreateRequest,
     inherit_launch_model,
     provision_profile,
 )
-from hermes_constants import get_hermes_home
+from eir_constants import get_eir_home
 from tui_gateway.launch_profile_policy import profile_config_scope
 
 
 @pytest.fixture
 def launch(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     home.mkdir()
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     monkeypatch.setenv("SEED_PROVIDER", "custom:lab")
     monkeypatch.setenv("SEED_MODEL", "private-model")
     monkeypatch.setenv("SEED_URL", "http://127.0.0.1:18080/v1")
@@ -38,9 +38,9 @@ def validation(monkeypatch):
     validate = Mock(wraps=models_validate.validate_requested_model)
     probe = Mock(return_value={"models": ["private-model"]})
     monkeypatch.setattr(models_validate, "validate_requested_model", validate)
-    monkeypatch.setattr("hermes_cli.models.probe_api_models", probe)
-    monkeypatch.setattr("hermes_cli.model_switch.get_model_info", lambda *a, **k: None)
-    monkeypatch.setattr("hermes_cli.model_switch.get_model_capabilities", lambda *a, **k: None)
+    monkeypatch.setattr("eir_cli.models.probe_api_models", probe)
+    monkeypatch.setattr("eir_cli.model_switch.get_model_info", lambda *a, **k: None)
+    monkeypatch.setattr("eir_cli.model_switch.get_model_capabilities", lambda *a, **k: None)
     return validate, probe
 
 
@@ -91,7 +91,7 @@ def test_inherit_copies_raw_route_without_validation(launch, monkeypatch, valida
     saves = []
 
     def save(cfg, **kwargs):
-        assert get_hermes_home() == target
+        assert get_eir_home() == target
         acquired = []
 
         def contend():
@@ -112,9 +112,9 @@ def test_inherit_copies_raw_route_without_validation(launch, monkeypatch, valida
         cached = config.load_config_readonly()
         snapshot = deepcopy(cached)
         assert inherit_launch_model(target) is True
-        assert get_hermes_home() == source
+        assert get_eir_home() == source
         assert cached == snapshot
-    assert get_hermes_home() == launch
+    assert get_eir_home() == launch
     assert {p: p.read_bytes() for p in before} == before
     actual = config.read_user_config_raw(target / "config.yaml")
     carried = {k: v for k, v in model.items() if k not in {"api_key", "context_length"}}
@@ -136,8 +136,8 @@ def test_inherit_copies_raw_route_without_validation(launch, monkeypatch, valida
 
 @pytest.mark.parametrize("legacy", [False, "default", "name"])
 def test_inherit_source_selection_destination_secret_refs(launch, validation, legacy):
-    from hermes_cli.config_effective import load_user_config_effective
-    from hermes_cli.runtime_provider import resolve_runtime_provider
+    from eir_cli.config_effective import load_user_config_effective
+    from eir_cli.runtime_provider import resolve_runtime_provider
 
     source = launch / "profiles" / "source"
     target = launch / "profiles" / "target"
@@ -158,12 +158,12 @@ def test_inherit_source_selection_destination_secret_refs(launch, validation, le
     config.atomic_config_write(source / "config.yaml", raw)
     # The writer canonicalizes too: use the raw backend fixture boundary for legacy input.
     if legacy:
-        (source / "config.yaml").write_text(hermes_yaml.safe_dump(raw))
+        (source / "config.yaml").write_text(eir_yaml.safe_dump(raw))
     config.atomic_config_write(target / "config.yaml", {"model": {"temperature": 0.3, "custom_model": {"extra_body": {"keep": True}}}})
     before = (source / "config.yaml").read_bytes()
     with profile_config_scope(source):
         assert inherit_launch_model(target)
-        assert get_hermes_home() == source
+        assert get_eir_home() == source
     inherited = config.read_user_config_raw(target / "config.yaml")
     assert inherited["model"]["provider"] == "custom:lab"
     assert inherited["model"]["default"] == "source-model"
@@ -188,8 +188,8 @@ def test_inherit_source_selection_destination_secret_refs(launch, validation, le
 
 @pytest.mark.parametrize("layout", ["root", "api_base", "complete"])
 def test_inherit_destination_legacy_route(launch, validation, layout):
-    from hermes_cli.config_effective import load_user_config_effective
-    from hermes_cli.runtime_provider import resolve_runtime_provider
+    from eir_cli.config_effective import load_user_config_effective
+    from eir_cli.runtime_provider import resolve_runtime_provider
 
     config.atomic_config_write(launch / "config.yaml", {
         "model": {"provider": "openrouter", "default": "source-model"}})
@@ -204,7 +204,7 @@ def test_inherit_destination_legacy_route(launch, validation, layout):
     if layout == "complete":
         destination["provider"] = "custom"
         model["name"] = "keep-model"
-    (target / "config.yaml").write_text(hermes_yaml.safe_dump(destination))
+    (target / "config.yaml").write_text(eir_yaml.safe_dump(destination))
     before = (target / "config.yaml").read_bytes()
     assert inherit_launch_model(target) is (layout != "complete")
     if layout == "complete":
@@ -226,8 +226,8 @@ def test_inherit_destination_legacy_route(launch, validation, layout):
 @pytest.mark.parametrize("schema", ["providers", "custom_providers"])
 @pytest.mark.parametrize("identity", ["literal", "name", "provider_key"])
 def test_inherit_endpoint_identity_scopes(launch, validation, schema, identity):
-    from hermes_cli.config_effective import load_user_config_effective
-    from hermes_cli.runtime_provider import resolve_runtime_provider
+    from eir_cli.config_effective import load_user_config_effective
+    from eir_cli.runtime_provider import resolve_runtime_provider
 
     source = launch / "profiles" / "source"
     target = launch / "profiles" / "target"
@@ -260,7 +260,7 @@ def test_inherit_endpoint_identity_scopes(launch, validation, schema, identity):
         cached = config.load_config_readonly()
         snapshot = deepcopy(cached)
         assert inherit_launch_model(target)
-        assert get_hermes_home() == source
+        assert get_eir_home() == source
         assert cached == snapshot
     raw = config.read_user_config_raw(target / "config.yaml")
     copied = next(iter(raw[schema].values())) if schema == "providers" else raw[schema][0]
@@ -277,14 +277,14 @@ def test_inherit_endpoint_identity_scopes(launch, validation, schema, identity):
         assert runtime["base_url"] == "http://127.0.0.1:18081/v1"
         assert runtime["api_key"] == "synthetic-Other"
     assert (source / "config.yaml").read_bytes() == before
-    assert get_hermes_home() == launch
+    assert get_eir_home() == launch
     validation[0].assert_not_called()
     validation[1].assert_not_called()
 
 
 @pytest.mark.parametrize("locked", [True, False])
 def test_inherit_keeps_remote_route_refusal(launch, monkeypatch, locked):
-    from hermes_cli import config_backend
+    from eir_cli import config_backend
 
     config.atomic_config_write(launch / "config.yaml", {"model": {"provider": "custom", "default": "source",
                                                                "base_url": "${SEED_URL}"}})
@@ -298,7 +298,7 @@ def test_inherit_keeps_remote_route_refusal(launch, monkeypatch, locked):
     saves = []
 
     def save(cfg):
-        assert get_hermes_home() == target
+        assert get_eir_home() == target
         assert {"model", "providers", "custom_providers"} <= set(config_backend.refused_locked_omission_prefixes())
         assert cfg["model"]["api_key"] is None
         assert cfg["model"]["key_env"] is None
@@ -312,7 +312,7 @@ def test_inherit_keeps_remote_route_refusal(launch, monkeypatch, locked):
     else:
         assert inherit_launch_model(target)
         assert len(saves) == 1
-    assert get_hermes_home() == launch
+    assert get_eir_home() == launch
     assert config_backend.refused_locked_omission_prefixes() == ()
     assert (target / "config.yaml").read_bytes() == before
 
@@ -342,7 +342,7 @@ def test_provision_only_validates_explicit_selections(launch, validation, kind, 
     result = provision_profile(request)
     assert result.warnings == []
     assert (launch / "config.yaml").read_bytes() == before
-    assert get_hermes_home() == launch
+    assert get_eir_home() == launch
     if kind == "rejected":
         rejection.assert_called_once()
         assert result.model_set is False

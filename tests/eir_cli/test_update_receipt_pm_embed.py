@@ -13,14 +13,14 @@ import threading
 
 import pytest
 
-import hermes_cli.update_receipt as ur
+import eir_cli.update_receipt as ur
 
 
 @pytest.fixture
 def homed(tmp_path, monkeypatch):
-    import hermes_constants
+    import eir_constants
 
-    monkeypatch.setattr(hermes_constants, "get_hermes_home", lambda: tmp_path)
+    monkeypatch.setattr(eir_constants, "get_eir_home", lambda: tmp_path)
     import pm.receipt as pm_receipt_mod
 
     monkeypatch.setattr(pm_receipt_mod, "_receipt_dir", lambda: tmp_path / "logs" / "update_receipts")

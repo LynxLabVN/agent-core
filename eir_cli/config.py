@@ -1,11 +1,11 @@
-"""Configuration management for Hermes Agent: config.yaml / .env loading, saving,
-validation, migration, and the ``hermes config`` command."""
+"""Configuration management for Eir Agent: config.yaml / .env loading, saving,
+validation, migration, and the ``eir config`` command."""
 
 # Stale-module bridge — must run before ANY import below can bind a root-level symbol.
 # A pre-handoff updater purges only package prefixes after the pull, so a root module
 # (``utils``) stays cached from the OLD tree; the first fresh consumer of its new symbols
-# dies with ImportError before any later heal point is reached. See hermes_cli.stale_modules.
-from hermes_cli.stale_modules import drop_stale_root_modules
+# dies with ImportError before any later heal point is reached. See eir_cli.stale_modules.
+from eir_cli.stale_modules import drop_stale_root_modules
 
 drop_stale_root_modules()
 
@@ -27,32 +27,32 @@ from contextlib import contextmanager, suppress
 from pathlib import Path
 from typing import Dict, Any, Literal, Optional, List, Tuple, Set
 
-import hermes_yaml as yaml
+import eir_yaml as yaml
 
-from hermes_cli.cli_output import line_input
-from hermes_cli.colors import Colors, color
-from hermes_cli import managed_scope
-from hermes_cli.default_soul import DEFAULT_SOUL_MD, is_legacy_template_soul
-from hermes_cli.left_core_migration import profile_env_names as _left_core_profile_env
-from hermes_cli.secret_prompt import masked_secret_prompt
-# Managed-mode, container and HERMES_UID/GID policy live in hermes_constants (import-safe);
+from eir_cli.cli_output import line_input
+from eir_cli.colors import Colors, color
+from eir_cli import managed_scope
+from eir_cli.default_soul import DEFAULT_SOUL_MD, is_legacy_template_soul
+from eir_cli.left_core_migration import profile_env_names as _left_core_profile_env
+from eir_cli.secret_prompt import masked_secret_prompt
+# Managed-mode, container and EIR_UID/GID policy live in eir_constants (import-safe);
 # re-exported here so existing callers/patch targets keep working.
-from hermes_constants import (
+from eir_constants import (
     _IGNORED_MANAGED_VALUES, _LEGACY_MANAGED_SYSTEM, _MANAGED_FALSE_VALUES, _MANAGED_TRUE_VALUES,
-    _chown_to_hermes_uid, _container_or_chmod_skipped, _resolve_hermes_uid_gid,
+    _chown_to_eir_uid, _container_or_chmod_skipped, _resolve_eir_uid_gid,
     apply_secure_dir_policy, get_managed_system)
-# Re-export from hermes_constants — canonical definition lives there.
-from hermes_constants import LAUNCH_ONLY_ENV_KEYS, get_hermes_home, is_launch_only_env_key, get_process_hermes_home
+# Re-export from eir_constants — canonical definition lives there.
+from eir_constants import LAUNCH_ONLY_ENV_KEYS, get_eir_home, is_launch_only_env_key, get_process_eir_home
 from utils import atomic_replace, fast_safe_load, file_cache_version, file_signature, mkstemp_beside
-from hermes_cli.config_set_scalars import _SCALAR_WORDS, _coerce_float, _coerce_int, _quoted_bool
-from hermes_cli.config_issues import ConfigIssue, _issue
-from hermes_cli.config_credential_values import (
+from eir_cli.config_set_scalars import _SCALAR_WORDS, _coerce_float, _coerce_int, _quoted_bool
+from eir_cli.config_issues import ConfigIssue, _issue
+from eir_cli.config_credential_values import (
     _check_non_ascii_credential, refuse_redacted_config_credentials, refuse_redacted_env_value)
-from hermes_cli.config_backend import (
+from eir_cli.config_backend import (
     ConfigWriteError, config_cache_version, config_destination, config_exists, config_version,
     get_config_backend, probe_config_readable, read_config_doc, supports_file_tooling,
     write_config_document)
-from hermes_cli.config_read_errors import (
+from eir_cli.config_read_errors import (
     _CONFIG_PARSE_FAILURES, _FIX_PERMS, _FIX_YAML, FailedConfigRead, _backups_dir_display,
     _refuse_failed_read, _refuse_overwrite, _warn_config_parse_failure, _yaml_error_details,
     _yaml_error_location)
@@ -84,13 +84,13 @@ _ENV_VAR_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 # Env var names that influence how the next subprocess executes — never writable through
 # ``save_env_value``: dynamic loader (LD_*/DYLD_*: attacker code loads before main()),
-# interpreter init (PYTHON*, NODE_*: Hermes restarts through them), PATH (fix tool lookup
+# interpreter init (PYTHON*, NODE_*: Eir restarts through them), PATH (fix tool lookup
 # with absolute paths instead), git rewrites (fire on every plugin install/update),
 # implicitly-invoked commands (BROWSER/EDITOR/VISUAL/PAGER = RCE on next $EDITOR), SHELL,
-# and Hermes runtime-location / security-policy flags (config.yaml is the supported surface).
+# and Eir runtime-location / security-policy flags (config.yaml is the supported surface).
 #
-# ``HERMES_*`` overall is NOT blocked — many integration credentials use that prefix
-# (HERMES_LANGFUSE_PUBLIC_KEY, HERMES_SPOTIFY_CLIENT_ID, ...). The denylist is name-by-name so
+# ``EIR_*`` overall is NOT blocked — many integration credentials use that prefix
+# (EIR_LANGFUSE_PUBLIC_KEY, EIR_SPOTIFY_CLIENT_ID, ...). The denylist is name-by-name so
 # it cannot break provider setup wizards. Enforced on *write* only: pre-existing/out-of-band
 # ``.env`` values keep working; the dashboard's writable surface just cannot escalate.
 
@@ -124,16 +124,16 @@ _ENV_VAR_NAME_DENYLIST: frozenset[str] = frozenset({
     "GIT_PROXY_COMMAND", "GIT_TEMPLATE_DIR", "GIT_DIR",
     # Shell init files / interactive hooks — sourced before or during execution
     "BASH_ENV", "ENV", "ZDOTDIR", "PROMPT_COMMAND", "VIMINIT", "EXINIT",
-    # Hermes runtime location
-    "HERMES_HOME", "HERMES_PROFILE", "HERMES_CONFIG", "HERMES_ENV",
-    "HERMES_CONFIG_PATH", "HERMES_ENV_PATH",
+    # Eir runtime location
+    "EIR_HOME", "EIR_PROFILE", "EIR_CONFIG", "EIR_ENV",
+    "EIR_CONFIG_PATH", "EIR_ENV_PATH",
     # MCP catalog trust root; package-manager wrappers may still set it in the process env.
-    "HERMES_OPTIONAL_MCPS",
+    "EIR_OPTIONAL_MCPS",
     # Security policy / approval-routing context — set via their dedicated controls only.
-    "HERMES_YOLO_MODE", "HERMES_ACCEPT_HOOKS", "HERMES_REDACT_SECRETS",
-    "HERMES_INTERACTIVE", "HERMES_EXEC_ASK", "HERMES_GATEWAY_SESSION",
-    "HERMES_CRON_SESSION", "HERMES_SINGLE_QUERY_SESSION",
-    "HERMES_SESSION_KEY", "HERMES_SESSION_PLATFORM"}) | LAUNCH_ONLY_ENV_KEYS
+    "EIR_YOLO_MODE", "EIR_ACCEPT_HOOKS", "EIR_REDACT_SECRETS",
+    "EIR_INTERACTIVE", "EIR_EXEC_ASK", "EIR_GATEWAY_SESSION",
+    "EIR_CRON_SESSION", "EIR_SINGLE_QUERY_SESSION",
+    "EIR_SESSION_KEY", "EIR_SESSION_PLATFORM"}) | LAUNCH_ONLY_ENV_KEYS
 
 
 def _env_var_policy_name(key: str, *, is_windows: Optional[bool] = None) -> str:
@@ -148,14 +148,14 @@ def validate_env_var_name_for_write(key: str) -> None:
     if not _ENV_VAR_NAME_RE.match(key):
         raise ValueError(f"Invalid environment variable name: {key!r}")
     policy_name = _env_var_policy_name(key)
-    from hermes_cli.auth_external_process import env_writer_launch_denylist as _launch_env  # ACP argv authority
+    from eir_cli.auth_external_process import env_writer_launch_denylist as _launch_env  # ACP argv authority
     if (policy_name in _ENV_VAR_NAME_DENYLIST or policy_name in map(_env_var_policy_name, _launch_env())
             or policy_name.startswith(_ENV_VAR_NAME_DENY_PREFIXES)):
         raise ValueError(
             f"Environment variable {key!r} is on the writer denylist. "
             "Names that influence subprocess execution (LD_PRELOAD, PYTHONPATH, PATH, EDITOR, ...) "
-            "or Hermes runtime location and security policy (HERMES_HOME, HERMES_YOLO_MODE, ...) "
-            "cannot be persisted via the env writer. If you really need this, edit ~/.hermes/.env "
+            "or Eir runtime location and security policy (EIR_HOME, EIR_YOLO_MODE, ...) "
+            "cannot be persisted via the env writer. If you really need this, edit ~/.eir/.env "
             "directly.")
 
 
@@ -163,7 +163,7 @@ def validate_env_var_name_for_write(key: str) -> None:
 # C extension is not thread-safe for concurrent safe_load() on one file, and tool threads
 # (approval, browser, setup flows) load/save config concurrently during long agent runs.
 # RLock because callers hold it across a read-modify-write and then call save_config(), which
-# acquires it again (hermes_cli/plugins.py: `with ..., config_mod._CONFIG_LOCK:` then
+# acquires it again (eir_cli/plugins.py: `with ..., config_mod._CONFIG_LOCK:` then
 # read_user_config_raw() + save_config()). save_config itself no longer re-enters via
 # read_raw_config; it takes its raw mapping from require_readable_config_before_write.
 _CONFIG_LOCK = threading.RLock()
@@ -211,35 +211,35 @@ _EXTRA_ENV_KEYS = frozenset({
     "IRC_SERVER", "IRC_PORT", "IRC_NICKNAME", "IRC_CHANNEL", "IRC_USE_TLS", "IRC_SERVER_PASSWORD",
     "IRC_NICKSERV_PASSWORD", "TERMINAL_ENV", "TERMINAL_SSH_KEY", "TERMINAL_SSH_PORT",
     # Deprecated (replaced by display.tool_progress) but STILL READ by the gateway as a
-    # back-compat fallback. The boolean HERMES_TOOL_PROGRESS variant is unsupported (its only
+    # back-compat fallback. The boolean EIR_TOOL_PROGRESS variant is unsupported (its only
     # consumer, the v3->4 migration, is below the v12 support floor); doctor flags it as ignored.
-    "HERMES_TOOL_PROGRESS_MODE",
+    "EIR_TOOL_PROGRESS_MODE",
     "WHATSAPP_MODE", "WHATSAPP_ENABLED",
     "MATTERMOST_HOME_CHANNEL", "MATTERMOST_HOME_CHANNEL_NAME", "MATTERMOST_REPLY_MODE",
     "MATRIX_PASSWORD", "MATRIX_ENCRYPTION", "MATRIX_DEVICE_ID", "MATRIX_HOME_ROOM",
     "MATRIX_REQUIRE_MENTION", "MATRIX_FREE_RESPONSE_ROOMS", "MATRIX_AUTO_THREAD", "MATRIX_DM_AUTO_THREAD",
     "MATRIX_RECOVERY_KEY",
     # ACP (Agent Client Protocol) keys — profile-isolable so profiles can use different backends.
-    "HERMES_ACP_AUTH_METHOD", "HERMES_ACP_AUTO_APPROVE"}) | _left_core_profile_env()  # moved providers' env
+    "EIR_ACP_AUTH_METHOD", "EIR_ACP_AUTO_APPROVE"}) | _left_core_profile_env()  # moved providers' env
 
 
 # ---- Managed mode (NixOS declarative config) ----
 
 _NIX_MANAGED_SYSTEMS = {"nixos", "home-manager"}
 # Nix store root; identifies `nix run` / `nix profile install` installs (which don't set
-# HERMES_MANAGED). Module-level so tests can patch it without touching /nix/store.
+# EIR_MANAGED). Module-level so tests can patch it without touching /nix/store.
 _NIX_STORE = Path("/nix/store")
 
 
 def is_managed() -> bool:
-    """Check if Hermes is running in package-manager-managed mode."""
+    """Check if Eir is running in package-manager-managed mode."""
     return get_managed_system() is not None
 
 
 # Nix installs arrive by several routes (nix run, nix profile, system flake, home-manager) and
 # the running process cannot tell which, so the text names the routes instead of one command.
 _NIX_UPDATE_MSG = (
-    "Update Hermes through the Nix source that installed it "
+    "Update Eir through the Nix source that installed it "
     "(e.g. nix profile upgrade, or update your flake input and rebuild with nixos-rebuild or home-manager switch)"
 )
 
@@ -264,29 +264,29 @@ def _install_method_stamp(path: Path) -> Optional[str]:
 
 
 def detect_install_method(project_root: Optional[Path] = None) -> str:
-    """Detect how Hermes was installed: apt/docker/nix/nixos/home-manager/git/unknown.
+    """Detect how Eir was installed: apt/docker/nix/nixos/home-manager/git/unknown.
     Order: code-scoped ``<install tree>/.install_method`` stamp (authoritative) -> legacy
-    ``$HERMES_HOME/.install_method`` -> managed marker -> /nix/store path -> .git dir -> unknown.
-    The stamp lives next to the code because HERMES_HOME is shared data: a container and a host
+    ``$EIR_HOME/.install_method`` -> managed marker -> /nix/store path -> .git dir -> unknown.
+    The stamp lives next to the code because EIR_HOME is shared data: a container and a host
     install can bind-mount the same home, so a home-scoped ``docker`` stamp would make the host
-    ``hermes update`` refuse to run. A legacy ``docker`` value is therefore ignored unless we are
+    ``eir update`` refuse to run. A legacy ``docker`` value is therefore ignored unless we are
     really inside a container, and being in a container alone never implies 'docker'.
 
     Source installers clone a git checkout and publish ``install-stamp.json``;
     the ``.git`` fallback identifies it as a source install. Older installations
     may carry ``.install_method``, which remains authoritative for compatibility.
-    The published image bakes a ``docker`` marker into ``/opt/hermes``. A manual
+    The published image bakes a ``docker`` marker into ``/opt/eir``. A manual
     clone in a container still resolves via ``.git``, not container presence alone.
     See issue #34397.
     """
-    # The stamp is a property of the running code tree (parent of hermes_cli/), NOT of $HERMES_HOME,
+    # The stamp is a property of the running code tree (parent of eir_cli/), NOT of $EIR_HOME,
     # so it survives two installs sharing a home.
     root = project_root if project_root is not None else get_project_root()
     method = _install_method_stamp(root / ".install_method")
     if method:
         return method
 
-    method = _install_method_stamp(get_hermes_home() / ".install_method")
+    method = _install_method_stamp(get_eir_home() / ".install_method")
     if method and not (method == "docker" and not _running_in_container()):
         return method
 
@@ -313,9 +313,9 @@ def detect_install_method(project_root: Optional[Path] = None) -> str:
 
 
 def _running_in_container() -> bool:
-    """Import-safe wrapper around ``hermes_constants.is_container``."""
+    """Import-safe wrapper around ``eir_constants.is_container``."""
     try:
-        from hermes_constants import is_container
+        from eir_constants import is_container
 
         return is_container()
     except Exception:
@@ -328,8 +328,8 @@ def is_nix_install_method(method: str) -> bool:
 
 
 _UPDATE_COMMAND_BY_METHOD = {
-    "docker": "docker pull nousresearch/hermes-agent:latest",
-    "apt": "pkg upgrade hermes-agent",  # "apt" == Termux APT by contract; uses Termux's `pkg`.
+    "docker": "docker pull nousresearch/eir-agent:latest",
+    "apt": "pkg upgrade eir-agent",  # "apt" == Termux APT by contract; uses Termux's `pkg`.
 }
 
 
@@ -337,7 +337,7 @@ def recommended_update_command_for_method(method: str) -> str:
     """Return the update command or guidance for a given install method."""
     if is_nix_install_method(method):
         return _NIX_UPDATE_MSG
-    return _UPDATE_COMMAND_BY_METHOD.get(method, "hermes update")
+    return _UPDATE_COMMAND_BY_METHOD.get(method, "eir update")
 
 
 def recommended_update_command() -> str:
@@ -348,23 +348,23 @@ def recommended_update_command() -> str:
         detect_install_method(get_project_root()))
 
 
-# Shared by ``cmd_update`` and ``_cmd_update_check`` (hermes_cli/main.py) so the wording never
+# Shared by ``cmd_update`` and ``_cmd_update_check`` (eir_cli/main.py) so the wording never
 # forks. The published image excludes ``.git``, so the git update path can never succeed there
-# and the generic "reinstall via install.sh" fallback would install a NEW host-side Hermes.
+# and the generic "reinstall via install.sh" fallback would install a NEW host-side Eir.
 _DOCKER_UPDATE_MESSAGE = """\
-✗ ``hermes update`` doesn't apply inside the Docker container.
+✗ ``eir update`` doesn't apply inside the Docker container.
 
-Hermes Agent runs as a published image (nousresearch/hermes-agent), not a
+Eir Agent runs as a published image (nousresearch/eir-agent), not a
 git checkout — the container has no working tree to pull into.  Update by
 pulling a fresh image and restarting your container instead:
 
-  docker pull nousresearch/hermes-agent:latest
+  docker pull nousresearch/eir-agent:latest
   # then restart whatever started the container, e.g.:
-  docker compose up -d --force-recreate hermes-agent
+  docker compose up -d --force-recreate eir-agent
   # or, for ad-hoc runs, exit the current container and `docker run` again
 
 Verify the new version after restart:
-  docker run --rm nousresearch/hermes-agent:latest --version
+  docker run --rm nousresearch/eir-agent:latest --version
 
 Notes:
   • If you pinned a specific tag (e.g. ``:v0.14.0``) the ``:latest`` tag
@@ -374,7 +374,7 @@ Notes:
   • On a ``-desktop`` tag (the one carrying Bot Screen)?  Keep the suffix:
     the unsuffixed image has no Xvnc/Xfce and no sudo to add them, so
     pulling it stops the bots' screens from starting.
-  • Your config and session history live under ``$HERMES_HOME`` (``/opt/data``
+  • Your config and session history live under ``$EIR_HOME`` (``/opt/data``
     in the container, typically bind-mounted from the host) and persist
     across image upgrades — re-pulling doesn't lose any state.
   • Running a fork?  Build your own image with this repo's ``Dockerfile``
@@ -382,16 +382,16 @@ Notes:
 
 
 def format_docker_update_message() -> str:
-    """Return the user-facing message for ``hermes update`` inside Docker."""
+    """Return the user-facing message for ``eir update`` inside Docker."""
     return _DOCKER_UPDATE_MESSAGE
 
 
-def format_managed_message(action: str = "modify this Hermes installation") -> str:
+def format_managed_message(action: str = "modify this Eir installation") -> str:
     """Build a user-facing error for managed installs."""
     managed_system = get_managed_system() or "a package manager"
     return (
-        f"Cannot {action}: this Hermes installation is managed by {managed_system}.\n"
-        "Use your package manager to upgrade or reinstall Hermes.")
+        f"Cannot {action}: this Eir installation is managed by {managed_system}.\n"
+        "Use your package manager to upgrade or reinstall Eir.")
 
 
 def managed_error(action: str = "modify configuration"):
@@ -400,21 +400,21 @@ def managed_error(action: str = "modify configuration"):
 
 
 def get_container_exec_info() -> Optional[dict]:
-    """Read container mode metadata from HERMES_HOME/.container-mode.
+    """Read container mode metadata from EIR_HOME/.container-mode.
     Written by the NixOS activation script when container.enable = true; tells the host CLI to
     exec into the container instead of running locally. None when container mode is off, when
-    already inside the container, or when HERMES_DEV=1 is set. Only FileNotFoundError is
+    already inside the container, or when EIR_DEV=1 is set. Only FileNotFoundError is
     swallowed; other errors (permissions, malformed data) propagate."""
-    if os.environ.get("HERMES_DEV") == "1":
+    if os.environ.get("EIR_DEV") == "1":
         return None
 
-    from hermes_constants import is_container
+    from eir_constants import is_container
     if is_container():
         return None
 
     try:
         info = {}
-        with open(get_hermes_home() / ".container-mode", "r", encoding="utf-8-sig") as f:
+        with open(get_eir_home() / ".container-mode", "r", encoding="utf-8-sig") as f:
             for line in f:
                 line = line.strip()
                 if "=" in line and not line.startswith("#"):
@@ -425,16 +425,16 @@ def get_container_exec_info() -> Optional[dict]:
 
     return {
         "backend": info.get("backend", "docker"),
-        "container_name": info.get("container_name", "hermes-agent"),
-        "exec_user": info.get("exec_user", "hermes"),
-        "hermes_bin": info.get("hermes_bin", "/data/current-package/bin/hermes")}
+        "container_name": info.get("container_name", "eir-agent"),
+        "exec_user": info.get("exec_user", "eir"),
+        "eir_bin": info.get("eir_bin", "/data/current-package/bin/eir")}
 
 
-# ---- Config paths / HERMES_HOME skeleton ----
+# ---- Config paths / EIR_HOME skeleton ----
 
 def get_config_path() -> Path:
     """Get the main config file path."""
-    return get_hermes_home() / "config.yaml"
+    return get_eir_home() / "config.yaml"
 
 
 def require_parseable_user_config(*, ignore_user_config: bool = False) -> None:
@@ -442,8 +442,8 @@ def require_parseable_user_config(*, ignore_user_config: bool = False) -> None:
     Interactive surfaces keep ``load_config()``'s recovery behavior so the operator can repair
     the file; a one-shot run has no such chance, and defaults there could silently pick a hosted
     provider and spend against ``.env`` credentials. Missing/empty files stay valid first-run
-    states; ``--ignore-user-config`` / HERMES_IGNORE_USER_CONFIG=1 remain authoritative."""
-    if ignore_user_config or os.environ.get("HERMES_IGNORE_USER_CONFIG") == "1":
+    states; ``--ignore-user-config`` / EIR_IGNORE_USER_CONFIG=1 remain authoritative."""
+    if ignore_user_config or os.environ.get("EIR_IGNORE_USER_CONFIG") == "1":
         return
 
     config_path = get_config_path()
@@ -458,13 +458,13 @@ def require_parseable_user_config(*, ignore_user_config: bool = False) -> None:
             return
         parse_error = TypeError(f"top-level YAML value must be a mapping, got {type(data).__name__}")
 
-    from hermes_cli.config_backups import backup_config
+    from eir_cli.config_backups import backup_config
     backup_path = backup_config(config_path, "corrupt")
     where = _yaml_error_location(parse_error)
     message = (
-        f"Hermes stopped because your settings file ({config_path}) has a formatting error"
-        f"{f' at {where}' if where else ''}. Fix it with `hermes config edit` and check with "
-        "`hermes config check`, or add --ignore-user-config to run once with default settings.")
+        f"Eir stopped because your settings file ({config_path}) has a formatting error"
+        f"{f' at {where}' if where else ''}. Fix it with `eir config edit` and check with "
+        "`eir config check`, or add --ignore-user-config to run once with default settings.")
     if backup_path is not None:
         message += f" A copy of the broken file is at {backup_path}."
     message += f" Details: {_yaml_error_details(parse_error)}"
@@ -474,25 +474,25 @@ def require_parseable_user_config(*, ignore_user_config: bool = False) -> None:
 
 def get_env_path() -> Path:
     """Get the .env file path (for API keys)."""
-    return get_hermes_home() / ".env"
+    return get_eir_home() / ".env"
 
 
 def get_project_root() -> Path:
-    from hermes_cli._startup_fast import project_root_str
+    from eir_cli._startup_fast import project_root_str
     return Path(project_root_str())
 
 
 def _secure_dir(path):
-    """chmod a directory owner-only (0700) and apply HERMES_UID/GID ownership. No-op when managed;
-    in a container only an explicit HERMES_HOME_MODE is applied. HERMES_HOME_MODE (e.g. 0701)
-    overrides the mode so a web server can traverse HERMES_HOME to a served subdirectory without
+    """chmod a directory owner-only (0700) and apply EIR_UID/GID ownership. No-op when managed;
+    in a container only an explicit EIR_HOME_MODE is applied. EIR_HOME_MODE (e.g. 0701)
+    overrides the mode so a web server can traverse EIR_HOME to a served subdirectory without
     directory listings.
 
-    Also applies ``HERMES_UID``/``HERMES_GID``-based ownership when those env vars are set (#34107 — Docker
+    Also applies ``EIR_UID``/``EIR_GID``-based ownership when those env vars are set (#34107 — Docker
     deployments need this so profile subdirs created at runtime by kanban workers don't land as root:root
     and block subsequent uid-mapped workers).
 
-    Delegates to the canonical import-safe primitive ``hermes_constants.apply_secure_dir_policy``
+    Delegates to the canonical import-safe primitive ``eir_constants.apply_secure_dir_policy``
     so callers outside this package (``get_scratch_dir``) share one implementation (#117347).
     """
     return apply_secure_dir_policy(path)
@@ -514,7 +514,7 @@ def seed_config_file(config_path: Path, template: Optional[Path] = None) -> bool
     """Create a missing config.yaml the way the installers do: copy cli-config.yaml.example (the display keys
     there are commented out), else write stripped DEFAULT_CONFIG. Never DEFAULT_CONFIG verbatim -- the gateway
     merges no defaults, so every written display key becomes a global that beats each platform's own default
-    (#121230). Shared by ``hermes config edit`` and ``hermes doctor --fix`` so the seeders cannot drift.
+    (#121230). Shared by ``eir config edit`` and ``eir doctor --fix`` so the seeders cannot drift.
     Returns True when the template was copied (the fallback, like save_config, writes get_config_path())."""
     template = template or get_project_root() / "cli-config.yaml.example"
     config_path.parent.mkdir(parents=True, exist_ok=True)
@@ -562,36 +562,36 @@ def _ensure_default_soul_md(home: Path) -> None:
 
 # Home paths whose directory skeleton was created this process. Only successful passes are
 # recorded, so a raised managed-mode/missing-profile error keeps re-checking on later loads.
-_HERMES_HOME_ENSURED: set = set()
-_HERMES_HOME_SUBDIRS = (
+_EIR_HOME_ENSURED: set = set()
+_EIR_HOME_SUBDIRS = (
     "cron", "sessions", "logs", "logs/curator", "memories",
     "pairing", "hooks", "image_cache", "audio_cache", "skills")
 
 
-def ensure_hermes_home():
-    """Ensure the ~/.hermes directory skeleton exists with secure permissions.
+def ensure_eir_home():
+    """Ensure the ~/.eir directory skeleton exists with secure permissions.
     Memoized per home path: this runs on EVERY ``load_config()`` and the ~14 mkdir/chmod syscalls
     made repeated loads the dominant cost of hot read paths."""
-    home = get_hermes_home()
+    home = get_eir_home()
     key = str(home)
 
     # Named profiles must be created explicitly. Check tombstones BEFORE the memo so a stale
     # empty shell cannot skip the deleted-profile guard.
-    from hermes_constants import assert_named_profile_home_live
+    from eir_constants import assert_named_profile_home_live
     assert_named_profile_home_live(home)
-    if key in _HERMES_HOME_ENSURED and home.is_dir():
+    if key in _EIR_HOME_ENSURED and home.is_dir():
         return
-    from hermes_cli.config_home import initialize_home
-    initialize_home(home, _HERMES_HOME_SUBDIRS, _HERMES_HOME_ENSURED)
+    from eir_cli.config_home import initialize_home
+    initialize_home(home, _EIR_HOME_SUBDIRS, _EIR_HOME_ENSURED)
 
 
 # ---- Config loading/saving ----
 
-from hermes_cli.config_defaults import DEFAULT_CONFIG, OPTIONAL_ENV_VARS
-from hermes_cli import config_provider_env as _config_provider_env
-from hermes_cli.config_provider_env import core_declared_env_names
-from hermes_cli.config_model_section import _normalize_root_model_keys  # re-exported: frozen compat name
-from hermes_cli.config_providers import (
+from eir_cli.config_defaults import DEFAULT_CONFIG, OPTIONAL_ENV_VARS
+from eir_cli import config_provider_env as _config_provider_env
+from eir_cli.config_provider_env import core_declared_env_names
+from eir_cli.config_model_section import _normalize_root_model_keys  # re-exported: frozen compat name
+from eir_cli.config_providers import (
     _API_MODE_ALIASES, _CAMEL_ALIASES, _KNOWN_PROVIDER_KEYS, _PROVIDER_NORMALIZE_WARNED,
     _canonical_api_mode, _coerce_ssl_verify, _custom_provider_entry_to_provider_config,
     _entries_for_route, _normalize_custom_provider_entry, _normalize_provider_models,
@@ -603,19 +603,19 @@ from hermes_cli.config_providers import (
     get_custom_provider_session_affinity_header,
     get_custom_provider_tls_settings, is_provider_enabled, normalize_extra_headers,
     providers_dict_to_custom_providers, stringify_provider_map)
-# Back-compat re-exports — :mod:`hermes_cli.personality` owns personality/overlay semantics.
-from hermes_cli.personality import (
+# Back-compat re-exports — :mod:`eir_cli.personality` owns personality/overlay semantics.
+from eir_cli.personality import (
     NEUTRAL_PERSONALITY_NAMES as _NEUTRAL_PERSONALITY_NAMES,
     prompt_text as _prompt_text,
     render_personality_prompt,
     resolve_ephemeral_system_prompt as resolve_ephemeral_system_prompt_from_config)
 
 # ---- Config schema-version stamp ----  (moved into config_version_stamp; re-exported here
-# because callers and tests import these from hermes_cli.config)
+# because callers and tests import these from eir_cli.config)
 
-from hermes_cli.config_version_stamp import (
+from eir_cli.config_version_stamp import (
     check_config_version, newer_stamp_message, note_first_stamp, read_config_version_stamp, stamp_missing_config)
-from hermes_cli.config_secret_display import _maskable_secret_text, redact_config_value
+from eir_cli.config_secret_display import _maskable_secret_text, redact_config_value
 
 
 # ---- Config Migration System ----
@@ -651,7 +651,7 @@ def _split_key_path(key: str) -> list[str]:
     """Split a dotted config-key path, honoring backslash-escaped dots (``a\\.b`` -> ``a.b``).
     Backslashes before any other character are preserved verbatim.
 
-    ``hermes config set`` uses ``.`` as the nesting separator, so a key that itself contains a literal dot
+    ``eir config set`` uses ``.`` as the nesting separator, so a key that itself contains a literal dot
     (e.g. provider names like ``qwen3.5-397b-wafer``) was silently split into bogus nested segments
     (#84064).
     """
@@ -876,7 +876,7 @@ _ENV_CONFIG_KEYS = frozenset({
 
 
 def _is_env_config_key(key: str) -> bool:
-    """Return whether `hermes config set` routes this credential-shaped key to .env through the
+    """Return whether `eir config set` routes this credential-shaped key to .env through the
     provider credential lifecycle. Non-secret env settings (``*_HOME_CHANNEL``, ``*_ALLOWED_USERS``)
     are ``config_env_routing.is_env_setting_key`` and take the plain ``.env`` path."""
     if "." in key:
@@ -903,7 +903,7 @@ def _format_config_get_value(value, *, as_json: bool) -> str:
 
 def get_missing_config_fields() -> list[dict[str, Any]]:
     """Check which config fields are missing or outdated (recursive)."""
-    from hermes_cli.moa_config import skip_deep_merge
+    from eir_cli.moa_config import skip_deep_merge
 
     missing = []
 
@@ -933,7 +933,7 @@ def get_missing_skill_config_vars() -> list[dict[str, Any]]:
     try:
         all_vars = discover_all_skill_config_vars()
     except Exception as e:
-        # A malformed SKILL.md must never break `hermes update`; this prompting is a nicety.
+        # A malformed SKILL.md must never break `eir update`; this prompting is a nicety.
         logger.debug("discover_all_skill_config_vars failed: %s", e)
         return []
     if not all_vars:
@@ -955,10 +955,10 @@ _EXTRA_KNOWN_ROOT_KEYS = {
     "mcp_servers",       # MCP server definitions written by setup/tools flows
     "image_gen",         # agent/image_gen_registry.py
     "video_gen",         # agent/video_gen_registry.py
-    "plugins",           # plugin enable/disable lists (hermes_cli/plugins_cmd.py)
+    "plugins",           # plugin enable/disable lists (eir_cli/plugins_cmd.py)
     "smart_model_routing",   # written by the setup wizard
     "platform_toolsets",     # written by the setup wizard
-    "known_plugin_toolsets", # hermes_cli/tools_config.py toolset-save flow
+    "known_plugin_toolsets", # eir_cli/tools_config.py toolset-save flow
     "known_builtin_toolsets",  # ditto — builtin toolsets a platform's checklist has offered
     "tool_gateway_declined_tools",  # per-tool Tool Gateway offer declines
     # Top-level forms read/bridged by gateway/config.py:
@@ -1060,10 +1060,10 @@ def validate_config_structure(config: Optional[dict[str, Any]] = None) -> list[C
         try:
             config = load_config()
         except Exception as exc:
-            from hermes_cli.config_home import config_load_issue
+            from eir_cli.config_home import config_load_issue
             return [config_load_issue(exc)]
 
-    from hermes_cli.config_value_checks import (
+    from eir_cli.config_value_checks import (
         _validate_quoted_containers, _validate_timezone, _validate_voice, _validate_web_backends)
     issues: list[ConfigIssue] = []
     _validate_voice(config, issues)
@@ -1080,7 +1080,7 @@ def validate_config_structure(config: Optional[dict[str, Any]] = None) -> list[C
 
     if cp and not config.get("model"):
         _issue(issues, "warning",
-               "custom_providers defined but no 'model' section — Hermes won't know which provider to use",
+               "custom_providers defined but no 'model' section — Eir won't know which provider to use",
                "Add a model section:\n  model:\n    provider: custom\n    default: your-model-name\n"
                "    base_url: https://...")
 
@@ -1111,7 +1111,7 @@ def print_config_warnings(config: Optional[dict[str, Any]] = None) -> None:
     for ci in issues:
         marker = "\033[31m✗\033[0m" if ci.severity == "error" else "\033[33m⚠\033[0m"
         lines.append(f"  {marker} {ci.message}")
-    lines.append("  \033[2mRun 'hermes doctor' for fix suggestions.\033[0m")
+    lines.append("  \033[2mRun 'eir doctor' for fix suggestions.\033[0m")
     sys.stderr.write("\n".join(lines) + "\n\n")
 
 
@@ -1130,9 +1130,9 @@ def warn_deprecated_cwd_env_vars() -> None:
         if val:
             lines.append(f"  \033[33m⚠\033[0m {name}={val} found in .env — this is deprecated.")
     if lines:
-        from hermes_constants import display_hermes_home
+        from eir_constants import display_eir_home
 
-        hint_path = display_hermes_home()
+        hint_path = display_eir_home()
         lines.insert(0, "\033[33m⚠ Deprecated .env settings detected:\033[0m")
         lines.append(
             "  \033[2mMove to config.yaml instead:  "
@@ -1146,14 +1146,14 @@ def _persist_migration(config: dict[str, Any]) -> None:
     persist values that DIFFER from the schema default, plus explicit removals/renames of user
     data. Every migration step MUST write through here (``save_config`` with default-stripping
     ON, no ``merge_existing``) so the invariant cannot regress one migration at a time. A migration
-    is Hermes' own write, never a user turning a feature off. A backend without file tooling
+    is Eir' own write, never a user turning a feature off. A backend without file tooling
     migrates in memory on read and never writes back (D12)."""
-    from hermes_cli.observability.shared_metrics_disabled import hermes_applied_write
+    from eir_cli.observability.shared_metrics_disabled import eir_applied_write
 
     if not supports_file_tooling():
         get_config_backend().apply_in_memory(get_config_path().parent, config)
         return
-    with hermes_applied_write():
+    with eir_applied_write():
         save_config(config)
 
 
@@ -1198,7 +1198,7 @@ def migrate_config(interactive: bool = True, quiet: bool = False) -> dict[str, A
     # ancient install: it gets only the legacy-key steps and a version stamp.
     # Missing/unparseable files never trip the floor gate.
     # Imported lazily because the steps call back into this module.
-    from hermes_cli.config_migrations import (
+    from eir_cli.config_migrations import (
         SUPPORT_FLOOR_VERSION, disable_suspicious_mcp_servers, run_migrations, support_floor_message)
 
     has_explicit_version = stamp is not None
@@ -1211,7 +1211,7 @@ def migrate_config(interactive: bool = True, quiet: bool = False) -> dict[str, A
         msg = newer_stamp_message(current_ver) if newer else support_floor_message()
         results["warnings"].append(msg)
         # stderr so it is visible even on quiet startup paths.
-        sys.stderr.write(f"⚠ hermes config: {msg}\n")
+        sys.stderr.write(f"⚠ eir config: {msg}\n")
         if not quiet:
             print(f"  ⚠ {msg}")
     else:
@@ -1264,7 +1264,7 @@ def _warn_invalid_platform_toolsets(results: dict[str, Any], quiet: bool) -> Non
     """Surface invalid toolset names in platform_toolsets: ``resolve_toolset()`` returns [] for an
     unknown name, silently disabling the affected tools. Best-effort; never blocks migration."""
     try:
-        from hermes_cli.toolset_validation import saved_toolset_resolver, validate_platform_toolsets
+        from eir_cli.toolset_validation import saved_toolset_resolver, validate_platform_toolsets
 
         config = read_raw_config()
         for w in validate_platform_toolsets(config.get("platform_toolsets"), saved_toolset_resolver(config)):
@@ -1282,7 +1282,7 @@ def _offer_list(heading: str, items: list[str], question: str) -> bool:
         print(f"    • {item}")
     print()
     if not _ask_yes_no(question):
-        print("  Set later with: hermes config set <key> <value>")
+        print("  Set later with: eir config set <key> <value>")
         return False
     print()
     return True
@@ -1427,7 +1427,7 @@ def _env_expand_match(m: re.Match) -> str:
         return val
     if inner.startswith("env:"):
         logger.warning(
-            "Config ref %r: %s is not set (check ~/.hermes/.env); "
+            "Config ref %r: %s is not set (check ~/.eir/.env); "
             "keeping the literal placeholder", raw, name)
     return raw
 
@@ -1461,7 +1461,7 @@ def _expand_env_vars(obj):
 def _env_ref_snapshot(obj, snapshot=None):
     """Map each env-sourced ``${...}`` ref in *obj* to its current value.
     Stored with cached ``load_config()`` results so a cache hit can detect that the expansion was
-    made against a different environment (load before ``load_hermes_dotenv()``, in-process
+    made against a different environment (load before ``load_eir_dotenv()``, in-process
     rotation) — file mtime/size alone cannot see either.
 
     See #58514.
@@ -1605,7 +1605,7 @@ def _canonicalize_config(config: dict[str, Any]) -> dict[str, Any]:
 
 
 # Sentinel for an unlimited turn budget. ``sys.maxsize`` survives the str->int round-trip through
-# the HERMES_MAX_ITERATIONS env bridge, works in every ``<``/``>=``/``max - used`` comparison in
+# the EIR_MAX_ITERATIONS env bridge, works in every ``<``/``>=``/``max - used`` comparison in
 # the iteration budget without an "unlimited" special case, and is unreachable in practice.
 TURN_LIMIT_UNLIMITED = sys.maxsize
 
@@ -1673,7 +1673,7 @@ def _raw_config_cache_store(path_key: str, cache_key: tuple[Any, ...], data: dic
 
 
 def _worker_config_snapshot() -> Optional[dict[str, Any]]:
-    """A safe worker's frozen config, or None. Install-time loads run from ``hermes_cli`` alone
+    """A safe worker's frozen config, or None. Install-time loads run from ``eir_cli`` alone
     (the installer's completion step ships no ``agent`` package), and without ``agent`` there
     is no worker policy to consult."""
     try:
@@ -1829,7 +1829,7 @@ def _write_config_state(
 ) -> None:
     """Shared comment-preserving config writer; omission policy is selected by the public wrapper."""
     _refuse_failed_read(config_path, data)
-    from hermes_cli.config_backend import keeping_read_base
+    from eir_cli.config_backend import keeping_read_base
     refuse_redacted_config_credentials(data, lambda: keeping_read_base(lambda: read_user_config_raw(config_path)))
     if not allow_omissions:
         # A guard read, not the caller's read: *data* came from the caller's own earlier read, so a
@@ -1949,7 +1949,7 @@ def terminal_config_env_var_for_key(key: str) -> Optional[str]:
 
 
 def _is_ssh_remote_tilde_cwd(backend: str, cwd: str) -> bool:
-    """Whether the remote SSH shell must expand *cwd* itself: ``~`` expanded on the Hermes host
+    """Whether the remote SSH shell must expand *cwd* itself: ``~`` expanded on the Eir host
     would name the host/container home instead of the SSH user's."""
     return (backend or "").strip().lower() == "ssh" and (cwd == "~" or cwd.startswith("~/"))
 
@@ -2035,12 +2035,12 @@ def _last_known_good_fallback(config_path: Path, path_key: str, cache_sig, exc: 
     lkg = _LAST_EXPANDED_CONFIG_BY_PATH.get(path_key)
     fallback = "last-known-good"
     if lkg is None:
-        # Fresh process (CLI restart, `hermes config get`): nothing loaded yet in this process, so
+        # Fresh process (CLI restart, `eir config get`): nothing loaded yet in this process, so
         # fall back to the newest byte-exact copy the last successful parse left in backups/config/.
         # It holds the raw file (``${VAR}`` templates intact), so it goes through the same
         # canonicalize -> expand -> managed-overlay pipeline as a normal load.
-        from hermes_cli.config_backups import load_newest_good_backup
-        from hermes_cli.moa_config import apply_user_moa_presets
+        from eir_cli.config_backups import load_newest_good_backup
+        from eir_cli.moa_config import apply_user_moa_presets
         raw_good = load_newest_good_backup(config_path)
         if raw_good is not None:
             merged_good = _deep_merge(copy.deepcopy(DEFAULT_CONFIG), raw_good)
@@ -2085,7 +2085,7 @@ def _merge_managed_overlay(expanded: dict[str, Any]) -> tuple[dict[str, Any], An
 def _load_config_cache_hit(path_key: str, cache_sig: Any) -> Optional[dict[str, Any]]:
     """Lookup: the cached expanded config for ``path_key`` if its signature equals
     ``cache_sig`` AND every ``${VAR}`` it was expanded against still has the same value, else
-    ``None``. Signatures matching is not enough: a load before load_hermes_dotenv() would otherwise
+    ``None``. Signatures matching is not enough: a load before load_eir_dotenv() would otherwise
     pin unexpanded literals (e.g. auxiliary.<task>.api_key) for the process lifetime (#58514).
     Shared by the lock-free fast path and the locked re-check of ``_load_config_impl``."""
     cached = _LOAD_CONFIG_CACHE.get(path_key)
@@ -2132,7 +2132,7 @@ def _load_config_impl(*, want_deepcopy: bool) -> dict[str, Any]:
         pass
 
     with _CONFIG_LOCK:
-        ensure_hermes_home()
+        ensure_eir_home()
         config_path = get_config_path()
         path_key = str(config_path)
 
@@ -2157,12 +2157,12 @@ def _load_config_impl(*, want_deepcopy: bool) -> dict[str, Any]:
                     user_config.pop("max_turns", None)
 
                 config = _deep_merge(config, user_config)
-                from hermes_cli.moa_config import apply_user_moa_presets
+                from eir_cli.moa_config import apply_user_moa_presets
                 apply_user_moa_presets(config, user_config)
                 # A copy of the file that just parsed is what a FRESH process falls back to when the
                 # next edit breaks the YAML (see _last_known_good_fallback). backup_config() skips
                 # byte-identical repeats and keeps a bounded count, so steady-state loads cost one stat.
-                from hermes_cli.config_backups import backup_config
+                from eir_cli.config_backups import backup_config
                 backup_config(config_path, "good")
             except Exception as e:
                 lkg_copy = _last_known_good_fallback(config_path, path_key, cache_sig, e)
@@ -2217,8 +2217,8 @@ _FALLBACK_COMMENT = """
 #
 # Supported providers:
 #   openrouter   (OPENROUTER_API_KEY)  — routes to any model
-#   openai-codex (OAuth — hermes auth) — OpenAI Codex
-#   nous         (OAuth — hermes auth) — Nous Portal
+#   openai-codex (OAuth — eir auth) — OpenAI Codex
+#   nous         (OAuth — eir auth) — Nous Portal
 #   zai          (ZAI_API_KEY)         — Z.AI / GLM
 #   kimi-coding  (KIMI_API_KEY)        — Kimi / Moonshot
 #   kimi-coding-cn (KIMI_CN_API_KEY)   — Kimi / Moonshot (China)
@@ -2263,7 +2263,7 @@ def _commented_sections_for_save(normalized: dict[str, Any]) -> Optional[str]:
 def save_config(
     config: dict[str, Any], *, strip_defaults: bool = True,
     preserve_keys: Optional[set[tuple[str, ...]]] = None, merge_existing: bool = False):
-    """Save configuration to ~/.hermes/config.yaml.
+    """Save configuration to ~/.eir/config.yaml.
     Schema defaults are not written unless the user explicitly set them (the path exists in the
     raw config before normalisation), so config.yaml is never contaminated with defaults that
     would hide future default changes. ``merge_existing`` deep-merges the on-disk raw config
@@ -2277,15 +2277,15 @@ def save_config(
         _refuse_failed_read(config_path, config)
         config = _strip_managed_keys_for_save(config)
 
-        ensure_hermes_home()
+        ensure_eir_home()
         # Explicit user paths come from the RAW dict BEFORE normalisation (which may inject
         # agent.max_turns) so _strip_default_values keeps exactly what the user set. The
         # fail-closed read is the single authority here: ``read_raw_config()`` is cached and
         # swallows transient stat/open errors into ``{}``, and a ``{}`` at this point makes the
         # strip pass drop every user section whose value matches a default (#113301).
-        from hermes_cli.config_backend import keeping_read_base
+        from eir_cli.config_backend import keeping_read_base
         _raw_for_paths = keeping_read_base(lambda: require_readable_config_before_write(config_path))
-        from hermes_cli.config_worker_save import rebase_for_save  # frozen-worker writes + merge_existing
+        from eir_cli.config_worker_save import rebase_for_save  # frozen-worker writes + merge_existing
         config = rebase_for_save(config, _raw_for_paths, merge_existing)
 
         normalized = current_normalized = _canonicalize_config(config)
@@ -2304,12 +2304,12 @@ def save_config(
         _secure_file(config_path)
         _RAW_CONFIG_CACHE.pop(str(config_path), None)
         _LAST_EXPANDED_CONFIG_BY_PATH[str(config_path)] = copy.deepcopy(current_normalized)
-    from hermes_cli.observability.shared_metrics_disabled import record_config_saved
+    from eir_cli.observability.shared_metrics_disabled import record_config_saved
     record_config_saved(_raw_for_paths, current_normalized)
 
 
 def load_env() -> dict[str, str]:
-    """Load ~/.hermes/.env as a dict. Memoised inside ``load_env_file`` (``get_env_value()`` runs
+    """Load ~/.eir/.env as a dict. Memoised inside ``load_env_file`` (``get_env_value()`` runs
     hundreds of times per interactive menu render). Each assignment's value is opaque data for
     boundary discovery."""
     # A frozen-policy worker never opens the profile's files; its secrets arrive
@@ -2319,7 +2319,7 @@ def load_env() -> dict[str, str]:
     from agent.secret_scope import load_env_file  # the one .env tokenizer; also installs profile scopes
 
     env = load_env_file(get_env_path())
-    _note_policy("note_env_policy", env.get("HERMES_REDACT_SECRETS"))
+    _note_policy("note_env_policy", env.get("EIR_REDACT_SECRETS"))
     return env
 
 
@@ -2327,14 +2327,14 @@ def _note_policy(setter: str, raw: Any) -> None:
     """Record the loaded profile's redaction policy for the log formatter, which never reads config."""
     note = getattr(sys.modules.get("agent.redact"), setter, None)
     if note is not None:
-        from hermes_constants import hermes_home_key
-        note(hermes_home_key(), raw)
+        from eir_constants import eir_home_key
+        note(eir_home_key(), raw)
 
 
 def _parse_env_value(raw_value: str) -> str:
     """Frozen compat surface name (tests/compat/old_updater_surface.json).
 
-    Pre-PM updaters lazy-import ``hermes_cli.config._parse_env_value`` after the
+    Pre-PM updaters lazy-import ``eir_cli.config._parse_env_value`` after the
     checkout swap. The tokenizer moved to ``agent.secret_scope._parse_env_value``
     (c849bc383a), so this forwards there — behavior-preserving by construction.
     """
@@ -2365,7 +2365,7 @@ def _sanitize_env_lines(lines: list) -> list:
 
 
 def sanitize_env_file() -> int:
-    """Rewrite ~/.hermes/.env with normalized line formatting; returns the number of changed lines."""
+    """Rewrite ~/.eir/.env with normalized line formatting; returns the number of changed lines."""
     env_path = get_env_path()
     if not env_path.exists():
         return 0
@@ -2411,9 +2411,9 @@ def _env_write_lock(env_path: Path):
     snapshot the pre-write file and the loser's replace silently drops the
     winner's key. ``_CONFIG_LOCK`` cannot help: it guards in-memory config only.
 
-    Reuses ``hermes_cli.auth._file_lock`` (fcntl flock / msvcrt byte lock,
+    Reuses ``eir_cli.auth._file_lock`` (fcntl flock / msvcrt byte lock,
     cross-process, reentrant per thread) rather than growing a second kernel-lock
-    implementation. The import is call-time: ``hermes_cli.auth`` imports this
+    implementation. The import is call-time: ``eir_cli.auth`` imports this
     module at import time, so a module-level import would be circular. Nothing
     under this lock takes other locks, and the only nesting direction that exists
     (credential_lifecycle takes ``_auth_store_lock`` around its own auth-store
@@ -2421,7 +2421,7 @@ def _env_write_lock(env_path: Path):
     On a filesystem without flock the helper degrades to a depth-only guard
     (same behavior as auth's locks), never to a crash.
     """
-    from hermes_cli.auth import _file_lock
+    from eir_cli.auth import _file_lock
 
     with _file_lock(
         env_path.with_name(env_path.name + ".lock"),
@@ -2562,7 +2562,7 @@ def _managed_source(filename: str):
 
 
 def save_env_value(key: str, value: str):
-    """Save or update a value in ~/.hermes/.env (also matching ``export KEY=`` lines, so a save
+    """Save or update a value in ~/.eir/.env (also matching ``export KEY=`` lines, so a save
     never appends a second line that a later delete would resurrect)."""
     if _env_write_blocked(key, "set"):
         return
@@ -2570,7 +2570,7 @@ def save_env_value(key: str, value: str):
     value = value.replace("\n", "").replace("\r", "")
     refuse_redacted_env_value(key, value)
     value = _check_non_ascii_credential(key, value)
-    ensure_hermes_home()
+    ensure_eir_home()
     env_path = get_env_path()
 
     with _env_write_lock(env_path):
@@ -2593,14 +2593,14 @@ def save_env_value(key: str, value: str):
 def custom_endpoint_key_env(identity: str) -> str:
     """Env var name holding a custom endpoint's API key.
     ``identity`` is the endpoint's own id (Desktop endpoint id, or ``host:port`` for CLI setup),
-    so two endpoints on one host get separate slots. The fixed ``HERMES_CUSTOM_`` prefix keeps the
+    so two endpoints on one host get separate slots. The fixed ``EIR_CUSTOM_`` prefix keeps the
     name POSIX-valid when the slug starts with a digit (``save_env_value`` rejects those)."""
     slug = re.sub(r"[^A-Z0-9]+", "_", str(identity or "").upper()).strip("_")
-    return f"HERMES_CUSTOM_{slug}_API_KEY" if slug else "HERMES_CUSTOM_API_KEY"
+    return f"EIR_CUSTOM_{slug}_API_KEY" if slug else "EIR_CUSTOM_API_KEY"
 
 
 def remove_env_value(key: str) -> bool:
-    """Remove a key from ~/.hermes/.env and os.environ; True if it was found and removed."""
+    """Remove a key from ~/.eir/.env and os.environ; True if it was found and removed."""
     if _env_write_blocked(key, "remove"):
         return False
     if not _ENV_VAR_NAME_RE.match(key):
@@ -2647,7 +2647,7 @@ def save_anthropic_api_key(value: str, save_fn=None):
 def save_env_value_secure(key: str, value: str) -> dict[str, Any]:
     """Save via the unified credential lifecycle (also refreshes any config.yaml mirror of the old
     value and lifts a prior env-source suppression)."""
-    from hermes_cli.credential_lifecycle import save_provider_env_credential
+    from eir_cli.credential_lifecycle import save_provider_env_credential
 
     # Route through the unified credential lifecycle so a rotation via the secret-capture path also
     # refreshes any config.yaml mirror of the old value and lifts a prior env-source suppression (#62269 fix
@@ -2657,9 +2657,9 @@ def save_env_value_secure(key: str, value: str) -> dict[str, Any]:
 
 
 def reload_env() -> int:
-    """Re-read ~/.hermes/.env into os.environ; returns count of vars changed. Removes deleted vars only when
-    known to Hermes (OPTIONAL_ENV_VARS and _EXTRA_ENV_KEYS), and none while the .env exists but is unreadable."""
-    from hermes_cli.env_loader import dotenv_unreadable
+    """Re-read ~/.eir/.env into os.environ; returns count of vars changed. Removes deleted vars only when
+    known to Eir (OPTIONAL_ENV_VARS and _EXTRA_ENV_KEYS), and none while the .env exists but is unreadable."""
+    from eir_cli.env_loader import dotenv_unreadable
     env_vars = load_env()
     count = 0
     for key, value in env_vars.items():
@@ -2686,7 +2686,7 @@ def _scoped_environ_get(key: str) -> Optional[str]:
 
 
 def get_env_value(key: str) -> Optional[str]:
-    """Get a value from ``os.environ`` (scope-aware) or ``~/.hermes/.env``.
+    """Get a value from ``os.environ`` (scope-aware) or ``~/.eir/.env``.
 
     The ``os.environ`` read routes through ``agent.secret_scope.get_secret`` so that, under an active
     profile scope (multiplexed gateway turn), this is scope-checked rather than leaking another profile's
@@ -2701,7 +2701,7 @@ def get_env_value(key: str) -> Optional[str]:
 
 
 def get_env_value_prefer_dotenv(key: str) -> Optional[str]:
-    """Resolve a Hermes-managed credential preferring ``~/.hermes/.env`` over ``os.environ``, so a
+    """Resolve a Eir-managed credential preferring ``~/.eir/.env`` over ``os.environ``, so a
     deliberate .env edit beats a stale value inherited from the parent shell.
 
     An unresolved ``op://`` reference left in .env yields to the already-resolved value from the
@@ -2757,8 +2757,8 @@ def edit_config():
     if not supports_file_tooling():
         # Exits 1 (unlike the managed refusal above, which every managed_error caller shares):
         # a script must not read this refusal as a successful edit.
-        _exit_invalid("`hermes config edit` opens the local config file, and this config backend has none. "
-                      "Use `hermes config set <key> <value>` instead.")
+        _exit_invalid("`eir config edit` opens the local config file, and this config backend has none. "
+                      "Use `eir config set <key> <value>` instead.")
     config_path = get_config_path()
     if not config_path.exists():  # config-reader: ok — file tooling, gated on supports_file_tooling()
         seed_config_file(config_path)
@@ -2839,7 +2839,7 @@ def _validate_config_key(key: str) -> tuple[bool, Optional[str]]:
     known, suggestion = _validate_schema_key(key)
     if known or not key:
         return known, suggestion
-    from hermes_cli.config_runtime_keys import is_runtime_read_key
+    from eir_cli.config_runtime_keys import is_runtime_read_key
     return (True, None) if is_runtime_read_key(_split_key_path(key)) else (False, suggestion)
 
 
@@ -2851,7 +2851,7 @@ def _validate_schema_key(key: str) -> tuple[bool, Optional[str]]:
     segments = _split_key_path(key)
     top = segments[0]
     # A leading ``_`` on the FIRST segment only marks an internal key (``agent._max_turns`` is caught).
-    from hermes_cli.left_core_migration import LEFT_CORE_TERMINAL_KEYS
+    from eir_cli.left_core_migration import LEFT_CORE_TERMINAL_KEYS
     if top.startswith("_") or top in _PLATFORM_CONTAINER_KEYS or key in LEFT_CORE_TERMINAL_KEYS:
         return True, None
 
@@ -2942,7 +2942,7 @@ def _looks_structured_value(value: str) -> bool:
 
 
 def _coerce_config_set_value(key: str, value: str) -> Any:
-    """Auto-coerce a ``hermes config set`` string to bool/None/int/float/list/dict.
+    """Auto-coerce a ``eir config set`` string to bool/None/int/float/list/dict.
     String-typed settings (per ``DEFAULT_CONFIG``) are preserved verbatim so enum members such as
     ``approvals.mode="off"`` never become booleans. List/mapping literals are parsed so
     isinstance-gated readers see real structures; the trigger is conservative.
@@ -3034,7 +3034,7 @@ def _refuse_container_type_mismatch(key: str, value: Any, user_config: dict[str,
     literal = "[item, ...]" if expected == "list" else "{key: value}"
     _exit_invalid(
         f"✗ Cannot set '{key}': it must be a {expected}, got a {got} — nothing was written.\n"
-        f"  Pass a YAML/JSON literal, e.g.:\n    hermes config set {key} '{literal}'\n"
+        f"  Pass a YAML/JSON literal, e.g.:\n    eir config set {key} '{literal}'\n"
         "  or edit config.yaml directly.")
 
 
@@ -3045,7 +3045,7 @@ def _redirect_platform_display_key(key: str) -> tuple[str, Optional[str]]:
     Only known display settings (``OVERRIDEABLE_KEYS``) are redirected. Returns ``(key, note)``;
     the gateway import is guarded so the CLI works where the gateway package is unavailable.
 
-    Before #71047 a write such as ``hermes config set platforms.telegram.streaming false`` landed on a key
+    Before #71047 a write such as ``eir config set platforms.telegram.streaming false`` landed on a key
     the gateway never reads: ``config get`` echoed the new value back while the runtime kept the old
     ``display.platforms`` one — a silent no-op that looks like a duplicated key to the user.
 
@@ -3104,7 +3104,7 @@ def _touch_skin_file(key: str, value: Any) -> None:
     (name, mtime) signature moves even when the name is unchanged. Best-effort."""
     if key == "display.skin" and isinstance(value, str) and value:
         try:
-            skin_file = get_hermes_home() / "skins" / f"{value}.yaml"
+            skin_file = get_eir_home() / "skins" / f"{value}.yaml"
             if skin_file.exists():
                 skin_file.touch()
         except Exception:
@@ -3118,15 +3118,15 @@ def _exit_invalid(msg: str) -> None:
 
 def _write_user_config(config_path: Path, user_config: dict[str, Any]) -> None:
     """Write only the user's raw config back (never the merged defaults)."""
-    ensure_hermes_home()
-    from hermes_cli.observability.shared_metrics_disabled import recording_raw_config_write
+    ensure_eir_home()
+    from eir_cli.observability.shared_metrics_disabled import recording_raw_config_write
     recording_raw_config_write(config_path, user_config, atomic_config_replace)
 
 
 def _print_unknown_key_notice(key: str, suggestion: Optional[str]) -> None:
     print(color(
         f"⚠ '{key}' is not a recognized config key — it was saved anyway, "
-        "but Hermes may not read it.", Colors.YELLOW))
+        "but Eir may not read it.", Colors.YELLOW))
     if suggestion:
         print(color(f"  Did you mean: {suggestion}", Colors.YELLOW))
     # The env bridge covers custom TOP-LEVEL keys only; an unseeded nested path (``stt.provider``)
@@ -3170,7 +3170,7 @@ def set_config_value(key: str, value: str, force: bool = False):
             "(leading, trailing, or doubled '.').")
     _exit_if_key_managed(key, "set")
     if _is_env_config_key(key):
-        from hermes_cli.credential_lifecycle import save_provider_env_credential
+        from eir_cli.credential_lifecycle import save_provider_env_credential
 
         # Unified lifecycle: also rotates any config.yaml mirror of the old value so a stale
         # higher-precedence copy can't win (#62269).
@@ -3180,12 +3180,12 @@ def set_config_value(key: str, value: str, force: bool = False):
             _exit_invalid(f"✗ {exc}")
         print(f"✓ Set {key} in {get_env_path()}")
         return
-    from hermes_cli.config_env_routing import is_env_setting_key, save_env_setting
+    from eir_cli.config_env_routing import is_env_setting_key, save_env_setting
 
     if is_env_setting_key(key):
         # Every UPPER_SNAKE name is an environment setting: same file the platform setup flows and
         # /sethome write, and the only one os.getenv readers see. config.yaml never gets one from
-        # here, --force included (#111848). The env writer's denylist (HERMES_YOLO_MODE, PATH, ...)
+        # here, --force included (#111848). The env writer's denylist (EIR_YOLO_MODE, PATH, ...)
         # therefore also refuses the config.yaml detour that used to bridge those into os.environ.
         try:
             save_env_setting(key, value)
@@ -3205,11 +3205,11 @@ def set_config_value(key: str, value: str, force: bool = False):
     # seeded default. Refuse only the positive wrong-prefix case from #112003; other unknown
     # paths keep the post-write warning so valid runtime settings remain configurable.
     if not is_known and not force and _is_wrong_prefix_suggestion(key, suggestion):
-        from hermes_cli.config_key_notices import unknown_subkey_refusal
+        from eir_cli.config_key_notices import unknown_subkey_refusal
         _exit_invalid(unknown_subkey_refusal(key, suggestion))
 
     if key == "display.language":
-        from hermes_cli.config_language import display_language_error
+        from eir_cli.config_language import display_language_error
         language_error = display_language_error(value)
         if language_error:
             _exit_invalid(language_error)
@@ -3223,16 +3223,16 @@ def set_config_value(key: str, value: str, force: bool = False):
     _model_val = user_config.get("model")
     if key.strip().lower().startswith("model.") and isinstance(_model_val, str) and _model_val:
         user_config["model"] = {"default": _model_val}
-    from hermes_cli.config_section_guard import _guard_section_overwrite
+    from eir_cli.config_section_guard import _guard_section_overwrite
     key = _guard_section_overwrite(key, value, user_config, force)
     value = _refuse_container_type_mismatch(key, value, user_config, force)
-    from hermes_cli.config_secret_refs import config_set_secret_value, masked_display_value
+    from eir_cli.config_secret_refs import config_set_secret_value, masked_display_value
     value = config_set_secret_value(key, value, user_config)
     # A provider switch re-points its block at a new route; the old provider's base_url/api_mode
     # must not survive it (#113719, #40862 for ``model``; #141832 for ``auxiliary.<task>``, where
     # base_url even overrides the provider). Before _set_nested, so the outgoing provider is
     # still readable.
-    from hermes_cli.config_route_guard import stale_route_notice
+    from eir_cli.config_route_guard import stale_route_notice
     _route_notice = stale_route_notice(user_config, key, value)
     try:
         _set_nested(user_config, key, value)
@@ -3243,13 +3243,13 @@ def set_config_value(key: str, value: str, force: bool = False):
         print(_note)
     # api_base -> base_url alias at set-time too (mirrors _normalize_root_model_keys).
     if key.strip().lower() in ("model.api_base", "api_base"):
-        # Normalize the api_base → base_url alias at set-time too (issue #8919), so a fresh `hermes config
+        # Normalize the api_base → base_url alias at set-time too (issue #8919), so a fresh `eir config
         # set model.api_base ...` lands on the canonical key the runtime resolver actually reads, instead of
         # being silently ignored.
         user_config = _normalize_root_model_keys(user_config)
         key = "model.base_url"
         print("  (note: 'api_base' is an alias — saved as model.base_url)")
-    from hermes_cli.config_backend import pinning_keys
+    from eir_cli.config_backend import pinning_keys
     with pinning_keys(key):  # an explicit set is stored even when it equals the inherited value
         _write_user_config(config_path, user_config)
 
@@ -3277,7 +3277,7 @@ def get_config_value(key: str, *, as_json: bool = False, raw: bool = False):
     """Print a resolved configuration value. Credentials are masked unless ``--raw`` or
     ``security.redact_secrets: false``: ``print`` bypasses the log redactor, and the agent runs
     this command from sessions whose transcripts persist (#84106, #110758)."""
-    from hermes_cli.config_env_routing import is_env_setting_key, read_env_setting
+    from eir_cli.config_env_routing import is_env_setting_key, read_env_setting
 
     if _is_env_config_key(key):
         env_value = get_env_value(key.upper())
@@ -3318,7 +3318,7 @@ def get_config_value(key: str, *, as_json: bool = False, raw: bool = False):
         is_known, suggestion = _validate_config_key(key)
         if not is_known:
             print(color(
-                f"⚠ '{key}' is not a recognized config key — Hermes may not read it; the value "
+                f"⚠ '{key}' is not a recognized config key — Eir may not read it; the value "
                 "printed above comes from your config file.", Colors.YELLOW), file=sys.stderr)
             if suggestion:
                 print(color(f"  Did you mean: {suggestion}", Colors.YELLOW), file=sys.stderr)
@@ -3334,7 +3334,7 @@ def unset_config_value(key: str):
     if _is_env_config_key(key):
         # Unified lifecycle: also prunes env-seeded credential_pool entries and model-cache rows so
         # the provider is fully removed instead of left resurrectable (#51071).
-        from hermes_cli.credential_lifecycle import remove_provider_env_credential
+        from eir_cli.credential_lifecycle import remove_provider_env_credential
 
         try:
             found = remove_provider_env_credential(key.upper()).get("found")
@@ -3344,7 +3344,7 @@ def unset_config_value(key: str):
             _exit_invalid(f"Config key not set: {key}")
         print(f"✓ Unset {key} from {get_env_path()}")
         return
-    from hermes_cli.config_env_routing import is_env_setting_key, remove_env_setting
+    from eir_cli.config_env_routing import is_env_setting_key, remove_env_setting
 
     if is_env_setting_key(key):
         # Also drops a stale top-level config.yaml copy left by older `config set` runs (#111848).
@@ -3369,7 +3369,7 @@ def unset_config_value(key: str):
     if legacy_key:
         removed = _unset_nested(user_config, legacy_key) or removed
 
-    from hermes_cli.left_core_migration import LEFT_CORE_TERMINAL_KEYS
+    from eir_cli.left_core_migration import LEFT_CORE_TERMINAL_KEYS
     env_var = terminal_config_env_var_for_key(key) or LEFT_CORE_TERMINAL_KEYS.get(key)
     if env_var and key != "terminal.cwd":
         removed = remove_env_value(env_var) or removed
@@ -3403,17 +3403,17 @@ def _run_write_command(fn, *args) -> None:
         _exit_invalid(f"✗ {exc}")
 
 
-_USAGE_GET = ("Usage: hermes config get <key> [--json] [--raw]", [
-    "hermes config get model", "hermes config get terminal.backend",
-    "hermes config get skills.config --json"], None)
-_USAGE_SET = ("Usage: hermes config set [--force] <key> <value>", [
-    "hermes config set model anthropic/claude-sonnet-4", "hermes config set terminal.backend docker",
-    "hermes config set OPENROUTER_API_KEY sk-or-..."], [
+_USAGE_GET = ("Usage: eir config get <key> [--json] [--raw]", [
+    "eir config get model", "eir config get terminal.backend",
+    "eir config get skills.config --json"], None)
+_USAGE_SET = ("Usage: eir config set [--force] <key> <value>", [
+    "eir config set model anthropic/claude-sonnet-4", "eir config set terminal.backend docker",
+    "eir config set OPENROUTER_API_KEY sk-or-..."], [
     "", "  --force: skip the unknown-key notice for unrecognized keys,",
     "           and allow a scalar to replace a whole mapping section"])
-_USAGE_UNSET = ("Usage: hermes config unset <key>", [
-    "hermes config unset model", "hermes config unset terminal.backend",
-    "hermes config unset OPENROUTER_API_KEY"], None)
+_USAGE_UNSET = ("Usage: eir config unset <key>", [
+    "eir config unset model", "eir config unset terminal.backend",
+    "eir config unset OPENROUTER_API_KEY"], None)
 
 
 def _cmd_config_get(args):
@@ -3516,9 +3516,9 @@ def _cmd_config_check(args):
     if missing_config:
         print()
         print(color(f"  {len(missing_config)} new config option(s) available", Colors.YELLOW))
-        print("    Run 'hermes config migrate' to add them")
+        print("    Run 'eir config migrate' to add them")
 
-    from hermes_cli.config_check_diagnostics import config_check_diagnostics
+    from eir_cli.config_check_diagnostics import config_check_diagnostics
 
     diagnostics = config_check_diagnostics(read_raw_config_readonly(), get_env_value)
     if diagnostics:
@@ -3531,7 +3531,7 @@ def _cmd_config_check(args):
 
 
 def _cmd_config_show() -> None:
-    from hermes_cli.config_show import show_config
+    from eir_cli.config_show import show_config
     show_config()
 
 
@@ -3548,15 +3548,15 @@ _CONFIG_SUBCOMMANDS = {
     "check": _cmd_config_check}
 
 _CONFIG_USAGE = """Available commands:
-  hermes config           Show current configuration
-  hermes config edit      Open config in editor
-  hermes config get <key>          Print a resolved config value
-  hermes config set <key> <value>   Set a config value
-  hermes config unset <key>        Remove a config value
-  hermes config check     Check for missing, outdated, or inactive config
-  hermes config migrate   Update config with new options
-  hermes config path      Show config file path
-  hermes config env-path  Show .env file path"""
+  eir config           Show current configuration
+  eir config edit      Open config in editor
+  eir config get <key>          Print a resolved config value
+  eir config set <key> <value>   Set a config value
+  eir config unset <key>        Remove a config value
+  eir config check     Check for missing, outdated, or inactive config
+  eir config migrate   Update config with new options
+  eir config path      Show config file path
+  eir config env-path  Show .env file path"""
 
 
 def config_command(args):
@@ -3591,7 +3591,7 @@ def _platform_manifest_paths(home: Optional[Path] = None, source: PlatformManife
     """Yield ``(dir_name, manifest_path, require_kind, stat)`` for every platform plugin manifest.
     ``source`` is ``"bundled"`` (shipped ``plugins/platforms/*``), ``"user"`` (``<home>/plugins/
     platforms/*`` plus flat ``<home>/plugins/*`` installs, which must declare ``kind: platform``,
-    #46600) or ``"all"``. ``home`` defaults to the bound Hermes home. A directory that cannot be
+    #46600) or ``"all"``. ``home`` defaults to the bound Eir home. A directory that cannot be
     listed or searched yields ``(name, None, require_kind, error)``: a plugin there can't load
     either, so callers skip it. One ``scandir`` per root and one ``stat`` per candidate, because
     the child-env scrub stamps these on every spawn."""
@@ -3599,7 +3599,7 @@ def _platform_manifest_paths(home: Optional[Path] = None, source: PlatformManife
     if source in ("all", "bundled"):
         roots.append((get_project_root() / "plugins" / "platforms", False))
     if source in ("all", "user"):
-        user_plugins = (home if home is not None else get_hermes_home()) / "plugins"
+        user_plugins = (home if home is not None else get_eir_home()) / "plugins"
         roots += [(user_plugins / "platforms", False), (user_plugins, True)]
     for root, require_kind in roots:
         try:
@@ -3729,7 +3729,7 @@ def platform_manifest_secret_scan(home: Optional[Path] = None) -> tuple[frozense
 
 def _inject_platform_plugin_env_vars() -> frozenset[str] | None:
     """Populate OPTIONAL_ENV_VARS from platform plugin manifests (bundled AND user-installed) so
-    Teams / IRC / Google Chat and third-party platforms are configurable in the ``hermes config`` /
+    Teams / IRC / Google Chat and third-party platforms are configurable in the ``eir config`` /
     Desktop Gateway form without the core knowing they exist. Failures are swallowed so a
     malformed plugin.yaml can't break CLI import. Returns the bundled manifests' secret names, or
     None when a bundled manifest could not be read (the policy then re-reads strictly).

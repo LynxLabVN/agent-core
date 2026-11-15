@@ -6,8 +6,8 @@ import logging
 
 import pytest
 
-from hermes_cli.config import DEFAULT_CONFIG
-from hermes_cli.observability.shared_metrics_send_config import (
+from eir_cli.config import DEFAULT_CONFIG
+from eir_cli.observability.shared_metrics_send_config import (
     DEFAULT_ENDPOINT,
     resolve_send_config,
 )
@@ -66,12 +66,12 @@ class TestEndpointPrecedence:
     def test_no_environment_variable_can_redirect_telemetry(self, monkeypatch):
         """A consent hazard: an inherited env var must not silently retarget.
 
-        AGENTS.md also reserves HERMES_* for secrets, not behaviour.
+        AGENTS.md also reserves EIR_* for secrets, not behaviour.
         """
         for name in (
-            "HERMES_TELEMETRY_ENDPOINT",
+            "EIR_TELEMETRY_ENDPOINT",
             "TELEMETRY_ENDPOINT",
-            "HERMES_SHARED_METRICS_ENDPOINT",
+            "EIR_SHARED_METRICS_ENDPOINT",
         ):
             monkeypatch.setenv(name, "https://attacker.test/v1")
         resolved = resolve_send_config(_config(enabled=True, send=True))

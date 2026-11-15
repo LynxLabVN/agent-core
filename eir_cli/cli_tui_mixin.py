@@ -1,6 +1,6 @@
-# health: allow FILE_LINES -- usage-window plans: /model picker hooks only (a multi-row hint, Large/Free row labels); the logic lives in hermes_cli/model_picker_usage.py
+# health: allow FILE_LINES -- usage-window plans: /model picker hooks only (a multi-row hint, Large/Free row labels); the logic lives in eir_cli/model_picker_usage.py
 """prompt_toolkit TUI construction, key-binding handlers, and overlay display fragments for the
-interactive CLI. Mixin bound onto ``HermesCLI`` via the MRO; cli.py-internal symbols are imported
+interactive CLI. Mixin bound onto ``EirCLI`` via the MRO; cli.py-internal symbols are imported
 LAZILY inside each method (``from cli import ...``) — never at module load (import cycle)."""
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ import time
 
 from agent.i18n import t
 from agent.interrupt_compat import request_hard_interrupt
-from hermes_cli.commands_completion import SlashCommandAutoSuggest, cli_slash_completer
+from eir_cli.commands_completion import SlashCommandAutoSuggest, cli_slash_completer
 from pathlib import Path
 from prompt_toolkit.filters import Condition
 from prompt_toolkit.history import FileHistory
@@ -39,11 +39,11 @@ from prompt_toolkit.styles import Style as PTStyle
 from prompt_toolkit.widgets import TextArea
 from typing import Optional
 
-from hermes_cli import cli_enter_burst as _enter_burst
-from hermes_cli.cli_enter_burst import RAPID_INPUT_ENTER_WINDOW_S as _RAPID_INPUT_ENTER_WINDOW_S
-from hermes_cli.cli_footer_split import FooterSplit
-from hermes_cli.cli_panel import _Panel
-from hermes_cli.cli_tui_wrap import _prefix_wrapped_rows, _wrap_rows
+from eir_cli import cli_enter_burst as _enter_burst
+from eir_cli.cli_enter_burst import RAPID_INPUT_ENTER_WINDOW_S as _RAPID_INPUT_ENTER_WINDOW_S
+from eir_cli.cli_footer_split import FooterSplit
+from eir_cli.cli_panel import _Panel
+from eir_cli.cli_tui_wrap import _prefix_wrapped_rows, _wrap_rows
 
 # Rows below an overlay panel taken by spinner/tool-progress, status bar, input, separators and
 # prompt symbol (measured ~6 during live PTY approval prompts) — shared by every panel budget.
@@ -67,10 +67,10 @@ def _approval_choice_label(choice: str) -> str:
 
 def _agent_name() -> str:
     try:
-        from hermes_cli.skin_engine import get_active_skin
-        return get_active_skin().get_branding("agent_name", "Hermes")
+        from eir_cli.skin_engine import get_active_skin
+        return get_active_skin().get_branding("agent_name", "Eir")
     except Exception:
-        return "Hermes"
+        return "Eir"
 
 
 def _tn(key: str, count: int, **kwargs) -> str:
@@ -236,13 +236,13 @@ class CLITuiMixin:
         leading icon. A non-default profile name is prepended (``coder ❯``).
         """
         try:
-            from hermes_cli.skin_engine import get_active_prompt_symbol
+            from eir_cli.skin_engine import get_active_prompt_symbol
             symbol = get_active_prompt_symbol("❯ ")
         except Exception:
             symbol = "❯ "
         symbol = (symbol or "❯ ").rstrip() + " "
         try:
-            from hermes_cli.profiles import get_active_profile_name
+            from eir_cli.profiles import get_active_profile_name
             profile = get_active_profile_name()
             if profile not in {"default", "custom"}:
                 symbol = f"{profile} {symbol}"
@@ -320,7 +320,7 @@ class CLITuiMixin:
         from cli import _detect_light_mode, _maybe_remap_for_light_mode
         style_dict = dict(getattr(self, "_tui_style_base", {}) or {})
         try:
-            from hermes_cli.skin_engine import get_prompt_toolkit_style_overrides
+            from eir_cli.skin_engine import get_prompt_toolkit_style_overrides
             style_dict.update(get_prompt_toolkit_style_overrides())
         except Exception:
             pass
@@ -524,7 +524,7 @@ class CLITuiMixin:
         the terminal rows or the bottom border and trailing items get clipped on long lists
         (e.g. Ollama Cloud's 36+ models). ``state["_scroll_offset"]`` is updated in place.
         """
-        from cli import HermesCLI, _panel_box_width, _wrap_panel_text
+        from cli import EirCLI, _panel_box_width, _wrap_panel_text
         # ``hint`` may be several rows (a window plan's limit line above the usual hint).
         hints = list(hint) if isinstance(hint, (list, tuple)) else [hint]
         box_width = _panel_box_width(title, hints + labels, min_width=min_width, max_width=max_width)
@@ -540,7 +540,7 @@ class CLITuiMixin:
             term_rows = get_app().output.get_size().rows
         except Exception:
             term_rows = _term_rows()
-        scroll_offset, visible = HermesCLI._compute_model_picker_viewport(
+        scroll_offset, visible = EirCLI._compute_model_picker_viewport(
             selected, state.get("_scroll_offset", 0), len(labels), term_rows,
             panel_chrome=5 + len(hints))
         state["_scroll_offset"] = scroll_offset
@@ -583,7 +583,7 @@ class CLITuiMixin:
                      model=state.get('current_model', _unknown),
                      provider=state.get('current_provider', _unknown))
         elif state.get("stage") == "reasoning":
-            from hermes_cli.cli_model_switch_mixin import _picker_reasoning_rows
+            from eir_cli.cli_model_switch_mixin import _picker_reasoning_rows
             result = state.get("switch_result")
             picked = getattr(result, "new_model", "") or t("cli.shared.noun_model")
             title = t("cli.tui.picker_title_effort", model=picked)
@@ -605,7 +605,7 @@ class CLITuiMixin:
             filtered_pairs = self._filter_model_picker_entries(model_list, _query)
             state["_filtered_pairs"] = filtered_pairs
             model_labels = [e for (_i, e) in filtered_pairs]
-            from hermes_cli.model_picker_usage import annotate_window_plan_rows
+            from eir_cli.model_picker_usage import annotate_window_plan_rows
             row_labels, limit_line = annotate_window_plan_rows(provider_data, model_labels)
             choices = row_labels + [t("cli.shared.back"), t("cli.shared.cancel")]
             if _query:
@@ -1061,7 +1061,7 @@ class CLITuiMixin:
     def _tui_handle_ignored_terminal_sequence(self, event):
         """Consume parser-level ignored terminal sequences before self-insert.
 
-        hermes_cli.pt_input_extras registers focus reports (CSI I / CSI O) as Keys.Ignore at the
+        eir_cli.pt_input_extras registers focus reports (CSI I / CSI O) as Keys.Ignore at the
         VT100 parser; without this no-op binding the default self-insert would still land the
         bytes in the buffer. Focus-in additionally schedules a rate-limited full repaint: while
         hidden, the emulator may have coalesced output or repainted, so prompt_toolkit's
@@ -1103,8 +1103,8 @@ class CLITuiMixin:
             return
         import signal as _sig
         from prompt_toolkit.application import run_in_terminal
-        from hermes_cli.skin_engine import get_active_skin
-        agent_name = get_active_skin().get_branding("agent_name", "Hermes Agent")
+        from eir_cli.skin_engine import get_active_skin
+        agent_name = get_active_skin().get_branding("agent_name", "Eir Agent")
         msg = "\n" + t("cli.tui.suspended", agent_name=agent_name)
 
         def _suspend():
@@ -1212,7 +1212,7 @@ class CLITuiMixin:
         if state.get("stage") == "provider":
             max_idx = len(state.get("providers") or [])
         elif state.get("stage") == "reasoning":
-            from hermes_cli.cli_model_switch_mixin import _picker_reasoning_rows
+            from eir_cli.cli_model_switch_mixin import _picker_reasoning_rows
             max_idx = len(_picker_reasoning_rows()) + 1  # + Back + Cancel
         else:
             # +1 for "← Back" and Cancel over the filtered visible rows.
@@ -1413,7 +1413,7 @@ class CLITuiMixin:
             event.app.invalidate()
             return
         # Enter mid-burst: a pasted newline (#10994), or the end of a scripted `text`+Enter write.
-        from hermes_cli.cli_enter_burst import handle_burst_enter
+        from eir_cli.cli_enter_burst import handle_burst_enter
         if not handle_burst_enter(self, event, buf):
             self._tui_submit_buffer(event, buf)
 
@@ -1478,7 +1478,7 @@ class CLITuiMixin:
         steer → agent.steer(text) mid-run (images can't ride along; a missing/rejecting steer() falls back
         to queue). interrupt → agent.redirect() when supported, else the legacy interrupt queue. queue →
         next turn: text-only on the gateway's session is a ``/queue`` FIFO admission (#134889 N5)."""
-        from cli import CLI_CONFIG, _ACCENT, _DIM, _RST, _cprint, _hermes_home
+        from cli import CLI_CONFIG, _ACCENT, _DIM, _RST, _cprint, _eir_home
         _effective_mode = mode or self.busy_input_mode
         redirected = False
         if _effective_mode == "steer":
@@ -1531,7 +1531,7 @@ class CLITuiMixin:
             if not is_seen(CLI_CONFIG, BUSY_INPUT_FLAG):
                 _hint_mode = "redirect" if redirected else _effective_mode
                 _cprint(f"  {_DIM}{busy_input_hint_cli(_hint_mode)}{_RST}")
-                mark_seen(_hermes_home / "config.yaml", BUSY_INPUT_FLAG)
+                mark_seen(_eir_home / "config.yaml", BUSY_INPUT_FLAG)
                 CLI_CONFIG.setdefault("onboarding", {}).setdefault("seen", {})[BUSY_INPUT_FLAG] = True
         except Exception:
             pass
@@ -1583,7 +1583,7 @@ class CLITuiMixin:
             try:
                 # Picker selections follow the same session-scoped default as /model <name>
                 # (model.persist_switch_by_default).
-                from hermes_cli.model_switch import resolve_persist_behavior
+                from eir_cli.model_switch import resolve_persist_behavior
                 self._handle_model_picker_selection(persist_global=resolve_persist_behavior(False, False))
             except Exception as _exc:
                 _cprint("  " + t("cli.tui.model_selection_failed", error=_exc))
@@ -1643,10 +1643,10 @@ class CLITuiMixin:
         event.app.invalidate()
 
     def _tui_collapse_paste(self, text: str, line_count: int, *, fallback: bool) -> str:
-        """Save a large paste under ~/.hermes/pastes and return the placeholder for the buffer."""
-        from cli import _hermes_home, datetime, logger
+        """Save a large paste under ~/.eir/pastes and return the placeholder for the buffer."""
+        from cli import _eir_home, datetime, logger
         self._tui_paste_counter += 1
-        paste_dir = _hermes_home / "pastes"
+        paste_dir = _eir_home / "pastes"
         paste_dir.mkdir(parents=True, exist_ok=True)
         paste_file = paste_dir / f"paste_{self._tui_paste_counter}_{datetime.now().strftime('%H%M%S')}.txt"
         paste_file.write_text(text, encoding="utf-8")
@@ -1755,7 +1755,7 @@ class CLITuiMixin:
         A stack (not a single slot) is what makes repeated Ctrl+S safe: a second stash never
         silently overwrites the first, both stay reachable in the panel.
         """
-        from hermes_cli.prompt_stash import ACTION_RESTORED, ACTION_STASHED, resolve_ctrl_s
+        from eir_cli.prompt_stash import ACTION_RESTORED, ACTION_STASHED, resolve_ctrl_s
         buf = event.app.current_buffer
         action, payload = resolve_ctrl_s(self._prompt_stash, buf.text, self._attached_images)
         if action == ACTION_STASHED:
@@ -1808,7 +1808,7 @@ class CLITuiMixin:
 
     def _tui_init_run_state(self):
         """Reset the per-run REPL state (queues, modal states, voice state, config watcher)."""
-        from hermes_cli.config_backend import config_version_or_none
+        from eir_cli.config_backend import config_version_or_none
         self._agent_running = False
         self._pending_input = queue.Queue()     # normal input (commands + new queries)
         self._interrupt_queue = queue.Queue()   # messages typed while the agent is running
@@ -1826,7 +1826,7 @@ class CLITuiMixin:
         # No PluginManager._cli_ref: plugins load in the gateway, not here (PLG-7).
 
         # Config file watcher — detect mcp_servers changes and auto-reload.
-        from hermes_cli.config import get_config_path as _get_config_path
+        from eir_cli.config import get_config_path as _get_config_path
         _cfg_path = _get_config_path()
         self._config_sig: tuple | None = config_version_or_none(_cfg_path)
         self._config_mcp_servers: dict = self.config.get("mcp_servers") or {}
@@ -1872,7 +1872,7 @@ class CLITuiMixin:
         self._voice_last_tts_text = ""  # most recently spoken TTS text (echo guard, #75780)
         self._voice_barge_phase = None  # "generation" or "playback" phase of the last barge trip
 
-        if os.environ.get("HERMES_DEFER_AGENT_STARTUP") != "1":
+        if os.environ.get("EIR_DEFER_AGENT_STARTUP") != "1":
             self._install_tool_callbacks()
 
     def _tui_build_key_bindings(self):
@@ -1930,7 +1930,7 @@ class CLITuiMixin:
         kb.add(Keys.BracketedPaste, eager=True)(self._tui_handle_paste)
         kb.add('c-v')(self._tui_handle_ctrl_v)
         kb.add('escape', 'v')(self._tui_handle_alt_v)
-        from hermes_cli.cli_subagent_monitor import modal_prompt_active, open_monitor, toggle_dock
+        from eir_cli.cli_subagent_monitor import modal_prompt_active, open_monitor, toggle_dock
         for key in ('c-t', 'f6'):
             kb.add(key, filter=Condition(lambda: not modal_prompt_active(self)))(
                 lambda event: open_monitor(self))
@@ -2057,8 +2057,8 @@ class CLITuiMixin:
         # notice the TUI/CLI split instead of a silent mismatch (round-11).
         _raw_key: object = "ctrl+b"
         try:
-            from hermes_cli.config import load_config
-            from hermes_cli.voice import (
+            from eir_cli.config import load_config
+            from eir_cli.voice import (
                 normalize_voice_record_key_for_prompt_toolkit,
                 pt_key_to_sequence,
                 voice_record_key_from_config)
@@ -2091,7 +2091,7 @@ class CLITuiMixin:
     def _tui_build_layout(self, kb):
         """Build the TUI widgets, Layout and Style; registers wrapper keybindings on ``kb``."""
         cli_ref = self
-        from hermes_cli.cli_subagent_monitor import install_dock
+        from eir_cli.cli_subagent_monitor import install_dock
         install_dock(self)
         input_area = self._tui_build_input_area()
         spinner_widget = Window(
@@ -2128,7 +2128,7 @@ class CLITuiMixin:
             char='─', height=lambda: cli_ref._tui_input_rule_height("bottom"), style='class:input-rule',
         )
         if getattr(self, "_modern_layout", False):
-            from hermes_cli.cli_modern_layout import modern_input_rules
+            from eir_cli.cli_modern_layout import modern_input_rules
             input_rule_top, input_rule_bot = modern_input_rules(self, kb)
         image_bar = Window(
             content=FormattedTextControl(self._tui_image_bar_fragments),

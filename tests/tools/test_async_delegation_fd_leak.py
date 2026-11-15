@@ -143,7 +143,7 @@ def test_post_open_hardening_failure_closes_connection(monkeypatch, tmp_path):
     connection must be closed, not leaked with its db/-wal/-shm descriptors."""
     import errno
 
-    import hermes_state
+    import eir_state
 
     _point_ledger(monkeypatch, tmp_path)
     opened, closed = [], []
@@ -157,14 +157,14 @@ def test_post_open_hardening_failure_closes_connection(monkeypatch, tmp_path):
         return _TrackingConnection(conn, closed)
 
     monkeypatch.setattr(ad.sqlite3, "connect", tracking_connect)
-    real_secure = hermes_state._secure_state_db_files
+    real_secure = eir_state._secure_state_db_files
 
     def secure_then_fail_after_open(path, *, create_main=False):
         real_secure(path, create_main=create_main)
         if not create_main:
             raise OSError(errno.ELOOP, "simulated swapped-in sidecar link", str(path))
 
-    monkeypatch.setattr(hermes_state, "_secure_state_db_files", secure_then_fail_after_open)
+    monkeypatch.setattr(eir_state, "_secure_state_db_files", secure_then_fail_after_open)
 
     with pytest.raises(OSError, match="simulated swapped-in sidecar link"):
         ad.open_state_db(tmp_path / "state.db", "state.db (test)")

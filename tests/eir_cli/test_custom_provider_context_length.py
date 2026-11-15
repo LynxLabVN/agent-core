@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from hermes_cli.config import (
+from eir_cli.config import (
     get_custom_provider_context_length,
     get_custom_provider_model_capability,
 )
@@ -212,7 +212,7 @@ def test_override_honored_when_caller_passes_no_custom_providers(tmp_path, monke
     from pathlib import Path
 
     base_url, model, override = "https://cp-ctx-selfresolve.invalid/v1", "router/auto", 999_999
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     (tmp_path / "config.yaml").write_text(
         "custom_providers:\n"

@@ -1,6 +1,6 @@
 """Model discovery / ``/model`` validation at an Azure Foundry ``model.base_url`` must send the
 Foundry key, never the Claude Code OAuth token (#154242). Real pool and config in the test
-HERMES_HOME; only the HTTP read is recorded."""
+EIR_HOME; only the HTTP read is recorded."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import json
 
 import pytest
 
-from hermes_cli import models as m
+from eir_cli import models as m
 
 FOUNDRY_URL = "https://myres.services.ai.azure.com/anthropic"
 OAUTH_TOKEN = "sk-ant-" + "oat01-" + "c" * 24  # concatenated: push protection rejects token-shaped literals
@@ -16,8 +16,8 @@ OAUTH_TOKEN = "sk-ant-" + "oat01-" + "c" * 24  # concatenated: push protection r
 
 @pytest.fixture
 def fx(tmp_path, monkeypatch):
-    """HERMES_HOME with a Claude Code login; returns it and the list of (url, headers) the fetcher sends."""
-    from hermes_constants import get_hermes_home
+    """EIR_HOME with a Claude Code login; returns it and the list of (url, headers) the fetcher sends."""
+    from eir_constants import get_eir_home
     for name in ("ANTHROPIC_API_KEY", "ANTHROPIC_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "AZURE_ANTHROPIC_KEY", "ANTHROPIC_BASE_URL"):
         monkeypatch.delenv(name, raising=False)
     claude_dir = tmp_path / "claude"
@@ -32,7 +32,7 @@ def fx(tmp_path, monkeypatch):
         return {"data": [{"id": "claude-x"}]}
 
     monkeypatch.setattr(m, "_get_json", record)
-    return get_hermes_home(), calls
+    return get_eir_home(), calls
 
 
 def _write(home, **model):

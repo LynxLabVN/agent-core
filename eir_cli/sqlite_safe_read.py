@@ -32,7 +32,7 @@ _live_connections: dict[str, int] = {}
 _released: deque[str] = deque()
 # Private, randomised name so no caller overloads it by accident (that would free the release
 # object early, while the connection is still open).
-_RELEASE_FUNCTION = f"_hermes_release_{secrets.token_hex(8)}"
+_RELEASE_FUNCTION = f"_eir_release_{secrets.token_hex(8)}"
 
 
 class UntrackableConnectionError(RuntimeError):
@@ -145,12 +145,12 @@ class _TrackingMixin:
     cross-thread ProgrammingError) keeps the entry while the FD stays open (#75629).
     """
 
-    _hermes_tracked_path: str | None = None
+    _eir_tracked_path: str | None = None
 
     def close(self) -> None:  # type: ignore[misc]
         with _live_lock:
             super().close()  # type: ignore[misc]
-            self._hermes_tracked_path = None
+            self._eir_tracked_path = None
             _apply_releases()
 
 
@@ -211,7 +211,7 @@ def connect_tracked(
                 _track_key(resolved, -1)  # the release object can never fire: take the count back
                 raise
             release.armed = True
-            conn._hermes_tracked_path = resolved
+            conn._eir_tracked_path = resolved
             return conn
         except Exception:
             try:

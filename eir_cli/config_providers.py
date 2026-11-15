@@ -1,8 +1,8 @@
 """Custom-provider entry normalization and per-route lookups (TLS, headers, context length, capabilities).
 
-Split out of ``hermes_cli/config.py``; every name is re-imported there, so
-``hermes_cli.config.<name>`` keeps resolving (and monkeypatching) as before. Functions that call
-``get_compatible_custom_providers`` / ``load_config*`` import them lazily from ``hermes_cli.config``
+Split out of ``eir_cli/config.py``; every name is re-imported there, so
+``eir_cli.config.<name>`` keeps resolving (and monkeypatching) as before. Functions that call
+``get_compatible_custom_providers`` / ``load_config*`` import them lazily from ``eir_cli.config``
 so tests patching that module still intercept the call.
 """
 
@@ -11,10 +11,10 @@ import re
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 from urllib.parse import urlparse
 
-from hermes_cli.route_identity import normalize_route_base_url
+from eir_cli.route_identity import normalize_route_base_url
 
 # Log-record parity with the origin module.
-logger = logging.getLogger("hermes_cli.config")
+logger = logging.getLogger("eir_cli.config")
 
 
 # ``_normalize_custom_provider_entry`` runs on every ``load_picker_context()`` call, so a warning
@@ -116,7 +116,7 @@ ENDPOINT_ADDRESS_FIELDS = ("base_url", "url", "api",
 
 
 _KNOWN_PROVIDER_KEYS = {
-    # ``provider`` duplicates the ``providers.<name>`` mapping key and is unused here, but Hermes'
+    # ``provider`` duplicates the ``providers.<name>`` mapping key and is unused here, but Eir'
     # own config writer has historically emitted it. Accept it so self-written configs don't warn.
     "provider",
     "name", "api", "url", "base_url", "api_key", "key_env", "api_key_env", "key_cmd",
@@ -251,7 +251,7 @@ def _normalize_custom_provider_entry(
     # Catalogued vendor whose models this endpoint resells (metadata lookups only, never routing).
     _put("catalog_provider", _stripped("catalog_provider"))
 
-    # ``models_discovered`` marks a mapping auto-discovered by Hermes, not hand-curated.
+    # ``models_discovered`` marks a mapping auto-discovered by Eir, not hand-curated.
     models_dict, discovered = _normalize_provider_models(entry.get("models"))
     _put("models", models_dict)
     if entry.get("models_discovered") is True or discovered:
@@ -328,7 +328,7 @@ def get_compatible_custom_providers(
 
     Never materialised back into config.yaml (it would duplicate entries in UIs).
     """
-    from hermes_cli.config import load_config
+    from eir_cli.config import load_config
     if config is None:
         config = load_config()
 
@@ -378,7 +378,7 @@ def _entries_for_route(
 
     None *custom_providers* → ``get_compatible_custom_providers(config)`` (failure → none).
     """
-    from hermes_cli.config import get_compatible_custom_providers
+    from eir_cli.config import get_compatible_custom_providers
     if custom_providers is None:
         try:
             custom_providers = get_compatible_custom_providers(config)
@@ -523,7 +523,7 @@ def get_custom_provider_session_affinity_header(
     config: Optional[dict[str, Any]] = None) -> str:
     """Header NAME declared as ``session_affinity_header`` on the route-matching entry, else "".
 
-    Opt-in per provider (default off): Hermes never ships a session identifier to an endpoint
+    Opt-in per provider (default off): Eir never ships a session identifier to an endpoint
     that did not ask for one (#86241).
     """
     for entry in _entries_for_route(base_url, custom_providers, config):
@@ -543,7 +543,7 @@ def get_custom_provider_context_length(
     Before this helper existed, the lookup was duplicated in ``run_agent.py``'s startup path only; every
     other path (notably ``/model`` switch) fell back to the 128K default. See #15779.
     """
-    from hermes_cli.config import get_compatible_custom_providers, load_config_readonly
+    from eir_cli.config import get_compatible_custom_providers, load_config_readonly
     if not model or not base_url:
         return None
     if custom_providers is None:
@@ -586,7 +586,7 @@ def get_custom_provider_model_capability(
     config: Optional[dict[str, Any]] = None) -> Optional[bool]:
     """Explicit boolean capability for one custom-provider model, or ``None``. Scoped to the
     normalized route + exact runtime model id so aliases can declare capabilities."""
-    from hermes_cli.config import get_compatible_custom_providers, load_config_readonly
+    from eir_cli.config import get_compatible_custom_providers, load_config_readonly
     if not model or not base_url or not capability:
         return None
     if custom_providers is None:

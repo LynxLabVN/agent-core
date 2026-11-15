@@ -9,7 +9,7 @@ import sys
 
 import pytest
 
-from hermes_cli import _launchers, doctor, doctor_platform
+from eir_cli import _launchers, doctor, doctor_platform
 from pm.environments import install_state_dir, site_packages
 
 
@@ -19,14 +19,14 @@ def _tree(tmp_path, monkeypatch):
     project = tmp_path / "source"
     project.mkdir()
     (project / ".install_method").write_text("git", encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.setenv("HERMES_RUNTIME_DIR", str(home / "tools"))
+    monkeypatch.setenv("EIR_HOME", str(home))
+    monkeypatch.setenv("EIR_RUNTIME_DIR", str(home / "tools"))
     monkeypatch.delenv("PREFIX", raising=False)
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     monkeypatch.setattr(doctor, "PROJECT_ROOT", project)
-    monkeypatch.setattr(doctor, "HERMES_HOME", home)
+    monkeypatch.setattr(doctor, "EIR_HOME", home)
     monkeypatch.setattr(doctor, "DOCTOR_CHECKS", ((None, doctor_platform._check_command_installation),))
-    command = tmp_path / ".local" / "bin" / "hermes"
+    command = tmp_path / ".local" / "bin" / "eir"
     command.parent.mkdir(parents=True)
     monkeypatch.setenv("PATH", str(command.parent))
     return project, home, command
@@ -45,17 +45,17 @@ def _generation(project):
 def _pm_source(project, home):
     root = Path(__file__).resolve().parents[2]
     for relative in (
-        "hermes", "hermes_bootstrap.py", "hermes_constants.py", "hermes_cli/__init__.py",
-        "hermes_agent/__init__.py", "hermes_agent/compat/__init__.py", "hermes_agent/compat/finder.py",
-        "hermes_agent/compat/moves.py",
-        "pm/environments.py", "pm/filesystem.py", "hermes_cli/runtime_state.py",
-        "hermes_cli/_early_recovery.py", "hermes_cli/_parser.py",
-        "hermes_cli/venv_sync.py", "hermes_cli/steward.py", "hermes_cli/stderr_timestamp.py",
+        "eir", "eir_bootstrap.py", "eir_constants.py", "eir_cli/__init__.py",
+        "eir_agent/__init__.py", "eir_agent/compat/__init__.py", "eir_agent/compat/finder.py",
+        "eir_agent/compat/moves.py",
+        "pm/environments.py", "pm/filesystem.py", "eir_cli/runtime_state.py",
+        "eir_cli/_early_recovery.py", "eir_cli/_parser.py",
+        "eir_cli/venv_sync.py", "eir_cli/steward.py", "eir_cli/stderr_timestamp.py",
     ):
         target = project / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(root / relative, target)
-    (project / "hermes_cli/main.py").write_text(
+    (project / "eir_cli/main.py").write_text(
         "def main():\n    import selected_probe\n    print(selected_probe.VALUE)\n    return 0\n",
         encoding="utf-8",
     )
@@ -73,14 +73,14 @@ def test_pm_generation_does_not_require_a_legacy_console_script(tmp_path, monkey
     project, home, command = _tree(tmp_path, monkeypatch)
     selected = _generation(project)
     _pm_source(project, home)
-    assert _launchers.stage_launcher("hermes", project, command.parent) == command
+    assert _launchers.stage_launcher("eir", project, command.parent) == command
 
     doctor.run_doctor(Namespace(fix=True))
 
     out = capsys.readouterr().out
     assert "All checks passed" in out
     assert not (project / "venv").exists()
-    assert not (selected / "bin" / "hermes").exists()
+    assert not (selected / "bin" / "eir").exists()
     assert command.is_file() and not command.is_symlink()
 
 
@@ -91,7 +91,7 @@ def test_pm_fix_publishes_a_generation_aware_launcher(tmp_path, monkeypatch, cap
     _pm_source(project, home)
     selected = _generation(project)
     (site_packages(selected) / "selected_probe.py").write_text("VALUE = 'selected'\n", encoding="utf-8")
-    stale = project / "venv" / "bin" / "hermes"
+    stale = project / "venv" / "bin" / "eir"
     stale.parent.mkdir(parents=True)
     stale.write_text("#!/bin/sh\nexit 99\n", encoding="utf-8")
     stale.chmod(0o755)
@@ -170,12 +170,12 @@ def test_doctor_reports_selected_import_tree_not_interpreter_prefix(tmp_path, mo
 
 @pytest.mark.platforms("posix")
 @pytest.mark.parametrize("method, remedy", [
-    ("git", "hermes pm repair"), ("nix", "Nix"), ("docker", "docker pull"), ("apt", "pkg upgrade"),
+    ("git", "eir pm repair"), ("nix", "Nix"), ("docker", "docker pull"), ("apt", "pkg upgrade"),
 ])
 def test_remedies_and_launcher_repairs_respect_install_owner(tmp_path, monkeypatch, capsys, method, remedy):
     project, _home, command = _tree(tmp_path, monkeypatch)
     (project / ".install_method").write_text(method, encoding="utf-8")
-    entry = project / "venv" / "bin" / "hermes"
+    entry = project / "venv" / "bin" / "eir"
     entry.parent.mkdir(parents=True)
     entry.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
     entry.chmod(0o755)
@@ -193,4 +193,4 @@ def test_remedies_and_launcher_repairs_respect_install_owner(tmp_path, monkeypat
         assert command.is_symlink() and command.resolve() == entry
     else:
         assert not command.exists()
-        assert "hermes pm repair" not in out
+        assert "eir pm repair" not in out

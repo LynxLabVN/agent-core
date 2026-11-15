@@ -31,23 +31,23 @@ from agent.file_safety import (
     HOME_CREDENTIAL_DIRS, HOME_CREDENTIAL_FILES, deny_key, deny_path_under, get_nt_namespace_error,
     get_write_denied_error, is_write_approval_required, resolved_home_credential_stores,
 )
-from hermes_cli import web_server_file_tickets as file_tickets
-from hermes_cli._subprocess_compat import windows_hide_flags
-from hermes_cli.home_data_layout import CREDENTIAL_STORE_DIRS, HOME_ENV_FILES, SECRET_CACHE_STORES
-from hermes_cli.sqlite_safe_read import LiveConnectionError, offline_file_access
-from hermes_cli.staged_uploads import (
+from eir_cli import web_server_file_tickets as file_tickets
+from eir_cli._subprocess_compat import windows_hide_flags
+from eir_cli.home_data_layout import CREDENTIAL_STORE_DIRS, HOME_ENV_FILES, SECRET_CACHE_STORES
+from eir_cli.sqlite_safe_read import LiveConnectionError, offline_file_access
+from eir_cli.staged_uploads import (
     ensure_profile_subdir, is_staged_upload, removed_on_failure, resolve_upload_home,
 )
-from hermes_cli.web_deps import late
-from hermes_cli.web_server_remote_media import remote_media_response
-from hermes_cli.web_upload_limit import CHAT_IMAGE_MAX_BYTES
-from hermes_cli.web_server_surface import route_on
-from hermes_cli.web_server_files import (
+from eir_cli.web_deps import late
+from eir_cli.web_server_remote_media import remote_media_response
+from eir_cli.web_upload_limit import CHAT_IMAGE_MAX_BYTES
+from eir_cli.web_server_surface import route_on
+from eir_cli.web_server_files import (
     SANDBOX_NOT_FOUND, _agent_fs_path, _agent_path_scope, _file_url_path, _fs_path, _hosted_fs_read_guard,
     _is_unmapped_container_path, _managed_file_entry, _managed_response_meta, _resolve_managed_path,
     _session_workspace,
 )
-from hermes_cli.web_models import (
+from eir_cli.web_models import (
     ChatImageUpload, FileTicketRequest, FsWriteText, ManagedDirectoryCreate, ManagedFileDelete,
     ManagedFileUpload,
 )
@@ -57,11 +57,11 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 # Late-bound so a test's monkeypatch on the owning module wins at call time.
-_profile_scope = late("_profile_scope", "hermes_cli.web_server_profiles")
-_config_profile_scope = late("_config_profile_scope", "hermes_cli.web_server_profiles")
-get_hermes_home = late("get_hermes_home", "hermes_cli.config")
-load_config = late("load_config", "hermes_cli.config")
-load_env = late("load_env", "hermes_cli.config")
+_profile_scope = late("_profile_scope", "eir_cli.web_server_profiles")
+_config_profile_scope = late("_config_profile_scope", "eir_cli.web_server_profiles")
+get_eir_home = late("get_eir_home", "eir_cli.config")
+load_config = late("load_config", "eir_cli.config")
+load_env = late("load_env", "eir_cli.config")
 _require_token = late("_require_token")
 # Image types GET /api/media serves — extension-allowlisted so an authenticated
 # caller can't pull non-image files through it.
@@ -82,7 +82,7 @@ _FS_READDIR_HIDDEN = {
 
 # Basenames the managed-files API must never list, read or download: credential
 # stores that become live secrets in the browsable tree the moment an operator
-# points the managed root at HERMES_HOME. Mirrors the two canonical guards
+# points the managed root at EIR_HOME. Mirrors the two canonical guards
 # (agent.file_safety.get_read_block_error, gateway.platforms.base
 # ._ROOT_CREDENTIAL_FILES) so the Files tab never lags behind them.
 # These typically contain credentials (API keys, tokens) and exposing them through the dashboard file
@@ -100,7 +100,7 @@ _SENSITIVE_MANAGED_FILE_BASENAMES = frozenset({
 # match). The browser can descend into subdirs, so a basename-only guard would
 # still expose ``mcp-tokens/<server>.json``; match the store's components as a run
 # anywhere in the path so the trees are blocked wherever they sit under the root,
-# no HERMES_HOME resolution (``whatsapp/session``, not every ``session`` dir).
+# no EIR_HOME resolution (``whatsapp/session``, not every ``session`` dir).
 # vault/ is covered by its file names above: a bare ``vault`` component is too
 # common (an Obsidian vault) to hide wherever it appears.
 _SENSITIVE_MANAGED_DIR_PARTS = tuple(
@@ -412,13 +412,13 @@ def _fs_backend(profile: Optional[str] = None):
     adapter is not re-dialed here: a host that goes down after it connected fails the read itself,
     which each route answers on its own.
     """
-    from hermes_cli.ssh_workspace_fs import SshWorkspaceFsError, get_ssh_workspace_fs
+    from eir_cli.ssh_workspace_fs import SshWorkspaceFsError, get_ssh_workspace_fs
     from tools.terminal_tool_config import coerce_ssh_remote_cwd
 
     with _profile_scope(profile):
         terminal = dict(load_config().get("terminal") or {})
         profile_env = load_env()
-        # The adapter dials outside this scope; map the profile's own Hermes dirs while its home is bound.
+        # The adapter dials outside this scope; map the profile's own Eir dirs while its home is bound.
         terminal["cwd"] = coerce_ssh_remote_cwd(terminal.get("cwd"), "ssh")
     for key, env_name in {
         "ssh_host": "TERMINAL_SSH_HOST",
@@ -439,9 +439,9 @@ def _fs_backend(profile: Optional[str] = None):
 def _chat_image_dir(home: Path) -> Path:
     """Where browser image pastes land: the profile's canonical image staging dir on this host
     (``gateway.platforms.base.get_image_cache_dir``), the only one attachment admission accepts."""
-    from hermes_constants import get_hermes_dir
+    from eir_constants import get_eir_dir
 
-    return get_hermes_dir("cache/images", "image_cache", home=home)
+    return get_eir_dir("cache/images", "image_cache", home=home)
 
 
 def _is_host_file(path: str, profile: Optional[str]) -> bool:
@@ -462,7 +462,7 @@ def _is_host_file(path: str, profile: Optional[str]) -> bool:
     except (OSError, RuntimeError, ValueError):  # ValueError: a decoded NUL (``%00``)
         return False  # not on this host: the workspace's to answer
     with _profile_scope(profile):
-        home = get_hermes_home()
+        home = get_eir_home()
         cache = _chat_image_dir(home)
     try:
         if target.parent == cache.resolve(strict=True):
@@ -482,7 +482,7 @@ def _remote_fs_backend(path: str, profile: Optional[str]):
 
 
 def _raise_fs_backend_error(exc: Exception) -> None:
-    from hermes_cli.ssh_workspace_fs import SshWorkspaceFsError
+    from eir_cli.ssh_workspace_fs import SshWorkspaceFsError
 
     if not isinstance(exc, SshWorkspaceFsError):
         raise exc
@@ -511,7 +511,7 @@ def _media_serve_roots() -> list[Path]:
     """Directories GET /api/media may read: where the agent and attach pipeline
     actually write media (images, screenshots, cache). Stops an authenticated
     client reading image-suffixed files anywhere else on disk."""
-    home = get_hermes_home()
+    home = get_eir_home()
     out: list[Path] = []
     for root in (home / "images", home / "screenshots", home / "cache"):
         try:
@@ -638,7 +638,7 @@ async def proxy_remote_media(url: str, request: Request):
 
 
 def _decode_data_url(data_url: str) -> tuple[bytes, str]:
-    from hermes_cli.web_server import _MANAGED_FILE_MAX_BYTES
+    from eir_cli.web_server import _MANAGED_FILE_MAX_BYTES
     text = (data_url or "").strip()
     if not text.startswith("data:") or "," not in text:
         raise HTTPException(status_code=400, detail="Upload payload must be a data URL")
@@ -698,13 +698,13 @@ async def upload_chat_image(payload: ChatImageUpload, profile: Optional[str] = N
 
     Browser clipboard bytes aren't visible to the server-side clipboard, so the
     /chat page uploads them here and drives the TUI's ``/image <path>`` with
-    the returned gateway-visible path under ``HERMES_HOME/images/`` (the same
+    the returned gateway-visible path under ``EIR_HOME/images/`` (the same
     dir ``clipboard.paste`` / ``image.attach`` use).
     """
     def _run():
         data, mime_type, ext = _decode_chat_image_upload(payload)
         home = resolve_upload_home(profile)
-        from hermes_constants import apply_secure_dir_policy, assert_named_profile_home_live
+        from eir_constants import apply_secure_dir_policy, assert_named_profile_home_live
 
         img_dir = ensure_profile_subdir(
             home,
@@ -774,7 +774,7 @@ def _managed_readable_file(
     sensitive-path denylist. Returns (policy, target, display_path, max_bytes,
     mime_type). Callers own the live-SQLite 409 (held through the read for
     /api/files/read, point-in-time for streamed responses)."""
-    from hermes_cli.web_server import _MANAGED_FILE_MAX_BYTES
+    from eir_cli.web_server import _MANAGED_FILE_MAX_BYTES
     policy, target, display_path = _resolve_managed_path(
         path, request, create_root=create_root, for_agent_read=True,
     )
@@ -827,7 +827,7 @@ async def _managed_file_response(
     time, as an SSH profile's clip already is, so a long recording plays."""
     authority = getattr(request.state, "file_ticket_authority", None)
     if authority is not None:
-        from hermes_cli.web_server_file_response import OpenedFileResponse
+        from eir_cli.web_server_file_response import OpenedFileResponse
 
         return OpenedFileResponse(
             path=str(authority.target),
@@ -894,8 +894,8 @@ def _pin_ticket_file(authority: file_tickets.FileAuthority, checked):
 @router.post("/api/files/ticket", dependencies=[Depends(route_on("browser_files"))])
 async def issue_file_ticket(payload: FileTicketRequest, request: Request):
     """Ticket a browser download/media URL instead of putting the session token in it."""
-    from hermes_cli.web_routers.sessions import _history_profile_home
-    from hermes_constants import named_profile_home
+    from eir_cli.web_routers.sessions import _history_profile_home
+    from eir_constants import named_profile_home
 
     def owner_home():
         return Path(_history_profile_home(payload.profile))
@@ -1036,7 +1036,7 @@ async def stream_upload_to_path(
     removed on EVERY non-success exit — including asyncio.CancelledError when a
     browser aborts a large upload mid-stream.
     """
-    from hermes_cli.web_server import _MANAGED_FILE_MAX_BYTES, _UPLOAD_CHUNK_BYTES
+    from eir_cli.web_server import _MANAGED_FILE_MAX_BYTES, _UPLOAD_CHUNK_BYTES
     tmp_fd, tmp_name = tempfile.mkstemp(prefix=f".{target.name}.", suffix=".upload", dir=str(target.parent))
     tmp_path = Path(tmp_name)
     total = 0
@@ -1225,7 +1225,7 @@ async def fs_read_text(
 async def fs_write_text(payload: FsWriteText, profile: Optional[str] = None):
     """Overwrite (or create) a UTF-8 text file for the in-app spot editor.
 
-    Mirrors the Electron ``hermes:fs:writeText`` hardening: path validated by
+    Mirrors the Electron ``eir:fs:writeText`` hardening: path validated by
     ``_fs_path``, the parent must already exist (never build trees), only
     regular files may be replaced, payload size-capped, staged to a sibling
     temp file and ``os.replace``-d so a crash can't truncate the original.
@@ -1249,7 +1249,7 @@ async def fs_write_text(payload: FsWriteText, profile: Optional[str] = None):
     if backend is not None:
         # The SSH write replaces the lexical path (mv onto a link swaps the link), so judge that
         # path exactly as the adapter writes it: stripped, ``~`` and cwd expanded, ``..`` folded.
-        from hermes_cli.ssh_workspace_fs import SshWorkspaceFsError
+        from eir_cli.ssh_workspace_fs import SshWorkspaceFsError
 
         try:
             target = backend.normalize(payload.path)
@@ -1340,7 +1340,7 @@ async def _fs_owned_session(session_id: Optional[str], profile: Optional[str]) -
     sessions a host or Docker one does."""
     if session_id is None:
         return None
-    from hermes_cli.web_routers.sessions import get_session_detail
+    from eir_cli.web_routers.sessions import get_session_detail
 
     if not session_id.strip():
         raise HTTPException(status_code=404, detail="Session not found")
@@ -1348,10 +1348,10 @@ async def _fs_owned_session(session_id: Optional[str], profile: Optional[str]) -
 
 
 def _fs_profile_home(profile: Optional[str]) -> Optional[Path]:
-    """HERMES_HOME of a requested profile (404/400 on an unknown one), None for the request's
+    """EIR_HOME of a requested profile (404/400 on an unknown one), None for the request's
     own profile (omitted, ``""`` or ``current``, as ``_is_current_profile`` reads them)."""
-    from hermes_cli.web_server_cron import _cron_profile_home
-    from hermes_cli.web_server_profiles import _is_current_profile
+    from eir_cli.web_server_cron import _cron_profile_home
+    from eir_cli.web_server_profiles import _is_current_profile
 
     if _is_current_profile(profile):
         return None
@@ -1363,7 +1363,7 @@ def _fs_profile_home(profile: Optional[str]) -> Optional[Path]:
 async def fs_read_data_url(
     path: str, request: Request, profile: Optional[str] = None, session_id: Optional[str] = None,
 ):
-    from hermes_cli.web_server import _FS_DATA_URL_MAX_BYTES
+    from eir_cli.web_server import _FS_DATA_URL_MAX_BYTES
     session = await _fs_owned_session(session_id, profile)
     backend = await asyncio.to_thread(_remote_fs_backend, path, profile)
     if backend is not None:
@@ -1411,7 +1411,7 @@ def _if_none_match(request: Request) -> set[str]:
 
 def _remote_download_target(backend, path: str) -> tuple[str, int]:
     """*path* resolved on the SSH workspace to a regular file a download may read, and its size."""
-    from hermes_cli.ssh_workspace_fs import SshWorkspaceFsError
+    from eir_cli.ssh_workspace_fs import SshWorkspaceFsError
 
     try:
         target, size = backend.inspect_file(path)
@@ -1428,7 +1428,7 @@ def _remote_download_target(backend, path: str) -> tuple[str, int]:
 
 def _remote_read_bytes(backend, path: str, **limits) -> tuple[bytes, int, str]:
     """*path* read from the SSH workspace once download's checks pass on the path it resolves to:
-    a link named ``notes.txt`` that points at ``~/.hermes/.env`` is refused before any byte moves."""
+    a link named ``notes.txt`` that points at ``~/.eir/.env`` is refused before any byte moves."""
     target, _size = _remote_download_target(backend, path)
     return backend.read_bytes(target, **limits)
 
@@ -1485,7 +1485,7 @@ async def _fs_download_authority(
 ) -> file_tickets.FileAuthority:
     """The file ``/api/fs/download`` serves for this query, captured for a download ticket: on the
     profile's SSH workspace when it has one, else on this host under the same read rules."""
-    from hermes_constants import named_profile_home
+    from eir_constants import named_profile_home
 
     remote = await _remote_file_authority(path, profile, owner, _remote_download_target)
     if remote is not None:
@@ -1514,7 +1514,7 @@ async def _ticketed_fs_download(
         target, size = await _ticketed_remote_target(authority, _remote_download_target)
         return _remote_download_response(request, authority.workspace, target, size)
 
-    from hermes_cli.web_server_file_response import OpenedFileResponse
+    from eir_cli.web_server_file_response import OpenedFileResponse
 
     def checked():
         _hosted_fs_read_guard(authority.target, request)

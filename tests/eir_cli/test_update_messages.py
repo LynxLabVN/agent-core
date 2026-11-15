@@ -1,4 +1,4 @@
-"""User-facing wording contracts for ``hermes update`` failure/partial output.
+"""User-facing wording contracts for ``eir update`` failure/partial output.
 
 Invariants only (what the user must be able to read and act on), never whole-string snapshots.
 """
@@ -9,8 +9,8 @@ import subprocess
 
 import pytest
 
-from hermes_cli import update_cmd
-import hermes_cli.update_receipt as ur
+from eir_cli import update_cmd
+import eir_cli.update_receipt as ur
 
 class TestFleetMatrixVerdict:
     """cli-09: a stale/down fleet must end with an explicit "not complete" verdict, because
@@ -24,7 +24,7 @@ class TestFleetMatrixVerdict:
         ]
         assert ur.print_fleet_version_matrix(fleet) is True
         out = capsys.readouterr().out
-        assert "hermes gateway restart" in out
+        assert "eir gateway restart" in out
 
     def test_unknown_rows_print_no_verdict(self, capsys):
         fleet = [{"profile": "default", "pid": 1, "code_sha": None, "state": "unknown"}]

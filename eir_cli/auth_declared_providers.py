@@ -24,8 +24,8 @@ def default_api_key_base_url(api_key: str, default: str, env_url: str) -> str:
 
 def provider_env_base_url(pconfig: Any) -> str:
     if pconfig.id == "actual":
-        from hermes_cli.config import read_raw_config
-        from hermes_cli.providers import normalize_provider
+        from eir_cli.config import read_raw_config
+        from eir_cli.providers import normalize_provider
 
         model = read_raw_config().get("model")
         if isinstance(model, dict) and normalize_provider(str(model.get("provider") or "")) == "actual":
@@ -45,9 +45,9 @@ def resolve_declared_api_key_provider(provider_id: str) -> dict[str, Any]:
 
     Raises ``AuthError`` when no enabled entry exists, so an unknown provider still fails.
     """
-    from hermes_cli.auth import AuthError
-    from hermes_cli.config import get_env_value_prefer_dotenv, load_config
-    from hermes_cli.config_providers import find_provider_entry, is_provider_enabled
+    from eir_cli.auth import AuthError
+    from eir_cli.config import get_env_value_prefer_dotenv, load_config
+    from eir_cli.config_providers import find_provider_entry, is_provider_enabled
 
     try:
         config = load_config() or {}
@@ -70,9 +70,9 @@ def resolve_declared_api_key_provider(provider_id: str) -> dict[str, Any]:
     key_cmd = str(entry.get("key_cmd") or "").strip()
     if key_cmd:
         from agent.command_token_source import build_command_token_provider, materialize_probe_api_key
-        from hermes_constants import hermes_home_key
+        from eir_constants import eir_home_key
         token_source = _KEY_CMD_SOURCES.setdefault(
-            (hermes_home_key(), key_cmd), build_command_token_provider(key_cmd, str(entry.get("name") or provider_id)))
+            (eir_home_key(), key_cmd), build_command_token_provider(key_cmd, str(entry.get("name") or provider_id)))
         api_key = materialize_probe_api_key(token_source)
         source = "key_cmd" if api_key else source
     if not api_key:
@@ -94,7 +94,7 @@ def relay_probe_api_key(provider_id: str, relay: str, api_key: str, cred_base_ur
     declared ``providers.<id>`` key belongs to that entry's own base_url, which is where inference
     resolves, so a ``model.base_url`` on another origin (stale or edited) must not receive it.
     """
-    from hermes_cli.auth import is_known_auth_provider
+    from eir_cli.auth import is_known_auth_provider
     from utils import base_url_origin
 
     if not api_key or is_known_auth_provider(provider_id):
@@ -115,8 +115,8 @@ def custom_catalog_probe_api_key(model_cfg: dict[str, Any], base_url: str, *, mi
     """
     from agent.command_token_source import materialize_probe_api_key
     from agent.secret_scope import get_secret_str
-    from hermes_cli import runtime_provider as rp
-    from hermes_cli.runtime_provider_custom import _model_cfg_key_env_for, _owning_entry_credential
+    from eir_cli import runtime_provider as rp
+    from eir_cli.runtime_provider_custom import _model_cfg_key_env_for, _owning_entry_credential
 
     is_cfg_url = str(model_cfg.get("base_url") or "").strip().rstrip("/") == (base_url or "").strip().rstrip("/")
     own = (str(model_cfg.get("api_key") or "").strip() if is_cfg_url else "") or _model_cfg_key_env_for(model_cfg, base_url)

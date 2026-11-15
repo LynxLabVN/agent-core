@@ -1,6 +1,6 @@
 """``anon_auth.run_sign_in``: the one plain device-code sign-in every surface renders.
 
-Driven directly against the same fake portal ``hermes auth upgrade`` is tested with, so the states,
+Driven directly against the same fake portal ``eir auth upgrade`` is tested with, so the states,
 the persistence rules, the cancel rules and the free tier's handoff are exercised on the real wire
 rather than mocked away. Each test asserts a single ruled property of the flow.
 """
@@ -14,9 +14,9 @@ import time
 
 import pytest
 
-from hermes_cli import anon_auth, auth_device_flow
-from hermes_cli.auth import _auth_file_path, _load_auth_store
-from tests.hermes_cli.test_anon_upgrade import (
+from eir_cli import anon_auth, auth_device_flow
+from eir_cli.auth import _auth_file_path, _load_auth_store
+from tests.eir_cli.test_anon_upgrade import (
     EMAIL, FREE_PICK, PORTAL, WELCOME, _write_model_config, free_account, portal)
 
 __all__ = ["free_account", "portal"]
@@ -123,7 +123,7 @@ def test_the_portal_override_is_read_inside_the_profile_scope(portal, free_accou
         finally:
             in_scope.pop()
 
-    from hermes_cli import auth_nous
+    from eir_cli import auth_nous
     reads = []
     real_override = auth_nous._nous_portal_env_override
     monkeypatch.setattr(auth_nous, "_nous_portal_env_override",
@@ -135,7 +135,7 @@ def test_the_portal_override_is_read_inside_the_profile_scope(portal, free_accou
 
 def test_the_portal_override_wins_over_a_saved_portal(portal, monkeypatch):
     guest = _seed_free_tier()
-    from hermes_cli.auth import _save_auth_store, _save_provider_state
+    from eir_cli.auth import _save_auth_store, _save_provider_state
     store = _load_auth_store()
     _save_provider_state(store, "nous", {**guest, "portal_base_url": "https://portal.nousresearch.com"})
     _save_auth_store(store)
@@ -172,7 +172,7 @@ def test_a_transport_error_yields_failed_without_leaking_the_detail_into_chat_co
 def test_a_persist_failure_yields_failed_rather_than_raising(portal, free_account, monkeypatch):
     _seed_free_tier()
     settles = []
-    from hermes_cli import auth_nous
+    from eir_cli import auth_nous
     monkeypatch.setattr(
         auth_nous, "persist_nous_credentials", lambda *a, **kw: (_ for _ in ()).throw(OSError("read-only home")))
     monkeypatch.setattr(anon_auth, "settle_after_upgrade", lambda state: settles.append(state) or {})
@@ -188,7 +188,7 @@ def test_a_persist_failure_yields_failed_rather_than_raising(portal, free_accoun
 def test_a_settle_failure_yields_failed_rather_than_raising(portal, free_account, monkeypatch):
     _seed_free_tier()
     persists = []
-    from hermes_cli import auth_nous
+    from eir_cli import auth_nous
     real_persist = auth_nous.persist_nous_credentials
     monkeypatch.setattr(
         auth_nous, "persist_nous_credentials",
@@ -206,7 +206,7 @@ def test_a_settle_failure_yields_failed_rather_than_raising(portal, free_account
 
 
 def test_already_signed_in_short_circuits_before_any_network_unless_replacing(portal):
-    from hermes_cli.auth import _save_auth_store, _save_provider_state
+    from eir_cli.auth import _save_auth_store, _save_provider_state
     store = _load_auth_store()
     _save_provider_state(store, "nous", {"auth_method": "oauth_device_code", "access_token": "x"})
     _save_auth_store(store)
@@ -303,8 +303,8 @@ def test_persistence_happens_only_after_the_token_grant(portal, free_account):
 
 
 def test_a_token_without_a_scope_keeps_the_requested_scope(portal, free_account, monkeypatch):
-    from hermes_cli import auth_nous
-    from hermes_cli.auth import PROVIDER_REGISTRY
+    from eir_cli import auth_nous
+    from eir_cli.auth import PROVIDER_REGISTRY
     real_poll = auth_device_flow._poll_for_token
     monkeypatch.setattr(auth_device_flow, "_poll_for_token",
                         lambda **kw: {k: v for k, v in real_poll(**kw).items() if k != "scope"})
@@ -319,9 +319,9 @@ def test_a_token_without_a_scope_keeps_the_requested_scope(portal, free_account,
 
 def test_the_ca_bundle_is_honoured_for_the_whole_sign_in(portal, free_account, monkeypatch):
     import certifi
-    monkeypatch.setenv("HERMES_CA_BUNDLE", certifi.where())
+    monkeypatch.setenv("EIR_CA_BUNDLE", certifi.where())
     seen = []
-    from hermes_cli import auth_nous
+    from eir_cli import auth_nous
     real_client = auth_nous._nous_http_client
 
     def _recording(timeout_seconds, verify):
@@ -370,8 +370,8 @@ def test_the_scope_is_entered_for_the_precondition_and_the_persist_but_never_aro
 def test_a_refused_portal_inference_url_is_not_stored(portal, free_account, monkeypatch, portal_url):
     # The URL receives the account bearer: off-allowlist / non-https falls back to the registry default.
     monkeypatch.delenv("NOUS_INFERENCE_BASE_URL", raising=False)
-    from hermes_cli.auth import PROVIDER_REGISTRY
-    from hermes_cli.config import load_config
+    from eir_cli.auth import PROVIDER_REGISTRY
+    from eir_cli.config import load_config
     _seed_free_tier()
     _write_model_config({"provider": "nous", "default": anon_auth.GUEST_MODEL, "base_url": WELCOME})
     portal.token_inference_url = portal_url

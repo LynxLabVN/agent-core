@@ -1,4 +1,4 @@
-"""hermes webhook — manage dynamic webhook subscriptions from the CLI."""
+"""eir webhook — manage dynamic webhook subscriptions from the CLI."""
 
 import hashlib
 import hmac
@@ -13,9 +13,9 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Callable, Dict
 
-from hermes_constants import display_hermes_home
+from eir_constants import display_eir_home
 from utils import atomic_json_write
-from hermes_cli.config import cfg_get
+from eir_cli.config import cfg_get
 
 
 _SUBSCRIPTIONS_FILENAME = "webhook_subscriptions.json"
@@ -30,8 +30,8 @@ class SubscriptionMutationConflict(RuntimeError):
 
 
 def _subscriptions_path() -> Path:
-    from hermes_constants import get_hermes_home
-    return get_hermes_home() / _SUBSCRIPTIONS_FILENAME
+    from eir_constants import get_eir_home
+    return get_eir_home() / _SUBSCRIPTIONS_FILENAME
 
 
 def _subscriptions_lock_path() -> Path:
@@ -41,7 +41,7 @@ def _subscriptions_lock_path() -> Path:
 @contextmanager
 def _subscriptions_lock():
     """Serialize subscription snapshots and mutations across threads and processes."""
-    from hermes_cli.active_sessions import _FileLock
+    from eir_cli.active_sessions import _FileLock
 
     with _SUBSCRIPTIONS_THREAD_LOCK:
         with _FileLock(_subscriptions_lock_path()):
@@ -110,7 +110,7 @@ def _replace_subscription(name: str, route: dict, expected: object) -> dict:
 def _get_webhook_config() -> dict:
     """Load webhook platform config. Returns {} if not configured."""
     try:
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
         cfg = load_config()
         return cfg_get(cfg, "platforms", "webhook", default={})
     except Exception:
@@ -137,12 +137,12 @@ def _route_url(name: str, route: dict) -> str:
 
 
 def _setup_hint() -> str:
-    _dhh = display_hermes_home()
+    _dhh = display_eir_home()
     return f"""
   Webhook platform is not enabled. To set it up:
 
   1. Run the gateway setup wizard:
-     hermes gateway setup
+     eir gateway setup
 
   2. Or manually add to {_dhh}/config.yaml:
      platforms:
@@ -157,16 +157,16 @@ def _setup_hint() -> str:
      WEBHOOK_PORT=8644
      WEBHOOK_SECRET=your-global-secret
 
-  Then start the gateway: hermes gateway run
+  Then start the gateway: eir gateway run
 """
 
 
 def webhook_command(args):
-    """Entry point for 'hermes webhook' subcommand."""
+    """Entry point for 'eir webhook' subcommand."""
     sub = getattr(args, "webhook_action", None)
     if not sub:
-        print("Usage: hermes webhook {subscribe|list|remove|test}")
-        print("Run 'hermes webhook --help' for details.")
+        print("Usage: eir webhook {subscribe|list|remove|test}")
+        print("Run 'eir webhook --help' for details.")
         return
     if not _is_webhook_enabled():
         print(_setup_hint())
@@ -196,7 +196,7 @@ def _is_known_delivery_target(target: object) -> bool:
 
     if not isinstance(target, str) or is_dispatchable_target(target):
         return isinstance(target, str)
-    from hermes_cli.plugins import discover_plugins
+    from eir_cli.plugins import discover_plugins
 
     discover_plugins()
     return is_dispatchable_target(target)
@@ -209,7 +209,7 @@ _REPAIR_FLAGS = (("prompt", "--prompt"), ("description", "--description"), ("scr
 def _repair_command(name: str, route: dict) -> str:
     """A ``subscribe`` line that fixes the target AND resupplies the route's other saved options: subscribe
     replaces the whole route (secret, signature and profile are kept on update by themselves)."""
-    parts = ["hermes", "webhook", "subscribe", name, "--deliver", "telegram", "--deliver-chat-id", "<CHAT_ID>"]
+    parts = ["eir", "webhook", "subscribe", name, "--deliver", "telegram", "--deliver-chat-id", "<CHAT_ID>"]
     for key, flag in _REPAIR_FLAGS:
         if isinstance(route.get(key), str) and route[key]:
             parts += [flag, shlex.quote(route[key])]
@@ -244,7 +244,7 @@ def _cmd_subscribe(args):
     if profile_arg is None:
         profile = existing.get("profile", "default")
     else:
-        from hermes_cli.profiles import normalize_profile_name, profile_exists, validate_profile_name
+        from eir_cli.profiles import normalize_profile_name, profile_exists, validate_profile_name
         try:
             profile = normalize_profile_name(profile_arg)
             validate_profile_name(profile)
@@ -302,7 +302,7 @@ def _cmd_subscribe(args):
             print(f"Error: {e}")
             return 1
         if job is None:
-            print(f"Error: no cron job matches '{cron_job}'. List jobs with: hermes cron list")
+            print(f"Error: no cron job matches '{cron_job}'. List jobs with: eir cron list")
             return 1
         route["cron_job"] = job["id"]
     script = (getattr(args, "script", "") or "").strip()
@@ -321,8 +321,8 @@ def _cmd_subscribe(args):
     print(f"  Profile: {profile}")
     # Masked: the full secret would otherwise land in scrollback, agent transcripts and CI logs.
     from agent.redact import mask_secret
-    from hermes_constants import display_hermes_home
-    print(f"  Secret: {mask_secret(secret)} (full value in {display_hermes_home()}/{_SUBSCRIPTIONS_FILENAME})")
+    from eir_constants import display_eir_home
+    print(f"  Secret: {mask_secret(secret)} (full value in {display_eir_home()}/{_SUBSCRIPTIONS_FILENAME})")
     print(f"  Events: {', '.join(events) or '(all)'}")
     print(f"  Signature: {route.get('signature', 'any supported scheme (unpinned)')!s}")
     print(f"  Deliver: {route['deliver']}")
@@ -339,13 +339,13 @@ def _cmd_subscribe(args):
         print(f"  Script: {route['script']}")
     print("\n  Configure your service to POST to the URL above.")
     print("  Use the route's stored secret for HMAC-SHA256 signature validation.")
-    print("  The gateway must be running to receive events (hermes gateway run).\n")
+    print("  The gateway must be running to receive events (eir gateway run).\n")
 
 
 def _resolve_route_cron_job(profile: str, reference: str):
     """Match runtime routing without changing the caller's subscription/config home."""
     from cron.jobs import resolve_job_ref, use_cron_store
-    from hermes_cli.profiles import get_profile_dir
+    from eir_cli.profiles import get_profile_dir
 
     # Bare/default routes execute in the ambient home, including standalone installs.
     if profile == "default":
@@ -358,7 +358,7 @@ def _cmd_list(args):
     subs = _load_subscriptions()
     if not subs:
         print("  No dynamic webhook subscriptions.")
-        print("  Create one with: hermes webhook subscribe <name>")
+        print("  Create one with: eir webhook subscribe <name>")
         return
 
     print(f"\n  {len(subs)} webhook subscription(s):\n")
@@ -415,7 +415,7 @@ def _cmd_test(args):
         return
     secret = subs[name].get("secret", "")
     url = _route_url(name, subs[name])
-    payload = args.payload or '{"test": true, "event_type": "test", "message": "Hello from hermes webhook test"}'
+    payload = args.payload or '{"test": true, "event_type": "test", "message": "Hello from eir webhook test"}'
     headers = {"Content-Type": "application/json",
                **_test_signature_headers(subs[name].get("signature"), secret, payload.encode())}
     print(f"  Sending test POST to {url}")
@@ -426,7 +426,7 @@ def _cmd_test(args):
             print(f"  Response ({resp.status}): {body}")
     except Exception as e:
         print(f"  Error: {e}")
-        print("  Is the gateway running? (hermes gateway run)")
+        print("  Is the gateway running? (eir gateway run)")
 
 
 def _test_signature_headers(scheme, secret: str, body: bytes) -> dict[str, str]:

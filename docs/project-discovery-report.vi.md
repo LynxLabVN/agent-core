@@ -1,20 +1,20 @@
-# Báo cáo Khám phá Dự án — Hermes Agent
+# Báo cáo Khám phá Dự án — Eir Agent
 
 > Tài liệu tổng hợp từ quá trình khảo sát codebase tại `/home/duy/Documents/Workspace/Work/agent-core`
-> (repo: `NousResearch/hermes-agent`). Ngày biên soạn: 15/11/2026.
+> (repo: `NousResearch/eir-agent`). Ngày biên soạn: 15/11/2026.
 
 ---
 
 ## 1. Tổng quan dự án
 
-**Hermes** là agent AI cá nhân có khả năng **tự cải thiện (self-improving)** do Nous Research phát triển. Điểm khác biệt cốt lõi: nó sở hữu **vòng lặp học tập khép kín (closed learning loop)** — tự tạo skill từ kinh nghiệm thực chiến, tự cải thiện skill trong lúc sử dụng, chủ động lưu kiến thức vào bộ nhớ, tự tìm kiếm trong các cuộc hội thoại quá khứ (FTS5 + tóm tắt LLM), và dần xây dựng "chân dung người dùng" xuyên suốt các phiên làm việc.
+**Eir** là agent AI cá nhân có khả năng **tự cải thiện (self-improving)** do Nous Research phát triển. Điểm khác biệt cốt lõi: nó sở hữu **vòng lặp học tập khép kín (closed learning loop)** — tự tạo skill từ kinh nghiệm thực chiến, tự cải thiện skill trong lúc sử dụng, chủ động lưu kiến thức vào bộ nhớ, tự tìm kiếm trong các cuộc hội thoại quá khứ (FTS5 + tóm tắt LLM), và dần xây dựng "chân dung người dùng" xuyên suốt các phiên làm việc.
 
 Đặc trưng kiến trúc quan trọng nhất: **một lõi agent duy nhất chạy trên 4 bề mặt (surfaces)**:
 
 | Bề mặt | Điểm vào | Ghi chú |
 |---|---|---|
-| CLI tương tác | `cli.py` + `hermes_cli/` | Rich banner, prompt_toolkit, autocomplete slash command |
-| TUI (Ink/React) | `ui-tui/` + `tui_gateway/` | `hermes --tui`; giao tiếp JSON-RPC qua stdio |
+| CLI tương tác | `cli.py` + `eir_cli/` | Rich banner, prompt_toolkit, autocomplete slash command |
+| TUI (Ink/React) | `ui-tui/` + `tui_gateway/` | `eir --tui`; giao tiếp JSON-RPC qua stdio |
 | Gateway nhắn tin | `gateway/run.py` | Telegram, Discord, Slack, WhatsApp, Signal và ~20 platform khác |
 | Desktop (Electron) | `apps/desktop/` | App riêng, không nhúng TUI; backend dùng chung `tui_gateway` |
 
@@ -46,7 +46,7 @@ Thông điệp theo chuẩn OpenAI (`system/user/assistant/tool`), reasoning lư
 2. **Lõi hẹp, năng lực ở rìa (narrow waist).** Mỗi model tool mới được gửi đi trên MỌI lời gọi API — nên ngưỡng thêm tool cốt lõi rất cao. Đa phần năng lực mới đến bằng: lệnh CLI + skill → tool có service-gate (`check_fn`) → plugin → MCP server → mới nhất là tool cốt ("Footprint Ladder").
 3. **Lõi bất kể nền tảng.** Một class `AIAgent` phục vụ CLI, gateway, ACP, batch, API server. Khác biệt nền tảng nằm ở điểm vào, không nằm trong agent.
 4. **Chèn xen được (interruptible).** Lời gọi API và tool execution có thể hủy giữa chừng bằng input hoặc signal.
-5. **Cô lập profile.** Mỗi profile (`hermes -p <name>`) có `HERMES_HOME` riêng — config, key, memory, session, PID gateway đều tách biệt, chạy song song được.
+5. **Cô lập profile.** Mỗi profile (`eir -p <name>`) có `EIR_HOME` riêng — config, key, memory, session, PID gateway đều tách biệt, chạy song song được.
 
 ### 2.2. Chức năng nổi bật
 
@@ -66,10 +66,10 @@ Thông điệp theo chuẩn OpenAI (`system/user/assistant/tool`), reasoning lư
 | Lõi | `run_agent.py`, `model_tools.py`, `toolsets.py` | Vòng lặp, dispatch tool, 28 toolset |
 | Nội bộ agent | `agent/` | prompt_builder, nén ngữ cảnh, prompt caching, memory manager, provider adapter |
 | Tools | `tools/` + `tools/environments/` | 70+ tool tự đăng ký qua `tools/registry.py`; 6 backend terminal |
-| CLI | `cli.py`, `hermes_cli/` | Slash command (registry trung tâm), setup wizard, skin engine |
+| CLI | `cli.py`, `eir_cli/` | Slash command (registry trung tâm), setup wizard, skin engine |
 | Gateway | `gateway/` + `gateway/platforms/` | 20 adapter platform, session store, hooks, token lock theo profile |
 | Rìa | `plugins/`, `skills/`, `optional-skills/`, `cron/`, `acp_adapter/`, `ui-tui/`, `apps/desktop/` | Nơi năng lực mới được đặt — không chạm lõi |
-| Trạng thái | `hermes_state.py` | SQLite + FTS5, lineage session (cha/con qua các lần nén) |
+| Trạng thái | `eir_state.py` | SQLite + FTS5, lineage session (cha/con qua các lần nén) |
 | Kiểm thử | `tests/` | ~17k test / ~900 file, cách ly subprocess, môi trường hermetic (`scripts/run_tests.sh`) |
 
 ### 3.1. Chuỗi phụ thuộc cốt
@@ -89,7 +89,7 @@ Tool đăng ký lúc import, trước khi instance agent nào tồn tại. File 
 ### 3.2. Dòng chảy dữ liệu
 
 ```
-CLI:        input → HermesCLI.process_input() → AIAgent.run_conversation()
+CLI:        input → EirCLI.process_input() → AIAgent.run_conversation()
             → build_system_prompt → resolve provider → API → tool loop → response → SessionDB
 
 Gateway:    event platform → Adapter → GatewayRunner (authorize, session key)

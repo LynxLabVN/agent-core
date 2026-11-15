@@ -1,6 +1,6 @@
 import pytest
 
-from hermes_state import SessionDB
+from eir_state import SessionDB
 
 
 @pytest.fixture

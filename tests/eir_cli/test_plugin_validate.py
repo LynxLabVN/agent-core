@@ -1,4 +1,4 @@
-"""Tests for ``hermes plugins validate`` (hermes_cli/plugin_validate.py).
+"""Tests for ``eir plugins validate`` (eir_cli/plugin_validate.py).
 
 Static manifest checks + subprocess-isolated capability probing against a
 recording stub context.
@@ -11,10 +11,10 @@ from pathlib import Path
 
 import pytest
 
-import hermes_yaml as yaml
+import eir_yaml as yaml
 
-from hermes_cli.plugin_validate import validate_plugin_dir
-from hermes_cli.plugin_validate_desktop import desktop_surface_hits, is_desktop_surface
+from eir_cli.plugin_validate import validate_plugin_dir
+from eir_cli.plugin_validate_desktop import desktop_surface_hits, is_desktop_surface
 
 
 def _make_plugin(
@@ -31,13 +31,13 @@ def _make_plugin(
 
 
 def _portable_plugin(root: Path, servers: dict, declarations: dict) -> Path:
-    from hermes_cli.agent_plugins import MCP_SCHEMA_V1, PLUGIN_SCHEMA_V1
+    from eir_cli.agent_plugins import MCP_SCHEMA_V1, PLUGIN_SCHEMA_V1
 
     root.mkdir()
     (root / "plugin.json").write_text(json.dumps({
         "$schema": PLUGIN_SCHEMA_V1,
         "name": "example-plugin",
-        "extensions": {"com.nousresearch.hermes": {"servers": declarations}},
+        "extensions": {"com.nousresearch.eir": {"servers": declarations}},
     }), encoding="utf-8")
     (root / "mcp.json").write_text(json.dumps({
         "$schema": MCP_SCHEMA_V1,
@@ -79,23 +79,23 @@ BASE_MANIFEST = {
 }
 
 
-def test_requires_hermes_spec_is_validated(tmp_path):
-    manifest = dict(BASE_MANIFEST, description="café", requires_hermes=">=0.21")
+def test_requires_eir_spec_is_validated(tmp_path):
+    manifest = dict(BASE_MANIFEST, description="café", requires_eir=">=0.21")
     d = _make_plugin(tmp_path, manifest=manifest)
     (d / "plugin.yaml").write_text(yaml.safe_dump(manifest), encoding="utf-8-sig")
 
     report = validate_plugin_dir(d)
 
     assert report.ok, report.failures
-    assert any(name == "requires_hermes" and ok for name, ok, _ in report.checks)
+    assert any(name == "requires_eir" and ok for name, ok, _ in report.checks)
 
 
 def test_config_schema_admits_every_type_the_loader_and_renderer_accept(tmp_path):
     """A ``type:`` the Desktop settings renderer/loader accept (``secret`` + ``env:``, ``object``) must
     pass admission — the catalog validator rejecting a documented type blocks pins of plugins that
     declare a secret setting."""
-    from hermes_cli.plugins_manifest import _CONFIG_SCHEMA_TYPES
-    from hermes_cli.plugins_settings import _FIELD_TYPES
+    from eir_cli.plugins_manifest import _CONFIG_SCHEMA_TYPES
+    from eir_cli.plugins_settings import _FIELD_TYPES
 
     assert set(_FIELD_TYPES) == set(_CONFIG_SCHEMA_TYPES)
     schema = {f"k_{t}": {"type": t} for t in _FIELD_TYPES}
@@ -290,17 +290,17 @@ class TestModelProviderKind:
         assert any("registered no ProviderProfile" in f for f in report.failures), report.failures
 
 
-class TestRequiresHermesSpec:
-    """A typo'd ``requires_hermes`` clause must fail admission, not silently gate nothing."""
+class TestRequiresEirSpec:
+    """A typo'd ``requires_eir`` clause must fail admission, not silently gate nothing."""
 
     def test_typoed_clause_fails_admission(self, tmp_path):
         d = _make_plugin(
-            tmp_path, manifest={**BASE_MANIFEST, "requires_hermes": ">=0.21.1,<0.x"}
+            tmp_path, manifest={**BASE_MANIFEST, "requires_eir": ">=0.21.1,<0.x"}
         )
         report = validate_plugin_dir(d)
         assert not report.ok
         assert any(
-            "requires_hermes" in f and "does not parse" in f for f in report.failures
+            "requires_eir" in f and "does not parse" in f for f in report.failures
         ), report.failures
 
 
@@ -318,7 +318,7 @@ class TestDesktopSurface:
 
     def test_sdk_only_plugin_passes(self, tmp_path):
         d = self._desktop_plugin(tmp_path, (
-            "import { definePlugin } from '@hermes/plugin-sdk'\n"
+            "import { definePlugin } from '@eir/plugin-sdk'\n"
             "// Storage.prototype.setItem = noop  (comments are not code)\n"
             "export default definePlugin({ id: 'desk', register(ctx) { ctx.storage.set('k', 1) } })\n"
         ))
@@ -331,15 +331,15 @@ class TestDesktopSurface:
         from CSS text or ``closest()`` pass the refusal rules, so review gets a warning (listed plugins
         still need the bridge where the SDK has no verb). A comment naming them is not a use."""
         d = self._desktop_plugin(tmp_path, (
-            "// window.hermesDesktop.readDir and [data-slot=x] are what we avoid\n"
-            "const git = () => window.hermesDesktop?.git || null\n"
+            "// window.eirDesktop.readDir and [data-slot=x] are what we avoid\n"
+            "const git = () => window.eirDesktop?.git || null\n"
             "rules.push('[data-tree-tab=\"bots:pane\"]{display:none!important}')\n"
             "const root = el.closest('[data-tree-split]')\n"
         ))
         report = validate_plugin_dir(d)
         assert any(name == "desktop surface" and ok for name, ok, _ in report.checks)
         [warning] = [w for w in report.warnings if w.startswith("desktop surface review")]
-        assert "raw bridge window.hermesDesktop (desktop/plugin.js:2)" in warning
+        assert "raw bridge window.eirDesktop (desktop/plugin.js:2)" in warning
         assert "app markup selector (desktop/plugin.js:3)" in warning
         assert "app markup selector (desktop/plugin.js:4)" in warning
         assert ":1)" not in warning
@@ -405,7 +405,7 @@ class TestDesktopSurface:
             "const raw = Storage.prototype.setItem\n"
             "Storage.prototype.setItem = function (k, v) { return raw.call(this, k, v) }\n"
             "const mod = await import(/* @vite-ignore */ new URL('./chunk.js', base).href)\n"
-            "const sdk = await import('@hermes/plugin-sdk')\n"
+            "const sdk = await import('@eir/plugin-sdk')\n"
         ))
         report = validate_plugin_dir(d)
         failed = {name: detail for name, ok, detail in report.checks if not ok}
@@ -445,7 +445,7 @@ class TestDesktopSurface:
         loader refuses URL-scheme specifiers, so admission must too. SDK/react imports stay clean."""
         d = self._desktop_plugin(
             tmp_path,
-            "import { host } from '@hermes/plugin-sdk'\n"
+            "import { host } from '@eir/plugin-sdk'\n"
             "import React from \"react\"\n"
             "import 'https://attacker.example/stage2.js'\n"
             "import stage from \"file:///tmp/stage3.js\"\n"
@@ -465,7 +465,7 @@ class TestDesktopSurface:
         (d / "sidecar").mkdir()
         (d / "plugin.yaml").write_text(yaml.safe_dump(dict(BASE_MANIFEST, name="root-desk")), encoding="utf-8")
         (d / "plugin.js").write_text(
-            "import { definePlugin } from '@hermes/plugin-sdk'\n"
+            "import { definePlugin } from '@eir/plugin-sdk'\n"
             "document.querySelectorAll('[data-slot=\"dialog-overlay\"]').forEach(el => el.remove())\n",
             encoding="utf-8")
         (d / "helper.js").write_text("const s = document.createElement('script')\n", encoding="utf-8")
@@ -480,15 +480,15 @@ class TestDesktopSurface:
         failed = {name: detail for name, ok, detail in report.checks if not ok}
         assert "app DOM reach (plugin.js:2)" in failed["desktop surface"]
 
-        (d / "plugin.js").write_text("import { definePlugin } from '@hermes/plugin-sdk'\n", encoding="utf-8")
+        (d / "plugin.js").write_text("import { definePlugin } from '@eir/plugin-sdk'\n", encoding="utf-8")
         (d / "helper.js").unlink()
         (d / "desktop" / "plugin.js").unlink()
         report = validate_plugin_dir(d)
         assert ("desktop surface", True, "stays inside the plugin SDK surface") in report.checks
 
 
-def test_runtime_rebind_of_hermes_core_fails_admission(tmp_path):
-    """A plugin that replaces Hermes core in place fails ``no core override``: through a module
+def test_runtime_rebind_of_eir_core_fails_admission(tmp_path):
+    """A plugin that replaces Eir core in place fails ``no core override``: through a module
     import, a helper that ``setattr``s its parameter, a local helper returning
     ``import_module(...)`` under an alias, and a write into a core module's dict. Ordinary use of
     core (calling it, mutating its return values, its own ``tools`` package, tests) passes."""
@@ -502,14 +502,14 @@ def test_runtime_rebind_of_hermes_core_fails_admission(tmp_path):
         "    _wrap(run_agent.AIAgent, '_replace_primary_openai_client', print)\n"
         "    srv = gateway_server()\n"
         "    setattr(srv, 'handle_request', print)\n"
-        "    import hermes_cli.models_catalog_static as m\n"
+        "    import eir_cli.models_catalog_static as m\n"
         "    m._PROVIDER_MODELS['x'] = ['y']\n"
     ))
     (bad / "compat.py").write_text(
         "from importlib import import_module\ndef server():\n    return import_module('tui_gateway.server')\n",
         encoding="utf-8")
     good = _make_plugin(tmp_path, manifest=dict(BASE_MANIFEST, name="good"), init_py=(
-        "from hermes_cli.config import load_config\n"
+        "from eir_cli.config import load_config\n"
         "from .tools import helper\n"
         "class Box:\n"
         "    def set(self, v):\n"
@@ -527,7 +527,7 @@ def test_runtime_rebind_of_hermes_core_fails_admission(tmp_path):
         "from unittest import mock\nimport run_agent\nrun_agent.AIAgent.x = 1\nmock.patch('run_agent.AIAgent.y')\n",
         encoding="utf-8")
 
-    from hermes_cli.plugin_validate_core_override import core_override_findings
+    from eir_cli.plugin_validate_core_override import core_override_findings
 
     assert core_override_findings(bad) == [
         "run_agent.AIAgent.run_conversation (__init__.py:6)",
@@ -549,7 +549,7 @@ def test_core_override_through_a_method_patch_helper(tmp_path):
         "    Patches().bind(auxiliary_client, '_relay_sync_stream', print)\n"
     ))
 
-    from hermes_cli.plugin_validate_core_override import core_override_findings
+    from eir_cli.plugin_validate_core_override import core_override_findings
 
     assert core_override_findings(bad) == ["bind(auxiliary_client, ...) (__init__.py:6)"]
 
@@ -562,7 +562,7 @@ def test_install_deps_probe_imports_from_the_synced_environment(tmp_path: Path, 
 
     import pm
     from pm import environments
-    from hermes_cli.plugins_cmd_catalog import cmd_validate
+    from eir_cli.plugins_cmd_catalog import cmd_validate
 
     deps = tmp_path / "synced-site-packages"
     deps.mkdir()
@@ -615,9 +615,9 @@ def test_oauth_block_passes_and_a_token_url_in_code_is_only_a_warning(tmp_path):
     ({"authorize_url": "http://accounts.example.com/o/oauth2/auth"}, "authorize_url"),
     ({"authorize_url": "http://127.0.0.1:8080/auth"}, "must use https"),  # no loopback exception
     ({"token_url": "http://[::1]:8080/token"}, "must use https"),
-    ({"client_secret_env": "OPENROUTER_API_KEY"}, "Hermes uses itself"),  # would be POSTed to token_url
-    ({"client_id_env": "TELEGRAM_BOT_TOKEN"}, "Hermes uses itself"),
-    ({"client_secret_env": "MATRIX_PASSWORD"}, "Hermes uses itself"),  # platform secrets too
+    ({"client_secret_env": "OPENROUTER_API_KEY"}, "Eir uses itself"),  # would be POSTed to token_url
+    ({"client_id_env": "TELEGRAM_BOT_TOKEN"}, "Eir uses itself"),
+    ({"client_secret_env": "MATRIX_PASSWORD"}, "Eir uses itself"),  # platform secrets too
     ({"id": 123}, "id"),
     ({"authorize_url": "https://accounts.example.com/o/oauth2/auth#consent"}, "authorize_url"),
     ({"token_url": "https://[oauth2.example.com/token"}, "token_url"),

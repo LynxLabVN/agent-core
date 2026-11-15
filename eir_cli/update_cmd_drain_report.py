@@ -1,4 +1,4 @@
-"""Name what a draining gateway is waiting on while ``hermes update`` blocks on it.
+"""Name what a draining gateway is waiting on while ``eir update`` blocks on it.
 
 The gateway's in-band restart (SIGUSR1 → ``request_restart``) defers ``stop()`` until in-flight
 work finishes, capped by ``agent.restart_after_turn_timeout`` (30 min by default). From the
@@ -29,17 +29,17 @@ def _fmt_elapsed(seconds: object) -> str:
 def _cron_job_name(job_id: str, home: Optional[Path]) -> Optional[str]:
     """``name`` from the profile's ``jobs.json`` (None when unreadable — the id alone still identifies it)."""
     try:
-        from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+        from eir_constants import reset_eir_home_override, set_eir_home_override
         from cron.jobs import load_jobs
 
-        token = set_hermes_home_override(home) if home else None
+        token = set_eir_home_override(home) if home else None
         try:
             for job in load_jobs():
                 if str(job.get("id")) == job_id:
                     return str(job.get("name") or "") or None
         finally:
             if token is not None:
-                reset_hermes_home_override(token)
+                reset_eir_home_override(token)
     except Exception:
         return None
     return None
@@ -85,11 +85,11 @@ def read_active_work(home: Optional[Path] = None) -> Optional[list]:
 
 
 def _tui_command(home: Optional[Path]) -> str:
-    """The TUI command that opens *home*'s profile: a bare ``hermes`` opens the default one."""
-    from hermes_constants import profile_name_for_home
+    """The TUI command that opens *home*'s profile: a bare ``eir`` opens the default one."""
+    from eir_constants import profile_name_for_home
 
     name = profile_name_for_home(home)
-    return f"hermes -p {name} --tui" if name and name != "default" else "hermes --tui"
+    return f"eir -p {name} --tui" if name and name != "default" else "eir --tui"
 
 
 def format_drain_report(work: Optional[list], *, remaining_s: float, home: Optional[Path] = None) -> str:
@@ -108,7 +108,7 @@ def format_drain_report(work: Optional[list], *, remaining_s: float, home: Optio
             # approval/clarify is answered from a client, not waited out.
             lines.append("     a chat turn waiting on an approval or clarify question can be answered now: "
                          f"open it with `{_tui_command(home)}` (resume the session)")
-        lines.append("     finish or kill the work above to restart now, or `hermes update --force` "
+        lines.append("     finish or kill the work above to restart now, or `eir update --force` "
                      "to stop it now")
     return "\n".join(lines)
 
@@ -150,7 +150,7 @@ def restart_left_pending(pid: int, home: Optional[Path] = None, *, start_time: O
     from gateway.status import get_process_start_time
     if get_process_start_time(pid) != start_time:
         return False
-    from hermes_cli.gateway import GATEWAY_LOOP_WEDGED, probe_gateway_loop_liveness
+    from eir_cli.gateway import GATEWAY_LOOP_WEDGED, probe_gateway_loop_liveness
     return probe_gateway_loop_liveness(pid, home=home) != GATEWAY_LOOP_WEDGED
 
 
@@ -170,6 +170,6 @@ def report_restart_left_pending(label: str, home: Optional[Path] = None, *, supe
     work = read_active_work(home)
     what = "; ".join(describe_active_work_unit(u, home) for u in work if isinstance(u, dict)) if work else ""
     after = ("restarts itself on the new code once idle" if supervised else
-             "exits once idle (start it again with `hermes gateway run` if nothing relaunches it)")
+             "exits once idle (start it again with `eir gateway run` if nothing relaunches it)")
     emit(f"  ↻ {label}: still running live work{f' ({what})' if what else ''} — left running; it {after}. "
-         "`hermes update --force` stops it now.")
+         "`eir update --force` stops it now.")

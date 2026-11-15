@@ -1,4 +1,4 @@
-"""``hermes update --force``: stop every gateway this update owns at once, without a drain.
+"""``eir update --force``: stop every gateway this update owns at once, without a drain.
 
 The default pre-swap pause (``update_cmd_posix_pause._stop_gateways``) asks each gateway to finish
 its in-flight work first and waits up to the restart budget (30 min by default). ``--force`` is the
@@ -48,7 +48,7 @@ def _checkpoint_homes(entry: dict) -> list[Path]:
     homes = [Path(entry["home"])] if entry.get("home") else []
     with suppress(Exception):
         from gateway.host_topology import host_gateway_topology
-        from hermes_cli.profiles import get_profile_dir
+        from eir_cli.profiles import get_profile_dir
         topology = host_gateway_topology()
         if topology is not None and topology.pid == entry["pid"]:
             homes += [get_profile_dir(name) for name in topology.profiles]
@@ -62,7 +62,7 @@ def _kill_scope(unit: str) -> None:
     """SIGKILL every process in a worker scope: what a timed-out ``systemctl stop`` left (a detached
     child ignoring SIGTERM). Same user bus and client as ``process_registry._stop_systemd_unit``."""
     import subprocess
-    from hermes_platform.resolver import locate_command
+    from eir_platform.resolver import locate_command
     from tools.process_registry import systemd_user_bus_env
     if not (found := locate_command("systemctl").command):
         return
@@ -111,7 +111,7 @@ def _sweep_left_behind(homes: list[Path], owner_pid: int) -> tuple[int, int, lis
 
 def _live_work(entry: dict) -> list | None:
     """What the gateway is running right now: the live ``active-work`` verb, else its state file."""
-    from hermes_cli.update_cmd_drain_report import read_active_work
+    from eir_cli.update_cmd_drain_report import read_active_work
     if not entry.get("home"):
         return None
     home = Path(entry["home"])
@@ -139,7 +139,7 @@ def _ask_force_stop(entry: dict) -> bool:
 
 def _signal_stop(entry: dict) -> None:
     """Planned-stop marker + SIGTERM: the gateway's immediate ``stop()``, read as a planned stop."""
-    from hermes_cli.update_cmd_windows import _write_update_planned_stop_marker
+    from eir_cli.update_cmd_windows import _write_update_planned_stop_marker
     if entry.get("home"):
         _write_update_planned_stop_marker(Path(entry["home"]), entry["pid"])
     with suppress(ProcessLookupError, PermissionError):
@@ -149,9 +149,9 @@ def _signal_stop(entry: dict) -> None:
 def _kill(entry: dict) -> None:
     """SIGKILL the gateway: through systemd for a unit (its privileged path reaches a system
     unit another account runs), else directly."""
-    from hermes_cli.update_cmd_posix_pause import _manage_cmd
+    from eir_cli.update_cmd_posix_pause import _manage_cmd
     if entry.get("kind") == "systemd" and (cmd := _manage_cmd(entry["scope"])) is not None:
-        from hermes_cli.update_cmd_fleet import _systemctl
+        from eir_cli.update_cmd_fleet import _systemctl
         _systemctl(cmd + ["kill", "--signal=SIGKILL", entry["unit"]], timeout=10)
         return
     with suppress(ProcessLookupError, PermissionError):
@@ -159,8 +159,8 @@ def _kill(entry: dict) -> None:
 
 
 def _describe(entry: dict, work: list | None) -> str:
-    from hermes_cli.update_cmd_drain_report import describe_active_work_unit
-    from hermes_cli.update_cmd_posix_pause import _names
+    from eir_cli.update_cmd_drain_report import describe_active_work_unit
+    from eir_cli.update_cmd_posix_pause import _names
     name = _names([entry])
     if not work:
         return f"  ⏹ {name}: stopped by --force (no active work reported)"
@@ -172,8 +172,8 @@ def _describe(entry: dict, work: list | None) -> str:
 def _stop_one(token: dict, entry: dict, lock: threading.Lock) -> tuple[bool, str] | None:
     """Stop *entry* within its own deadline. ``None`` when it is gone (and, if supervised, its
     supervisor is stopped), else ``(unsettled, why)``: *unsettled* when its stop is still running."""
-    from hermes_cli import update_pause_record as pause_record
-    from hermes_cli.update_cmd_posix_pause import _names, _stop_at_once, _wait_gone
+    from eir_cli import update_pause_record as pause_record
+    from eir_cli.update_cmd_posix_pause import _names, _stop_at_once, _wait_gone
     work = _live_work(entry)
     homes = _checkpoint_homes(entry)
     with lock:  # the pause record is one file shared by every entry
@@ -206,7 +206,7 @@ def _stop_one(token: dict, entry: dict, lock: threading.Lock) -> tuple[bool, str
             print(f"  ⏹ {_names([entry])}: also stopped {swept} background process(es) it left behind", flush=True)
         if skipped:
             print(f"  ℹ {_names([entry])}: left {skipped} recorded background process(es) running that another "
-                  "process (or an older Hermes) recorded", flush=True)
+                  "process (or an older Eir) recorded", flush=True)
         if leftover:
             return True, (f"background scope(s) {', '.join(leftover)} of gateway PID {entry['pid']} still running "
                           f"after SIGKILL (check `systemctl --user status {leftover[0]}`)")
@@ -237,7 +237,7 @@ def force_stop_gateways(token: dict, entries: list[dict]) -> None:
     """Stop every entry now, concurrently; kill each survivor ``FORCE_KILL_AFTER_S`` after its own
     stop request. Raises ``StopUnsettled`` when any stop is still running (the update must not
     restart or swap past it), else ``PauseRefused`` naming every entry that is not stopped."""
-    from hermes_cli.update_cmd_posix_pause import PauseRefused, StopUnsettled
+    from eir_cli.update_cmd_posix_pause import PauseRefused, StopUnsettled
     if not entries:
         return
     lock = threading.Lock()

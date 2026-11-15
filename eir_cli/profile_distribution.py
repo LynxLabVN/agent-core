@@ -1,4 +1,4 @@
-"""Profile distributions — shareable, packaged Hermes profiles via git.
+"""Profile distributions — shareable, packaged Eir profiles via git.
 
 Sources: a git URL (``github.com/user/repo``, ``https://...``, ``git@...``, ``ssh://``,
 ``git://``) or a local directory that already contains ``distribution.yaml`` (profile
@@ -20,16 +20,16 @@ from datetime import datetime, timezone, UTC
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-import hermes_yaml as yaml
+import eir_yaml as yaml
 
 from agent.skill_utils import DIST_SWAP_DIR
-from hermes_cli._subprocess_compat import noninteractive_git_env
-from hermes_cli.archive_safe import normalize_archive_parts
-from hermes_cli.profiles import (
+from eir_cli._subprocess_compat import noninteractive_git_env
+from eir_cli.archive_safe import normalize_archive_parts
+from eir_cli.profiles import (
     DEFAULT_EXPORT_EXCLUDE_ROOT, profile_path_contains_private_store,
     profile_path_is_private,
 )
-from hermes_constants import clear_named_profile_deleted
+from eir_constants import clear_named_profile_deleted
 from utils import rmtree_readonly
 
 
@@ -52,7 +52,7 @@ _CRON_STORE_REL = ("cron", "jobs.json")
 
 
 def _is_installer_owned_path(parts: tuple[str, ...]) -> bool:
-    """Entries a distribution never writes: credential stores (and Hermes' copies of them) at any
+    """Entries a distribution never writes: credential stores (and Eir' copies of them) at any
     depth, and runtime-owned entries nested under otherwise distribution-owned roots."""
     if profile_path_is_private(parts):
         return True
@@ -60,7 +60,7 @@ def _is_installer_owned_path(parts: tuple[str, ...]) -> bool:
         return False
     if parts[0] == "cron":
         return parts[:2] != _CRON_STORE_REL
-    # Root-level dot entries under skills are Hermes bookkeeping (.hub,
+    # Root-level dot entries under skills are Eir bookkeeping (.hub,
     # .usage.json, curator state, bundled manifest, locks, archives, ...).
     return parts[0] == "skills" and len(parts) == 2 and parts[1].startswith(".")
 
@@ -109,7 +109,7 @@ class DistributionManifest:
     name: str
     version: str = "0.1.0"
     description: str = ""
-    hermes_requires: str = ""
+    eir_requires: str = ""
     author: str = ""
     license: str = ""
     env_requires: list[EnvRequirement] = field(default_factory=list)
@@ -134,7 +134,7 @@ class DistributionManifest:
             raise DistributionError("distribution_owned must be a list")
         return cls(
             name=name, version=_str(data, "version", "0.1.0"), description=_str(data, "description"),
-            hermes_requires=_str(data, "hermes_requires"), author=_str(data, "author"),
+            eir_requires=_str(data, "eir_requires"), author=_str(data, "author"),
             license=_str(data, "license"), env_requires=[EnvRequirement.from_dict(e) for e in env_raw],
             distribution_owned=[str(p).strip().strip("/") for p in dist_owned_raw if str(p).strip()],
             source=_str(data, "source"), installed_at=_str(data, "installed_at"),
@@ -144,7 +144,7 @@ class DistributionManifest:
         out: dict[str, Any] = {"name": self.name, "version": self.version}
         # Key order is the on-disk YAML order (write_manifest uses sort_keys=False).
         optional = (
-            ("description", self.description), ("hermes_requires", self.hermes_requires),
+            ("description", self.description), ("eir_requires", self.eir_requires),
             ("author", self.author), ("license", self.license),
             ("env_requires", [e.to_dict() for e in self.env_requires]),
             ("distribution_owned", self.distribution_owned), ("source", self.source),
@@ -197,20 +197,20 @@ def _parse_semver(v: str) -> tuple[int, int, int]:
         raise DistributionError(f"Unparseable version: {v!r}") from exc
 
 
-def check_hermes_requires(spec: str, current_version: str) -> None:
+def check_eir_requires(spec: str, current_version: str) -> None:
     """Raise DistributionError if ``current_version`` does not satisfy ``spec`` (bare version = ``>=``)."""
     if not spec or not spec.strip():
         return
     m = _VERSION_OP_RE.match(spec)
     op, target = m.groups() if m else (">=", spec.strip())
     if not _VERSION_OPS[op](_parse_semver(current_version), _parse_semver(target)):
-        raise DistributionError(f"This distribution requires Hermes {op}{target}, but you have {current_version}.")
+        raise DistributionError(f"This distribution requires Eir {op}{target}, but you have {current_version}.")
 
 
 def _env_template_from_manifest(manifest: DistributionManifest) -> str:
     """Generate a ``.env.template`` body from env_requires."""
     lines = [
-        "# Environment variables required by this Hermes distribution.",
+        "# Environment variables required by this Eir distribution.",
         "# Copy to `.env` and fill in your own values before running.", "",
     ]
     for req in manifest.env_requires:
@@ -242,7 +242,7 @@ def _looks_like_git_url(s: str) -> bool:
 def _git_clone(url: str, dest: Path) -> None:
     if _GITHUB_SHORTHAND_RE.match(url):
         url = f"https://{url.rstrip('/')}"
-    from hermes_cli.git_credentials import run_git_with_credential_fallback
+    from eir_cli.git_credentials import run_git_with_credential_fallback
     try:
         result = run_git_with_credential_fallback(
             ["git", "clone", "--depth", "1", url, str(dest)], url, env=noninteractive_git_env(),
@@ -266,7 +266,7 @@ def _stage_source(source: str, workdir: Path) -> tuple[Path, str]:
         rmtree_readonly(staged / ".git")
         missing = (
             f"No {MANIFEST_FILENAME} at the root of {src_str!r}. "
-            "This repository is not a Hermes profile distribution."
+            "This repository is not a Eir profile distribution."
         )
     elif (path_guess := Path(src_str).expanduser()).is_dir():
         staged = path_guess.resolve()
@@ -317,21 +317,21 @@ def _has_cron_jobs(staged: Path) -> bool:
 
 def plan_install(source: str, workdir: Path, override_name: Optional[str] = None) -> InstallPlan:
     """Stage *source* and produce a plan describing what install would do."""
-    from hermes_cli.profiles import _canon_valid, get_profile_dir
-    from hermes_cli.version_info import get_version_info
+    from eir_cli.profiles import _canon_valid, get_profile_dir
+    from eir_cli.version_info import get_version_info
     staged, provenance = _stage_source(source, workdir)
     _reject_distribution_symlinks(staged)
     manifest = read_manifest(staged)
     if manifest is None:
         raise DistributionError(
-            f"No {MANIFEST_FILENAME} found at the distribution root — this source is not a Hermes distribution."
+            f"No {MANIFEST_FILENAME} found at the distribution root — this source is not a Eir distribution."
         )
-    check_hermes_requires(manifest.hermes_requires, get_version_info().base_version)  # fail fast
+    check_eir_requires(manifest.eir_requires, get_version_info().base_version)  # fail fast
     canon = _canon_valid(override_name or manifest.name)
     if canon == "default":
         raise DistributionError(
             "Cannot install a distribution as 'default' — that is the built-in "
-            "root profile (~/.hermes).  Pass --name <name> to install under a new profile."
+            "root profile (~/.eir).  Pass --name <name> to install under a new profile."
         )
     manifest.name = canon
     manifest.source = provenance
@@ -432,7 +432,7 @@ def _merge_cron_store(src: Path, home: Path) -> None:
 
     dest = home.joinpath(*_CRON_STORE_REL)
     try:
-        with tempfile.TemporaryDirectory(prefix="hermes_dist_cron_") as tmp:
+        with tempfile.TemporaryDirectory(prefix="eir_dist_cron_") as tmp:
             staged_store = Path(tmp) / "cron"
             staged_store.mkdir()
             shutil.copy2(src, staged_store / "jobs.json")
@@ -530,7 +530,7 @@ def _refuse_store_ancestor_replacement(dest: Path, rel_parts: tuple[str, ...]) -
 def _merges_per_root(src: Path, rel_parts: tuple[str, ...]) -> bool:
     """An owned top-level dir, or an owned container (``skills/research/``, see
     ``_is_container``), is merged per authored root instead of replaced whole, so skills the installer
-    added to it (``hermes skills install`` and agent-created skills land in
+    added to it (``eir skills install`` and agent-created skills land in
     ``skills/<category>/``) survive. The pre-write symlink guard and the copy loop both
     use this, so the guard covers exactly what the copy merges. An ancestor of a credential
     store (``platforms`` of ``platforms/pairing``) is merged too, so replacing it whole can
@@ -567,7 +567,7 @@ def _copy_dist_payload(staged: Path, target: Path, manifest: DistributionManifes
     A top-level owned directory, and an owned container (``_is_container``), is merged per
     authored root. ``cron/jobs.json`` is special: it is one multi-record runtime store, so
     shipped definitions merge by job id instead of replacing the file."""
-    from hermes_cli.config_backend import drop_other_access, require_file_tooling
+    from eir_cli.config_backend import drop_other_access, require_file_tooling
     require_file_tooling("Profile distribution install")
     target.mkdir(parents=True, exist_ok=True)
     entries = list(_owned_entries(staged, manifest))
@@ -607,7 +607,7 @@ def _copy_dist_payload(staged: Path, target: Path, manifest: DistributionManifes
 
 def _bootstrap_user_dirs(target: Path) -> None:
     """Create the bootstrap dirs a fresh profile expects (same set as ``create_profile``)."""
-    from hermes_cli.profiles import _PROFILE_DIRS
+    from eir_cli.profiles import _PROFILE_DIRS
     for d in _PROFILE_DIRS:
         (target / d).mkdir(parents=True, exist_ok=True)
 
@@ -617,13 +617,13 @@ def install_distribution(
 ) -> InstallPlan:
     """Install a distribution from *source* into a new profile; returns the resolved plan.
     Use :func:`plan_install` first to preview + prompt."""
-    from hermes_cli.profiles import check_alias_collision, create_wrapper_script
-    with tempfile.TemporaryDirectory(prefix="hermes_dist_install_") as tmp:
+    from eir_cli.profiles import check_alias_collision, create_wrapper_script
+    with tempfile.TemporaryDirectory(prefix="eir_dist_install_") as tmp:
         plan = plan_install(source, Path(tmp), override_name=name)
         if plan.existing and not force:
             raise DistributionError(
                 f"Profile '{plan.manifest.name}' already exists at {plan.target_dir}. "
-                "Use `hermes profile update` to upgrade in place, or pass --force to overwrite."
+                "Use `eir profile update` to upgrade in place, or pass --force to overwrite."
             )
 
         # Fresh install (or --force): config.yaml comes from the distribution. Roots the
@@ -638,7 +638,7 @@ def install_distribution(
 
 def _existing_profile(profile_name: str) -> tuple[str, Path]:
     """Return ``(canonical_name, profile_dir)`` or raise if the profile doesn't exist."""
-    from hermes_cli.profiles import _existing_profile_dir
+    from eir_cli.profiles import _existing_profile_dir
 
     try:
         return _existing_profile_dir(profile_name)
@@ -654,14 +654,14 @@ def update_distribution(profile_name: str, force_config: bool = False) -> Instal
     if existing_manifest is None:
         raise DistributionError(
             f"Profile '{canon}' is not a distribution (no {MANIFEST_FILENAME}). "
-            "Only profiles installed via `hermes profile install` can be updated."
+            "Only profiles installed via `eir profile install` can be updated."
         )
     if not existing_manifest.source:
         raise DistributionError(
             f"Profile '{canon}' has no recorded source.  Re-install with "
-            "`hermes profile install <source> --name {canon} --force`."
+            "`eir profile install <source> --name {canon} --force`."
         )
-    with tempfile.TemporaryDirectory(prefix="hermes_dist_update_") as tmp:
+    with tempfile.TemporaryDirectory(prefix="eir_dist_update_") as tmp:
         plan = plan_install(existing_manifest.source, Path(tmp), override_name=canon)
         plan.preserves_config = not force_config
         _copy_dist_payload(plan.staged_dir, plan.target_dir, plan.manifest, preserve_config=plan.preserves_config)

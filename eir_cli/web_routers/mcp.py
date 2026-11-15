@@ -17,22 +17,22 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 
-from hermes_cli.web_deps import late
-from hermes_cli.web_server_mcp import _mcp_oauth_flows, _mcp_server_summary, normalize_mcp_server_create
-from hermes_cli.web_models import MCPCatalogInstall, MCPEnabledToggle, MCPServerCreate, MCPServersReplace
-from hermes_cli.web_routers._common import (
-    _profile_cli_args, _profile_scope, _spawn_hermes_action, config_write_scope, http_failure,
+from eir_cli.web_deps import late
+from eir_cli.web_server_mcp import _mcp_oauth_flows, _mcp_server_summary, normalize_mcp_server_create
+from eir_cli.web_models import MCPCatalogInstall, MCPEnabledToggle, MCPServerCreate, MCPServersReplace
+from eir_cli.web_routers._common import (
+    _profile_cli_args, _profile_scope, _spawn_eir_action, config_write_scope, http_failure,
     log as _log, scoped_to_thread,
 )
 
 router = APIRouter()
 
-_config_profile_scope = late("_config_profile_scope", "hermes_cli.web_server_profiles")
+_config_profile_scope = late("_config_profile_scope", "eir_cli.web_server_profiles")
 _require_token = late("_require_token")
-_run_dashboard_mcp_oauth = late("_run_dashboard_mcp_oauth", "hermes_cli.web_server_mcp")
-load_config = late("load_config", "hermes_cli.config")
-save_config = late("save_config", "hermes_cli.config")
-save_env_value = late("save_env_value", "hermes_cli.config")
+_run_dashboard_mcp_oauth = late("_run_dashboard_mcp_oauth", "eir_cli.web_server_mcp")
+load_config = late("load_config", "eir_cli.config")
+save_config = late("save_config", "eir_cli.config")
+save_env_value = late("save_env_value", "eir_cli.config")
 
 _mcp_oauth_flows_lock = threading.Lock()
 _MCP_DASHBOARD_OAUTH_TTL = 15 * 60
@@ -68,7 +68,7 @@ def _mcp_oauth_callback_url(request: Request, server_name: str) -> str:
     """Externally reachable callback URL for a dashboard flow."""
     from urllib.parse import quote, urlparse, urlunparse
 
-    from hermes_cli.dashboard_auth.prefix import prefix_from_request, resolve_public_url
+    from eir_cli.dashboard_auth.prefix import prefix_from_request, resolve_public_url
 
     suffix = f"/api/mcp/oauth/callback/{quote(server_name, safe='')}"
     public_url = resolve_public_url(request.app.state)
@@ -83,7 +83,7 @@ def _mcp_install_action_name(name: str) -> str:
     """Unique per-entry mcp-install action name (+ registered log file), so a
     re-click or a second catalog install doesn't overwrite the first's tracked
     process/log while its git clone is still running."""
-    from hermes_cli.web_server_gateway import _ACTION_LOG_FILES
+    from eir_cli.web_server_gateway import _ACTION_LOG_FILES
     slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:48] or "server"
     digest = hashlib.sha1(name.encode()).hexdigest()[:8]
     action = f"mcp-install-{slug}-{digest}"
@@ -93,7 +93,7 @@ def _mcp_install_action_name(name: str) -> str:
 
 @router.get("/api/mcp/servers")
 async def list_mcp_servers(profile: Optional[str] = None):
-    from hermes_cli.mcp_config import _get_mcp_servers
+    from eir_cli.mcp_config import _get_mcp_servers
 
     def _read():
         config_servers = _get_mcp_servers()
@@ -109,8 +109,8 @@ async def list_mcp_servers(profile: Optional[str] = None):
 
 @router.post("/api/mcp/servers")
 async def add_mcp_server(body: MCPServerCreate, profile: Optional[str] = None):
-    from hermes_cli.mcp_catalog import record_mcp_install
-    from hermes_cli.mcp_config import _get_mcp_servers, _save_bearer_auth_token, _save_mcp_server
+    from eir_cli.mcp_catalog import record_mcp_install
+    from eir_cli.mcp_config import _get_mcp_servers, _save_bearer_auth_token, _save_mcp_server
 
     try:
         name, server_config, bearer_token = normalize_mcp_server_create(body)
@@ -162,7 +162,7 @@ async def replace_mcp_servers(body: MCPServersReplace, profile: Optional[str] = 
     """Replace the entire ``mcp_servers`` map (the mcp.json editor's save) —
     the deep-merging ``/api/config`` can never delete a key or drop an
     ``enabled: false``, so removals wouldn't persist through it."""
-    from hermes_cli.mcp_config import _replace_mcp_servers
+    from eir_cli.mcp_config import _replace_mcp_servers
 
     def _run():
         with config_write_scope(body.profile or profile):
@@ -182,7 +182,7 @@ async def replace_mcp_servers(body: MCPServersReplace, profile: Optional[str] = 
 
 @router.delete("/api/mcp/servers/{name}")
 async def remove_mcp_server(name: str, profile: Optional[str] = None):
-    from hermes_cli.mcp_config import _get_mcp_servers, _remove_mcp_server
+    from eir_cli.mcp_config import _get_mcp_servers, _remove_mcp_server
 
     def _run():
         with config_write_scope(profile):
@@ -204,7 +204,7 @@ async def remove_mcp_server(name: str, profile: Optional[str] = None):
 @router.post("/api/mcp/servers/{name}/test")
 async def test_mcp_server(name: str, profile: Optional[str] = None):
     """Connect to the server, list its tools, disconnect."""
-    from hermes_cli.mcp_config import _get_mcp_servers, _oauth_tokens_present, _probe_single_server
+    from eir_cli.mcp_config import _get_mcp_servers, _oauth_tokens_present, _probe_single_server
 
     def _read():
         config_servers = _get_mcp_servers()
@@ -228,7 +228,7 @@ async def test_mcp_server(name: str, profile: Optional[str] = None):
     try:  # probe blocks on a dedicated MCP event loop — keep it off the FastAPI loop
         tools, token_present = await asyncio.to_thread(_secret_scoped(profile, _probe))
     except Exception as exc:
-        from hermes_cli.mcp_config import redact_mcp_probe_text
+        from eir_cli.mcp_config import redact_mcp_probe_text
 
         return {"ok": False, "error": redact_mcp_probe_text(exc), "tools": []}
     if not token_present:
@@ -254,15 +254,15 @@ async def test_mcp_server(name: str, profile: Optional[str] = None):
 @router.post("/api/mcp/servers/{name}/auth")
 async def auth_mcp_server(name: str, request: Request, profile: Optional[str] = None):
     """Start MCP OAuth and hand the authorization URL to the dashboard browser."""
-    from hermes_cli.mcp_config import _get_mcp_servers
-    from hermes_constants import get_hermes_home
+    from eir_cli.mcp_config import _get_mcp_servers
+    from eir_constants import get_eir_home
     from tools.mcp_dashboard_oauth import DashboardOAuthFlow, exception_message
 
     _require_token(request)
     _gc_mcp_oauth_flows()
 
     def _home() -> str:
-        return str(get_hermes_home().expanduser().resolve(strict=False))
+        return str(get_eir_home().expanduser().resolve(strict=False))
 
     process_home = _home()
 
@@ -291,7 +291,7 @@ async def auth_mcp_server(name: str, request: Request, profile: Optional[str] = 
         flow_id=flow_id,
         server_name=name,
         profile=profile,
-        hermes_home=flow_home,
+        eir_home=flow_home,
         redirect_uri=(cfg.get("oauth") or {}).get("redirect_uri") or _mcp_oauth_callback_url(request, name),
         reconnect_live=flow_home == process_home,
     )
@@ -299,7 +299,7 @@ async def auth_mcp_server(name: str, request: Request, profile: Optional[str] = 
         live = [f for f in _mcp_oauth_flows.values() if not f.worker_done]
         if len(live) >= _MAX_PENDING_MCP_OAUTH_FLOWS:
             raise HTTPException(status_code=429, detail="Too many MCP OAuth flows are already in progress")
-        if any(f.server_name == name and f.hermes_home == flow_home for f in live):
+        if any(f.server_name == name and f.eir_home == flow_home for f in live):
             raise HTTPException(status_code=409, detail=f"MCP OAuth for '{name}' is already in progress")
         _mcp_oauth_flows[flow_id] = flow
     threading.Thread(target=_run_dashboard_mcp_oauth, args=(flow, cfg), daemon=True, name=f"mcp-oauth-{name}").start()
@@ -356,7 +356,7 @@ async def mcp_oauth_callback(
         None,
     )
     if flow is None:
-        return HTMLResponse("<h1>OAuth flow expired</h1><p>Return to Hermes and try again.</p>", status_code=404)
+        return HTMLResponse("<h1>OAuth flow expired</h1><p>Return to Eir and try again.</p>", status_code=404)
     try:
         flow.deliver_callback(code=code, state=state, error=error, iss=iss)
     except ValueError as exc:
@@ -365,8 +365,8 @@ async def mcp_oauth_callback(
             status_code=409 if "already received" in str(exc) else 400,
         )
     if error:
-        return HTMLResponse("<h1>Authorization failed</h1><p>Return to Hermes for details.</p>", status_code=400)
-    return HTMLResponse("<h1>Authorization received</h1><p>You can close this tab and return to Hermes.</p>")
+        return HTMLResponse("<h1>Authorization failed</h1><p>Return to Eir for details.</p>", status_code=400)
+    return HTMLResponse("<h1>Authorization received</h1><p>You can close this tab and return to Eir.</p>")
 
 
 @router.put("/api/mcp/servers/{name}/enabled")
@@ -442,7 +442,7 @@ async def list_mcp_catalog(profile: Optional[str] = None):
     """Browse the Nous-approved MCP catalog (optional-mcps/ manifests), each
     entry annotated with installed/enabled state for ``profile``."""
     with http_failure("mcp_catalog import failed", 500, "Catalog unavailable"):
-        from hermes_cli import mcp_catalog
+        from eir_cli import mcp_catalog
 
     entries = []
     try:
@@ -473,8 +473,8 @@ async def list_mcp_catalog(profile: Optional[str] = None):
 async def install_mcp_catalog_entry(body: MCPCatalogInstall, profile: Optional[str] = None):
     """Install a catalog MCP into config.yaml (declared env vars go to .env
     first; git-bootstrap entries run via the background CLI action path)."""
-    from hermes_cli import mcp_catalog
-    from hermes_cli.config import validate_env_var_name_for_write
+    from eir_cli import mcp_catalog
+    from eir_cli.config import validate_env_var_name_for_write
 
     name = (body.name or "").strip()
     entry = mcp_catalog.get_entry(name)
@@ -517,7 +517,7 @@ async def install_mcp_catalog_entry(body: MCPCatalogInstall, profile: Optional[s
     if entry.install is not None:
         action = _mcp_install_action_name(name)
         try:
-            _spawn_hermes_action(_profile_cli_args(effective_profile) + ["mcp", "install", name], action)
+            _spawn_eir_action(_profile_cli_args(effective_profile) + ["mcp", "install", name], action)
         except HTTPException:
             raise
         except Exception as exc:

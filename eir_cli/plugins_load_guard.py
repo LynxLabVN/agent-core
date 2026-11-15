@@ -1,10 +1,10 @@
-"""The abandoned-load guard behind :class:`hermes_cli.plugins.PluginContext`.
+"""The abandoned-load guard behind :class:`eir_cli.plugins.PluginContext`.
 
 A plugin's ``register()`` runs on a worker bounded by ``plugins.load_timeout_seconds``. When it
 overruns, the loader marks the context abandoned (``PluginContext._abandon_load``) and sweeps what it
 registered, but the worker thread may still be executing ``register()``; every registrar it reaches
 afterwards must be a no-op, or the late registration lands in registries the failure path already
-swept (#108139). ``hermes_cli.plugins`` applies :func:`ignore_registrars_after_abandoned_load` to
+swept (#108139). ``eir_cli.plugins`` applies :func:`ignore_registrars_after_abandoned_load` to
 ``PluginContext`` once, after its last registrar is defined.
 """
 
@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 from functools import wraps
 
-logger = logging.getLogger("hermes_cli.plugins")
+logger = logging.getLogger("eir_cli.plugins")
 
 
 def _ignore_after_abandoned_load(method):

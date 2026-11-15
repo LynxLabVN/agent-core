@@ -1,9 +1,9 @@
 """``PluginContext``: the ``ctx`` every plugin's ``register(ctx)`` receives.
 
-Import it from :mod:`hermes_cli.plugins` (the public path, re-exported there). Every name the method
-bodies read that ``hermes_cli.plugins`` also binds (functions, classes, constants, ``logger``,
+Import it from :mod:`eir_cli.plugins` (the public path, re-exported there). Every name the method
+bodies read that ``eir_cli.plugins`` also binds (functions, classes, constants, ``logger``,
 ``replacement_coordinator``, stdlib modules) is read from that facade at call time (``_facade()``), so
-a patch on ``hermes_cli.plugins.<name>`` reaches ctx methods as it did when the class lived there.
+a patch on ``eir_cli.plugins.<name>`` reaches ctx methods as it did when the class lived there.
 """
 
 from __future__ import annotations
@@ -13,25 +13,25 @@ from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Mapping, Optional
 
-from hermes_cli.plugins_capability_ctx import PluginCapabilityCtxMixin
-from hermes_cli.plugins_dispatch import DEFAULT_SYSTEM_PROMPT_SECTION_MAX_CHARS
-from hermes_cli.plugins_idle_tasks import PluginIdleTaskCtxMixin
-from hermes_cli.plugins_ledger import PluginRegistration
-from hermes_cli.plugins_load_guard import _ignore_after_abandoned_load, ignore_registrars_after_abandoned_load
-from hermes_cli.plugins_loader import _serialized_replacement
-from hermes_cli.plugins_manifest import PluginManifest
-from hermes_cli.plugins_registrars import register_scoped_provider, scoped_provider_registrar
-from hermes_cli.plugins_state import PluginState
+from eir_cli.plugins_capability_ctx import PluginCapabilityCtxMixin
+from eir_cli.plugins_dispatch import DEFAULT_SYSTEM_PROMPT_SECTION_MAX_CHARS
+from eir_cli.plugins_idle_tasks import PluginIdleTaskCtxMixin
+from eir_cli.plugins_ledger import PluginRegistration
+from eir_cli.plugins_load_guard import _ignore_after_abandoned_load, ignore_registrars_after_abandoned_load
+from eir_cli.plugins_loader import _serialized_replacement
+from eir_cli.plugins_manifest import PluginManifest
+from eir_cli.plugins_registrars import register_scoped_provider, scoped_provider_registrar
+from eir_cli.plugins_state import PluginState
 
 if TYPE_CHECKING:
-    from hermes_cli.plugins import PluginManager
+    from eir_cli.plugins import PluginManager
 
 _UNSET = object()
 
 
 def _facade():
-    """``hermes_cli.plugins``, late-imported (it imports this module)."""
-    import hermes_cli.plugins as facade
+    """``eir_cli.plugins``, late-imported (it imports this module)."""
+    import eir_cli.plugins as facade
     return facade
 
 
@@ -99,7 +99,7 @@ class PluginContext(PluginCapabilityCtxMixin, PluginIdleTaskCtxMixin):
         re-checks ``gateway.platform_actions`` (legacy ``plugins.entries.<id>.allow_platform_actions``,
         default OFF) and returns ``{"ok": bool, ...}`` — verbs never raise into hook dispatch; no adapter
         handles or raw SDK objects."""
-        from hermes_cli.platform_actions import PlatformActions
+        from eir_cli.platform_actions import PlatformActions
         return PlatformActions(self.plugin_id)
 
     def _wrong_type(self, obj: Any, base_class: type, label: str, article: str = "a") -> bool:
@@ -208,11 +208,11 @@ class PluginContext(PluginCapabilityCtxMixin, PluginIdleTaskCtxMixin):
 
     @property
     def profile_name(self) -> str:
-        """Active profile name (``"default"``, the ``~/.hermes/profiles/<name>`` id, or ``"custom"``),
-        derived from ``HERMES_HOME`` — not ``_cli_ref``, which is None outside the interactive CLI —
+        """Active profile name (``"default"``, the ``~/.eir/profiles/<name>`` id, or ``"custom"``),
+        derived from ``EIR_HOME`` — not ``_cli_ref``, which is None outside the interactive CLI —
         so gateway and kanban workers get it too."""
         try:
-            from hermes_cli.profiles import get_active_profile_name
+            from eir_cli.profiles import get_active_profile_name
             return get_active_profile_name()
         except Exception:
             return "default"
@@ -247,7 +247,7 @@ class PluginContext(PluginCapabilityCtxMixin, PluginIdleTaskCtxMixin):
         """Register a human approval transport, inactive until ``security.approval.transport:
         <name>`` selects it. It receives a redacted ``ApprovalRequest`` and returns only a
         correlated decision; policy and persistence stay host-owned. ``present_fn`` may be async."""
-        from hermes_cli.approval_transport import RegisteredApprovalTransport
+        from eir_cli.approval_transport import RegisteredApprovalTransport
         transports = self._manager._approval_transports
         clean = str(name).strip().lower()
         if clean == "builtin":
@@ -261,7 +261,7 @@ class PluginContext(PluginCapabilityCtxMixin, PluginIdleTaskCtxMixin):
             raise ValueError(f"approval transport {clean!r} is already registered by {owner!r}")
         entry = RegisteredApprovalTransport(
             name=clean, present=present_fn, plugin_id=self.plugin_id,
-            profile_home=str(_facade().get_hermes_home().resolve()),
+            profile_home=str(_facade().get_eir_home().resolve()),
         )
         _facade().logger.info("Plugin %s registered approval transport: %s", self.plugin_id, clean)
         # Duplicate names are rejected above, so there is never a displaced previous entry to restore;
@@ -367,7 +367,7 @@ class PluginContext(PluginCapabilityCtxMixin, PluginIdleTaskCtxMixin):
     def _mcp_allowlist(plugin_id: str) -> list[str]:
         """Operator-granted MCP server allowlist; missing/unreadable -> [] (default-deny)."""
         try:
-            from hermes_cli.config import load_config
+            from eir_cli.config import load_config
             cfg = load_config() or {}
         except Exception:
             return []
@@ -382,7 +382,7 @@ class PluginContext(PluginCapabilityCtxMixin, PluginIdleTaskCtxMixin):
         if self.manifest.source == "bundled":
             return True
         try:
-            from hermes_cli.config import load_config
+            from eir_cli.config import load_config
             with _facade()._plugin_home_scope(self._manager.home_path):
                 cfg = load_config() or {}
         except Exception:
@@ -400,34 +400,34 @@ class PluginContext(PluginCapabilityCtxMixin, PluginIdleTaskCtxMixin):
     ) -> bool:
         """Queue *content* for a session (``session_key``) or a chat in this plugin's own profile
         (``origin``); ``True`` means a host accepted it. Contract: plugins_injection.py, plugin docs."""
-        from hermes_cli.plugins_injection import inject_plugin_message
+        from eir_cli.plugins_injection import inject_plugin_message
         return inject_plugin_message(self, content, role, session_key=session_key, origin=origin)
 
     def session_cwd(self) -> str:
         """The calling session's recorded cwd, never the gateway's own (``plugin_session``)."""
-        from hermes_cli.plugin_session import context_cwd
+        from eir_cli.plugin_session import context_cwd
         return context_cwd(self._manager)
 
     def session_surface(self) -> str:
         """The calling session's client (``cli``/``tui``/``desktop``/``acp``) or messaging platform."""
-        from hermes_cli.plugin_session import context_surface
+        from eir_cli.plugin_session import context_surface
         return context_surface(self._manager)
 
     def post_message(self, text: str) -> Any:
         """Post *text* into the session bound to this call; the handle's ``edit(text)`` updates it in
         place. Never raises (``ok=False`` + ``error`` with no conversation): ``plugin_messages.py``."""
-        from hermes_cli.plugin_messages import post
+        from eir_cli.plugin_messages import post
         return post(self, text)
 
     async def apost_message(self, text: str) -> Any:
         """``post_message`` for async code on the gateway loop (edit with ``await handle.aedit``)."""
-        from hermes_cli.plugin_messages import apost
+        from eir_cli.plugin_messages import apost
         return await apost(self, text)
 
     def ask_choice(self, question: str, choices: list) -> Optional[str]:
         """From a sync slash-command handler: ask its user to pick one of *choices* (``str`` or
         ``{value, label?, description?}``); the value, or None if unanswerable: ``plugin_choices.py``."""
-        from hermes_cli.plugin_choices import ask_choice
+        from eir_cli.plugin_choices import ask_choice
         return ask_choice(question, choices)
 
     def _gateway_injection_allowed(self) -> bool:
@@ -445,7 +445,7 @@ class PluginContext(PluginCapabilityCtxMixin, PluginIdleTaskCtxMixin):
         self, name: str, help: str, setup_fn: Callable, handler_fn: Callable | None = None,
         description: str = "",
     ) -> PluginRegistration:
-        """Register a CLI subcommand (``hermes <name> ...``). *setup_fn* receives the argparse
+        """Register a CLI subcommand (``eir <name> ...``). *setup_fn* receives the argparse
         subparser; *handler_fn* becomes ``set_defaults(func=...)``."""
         entry = {
             "name": name, "help": help, "description": description, "setup_fn": setup_fn,
@@ -467,7 +467,7 @@ class PluginContext(PluginCapabilityCtxMixin, PluginIdleTaskCtxMixin):
             _facade().logger.warning("Plugin '%s' tried to register a command with an empty name.", self.manifest.name)
             return
         with _facade().suppress(Exception):  # reject if it conflicts with a built-in command
-            from hermes_cli.commands import resolve_command
+            from eir_cli.commands import resolve_command
             if resolve_command(clean) is not None:
                 _facade().logger.warning("Plugin '%s' tried to register command '/%s' which conflicts "
                                          "with a built-in command. Skipping.", self.manifest.name, clean)
@@ -543,14 +543,14 @@ class PluginContext(PluginCapabilityCtxMixin, PluginIdleTaskCtxMixin):
 
     @_serialized_replacement
     def register_dashboard_auth_provider(self, provider) -> Optional[PluginRegistration]:
-        """Register a :class:`hermes_cli.dashboard_auth.DashboardAuthProvider` for the dashboard
+        """Register a :class:`eir_cli.dashboard_auth.DashboardAuthProvider` for the dashboard
         auth gate (non-loopback bind without ``--insecure``). Wrong type / duplicate name warn and
         are ignored, never raised."""
-        from hermes_cli.dashboard_auth import DashboardAuthProvider
-        from hermes_cli.dashboard_auth.registry import register_global_provider, unregister_global_provider
+        from eir_cli.dashboard_auth import DashboardAuthProvider
+        from eir_cli.dashboard_auth.registry import register_global_provider, unregister_global_provider
         if self._wrong_type(provider, DashboardAuthProvider, "dashboard-auth provider"):
             return
-        launch_scope = _facade().hermes_home_key(_facade().get_process_hermes_home())
+        launch_scope = _facade().eir_home_key(_facade().get_process_eir_home())
         if self._manager.scope_key != launch_scope:
             _facade().logger.warning(
                 "Plugin '%s' tried to register dashboard-auth provider %r "
@@ -674,7 +674,7 @@ class PluginContext(PluginCapabilityCtxMixin, PluginIdleTaskCtxMixin):
         with ``plugins.entries.<id>.llm.allow_task_override``. An unknown or self-referential
         ``inherit_from`` logs a warning and registers the task without inheritance.
         Raises ``ValueError`` for an empty/invalid key, a built-in key, or another plugin's key."""
-        from hermes_cli.plugins_aux_tasks import build_auxiliary_task_entry
+        from eir_cli.plugins_aux_tasks import build_auxiliary_task_entry
         existing = self._manager._aux_tasks.get(key)
         entry = build_auxiliary_task_entry(
             self.manifest.name, self.plugin_id, key, display_name=display_name, description=description,
@@ -698,7 +698,7 @@ class PluginContext(PluginCapabilityCtxMixin, PluginIdleTaskCtxMixin):
         return count
 
     def redact_text(self, text: str, *, force: bool = False) -> str:
-        """Return *text* with credentials replaced by Hermes's non-reusable sentinel (``«redacted:sk-…»``,
+        """Return *text* with credentials replaced by Eir's non-reusable sentinel (``«redacted:sk-…»``,
         no key characters), credential assignments masked, and URL credentials (userinfo and
         credential-named query params) removed, since a stored or uploaded link would otherwise still
         work. Honours ``security.redact_secrets`` unless ``force``; use ``force=True`` for text that
@@ -763,7 +763,7 @@ class PluginContext(PluginCapabilityCtxMixin, PluginIdleTaskCtxMixin):
 
     def register_session_env(self, names, resolver: Callable[[str], Any]) -> PluginRegistration:
         """Each session's tool subprocesses get ``resolver(session_id)``'s ``names``, resolved at spawn."""
-        from hermes_cli.plugins_session_env import register_session_env
+        from eir_cli.plugins_session_env import register_session_env
         release = register_session_env(self._manager.scope_key, names, resolver, owner=self.plugin_id)
         return self._track("session_env", getattr(resolver, "__qualname__", "resolver"), release)
 
@@ -809,7 +809,7 @@ class PluginContext(PluginCapabilityCtxMixin, PluginIdleTaskCtxMixin):
 
     def emit(self, event: str, payload: Optional[dict] = None) -> int:
         """Publish bare *event* as ``<plugin_key>:<event>`` (namespace FORCED to this plugin); return
-        the subscriber count scheduled. Any ``':'`` in the name (``hermes:x`` is reserved for core,
+        the subscriber count scheduled. Any ``':'`` in the name (``eir:x`` is reserved for core,
         foreign namespaces forbidden) raises ``ValueError``. Delivery is fire-and-forget via a
         single-worker queue: order preserved, a blocking subscriber cannot stall the emitter."""
         plugin_key = self.plugin_id
@@ -820,9 +820,9 @@ class PluginContext(PluginCapabilityCtxMixin, PluginIdleTaskCtxMixin):
             _facade().logger.warning("Plugin '%s' tried to emit namespaced/reserved event '%s' — a plugin may only emit "
                                      "bare event names under its own '%s:' namespace (the '%s:' prefix is reserved "
                                      "for core, and foreign namespaces are forbidden)",
-                                     plugin_key, event, plugin_key, _facade().HERMES_EVENT_NAMESPACE)
+                                     plugin_key, event, plugin_key, _facade().EIR_EVENT_NAMESPACE)
             raise ValueError(f"Plugin '{plugin_key}' may not emit '{event}': emit only the bare event name; "
-                             f"the namespace is forced to '{plugin_key}:' and the '{_facade().HERMES_EVENT_NAMESPACE}:' "
+                             f"the namespace is forced to '{plugin_key}:' and the '{_facade().EIR_EVENT_NAMESPACE}:' "
                              f"prefix is reserved for core")
         if payload is not None and not isinstance(payload, dict):
             raise TypeError(f"Plugin '{plugin_key}' emit() payload must be a dict or None")
@@ -836,8 +836,8 @@ class PluginContext(PluginCapabilityCtxMixin, PluginIdleTaskCtxMixin):
         self._manager._subscribe_event(self.plugin_id, event, callback)
         _facade().logger.debug("Plugin %s subscribed to event: %s", self.manifest.name, event)
 
-    from hermes_cli.plugins_content import register_automation_blueprint, register_skill
-    from hermes_cli.plugin_rpc import emit_to_session, register_rpc
+    from eir_cli.plugins_content import register_automation_blueprint, register_skill
+    from eir_cli.plugin_rpc import emit_to_session, register_rpc
 
     # -- scoped provider registrars ----------------------------------------------------------------
     # One method per row of plugins_registrars.py's table, which also holds each method's docstring.

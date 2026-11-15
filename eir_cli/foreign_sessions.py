@@ -15,7 +15,7 @@ from pathlib import Path
 from stat import S_ISREG
 from typing import Any, Dict, List, Optional, Tuple
 
-from hermes_state_ids import new_session_id
+from eir_state_ids import new_session_id
 
 # User-message texts that are really injected context wrappers, not typed input.
 _WRAPPER_TAG_RE = re.compile(
@@ -231,8 +231,8 @@ def _list_sessions(source: str, root: Optional[Path]) -> list[ForeignSession]:
 
 def import_foreign_session(source: str, path) -> str:
     """Import one foreign session through the gateway's ``session.mutate import`` (the gateway is the
-    only state.db writer, #106742); returns the new Hermes session id. The row lands as an ordinary
-    ``cli`` session bound to this importer, so ``hermes --resume`` continues it writable.
+    only state.db writer, #106742); returns the new Eir session id. The row lands as an ordinary
+    ``cli`` session bound to this importer, so ``eir --resume`` continues it writable.
 
     Raises ``ValueError`` on unknown source or a session with no usable conversation turns, and
     ``GatewayClientError`` (a ``ValueError``) when the gateway refuses the import."""
@@ -249,8 +249,8 @@ def import_foreign_session(source: str, path) -> str:
     first_user = _first_user_line([(t["role"], t["content"]) for t in turns]) or path.stem
     if len(first_user) > _TITLE_MAX:
         first_user = first_user[: _TITLE_MAX - 1] + "…"
-    from hermes_cli.gateway_client import GatewayClientError
-    from hermes_cli.gateway_session_store import session_store
+    from eir_cli.gateway_client import GatewayClientError
+    from eir_cli.gateway_session_store import session_store
     store = session_store()
     session_id = new_session_id()
     cwd = parsed.get("cwd")
@@ -288,7 +288,7 @@ def pick_foreign_session(source: Optional[str] = None, *, limit: int = 25) -> Op
         print(f"  {i:>2}. {datetime.fromtimestamp(s.mtime):%Y-%m-%d %H:%M}  {s.label}{ws}  [{s.turn_count} turns]")
     if not sys.stdin.isatty():
         print("Non-interactive terminal — pass the file path directly:\n"
-              "  hermes sessions import --from claude|codex <path>")
+              "  eir sessions import --from claude|codex <path>")
         return None
     try:
         raw = input(f"Import which session? [1-{len(sessions)}, empty to cancel] ").strip()
@@ -306,7 +306,7 @@ def pick_foreign_session(source: Optional[str] = None, *, limit: int = 25) -> Op
 
 
 def run_sessions_import(args) -> Optional[str]:
-    """`hermes sessions import` entry point. Returns new session id or None."""
+    """`eir sessions import` entry point. Returns new session id or None."""
     source = getattr(args, "from_source", None)
     path = getattr(args, "path", None)
     if path:
@@ -334,5 +334,5 @@ def run_sessions_import(args) -> Optional[str]:
         print(f"Error: {e}")
         return None
     print(f"✓ Imported {_SOURCE_LABELS.get(source, source)} session as {session_id}")
-    print(f"  Continue it with:  hermes --resume {session_id}")
+    print(f"  Continue it with:  eir --resume {session_id}")
     return session_id

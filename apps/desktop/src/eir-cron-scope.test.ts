@@ -12,26 +12,26 @@ import {
   setApiRequestProfile,
   triggerCronJob,
   updateCronJob
-} from './hermes'
+} from './eir'
 
 // Contract: every cron helper must carry the active gateway profile, so a
 // multi-profile / remote user's cron list, runs, and mutations hit the backend
 // they're actually on — not the primary/default. Without it, selecting a remote
 // profile still showed the local primary's jobs (the "remote cron jobs don't
 // show up" bug), the counterpart to the backend-action-helper fix in
-// hermes-profile-scope.test.ts.
+// eir-profile-scope.test.ts.
 describe('cron helpers are profile-scoped', () => {
   const api = vi.fn(async (_req: { path: string; profile?: string }) => ({}) as never)
 
   beforeEach(() => {
-    ;(window as { hermesDesktop?: unknown }).hermesDesktop = { api }
+    ;(window as { eirDesktop?: unknown }).eirDesktop = { api }
     api.mockClear()
   })
 
   afterEach(() => {
     setApiRequestProfile(null)
     setApiRequestConnection(null)
-    delete (window as { hermesDesktop?: unknown }).hermesDesktop
+    delete (window as { eirDesktop?: unknown }).eirDesktop
   })
 
   const lastProfile = () => api.mock.calls.at(-1)?.[0].profile
@@ -121,14 +121,14 @@ describe('cron run rows carry their owning connection', () => {
   const api = vi.fn(async () => ({ runs: [{ ...run }] }))
 
   beforeEach(() => {
-    ;(window as { hermesDesktop?: unknown }).hermesDesktop = { api }
+    ;(window as { eirDesktop?: unknown }).eirDesktop = { api }
     api.mockClear()
   })
 
   afterEach(() => {
     setApiRequestProfile(null)
     setApiRequestConnection(null)
-    delete (window as { hermesDesktop?: unknown }).hermesDesktop
+    delete (window as { eirDesktop?: unknown }).eirDesktop
   })
 
   it('stamps the active registry connection onto every run row', async () => {

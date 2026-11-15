@@ -27,13 +27,13 @@ from xml.etree import ElementTree
 from xml.sax.saxutils import escape
 
 from agent.deadline import poll_until
-from hermes_cli._subprocess_compat import (
+from eir_cli._subprocess_compat import (
     _WINDOWS_GATEWAY_BREAKAWAY_ENV,
     windows_detach_flags,
     windows_detach_flags_without_breakaway,
     windows_hide_flags,
 )
-from hermes_cli._startup_fast import project_root_str
+from eir_cli._startup_fast import project_root_str
 
 logger = logging.getLogger(__name__)
 
@@ -56,8 +56,8 @@ _ACCESS_DENIED_PATTERN = re.compile(rf"({_ACCESS_DENIED_WORDS})", re.IGNORECASE)
 # shell exits. Dict (not bare bool) so the flag is mutable without ``global``.
 _LAST_SPAWN_BREAKAWAY_FALLBACK: dict = {"fallback": False}
 
-_TASK_NAME_DEFAULT = "Hermes_Gateway"
-_TASK_DESCRIPTION = "Hermes Agent Gateway - Messaging Platform Integration"
+_TASK_NAME_DEFAULT = "Eir_Gateway"
+_TASK_DESCRIPTION = "Eir Agent Gateway - Messaging Platform Integration"
 _TASK_LOGON_DELAY = "PT30S"
 _TASK_RESTART_INTERVAL = "PT1M"
 _TASK_RESTART_COUNT = 999
@@ -70,13 +70,13 @@ _TASK_RESTART_COUNT = 999
 _LAUNCHER_FATAL_CONFIG_EXIT = "If code = 78 Then code = 0"
 
 
-def _launcher_owned_exit_line(hermes_home: str) -> str:
-    from hermes_cli.gateway_runtime_service_identity import launcher_pid_file
+def _launcher_owned_exit_line(eir_home: str) -> str:
+    from eir_cli.gateway_runtime_service_identity import launcher_pid_file
     return (f'If code = 1 And CreateObject("Scripting.FileSystemObject").FileExists('
-            f'{_quote_vbs_string(launcher_pid_file(hermes_home))}) Then code = 0')
+            f'{_quote_vbs_string(launcher_pid_file(eir_home))}) Then code = 0')
 
 
-_GATEWAY_ENV = (("PYTHONIOENCODING", "utf-8"), ("HERMES_GATEWAY_DETACHED", "1"), ("HERMES_SUPERVISED_CHILD", "1"))
+_GATEWAY_ENV = (("PYTHONIOENCODING", "utf-8"), ("EIR_GATEWAY_DETACHED", "1"), ("EIR_SUPERVISED_CHILD", "1"))
 
 
 def _schtasks_encoding() -> str:
@@ -132,44 +132,44 @@ def _assert_windows() -> None:
         raise RuntimeError("gateway_windows is Windows-only")
 
 
-def _hermes_home() -> Path:
-    from hermes_cli.config import get_hermes_home
+def _eir_home() -> Path:
+    from eir_cli.config import get_eir_home
 
-    return Path(get_hermes_home())
+    return Path(get_eir_home())
 
 
-def hermes_service_roots() -> tuple[str, ...]:
-    """Directories a Hermes-owned SCM service binary lives under: the checkout (its ``venv`` included),
-    the running interpreter's ``Scripts`` dir (``hermes.exe`` shim) and the ``gateway-service`` launcher dir."""
+def eir_service_roots() -> tuple[str, ...]:
+    """Directories a Eir-owned SCM service binary lives under: the checkout (its ``venv`` included),
+    the running interpreter's ``Scripts`` dir (``eir.exe`` shim) and the ``gateway-service`` launcher dir."""
     project_root = Path(project_root_str())
-    return (str(project_root), str(Path(sys.executable).parent), str(_hermes_home() / "gateway-service"))
+    return (str(project_root), str(Path(sys.executable).parent), str(_eir_home() / "gateway-service"))
 
 
 def _normalize_windows_path(value: str) -> str:
     return value.strip().lstrip('"').replace("\\", "/").rstrip("/").casefold()
 
 
-def hermes_owns_windows_service(name: str, binpath: str, hermes_roots: tuple[str, ...]) -> bool:
-    """Positive ownership of an SCM service: Hermes-named (``hermes*``) or its binary path starts under a
-    Hermes root. Pure so it is testable off-Windows. A Scheduled-Task-launched gateway descends from
+def eir_owns_windows_service(name: str, binpath: str, eir_roots: tuple[str, ...]) -> bool:
+    """Positive ownership of an SCM service: Eir-named (``eir*``) or its binary path starts under a
+    Eir root. Pure so it is testable off-Windows. A Scheduled-Task-launched gateway descends from
     ``svchost.exe`` hosting ``Schedule``; without this gate the updater took Task Scheduler for the
     gateway's supervisor and ``sc.exe stop Schedule`` aborted every update (#97208)."""
     normalized_name = "".join(char for char in name.casefold() if char.isalnum())
-    if normalized_name.startswith("hermes"):
+    if normalized_name.startswith("eir"):
         return True
     candidate = _normalize_windows_path(binpath)
-    return any(candidate.startswith(_normalize_windows_path(root) + "/") for root in hermes_roots if root)
+    return any(candidate.startswith(_normalize_windows_path(root) + "/") for root in eir_roots if root)
 
 
-def _preserve_hermes_home_path(path: str | Path) -> str:
-    r"""Render Hermes-owned paths under the configured HERMES_HOME spelling.
+def _preserve_eir_home_path(path: str | Path) -> str:
+    r"""Render Eir-owned paths under the configured EIR_HOME spelling.
 
-    ``%LOCALAPPDATA%\hermes`` may be a symlink/junction to another drive; launcher files must not
-    bake in the resolved target for paths under HERMES_HOME.
+    ``%LOCALAPPDATA%\eir`` may be a symlink/junction to another drive; launcher files must not
+    bake in the resolved target for paths under EIR_HOME.
     """
     candidate = Path(path)
     try:
-        home = _hermes_home()
+        home = _eir_home()
         resolved_home = home.resolve()
         resolved_candidate = candidate.resolve()
         home_key = os.path.normcase(str(resolved_home))
@@ -243,13 +243,13 @@ def _is_running_as_admin() -> bool:
     """Return True when the current Windows process is elevated (the shared ``TokenElevation``
     probe; ``IsUserAnAdmin`` is deprecated and answered the same question a second way)."""
     _assert_windows()
-    from hermes_dir_acl import process_is_elevated
+    from eir_dir_acl import process_is_elevated
     return process_is_elevated()
 
 
 def _current_profile_cli_args() -> list[str]:
-    """Return CLI args that preserve the current Hermes profile."""
-    from hermes_cli.gateway import _profile_arg
+    """Return CLI args that preserve the current Eir profile."""
+    from eir_cli.gateway import _profile_arg
 
     profile_arg = _profile_arg()
     return shlex.split(profile_arg) if profile_arg else []
@@ -264,7 +264,7 @@ def _launch_elevated_gateway_command(command: str, extra_args: list[str] | None 
     All operator decisions are already collected in the parent shell before this point. See #54220, #56747.
     """
     _assert_windows()
-    args = ["-m", "hermes_cli.main", *_current_profile_cli_args(), "gateway", command, *(extra_args or [])]
+    args = ["-m", "eir_cli.main", *_current_profile_cli_args(), "gateway", command, *(extra_args or [])]
     params = subprocess.list2cmdline(args)
     cwd = project_root_str()
     try:
@@ -280,13 +280,13 @@ def _launch_elevated_gateway_command(command: str, extra_args: list[str] | None 
 
 def _launch_elevated_install(force: bool = False, *, start_now: bool | None = None, start_on_login: bool | None = None) -> bool:
     """Launch an elevated gateway install via UAC and return True on handoff."""
-    overrides = {"HERMES_GATEWAY_ELEVATED_HANDOFF": "1"}
+    overrides = {"EIR_GATEWAY_ELEVATED_HANDOFF": "1"}
     extra_args = ["--elevated-handoff"]
     if force:
         extra_args.append("--force")
     for choice, env_key, flag in (
-        (start_now, "HERMES_GATEWAY_INSTALL_START_NOW", "start-now"),
-        (start_on_login, "HERMES_GATEWAY_INSTALL_START_ON_LOGIN", "start-on-login"),
+        (start_now, "EIR_GATEWAY_INSTALL_START_NOW", "start-now"),
+        (start_on_login, "EIR_GATEWAY_INSTALL_START_ON_LOGIN", "start-on-login"),
     ):
         if choice is not None:
             overrides[env_key] = "1" if choice else "0"
@@ -308,7 +308,7 @@ def _launch_elevated_install(force: bool = False, *, start_now: bool | None = No
 def get_task_name() -> str:
     """Scheduled Task name, scoped per profile."""
     _assert_windows()
-    from hermes_cli.gateway import _profile_suffix  # local: avoids circular init during boot
+    from eir_cli.gateway import _profile_suffix  # local: avoids circular init during boot
 
     suffix = _profile_suffix()
     return f"{_TASK_NAME_DEFAULT}_{suffix}" if suffix else _TASK_NAME_DEFAULT
@@ -320,10 +320,10 @@ def _sanitize_filename(value: str) -> str:
 
 
 def get_task_script_path() -> Path:
-    """The generated ``gateway.cmd`` wrapper under ``<HERMES_HOME>/gateway-service/`` (per-profile
+    """The generated ``gateway.cmd`` wrapper under ``<EIR_HOME>/gateway-service/`` (per-profile
     installs stay self-contained); the VBS launcher lives beside it."""
     _assert_windows()
-    script_dir = _hermes_home() / "gateway-service"
+    script_dir = _eir_home() / "gateway-service"
     script_dir.mkdir(parents=True, exist_ok=True)
     return script_dir / f"{_sanitize_filename(get_task_name())}.cmd"
 
@@ -354,12 +354,12 @@ def _startup_staging_path() -> Path:
 
 
 def _stable_gateway_working_dir(project_root: Path, home: Path | None = None) -> str:
-    """Stable cwd for detached/startup runs: anchor at ``home`` (default HERMES_HOME) when it exists (mirrors
+    """Stable cwd for detached/startup runs: anchor at ``home`` (default EIR_HOME) when it exists (mirrors
     the POSIX service invariant) so a moved checkout/worktree can't fail the ``cd`` step; else the checkout."""
-    from hermes_cli.config import get_hermes_home
+    from eir_cli.config import get_eir_home
 
     try:
-        home = home if home is not None else get_hermes_home()
+        home = home if home is not None else get_eir_home()
         if home and Path(home).is_dir():
             return str(Path(home))
     except Exception:
@@ -370,8 +370,8 @@ def _stable_gateway_working_dir(project_root: Path, home: Path | None = None) ->
 # ── Script rendering
 
 def _gateway_run_argv(python_exe: str, profile_arg: str) -> list[str]:
-    """``python -m hermes_cli.main [--profile X] gateway run`` — shared by every launcher renderer."""
-    argv = [python_exe, "-m", "hermes_cli.main"]
+    """``python -m eir_cli.main [--profile X] gateway run`` — shared by every launcher renderer."""
+    argv = [python_exe, "-m", "eir_cli.main"]
     if profile_arg:
         argv.extend(profile_arg.split())
     argv.extend(["gateway", "run"])
@@ -379,27 +379,27 @@ def _gateway_run_argv(python_exe: str, profile_arg: str) -> list[str]:
 
 
 def _launcher_settings(home: Path | None = None) -> tuple[str, str, str, str]:
-    """Return (python_path, working_dir, hermes_home, profile_arg) for generated launchers.
-    ``home`` targets another profile's HERMES_HOME (per-profile cold-start, #110959)."""
-    from hermes_cli.gateway import PROJECT_ROOT, _profile_arg, get_python_path  # avoid circular init
+    """Return (python_path, working_dir, eir_home, profile_arg) for generated launchers.
+    ``home`` targets another profile's EIR_HOME (per-profile cold-start, #110959)."""
+    from eir_cli.gateway import PROJECT_ROOT, _profile_arg, get_python_path  # avoid circular init
 
-    hermes_home = str(home if home is not None else _hermes_home())
+    eir_home = str(home if home is not None else _eir_home())
     return (
-        _preserve_hermes_home_path(get_python_path()),
+        _preserve_eir_home_path(get_python_path()),
         _stable_gateway_working_dir(PROJECT_ROOT, home),
-        hermes_home,
-        _profile_arg(hermes_home),
+        eir_home,
+        _profile_arg(eir_home),
     )
 
 
 def _launcher_pythonpath_entries(extra_pythonpath: list[str]) -> list[str]:
     return [
-        _preserve_hermes_home_path(Path(project_root_str())),
-        *[_preserve_hermes_home_path(entry) for entry in extra_pythonpath],
+        _preserve_eir_home_path(Path(project_root_str())),
+        *[_preserve_eir_home_path(entry) for entry in extra_pythonpath],
     ]
 
 
-def _build_gateway_cmd_script(python_path: str, working_dir: str, hermes_home: str, profile_arg: str) -> str:
+def _build_gateway_cmd_script(python_path: str, working_dir: str, eir_home: str, profile_arg: str) -> str:
     """Build the ``gateway.cmd`` wrapper (CRLF-terminated). No PATH overrides (rewriting PATH breaks
     Homebrew/nvm-style installs), no ``start`` (extra wrapper process muddles lifecycle/status), no
     ``--replace`` (repeated /Run calls must be idempotent, not takeover loops)."""
@@ -409,10 +409,10 @@ def _build_gateway_cmd_script(python_path: str, working_dir: str, hermes_home: s
         "@echo off",
         f"rem {_TASK_DESCRIPTION}",
         f"cd /d {_quote_cmd_script_arg(working_dir)}",
-        f'set "HERMES_HOME={hermes_home}"',
+        f'set "EIR_HOME={eir_home}"',
         *[f'set "{k}={v}"' for k, v in _GATEWAY_ENV],
         # VIRTUAL_ENV lets the gateway's own python detection find the venv.
-        f'set "VIRTUAL_ENV={_preserve_hermes_home_path(venv_dir)}"',
+        f'set "VIRTUAL_ENV={_preserve_eir_home_path(venv_dir)}"',
         f'set "PYTHONPATH={pythonpath}"',
         " ".join(_quote_cmd_script_arg(a) for a in _gateway_run_argv(python_exe_path, profile_arg)),
         "exit /b 0",
@@ -420,7 +420,7 @@ def _build_gateway_cmd_script(python_path: str, working_dir: str, hermes_home: s
     return "\r\n".join(lines) + "\r\n"
 
 
-def _build_gateway_vbs_script(python_path: str, working_dir: str, hermes_home: str, profile_arg: str) -> str:
+def _build_gateway_vbs_script(python_path: str, working_dir: str, eir_home: str, profile_arg: str) -> str:
     """Build the hidden-console ``gateway.vbs`` launcher (CRLF-terminated).
 
     Run via ``wscript.exe``, not ``cmd.exe``: at logon Windows broadcasts CTRL_CLOSE_EVENT to console
@@ -448,9 +448,9 @@ def _build_gateway_vbs_script(python_path: str, working_dir: str, hermes_home: s
         "Dim sh, env, existing_pp, code",
         'Set sh = CreateObject("WScript.Shell")',
         'Set env = sh.Environment("PROCESS")',
-        f"env.Item({q('HERMES_HOME')}) = {q(hermes_home)}",
+        f"env.Item({q('EIR_HOME')}) = {q(eir_home)}",
         *[f"env.Item({q(k)}) = {q(v)}" for k, v in _GATEWAY_ENV],
-        f"env.Item({q('VIRTUAL_ENV')}) = {q(_preserve_hermes_home_path(venv_dir))}",
+        f"env.Item({q('VIRTUAL_ENV')}) = {q(_preserve_eir_home_path(venv_dir))}",
         # Mirror the cmd wrapper's ``PYTHONPATH=<static>;%PYTHONPATH%`` at runtime.
         f"existing_pp = env.Item({q('PYTHONPATH')})",
         "If Len(existing_pp) > 0 Then",
@@ -464,7 +464,7 @@ def _build_gateway_vbs_script(python_path: str, working_dir: str, hermes_home: s
         # that returned at once ended the task "successfully" before the gateway could ever fail.
         f"code = sh.Run({q(command_line)}, 0, True)",
         _LAUNCHER_FATAL_CONFIG_EXIT,
-        _launcher_owned_exit_line(hermes_home),
+        _launcher_owned_exit_line(eir_home),
         "WScript.Quit code",
     ]
     return "\r\n".join(lines) + "\r\n"
@@ -520,11 +520,11 @@ def refresh_dead_launcher(home: Path, task_name: str) -> bool:
     """Re-render ``home``'s launcher when the interpreter it runs no longer exists; True if rewritten.
 
     A Store update replaces the versioned payload folder that interpreter lived in, and a Store
-    install has no ``hermes update`` to re-render it, so the task and the Startup entry kept running a
+    install has no ``eir update`` to re-render it, so the task and the Startup entry kept running a
     dead launcher (#150448). Only a launcher this installer wrote for ``home`` is touched, and only
     its files: the task and the Startup entry already point at them.
     """
-    from hermes_cli.gateway_runtime_service_identity import _vbs_identity, launcher_text, read_definition
+    from eir_cli.gateway_runtime_service_identity import _vbs_identity, launcher_text, read_definition
 
     vbs = home / "gateway-service" / f"{_sanitize_filename(task_name)}.vbs"
     try:
@@ -573,11 +573,11 @@ def _atomic_write(path: Path, content: str, tmp: Path, *, encoding: str = "utf-8
 
     The staging file is removed even when the rename fails: the Startup-folder caller stages
     inside the Startup folder itself, and Windows opens every file there at login — a leftover
-    ``Hermes_Gateway.tmp`` pops up in Notepad after every sign-in (#114093).
+    ``Eir_Gateway.tmp`` pops up in Notepad after every sign-in (#114093).
 
     ``.vbs`` launchers pass ``utf-16`` (BOM included): Windows Script Host decodes a BOM-less script
     with the ANSI code page, so a non-ASCII install path reached python as mojibake, ``PYTHONPATH``
-    no longer imported ``hermes_cli`` and every task or Startup start died before logging a line.
+    no longer imported ``eir_cli`` and every task or Startup start died before logging a line.
     """
     try:
         tmp.write_text(content, encoding=encoding, newline="")
@@ -810,12 +810,12 @@ def _build_gateway_argv(home: Path | None = None) -> tuple[list[str], str, dict[
     """Build (argv, working_dir, env_overlay) for the gateway subprocess — the same logical command
     as gateway.cmd, assembled as a native argv so no cmd.exe layer sits in between."""
     _assert_windows()
-    from hermes_cli.gateway import PROJECT_ROOT
+    from eir_cli.gateway import PROJECT_ROOT
 
-    python_path, working_dir, hermes_home, profile_arg = _launcher_settings(home)
+    python_path, working_dir, eir_home, profile_arg = _launcher_settings(home)
     python_exe, venv_dir, extra_pythonpath = _resolve_detached_python(python_path)
-    env_overlay = {"HERMES_HOME": hermes_home, **dict(_GATEWAY_ENV), "VIRTUAL_ENV": _preserve_hermes_home_path(venv_dir)}
-    _prepend_pythonpath(env_overlay, [_preserve_hermes_home_path(p) for p in (PROJECT_ROOT, *extra_pythonpath)])
+    env_overlay = {"EIR_HOME": eir_home, **dict(_GATEWAY_ENV), "VIRTUAL_ENV": _preserve_eir_home_path(venv_dir)}
+    _prepend_pythonpath(env_overlay, [_preserve_eir_home_path(p) for p in (PROJECT_ROOT, *extra_pythonpath)])
     return _gateway_run_argv(python_exe, profile_arg), working_dir, env_overlay
 
 
@@ -828,14 +828,14 @@ def windowless_gateway_restart_spec(run_argv: list[str], home: str | None = None
     flags, so the respawned gateway owns a single hidden console that all of its descendants inherit —
     nothing flashes (#54220/#56747; the old pythonw.exe rewrite here produced a console-less gateway whose
     every console-subsystem child allocated a visible conhost). This helper now only normalizes the
-    interpreter via ``_resolve_detached_python`` and supplies the stable cwd + env overlay (HERMES_HOME,
+    interpreter via ``_resolve_detached_python`` and supplies the stable cwd + env overlay (EIR_HOME,
     VIRTUAL_ENV, PYTHONPATH) so the respawn doesn't depend on the watcher's transient working directory.
-    ``HERMES_HOME`` is ``home`` when given: a replayed selectorless argv runs on whatever home its
+    ``EIR_HOME`` is ``home`` when given: a replayed selectorless argv runs on whatever home its
     environment names, so the paused runtime's home, not the updater's, must come back.
     """
     if not run_argv or sys.platform != "win32":
         return run_argv, "", {}
-    from hermes_cli.gateway import PROJECT_ROOT
+    from eir_cli.gateway import PROJECT_ROOT
 
     try:
         hidden_console_python, venv_dir, extra_pythonpath = _resolve_detached_python(run_argv[0])
@@ -843,12 +843,12 @@ def windowless_gateway_restart_spec(run_argv: list[str], home: str | None = None
         return run_argv, "", {}
 
     try:
-        hermes_home = str(Path(home or _hermes_home()).resolve())
+        eir_home = str(Path(home or _eir_home()).resolve())
     except Exception:
-        hermes_home = ""
-    env_overlay: dict[str, str] = {"PYTHONIOENCODING": "utf-8", "HERMES_GATEWAY_DETACHED": "1", "VIRTUAL_ENV": str(venv_dir)}
-    if hermes_home:
-        env_overlay["HERMES_HOME"] = hermes_home
+        eir_home = ""
+    env_overlay: dict[str, str] = {"PYTHONIOENCODING": "utf-8", "EIR_GATEWAY_DETACHED": "1", "VIRTUAL_ENV": str(venv_dir)}
+    if eir_home:
+        env_overlay["EIR_HOME"] = eir_home
     _prepend_pythonpath(env_overlay, [str(PROJECT_ROOT), *extra_pythonpath])
     return [hidden_console_python, *run_argv[1:]], _stable_gateway_working_dir(PROJECT_ROOT), env_overlay
 
@@ -872,12 +872,12 @@ def _spawn_detached(script_path: Path | None = None, home: Path | None = None) -
     from tools.environments.local import served_profile_child_env
     # home=None is this process's own gateway, not a forced jump to the default root.
     # served_profile_child_env overlays that home's secrets instead of os.environ.copy().
-    target = home if home is not None else _hermes_home()
+    target = home if home is not None else _eir_home()
     env = {**served_profile_child_env(target_home=target, inherit_credentials=True), **env_overlay}
 
     # Stray print()/native stderr goes to a sidecar log; real gateway logs still land in gateway.log
     # via the logging FileHandler.
-    log_dir = _hermes_home() / "logs"
+    log_dir = _eir_home() / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     stray_log = log_dir / "gateway-stdio.log"
 
@@ -906,7 +906,7 @@ def _spawn_detached(script_path: Path | None = None, home: Path | None = None) -
 
 def _stdin_is_interactive(*, isatty: bool, console_mode_ok: bool | None) -> bool:
     """A human can answer a prompt only on a real console. The Windows CRT reports isatty()==True for
-    every character device — the NUL device included (`hermes gateway start < NUL`, stdin=DEVNULL) — so
+    every character device — the NUL device included (`eir gateway start < NUL`, stdin=DEVNULL) — so
     isatty must be confirmed by GetConsoleMode accepting the handle (#113977). ``console_mode_ok`` is
     None where that fact does not exist (not Windows) and isatty alone decides."""
     return isatty and console_mode_ok is not False
@@ -942,13 +942,13 @@ def _install_choice_from_env(name: str) -> bool | None:
 def _prompt_install_choices(start_now: bool | None = None, start_on_login: bool | None = None) -> tuple[bool, bool]:
     """Return (start_now, start_on_login), asking before any UAC escalation."""
     if start_now is None:
-        start_now = _install_choice_from_env("HERMES_GATEWAY_INSTALL_START_NOW")
+        start_now = _install_choice_from_env("EIR_GATEWAY_INSTALL_START_NOW")
     if start_on_login is None:
-        start_on_login = _install_choice_from_env("HERMES_GATEWAY_INSTALL_START_ON_LOGIN")
+        start_on_login = _install_choice_from_env("EIR_GATEWAY_INSTALL_START_ON_LOGIN")
     if start_now is not None and start_on_login is not None:
         return start_now, start_on_login
 
-    from hermes_cli.setup import prompt_yes_no
+    from eir_cli.setup import prompt_yes_no
 
     if start_now is None:
         start_now = prompt_yes_no("Start the gateway now after install?", True)
@@ -979,7 +979,7 @@ def _install_startup_fallback(script_path: Path, start_now: bool, detail: str) -
         # An earlier task survives (UAC declined, access denied on re-create) and still fires at
         # logon; adding the fallback beside it would start the gateway twice (#80569).
         print("⚠ Scheduled Task is still registered — skipped the Startup fallback to avoid a duplicate autostart.")
-        print("  If that task is disabled or broken, run 'hermes gateway uninstall', then install again.")
+        print("  If that task is disabled or broken, run 'eir gateway uninstall', then install again.")
     else:
         entry = _install_startup_entry(script_path)
         print(f"✓ Installed Windows login item: {entry}")
@@ -991,10 +991,10 @@ def _install_startup_fallback(script_path: Path, start_now: bool, detail: str) -
     if running_pids or start_now:
         _start_or_report_running(running_pids)
     else:
-        from hermes_cli.gateway import _profile_arg
+        from eir_cli.gateway import _profile_arg
 
         profile_arg = _profile_arg()
-        start_cmd = f"hermes {profile_arg} gateway start" if profile_arg else "hermes gateway start"
+        start_cmd = f"eir {profile_arg} gateway start" if profile_arg else "eir gateway start"
         print("ℹ Startup fallback installed; gateway not started now.")
         print(f"  Start manually with: {start_cmd}")
     _print_next_steps()
@@ -1002,17 +1002,17 @@ def _install_startup_fallback(script_path: Path, start_now: bool, detail: str) -
 
 def _offer_elevated_install(headline: str, force: bool, start_now: bool, start_on_login: bool) -> bool:
     """Offer the UAC prompt for a Scheduled Task install. True when handed off to an elevated child."""
-    from hermes_cli.setup import prompt_yes_no
+    from eir_cli.setup import prompt_yes_no
 
     print(headline)
     print("  UAC is Windows' admin approval prompt; it is needed to create/update the Scheduled Task.")
     if prompt_yes_no("  Open the UAC prompt now?", False):
         if _launch_elevated_install(force=force, start_now=start_now, start_on_login=start_on_login):
-            print("✓ Launched elevated Hermes gateway install prompt.")
+            print("✓ Launched elevated Eir gateway install prompt.")
             if start_now:
                 print("  Approve the Windows UAC prompt; the elevated install will start the gateway afterwards.")
             else:
-                print("  Approve the Windows UAC prompt, then run: hermes gateway status")
+                print("  Approve the Windows UAC prompt, then run: eir gateway status")
             return True
         print("⚠ Falling back to Startup folder because elevation was unavailable or cancelled.")
     else:
@@ -1035,21 +1035,21 @@ def install(
             _start_or_report_running()
         else:
             print("ℹ Gateway not started and no auto-start service installed.")
-            print("  Run in the foreground later with: hermes gateway run")
+            print("  Run in the foreground later with: eir gateway run")
         return
 
     task_name = get_task_name()
     script_path = _write_task_script()
-    # A pre-fix install that failed its Startup-folder swap left `Hermes_Gateway.tmp` there, and the
+    # A pre-fix install that failed its Startup-folder swap left `Eir_Gateway.tmp` there, and the
     # Scheduled Task path below never touches that folder — sweep it so a re-run clears the debris.
     try:
         _startup_staging_path().unlink(missing_ok=True)
     except OSError:
         pass
     if force:
-        # Pre-suffix strays (task ``Hermes_Gateway``, Startup ``Hermes_Gateway.vbs``) are unreachable by
+        # Pre-suffix strays (task ``Eir_Gateway``, Startup ``Eir_Gateway.vbs``) are unreachable by
         # the current names, so a plain reconcile never heals them (#116157).
-        from hermes_cli.gateway_windows_legacy import remove_legacy_launchers
+        from eir_cli.gateway_windows_legacy import remove_legacy_launchers
         remove_legacy_launchers()
 
     # On locked-down accounts schtasks can sit for the full timeout before returning Access Denied.
@@ -1078,7 +1078,7 @@ def install(
             _start_or_report_running()
         else:
             print("ℹ Gateway not started now.")
-            print("  Start manually with: hermes gateway start")
+            print("  Start manually with: eir gateway start")
         _print_next_steps()
         return
 
@@ -1108,7 +1108,7 @@ def _live_gateway_pids(
         pid = get_running_pid(home / "gateway.pid", cleanup_stale=False)
         pids = [pid] if pid else []
     else:
-        from hermes_cli.gateway import find_gateway_pids
+        from eir_cli.gateway import find_gateway_pids
         pids = list(find_gateway_pids(all_profiles=all_profiles))
     return list(pid_filter(pids)) if pid_filter is not None else pids
 
@@ -1172,7 +1172,7 @@ _START_ATTESTATION_RELATIVE = ("state", "gateway.start-attestation.json")
 
 def _start_attestation_path(home: Path | None = None) -> Path:
     """Marker path; ``home`` addresses another profile's marker (per-profile cold-start, #110959)."""
-    return (home if home is not None else _hermes_home()).joinpath(*_START_ATTESTATION_RELATIVE)
+    return (home if home is not None else _eir_home()).joinpath(*_START_ATTESTATION_RELATIVE)
 
 
 def _write_start_attestation(pids: list[int], via: str, home: Path | None = None) -> None:
@@ -1180,11 +1180,11 @@ def _write_start_attestation(pids: list[int], via: str, home: Path | None = None
 
     ``generation`` identifies this marker instance: the update resume token records the generation
     whose death authorized a cold-start, so execution consumes exactly that marker and never a
-    newer one written by a concurrent ``hermes gateway start`` (#110020 review)."""
+    newer one written by a concurrent ``eir gateway start`` (#110020 review)."""
     try:
         path = _start_attestation_path(home)
         path.parent.mkdir(parents=True, exist_ok=True)
-        from hermes_cli.process_identity import _process_create_time
+        from eir_cli.process_identity import _process_create_time
 
         payload = {
             "pids": [int(p) for p in pids], "via": via, "ts": datetime.now(UTC).isoformat(),
@@ -1209,7 +1209,7 @@ def _clear_start_attestation(home: Path | None = None) -> None:
 
 
 # A start attestation older than this is no authority (#110020 review (d)): the marker is a one-shot
-# meant to bridge the seconds between a ✓ and the next ``hermes gateway status``/``update``; a
+# meant to bridge the seconds between a ✓ and the next ``eir gateway status``/``update``; a
 # historical marker must never later override Desktop ownership into a duplicate gateway (#76129).
 START_ATTESTATION_MAX_AGE_S = 24 * 3600
 # Same slack process_identity uses for psutil create_time comparisons (PID reuse disambiguation).
@@ -1282,7 +1282,7 @@ def _attested_pid_exited_cleanly(pid: int, create_time: float | None = None, hom
     try:
         from gateway.lifecycle_ledger import get_lifecycle_sentinel_path
 
-        sentinel = get_lifecycle_sentinel_path(home if home is not None else _hermes_home())
+        sentinel = get_lifecycle_sentinel_path(home if home is not None else _eir_home())
         data = json.loads(sentinel.read_text(encoding="utf-8-sig"))
     except OSError:
         return False
@@ -1315,7 +1315,7 @@ def attested_death_generation(current_pids: list[int], home: Path | None = None)
     or ``None``.
 
     Read-only twin of :func:`check_start_attestation` for callers that must not consume the
-    one-shot marker — ``hermes update`` consults it to decide whether a Desktop-owned install
+    one-shot marker — ``eir update`` consults it to decide whether a Desktop-owned install
     still owes a gateway cold-start (#109538) and records the generation in its resume token so the
     execution step consumes exactly the marker it was authorized by. Callers pass the liveness they
     already established (``[]`` after their own discovery came back empty) so the process table is
@@ -1342,7 +1342,7 @@ def check_start_attestation(current_pids: list[int] | None = None) -> str | None
 
     if current_pids is None:
         try:
-            from hermes_cli.gateway import find_gateway_pids
+            from eir_cli.gateway import find_gateway_pids
 
             current_pids = list(find_gateway_pids())
         except Exception:
@@ -1361,7 +1361,7 @@ def _format_attestation_warning(attested: list[int], data: dict) -> str:
         f"⚠ The previous gateway start ({via}, {ts}) reported success, but the "
         f"process (PID {', '.join(map(str, attested))}) died without a clean "
         "shutdown record.",
-        "  This usually means the shell that ran `hermes gateway start` was inside "
+        "  This usually means the shell that ran `eir gateway start` was inside "
         "a Windows Job Object that killed the gateway on exit (#91675).",
     ]
     hint = _task_run_hint("  Recovery: schtasks /Run /TN {}   (Task Scheduler starts the gateway outside any Job Object)")
@@ -1407,13 +1407,13 @@ def _report_gateway_start(via: str) -> None:
     else:
         print(f"✗ Gateway start via {via} FAILED — no stable gateway process detected within the verification window.")
         print("  (The process may have been created and then killed — e.g. by a parent Job Object, #91675.)")
-        print(f"  Check the log for startup errors:\n    type {_hermes_home()}\\logs\\gateway.log\n    type {_hermes_home()}\\logs\\gateway-stdio.log")
+        print(f"  Check the log for startup errors:\n    type {_eir_home()}\\logs\\gateway.log\n    type {_eir_home()}\\logs\\gateway-stdio.log")
         _print_task_run_hint("  Recovery: schtasks /Run /TN {}   (starts the gateway outside any Job Object)")
 
 
 def _print_next_steps() -> None:
-    print("\nNext steps:\n  hermes gateway status                      # Check status")
-    print(f"  type {_hermes_home()}\\logs\\gateway.log       # View logs")
+    print("\nNext steps:\n  eir gateway status                      # Check status")
+    print(f"  type {_eir_home()}\\logs\\gateway.log       # View logs")
 
 
 def uninstall() -> None:
@@ -1430,14 +1430,14 @@ def uninstall() -> None:
             scheduled_task_removed = True
             print(f"✓ Removed Scheduled Task {task_name!r}")
         elif _is_access_denied(detail) and not _is_running_as_admin():
-            from hermes_cli.setup import prompt_yes_no
+            from eir_cli.setup import prompt_yes_no
 
             print(f"↻ Scheduled Task uninstall needs administrator approval ({detail or 'access denied'})")
             print("  UAC is Windows' admin approval prompt; it is needed to remove the Scheduled Task.")
             if prompt_yes_no("  Open the UAC prompt now?", False):
                 if _launch_elevated_gateway_command("uninstall"):
-                    print("✓ Launched elevated Hermes gateway uninstall prompt.")
-                    print("  Approve the Windows UAC prompt, then run: hermes gateway status")
+                    print("✓ Launched elevated Eir gateway uninstall prompt.")
+                    print("  Approve the Windows UAC prompt, then run: eir gateway status")
                     return
                 print("⚠ Elevated uninstall prompt was unavailable or cancelled.")
             else:
@@ -1456,7 +1456,7 @@ def uninstall() -> None:
         except FileNotFoundError:
             pass
 
-    from hermes_cli.gateway_windows_legacy import remove_legacy_launchers
+    from eir_cli.gateway_windows_legacy import remove_legacy_launchers
     remove_legacy_launchers()
 
     if is_task_registered() and not scheduled_task_removed:
@@ -1489,12 +1489,12 @@ _TASK_PROBE_TIMEOUT_S = 5
 
 
 def registered_task_launchers() -> list[str]:
-    """The scripts this OS user's ``Hermes_Gateway*`` Scheduled Tasks start (``install_state``). A task
+    """The scripts this OS user's ``Eir_Gateway*`` Scheduled Tasks start (``install_state``). A task
     install removes the Startup-folder entries, so for a custom home the task is all that still names
     it. Empty off Windows, and when Task Scheduler does not answer, as for an unreadable Startup entry."""
     if sys.platform != "win32":
         return []
-    from hermes_cli.gateway_service_owner import service_definition_launchers
+    from eir_cli.gateway_service_owner import service_definition_launchers
 
     code, listing, _err = _exec_schtasks(["/Query", "/FO", "CSV", "/NH"], timeout=_TASK_PROBE_TIMEOUT_S)
     names = re.findall(rf'^"\\({_TASK_NAME_DEFAULT}[^"\\]*)"', listing, flags=re.MULTILINE) if code == 0 else []
@@ -1575,18 +1575,18 @@ def scheduled_task_drift(task_name: str) -> list[str]:
 
 def _print_scheduled_task_drift(task_name: str) -> None:
     """Warn when the registered task predates the current template (status is read-only; the
-    repair runs from ``start()`` / ``hermes update`` via ``reconcile_scheduled_task``)."""
+    repair runs from ``start()`` / ``eir update`` via ``reconcile_scheduled_task``)."""
     drift = scheduled_task_drift(task_name)
     if drift:
         print(f"⚠ Scheduled Task registration predates the current template ({'; '.join(drift)})")
-        print("  Repair: hermes gateway start  (or: hermes gateway install)")
+        print("  Repair: eir gateway start  (or: eir gateway install)")
 
 
 def reconcile_scheduled_task(task_name: str) -> bool:
     """Re-register the task from the current template when it drifts (#113670) — the Windows sibling
     of ``gateway.py::refresh_systemd_unit_if_needed``. Template hardening (``RestartOnFailure``, logon
     ``Delay``) otherwise only ever reaches fresh installs. False when aligned/unqueryable or when
-    ``schtasks`` refused (typically Access Denied — the elevating ``hermes gateway install`` is the fallback)."""
+    ``schtasks`` refused (typically Access Denied — the elevating ``eir gateway install`` is the fallback)."""
     drift = scheduled_task_drift(task_name)
     if not drift:
         return False
@@ -1594,7 +1594,7 @@ def reconcile_scheduled_task(task_name: str) -> bool:
     ok, detail = _install_scheduled_task(task_name, _write_task_script())
     print(f"{'✓' if ok else '⚠'} {detail}")
     if not ok:
-        print("  Repair manually: hermes gateway install")
+        print("  Repair manually: eir gateway install")
     return ok
 
 
@@ -1626,7 +1626,7 @@ def query_task_status() -> dict[str, str]:
 
 def _gateway_pids() -> list[int]:
     """Reuse the cross-platform PID scanner in gateway.py."""
-    from hermes_cli.gateway import find_gateway_pids
+    from eir_cli.gateway import find_gateway_pids
 
     return list(find_gateway_pids())
 
@@ -1737,7 +1737,7 @@ def _probe_exit_diag(diag_path: Path) -> None:
 def _print_deep_probes() -> None:
     """Print PASS/FAIL per individual liveness signal, so when the collapsed ✓/✗ summary disagrees
     with reality the user can see exactly which signal is wrong."""
-    home = _hermes_home()
+    home = _eir_home()
     print("\nDeep probes:")
     pid_value = _probe_pid_file(home / "gateway.pid")
     _probe_lock_file(home / "gateway.lock")
@@ -1768,7 +1768,7 @@ def status(deep: bool = False) -> None:
         print(f"✓ Windows login item installed: {entry if entry.exists() else _legacy_startup_entry_path()}")
     else:
         print("✗ Gateway service not installed")
-    from hermes_cli.gateway_windows_legacy import warn_legacy_launchers
+    from eir_cli.gateway_windows_legacy import warn_legacy_launchers
     warn_legacy_launchers()
 
     print(f"✓ Gateway process running (PID: {', '.join(map(str, pids))})" if pids else "✗ No gateway process detected")
@@ -1781,7 +1781,7 @@ def status(deep: bool = False) -> None:
         _print_deep_probes()
 
     if not task_installed and not startup_installed and not pids:
-        print("\nTo install:\n  hermes gateway install")
+        print("\nTo install:\n  eir gateway install")
 
 
 def start() -> None:
@@ -1795,11 +1795,11 @@ def start() -> None:
 
     if not is_task_registered() and not is_startup_entry_installed():
         # Login persistence is a lasting system change: a bare ``start`` installs it only on an explicit
-        # answer — the HERMES_GATEWAY_INSTALL_START_ON_LOGIN override or a real TTY prompt — never on a
+        # answer — the EIR_GATEWAY_INSTALL_START_ON_LOGIN override or a real TTY prompt — never on a
         # non-TTY default (#113977). Declining still starts the gateway; the command is ``start``.
-        start_on_login = _install_choice_from_env("HERMES_GATEWAY_INSTALL_START_ON_LOGIN")
+        start_on_login = _install_choice_from_env("EIR_GATEWAY_INSTALL_START_ON_LOGIN")
         if start_on_login is None:
-            from hermes_cli.setup import is_interactive_stdin, is_noninteractive, prompt_yes_no
+            from eir_cli.setup import is_interactive_stdin, is_noninteractive, prompt_yes_no
 
             print("✗ Gateway service is not installed")
             if is_noninteractive() or not _stdout_isatty() or not _stdin_is_interactive(
@@ -1813,7 +1813,7 @@ def start() -> None:
             # hand-off to an elevated child — so there is nothing left to spawn or to warn about here.
             install(force=False, start_now=True, start_on_login=True)
             return
-        print("ℹ Login auto-start not installed; add it later with: hermes gateway install")
+        print("ℹ Login auto-start not installed; add it later with: eir gateway install")
     elif is_task_registered():
         reconcile_scheduled_task(get_task_name())   # like systemd's regenerate-on-stale before a start
 
@@ -1844,7 +1844,7 @@ def _drain_gateway_pid(pid: int, drain_timeout: float) -> bool:
 def _windows_stop_drain_timeout() -> float:
     """Bounded stop grace period: a real graceful-drain window, but the CLI must never wedge."""
     try:
-        from hermes_cli.gateway import _get_restart_drain_timeout
+        from eir_cli.gateway import _get_restart_drain_timeout
 
         configured = float(_get_restart_drain_timeout() or 30.0)
     except Exception:
@@ -1986,7 +1986,7 @@ def restart() -> None:
                 "start a duplicate. Investigate stray PIDs before retrying."
             )
 
-    from hermes_cli.gateway import _wait_for_api_server_port_free  # avoid circular init
+    from eir_cli.gateway import _wait_for_api_server_port_free  # avoid circular init
 
     _wait_for_api_server_port_free()
     _mark_planned_restart()
@@ -1995,5 +1995,5 @@ def restart() -> None:
     if not _wait_for_gateway_ready(timeout_s=15.0):
         raise RuntimeError(
             "Gateway restart did not produce a running gateway process. "
-            "Check logs/gateway.log and run `hermes gateway status`."
+            "Check logs/gateway.log and run `eir gateway status`."
         )

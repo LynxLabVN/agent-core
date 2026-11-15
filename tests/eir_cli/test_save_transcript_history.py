@@ -10,7 +10,7 @@ import pytest
 
 
 def _compacted_store(path):
-    from hermes_state import SessionDB
+    from eir_state import SessionDB
 
     db = SessionDB(db_path=path)
     db.create_session("s1", "telegram")
@@ -32,7 +32,7 @@ def _cli_save(db, fmt, out):
                            session_start=datetime(2026, 1, 1))
     printed = io.StringIO()
     with contextlib.redirect_stdout(printed):
-        cli.HermesCLI.save_conversation(stub, f"/save {fmt} {out}")
+        cli.EirCLI.save_conversation(stub, f"/save {fmt} {out}")
     return out.read_text(encoding="utf-8") if out.exists() else printed.getvalue()
 
 
@@ -41,7 +41,7 @@ def _gateway_save(db, fmt, out):
     from gateway.platforms.event import MessageEvent
     from gateway.run import GatewayRunner
     from gateway.session import SessionEntry, SessionSource, build_session_key
-    from hermes_state import AsyncSessionDB
+    from eir_state import AsyncSessionDB
 
     source = SessionSource(platform=Platform.TELEGRAM, user_id="u1", chat_id="c1", user_name="t", chat_type="dm")
     runner = object.__new__(GatewayRunner)
@@ -86,7 +86,7 @@ def _tui_save(db, fmt, out, *, host=False, profile=False):
             ComputeHost(stdout=wire, heartbeat_secs=0)._handle_control({"sid": sid, **frame})
         return json.loads(wire.getvalue())
 
-    launch = {"HERMES_HOME": str(out.parent / "launch")} if profile else {}
+    launch = {"EIR_HOME": str(out.parent / "launch")} if profile else {}
     with mock.patch.dict(server._sessions, {"tui-save": parent}), mock.patch.dict(os.environ, launch), \
             mock.patch.object(server, "_session_uses_compute_host", lambda s: host and s is parent), \
             mock.patch.object(server, "_send_compute_host_control", control):
@@ -99,7 +99,7 @@ def _tui_save(db, fmt, out, *, host=False, profile=False):
 
 @pytest.mark.parametrize("save", [_cli_save, _gateway_save], ids=["cli", "gateway"])
 def test_save_transcript_holds_display_history(tmp_path, monkeypatch, save):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     db = _compacted_store(tmp_path / "state.db")
     try:
         text = save(db, "md", tmp_path / "saved.md")
@@ -116,9 +116,9 @@ def test_save_json_restores_compacted_history_as_archived(tmp_path, monkeypatch,
     in the display history, and stay out of the live context."""
     import json
 
-    from hermes_state import SessionDB
+    from eir_state import SessionDB
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     db = _compacted_store(tmp_path / "state.db")
     # A model-only live row (a micro-compaction merge) is context, not display history: only the transfer
     # projection carries it, so the snapshot's ids pin that projection, not the display read.
@@ -136,7 +136,7 @@ def test_save_json_restores_compacted_history_as_archived(tmp_path, monkeypatch,
         assert [m["id"] for m in snapshot["messages"]] == kept  # every kept row, not the deduped display read
         assert sum(snapshot["timings"]["role_counts"].values()) == len(kept)  # timings name no undone row
         assert {i[k] for i in snapshot["timings"]["intervals"] for k in ("from_message_id", "to_message_id")} <= set(kept)
-        # Like `hermes sessions export`, the in-memory backup is capped per session (the session profile's
+        # Like `eir sessions export`, the in-memory backup is capped per session (the session profile's
         # sessions.max_export_messages).
         (tmp_path / "config.yaml").write_text("sessions:\n  max_export_messages: 5\n", encoding="utf-8")
         assert "max_export_messages" in save(db, "json", tmp_path / "capped.json")

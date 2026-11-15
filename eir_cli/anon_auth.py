@@ -1,7 +1,7 @@
 """Nous free-tier identity: the ``anonymous`` auth method of the ``nous`` provider.
 
 The identity is created in two places: by the desktop's first install, which claims the welcome
-trial (``hermes_cli.welcome_trial``), and on the first hosted connector action for anyone without a
+trial (``eir_cli.welcome_trial``), and on the first hosted connector action for anyone without a
 Nous identity (``tools.connectors.gateway.config.ensure_guest_identity``, gated by ``guest_allowed``).
 Either mints an anonymous Nous account (``POST /api/anonymous/create``); its ``anon_`` credential is
 later exchanged for short-lived JWTs (``POST /api/anonymous/token``). The result is persisted as the
@@ -18,7 +18,7 @@ token acquisition (re-exchange the ``anon_`` credential; there is no refresh tok
 
 Users are never shown the words guest / anonymous / account for this state: surfaces say
 "Nous · free tier". Two user-facing verbs reach the same flow, both keeping the identity's
-connectors: ``hermes auth upgrade`` in a terminal and ``/login`` inside a chat.
+connectors: ``eir auth upgrade`` in a terminal and ``/login`` inside a chat.
 
 Lifecycle lives in ONE primitive, :func:`_reconcile_and_provision`: adopt what the shared store already
 holds, else mint under the shared-store lock. :func:`ensure_portal_identity` (connectors) and the
@@ -37,11 +37,11 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
 from agent.retry_utils import parse_retry_after_seconds
-from hermes_cli.auth_constants import (
+from eir_cli.auth_constants import (
     AuthError, DEFAULT_NOUS_PORTAL_URL, DEFAULT_NOUS_WELCOME_URL, NOUS_INFERENCE_INVOKE_SCOPE, WELCOME_CLAIM_FLAG,
     _decode_jwt_claims, httpx)
 
-logger = logging.getLogger("hermes_cli.auth")
+logger = logging.getLogger("eir_cli.auth")
 
 ANON_AUTH_METHOD = "anonymous"
 ANON_CLIENT_ID = "nas-anonymous"
@@ -50,19 +50,19 @@ GUEST_MODEL = "nous/welcome"
 ANON_SECRET_HEADER = "x-anonymous-api-secret"
 # The shared secret gates the anonymous surface during its integration phase. It is a deployment
 # secret (Sid's), read from the environment only.
-ANON_SECRET_ENV = "HERMES_ANON_API_SECRET"
+ANON_SECRET_ENV = "EIR_ANON_API_SECRET"
 # Preview cohort for the free tier's connector set, sent once on account creation so the account
 # service can record it on the account. "1" / "true" send true and "0" / "false" send false; anything
 # else (unset included) omits the field and the service applies its default. Self-reported and
 # baked into desktop bundles in plain text: the service must treat it as a preference, never proof.
-PREVIEW_FULL_CONNECTORS_ENV = "HERMES_PREVIEW_FULL_CONNECTORS"
+PREVIEW_FULL_CONNECTORS_ENV = "EIR_PREVIEW_FULL_CONNECTORS"
 GUEST_MINT_TIMEOUT_SECONDS = 5.0
 # Copy shared by every surface that names the free tier (R-USR-1): never guest / anonymous / account.
 FREE_TIER_LABEL = "Nous · free tier"
-UPGRADE_HINT = "Run `hermes auth upgrade` to sign in with a Nous account, or /login inside a chat."
+UPGRADE_HINT = "Run `eir auth upgrade` to sign in with a Nous account, or /login inside a chat."
 FREE_TIER_NOT_SIGNED_IN = (
     "You're not signed in. Free inference and connectors are always on. "
-    "Run `hermes auth` to sign in with a Nous account.")
+    "Run `eir auth` to sign in with a Nous account.")
 
 
 class AnonCredentialDead(AuthError):
@@ -81,7 +81,7 @@ def _anon_err(message: str, code: str, *, retry_after: Optional[float] = None) -
 #
 # Every way the account service (NAS) or the wire can refuse the free tier, as one ``AuthError.code``
 # each. Surfaces key their copy on the code; the message on the error is the surface-agnostic
-# fallback (no ``/login``, no ``hermes`` verb, no guest / anonymous / credential). ``retryable``
+# fallback (no ``/login``, no ``eir`` verb, no guest / anonymous / credential). ``retryable``
 # says whether a later attempt can succeed at all; ``retry_after`` is the wait the server named.
 #
 # What NAS actually sends (nous-account-service ``api/anonymous/gate.ts`` and the routes behind it):
@@ -112,11 +112,11 @@ ANON_TERMINAL_CODES = frozenset({
 ANON_UNREACHABLE_CODES = frozenset({ANON_UNREACHABLE, ANON_SERVER_ERROR})
 
 # Copy per code: what happened, then the one honest way forward. The free MODEL is never "off":
-# what is unavailable is using Hermes without signing in, and signing in is free.
+# what is unavailable is using Eir without signing in, and signing in is free.
 _SIGNIN_IS_FREE = "Signing in is free."
 ANON_FAILURE_COPY = {
     ANON_GATE_CLOSED: f"This version can't be used without a Nous account. {_SIGNIN_IS_FREE}",
-    ANON_GATE_PAUSED: f"Using Hermes without signing in is paused for a moment. {_SIGNIN_IS_FREE}",
+    ANON_GATE_PAUSED: f"Using Eir without signing in is paused for a moment. {_SIGNIN_IS_FREE}",
     ANON_RATE_LIMITED: "Lots of people are getting started right now. Try again in {wait}. "
                        "Signing in is free and skips the wait.",
     ANON_POW_REQUIRED: "The Nous server asked for a proof of work, but that isn't implemented in your "
@@ -156,7 +156,7 @@ def anon_failure_copy(code: str, *, retry_after: Any = None) -> str:
 def guest_allowed() -> bool:
     """``nous.guest`` (default True) has not switched guests off: no connector guest, no trial."""
     try:
-        from hermes_cli.config import load_config_readonly
+        from eir_cli.config import load_config_readonly
         nous_cfg = load_config_readonly().get("nous")
     except Exception:  # config unreadable: keep today's behaviour (no guest) rather than mint
         logger.debug("guest: config unreadable, treating nous.guest as false", exc_info=True)
@@ -176,7 +176,7 @@ def is_anonymous_request(provider: Any, api_key: Any) -> bool:
     This is display/recovery metadata, not token verification; the gateway authenticates the JWT.
     Named free accounts and opaque API keys must retain normal provider errors.
     """
-    from hermes_cli.auth_constants import _decode_jwt_claims
+    from eir_cli.auth_constants import _decode_jwt_claims
     return provider == "nous" and _decode_jwt_claims(api_key).get("account_tier") == ANON_ACCOUNT_TIER
 
 
@@ -187,7 +187,7 @@ def is_anonymous_agent(agent: Any) -> bool:
 
 def current_nous_state() -> Optional[dict[str, Any]]:
     """The profile's ``providers.nous`` state without locking or network (status/picker reads)."""
-    from hermes_cli.auth import _load_auth_store, _load_provider_state
+    from eir_cli.auth import _load_auth_store, _load_provider_state
     try:
         return _load_provider_state(_load_auth_store(), "nous")
     except Exception as exc:
@@ -203,7 +203,7 @@ def on_local_desktop_backend() -> bool:
     """This activity is work for the Desktop app on this machine: a request from, or a turn of a chat
     created by, a connection ``process_identity.local_desktop_client`` accepted. Never an SSH, URL or
     cloud backend, a shell the desktop launched, or the gateway's other clients."""
-    from hermes_cli.process_identity import serves_local_desktop_now
+    from eir_cli.process_identity import serves_local_desktop_now
     return serves_local_desktop_now()
 
 
@@ -239,7 +239,7 @@ def guest_without_free_tier(state: Any) -> bool:
 
 
 def free_tier_route() -> bool:
-    from hermes_cli.auth import resolve_provider
+    from eir_cli.auth import resolve_provider
     return has_free_tier_account() and resolve_provider("auto") == "nous"
 
 
@@ -248,11 +248,11 @@ WELCOME_HOSTS = frozenset({"welcome-api.nousresearch.com"})
 # ``127.0.0.1`` while ``NOUS_INFERENCE_BASE_URL`` points at a local stand-in). Read from the
 # environment, which the user controls, so it sits at the same trust level as the URL override
 # itself; it never widens the NETWORK-side allowlist in ``auth_nous``.
-EXTRA_WELCOME_HOSTS_ENV = "HERMES_EXTRA_WELCOME_HOSTS"
+EXTRA_WELCOME_HOSTS_ENV = "EIR_EXTRA_WELCOME_HOSTS"
 
 
 def welcome_hosts() -> frozenset[str]:
-    """``WELCOME_HOSTS`` plus any ``HERMES_EXTRA_WELCOME_HOSTS`` entries (lowercased hostnames)."""
+    """``WELCOME_HOSTS`` plus any ``EIR_EXTRA_WELCOME_HOSTS`` entries (lowercased hostnames)."""
     raw = os.environ.get(EXTRA_WELCOME_HOSTS_ENV) or ""
     extra = {part.strip().lower() for part in raw.split(",") if part.strip()}
     return WELCOME_HOSTS | frozenset(extra) if extra else WELCOME_HOSTS
@@ -304,7 +304,7 @@ def anon_secret() -> str:
 
 
 def _anon_headers() -> dict[str, str]:
-    from hermes_cli.anon_challenge import user_agent
+    from eir_cli.anon_challenge import user_agent
     headers = {"content-type": "application/json", "user-agent": user_agent()}
     if secret := anon_secret():
         headers[ANON_SECRET_HEADER] = secret
@@ -377,14 +377,14 @@ def mint_guest(client: httpx.Client, portal_base_url: str) -> dict[str, Any]:
     return payload
 
 
-# ``purpose: "connectors"`` (NAS hermes-portal#1516) mints a JWT whose only scope is
+# ``purpose: "connectors"`` (NAS eir-portal#1516) mints a JWT whose only scope is
 # ``connectors:invoke``: connector routes and the tool gateway accept it, the welcome host refuses it,
 # and NAS never puts the free-inference challenge in front of it. A NAS from before #1516 ignores the
 # field and answers with an inference token (a superset), so which slot a token fills is read off its
 # ``scope`` claim, never off the purpose that asked for it.
 def is_connectors_only(token: Any) -> bool:
     """*token* carries a scope claim and it lacks ``inference:invoke`` (a scopeless JWT reads as today's)."""
-    from hermes_cli.auth_nous import _scope_values
+    from eir_cli.auth_nous import _scope_values
     claims = _decode_jwt_claims(token)
     scopes = _scope_values(claims.get("scope")) | _scope_values(claims.get("scp"))
     return bool(scopes) and NOUS_INFERENCE_INVOKE_SCOPE not in scopes
@@ -394,7 +394,7 @@ def held_connectors_token(state: Any, *, skew_seconds: Optional[int] = None) -> 
     """The bearer a connectors / managed-tools call sends: the profile's token (for a guest the
     inference one, a superset), else a guest's connectors-only token, preferring one that outlives
     *skew_seconds*. ``None`` also accepts an expiring token (availability probes)."""
-    from hermes_cli.auth import _is_expiring
+    from eir_cli.auth import _is_expiring
     if not isinstance(state, dict):
         return None
     slots = (state, state.get("connectors_token") if is_guest_state(state) else None)
@@ -411,10 +411,10 @@ def exchange_anon_jwt(
     """``POST /api/anonymous/token {token}`` -> ``{access_token, expires_in, inference_base_url, ...}``.
 
     Raises :class:`AnonCredentialDead` on 404 ``unknown_token`` / 401 (reaped or claimed), and
-    :class:`~hermes_cli.anon_challenge.AnonChallengeRequired` (carrying what the status poll needs:
+    :class:`~eir_cli.anon_challenge.AnonChallengeRequired` (carrying what the status poll needs:
     portal, credential, and the *auth_state* whose ``tls`` block the mint used) on a browser challenge.
     """
-    from hermes_cli import anon_challenge
+    from eir_cli import anon_challenge
     response = client.post(
         f"{portal_base_url.rstrip('/')}/api/anonymous/token", headers=_anon_headers(),
         json={"token": anon_token, "client": anon_challenge.client_info(), "purpose": purpose})
@@ -448,7 +448,7 @@ def exchange_anon_jwt(
 def apply_exchange_to_state(state: dict[str, Any], exchanged: dict[str, Any]) -> None:
     """Write a fresh exchange result into a guest state in place: an inference token (token, expiry,
     routing) into the state itself, a connectors-only one into ``connectors_token`` beside it."""
-    from hermes_cli.auth_nous import _validate_nous_inference_url_from_network
+    from eir_cli.auth_nous import _validate_nous_inference_url_from_network
     access_token = exchanged["access_token"]
     claims = _decode_jwt_claims(access_token)
     now = datetime.now(UTC)
@@ -481,7 +481,7 @@ def apply_exchange_to_state(state: dict[str, Any], exchanged: dict[str, Any]) ->
 
 
 def _portal_base_url() -> str:
-    from hermes_cli.auth_nous import _nous_portal_env_override
+    from eir_cli.auth_nous import _nous_portal_env_override
     return (_nous_portal_env_override() or DEFAULT_NOUS_PORTAL_URL).rstrip("/")
 
 
@@ -499,8 +499,8 @@ def _mint_locked(client: httpx.Client, portal: str, auth_store: dict[str, Any], 
     the exchange: a 429 or timeout on the exchange must not lose a credential NAS still honours (the
     next attempt exchanges the stored one instead of minting again). *welcome_claim* is written in
     that same save, so a claimed guest is never left unstamped."""
-    from hermes_cli.auth import _store_provider_state, _save_auth_store
-    from hermes_cli.auth_nous import _write_shared_nous_state
+    from eir_cli.auth import _store_provider_state, _save_auth_store
+    from eir_cli.auth_nous import _write_shared_nous_state
     minted = mint_guest(client, portal)
     state: dict[str, Any] = {
         "auth_method": ANON_AUTH_METHOD, "account_tier": ANON_ACCOUNT_TIER,
@@ -555,8 +555,8 @@ _mint_failures: dict[str, MintFailure] = {}
 
 
 def _mint_memo_key() -> str:
-    from hermes_constants import get_hermes_home_override, hermes_home_key
-    return "" if get_hermes_home_override() is None else hermes_home_key()
+    from eir_constants import get_eir_home_override, eir_home_key
+    return "" if get_eir_home_override() is None else eir_home_key()
 
 
 def _mint_failure_for_profile() -> Optional[MintFailure]:
@@ -619,16 +619,16 @@ def _reconcile_and_provision(*, timeout_seconds: float, force: bool = False,
                              welcome_claim: bool = False) -> Optional[dict[str, Any]]:
     """The lifecycle body, run under profile lock THEN shared lock (the documented order).
 
-    1. The shared store is the identity of record for this Hermes root. If it holds an identity
+    1. The shared store is the identity of record for this Eir root. If it holds an identity
        that differs from the profile's, the profile adopts it (a stale guest never outlives a
        sibling profile's sign-in, and never overwrites it).
     2. Otherwise the profile's own identity stands.
     3. Nothing anywhere: mint, persisting the credential before exchanging it.
     """
-    from hermes_cli.auth import (
+    from eir_cli.auth import (
         _auth_store_lock, _load_auth_store, _load_provider_state, _save_auth_store,
         _store_provider_state, _resolve_verify)
-    from hermes_cli.auth_nous import (
+    from eir_cli.auth_nous import (
         _SHARED_RENEWAL_KEY, _nous_http_client, _nous_shared_store_lock, _read_shared_nous_state,
         _write_shared_nous_state)
     portal = _portal_base_url()
@@ -710,7 +710,7 @@ def ensure_portal_identity(
     if state is not None:
         _clear_mint_failure()
         # Adopting a sibling profile's sign-in replaced this profile's guest under the locks above.
-        from hermes_cli.guest_handoff import drain
+        from eir_cli.guest_handoff import drain
         drain()
     return state
 
@@ -728,11 +728,11 @@ def refresh_guest_state(state: dict[str, Any], client: httpx.Client, *, purpose:
     if purpose == "inference" and not free_inference_active(state):
         # The one place a guest's inference token is minted: only the welcome trial on the desktop's
         # local backend carries one. Not terminal: the guest stays for connectors.
-        raise AuthError("Hermes is not logged into Nous Portal.", provider="nous", code="nous_auth_missing")
+        raise AuthError("Eir is not logged into Nous Portal.", provider="nous", code="nous_auth_missing")
     anon_token = state.get("anon_token")
     if not isinstance(anon_token, str) or not anon_token:
         raise AnonCredentialDead(ANON_FAILURE_COPY[ANON_CREDENTIAL_DEAD], code=ANON_CREDENTIAL_DEAD)
-    from hermes_cli.auth import _nous_portal_base_url
+    from eir_cli.auth import _nous_portal_base_url
     exchanged = exchange_anon_jwt(
         client, _nous_portal_base_url(state), anon_token, auth_state=state, purpose=purpose)
     apply_exchange_to_state(state, exchanged)
@@ -746,9 +746,9 @@ def clear_dead_guest(reason: str, *, dead_token: Optional[str] = None) -> None:
     must not erase a sibling profile's newer sign-in or replacement guest from the shared store. When
     *dead_token* is None the profile's current guest is treated as the failed one.
     """
-    from hermes_cli.auth import (
+    from eir_cli.auth import (
         _auth_store_lock, _load_auth_store, _load_provider_state, _save_auth_store, _store_section)
-    from hermes_cli.auth_nous import _clear_shared_nous_state, _nous_shared_store_lock, _read_shared_nous_state
+    from eir_cli.auth_nous import _clear_shared_nous_state, _nous_shared_store_lock, _read_shared_nous_state
     with _auth_store_lock():
         auth_store = _load_auth_store()
         state = _load_provider_state(auth_store, "nous")
@@ -788,7 +788,7 @@ WELCOME_TIER_GATE_REASONS = frozenset({"model_not_free", "feature_not_free"})
 # Gateway messages (lowercased substrings) for a request on the wrong host or a dark tier.
 _WELCOME_ROUTE_REFUSALS = (
     ("anonymous accounts must use", "anon_on_paid_host"),
-    ("serves anonymous hermes agent accounts only", "named_on_welcome_host"),
+    ("serves anonymous eir agent accounts only", "named_on_welcome_host"),
     ("anonymous accounts are not accepted", "tier_disabled"),
     # The gateway's answer to an expired or unreadable bearer: the credential, not the tier. A
     # retry that waited out a long rate limit outlives the 15-minute free-tier JWT and lands here.
@@ -800,17 +800,17 @@ _WELCOME_ROUTE_COPY = {
     "anon_on_paid_host": "This install is set to use a different Nous server (NOUS_INFERENCE_BASE_URL). "
                          "Unset it to use the free model, or sign in. {signin}",
     "named_on_welcome_host": "This Nous account needs to reconnect. {model_hint}",
-    "tier_disabled": "Using Hermes without signing in is switched off right now. "
+    "tier_disabled": "Using Eir without signing in is switched off right now. "
                      "Sign in to keep chatting, it's free. {signin}",
     # Only reachable when re-exchanging the free credential failed (``turn_recovery._recover_welcome_tier``).
-    "session_expired": "Hermes couldn't renew its connection to the free model. "
+    "session_expired": "Eir couldn't renew its connection to the free model. "
                        "Send your message again, or sign in to keep chatting, it's free. {signin}",
 }
 # The sign-in door, phrased for a chat surface (slash command) and for a terminal.
 _SIGNIN_CHAT = "To sign in: /login."
-_SIGNIN_TERMINAL = "To sign in: `hermes auth upgrade`."
+_SIGNIN_TERMINAL = "To sign in: `eir auth upgrade`."
 _MODEL_HINT_CHAT = "Run /model and pick the Nous row again."
-_MODEL_HINT_TERMINAL = "Run `hermes model` and pick the Nous row again."
+_MODEL_HINT_TERMINAL = "Run `eir model` and pick the Nous row again."
 # Terminal copy for a free-model outage once the retries are spent (5xx, transport failure).
 FREE_TIER_OUTAGE_COPY = ("The free model is having trouble responding right now. "
                          "Try sending your message again in a minute.")
@@ -853,7 +853,7 @@ def welcome_refusal_copy(refusal: dict[str, Any], *, model: str = "", in_chat: b
     wait = friendly_wait(retry) if retry > 0 else "a little while"
     if reason == "model_not_free":
         what = f"{model} isn't" if model else "That model isn't"
-        return (f"{what} available without signing in, so Hermes uses {serves} for now. "
+        return (f"{what} available without signing in, so Eir uses {serves} for now. "
                 f"Sign in for more models. {signin}").rstrip()
     if reason == "feature_not_free":
         return f"That isn't available without signing in. Sign in to use it, it's free. {signin}".rstrip()
@@ -866,7 +866,7 @@ def welcome_refusal_copy(refusal: dict[str, Any], *, model: str = "", in_chat: b
     if reason == "rate_limited":
         return (f"You've used up the allowance for chatting without signing in. It refreshes in {wait}. "
                 f"Sign in for a bigger allowance, it's free. {signin}").rstrip()
-    return f"Hermes couldn't send that without signing in. Signing in is free. {signin}".rstrip()
+    return f"Eir couldn't send that without signing in. Signing in is free. {signin}".rstrip()
 
 
 def welcome_route_refusal(status: Any, message: Any, base_url: Any = None) -> Optional[str]:
@@ -891,7 +891,7 @@ def welcome_route_refusal(status: Any, message: Any, base_url: Any = None) -> Op
 
 
 def welcome_route_refusal_copy(kind: str, *, in_chat: bool = True, door: bool = True) -> str:
-    template = _WELCOME_ROUTE_COPY.get(kind) or "Hermes couldn't reach the free model on this route."
+    template = _WELCOME_ROUTE_COPY.get(kind) or "Eir couldn't reach the free model on this route."
     return template.format(
         host=DEFAULT_NOUS_WELCOME_URL, signin=(_SIGNIN_CHAT if in_chat else _SIGNIN_TERMINAL) if door else "",
         model_hint=_MODEL_HINT_CHAT if in_chat else _MODEL_HINT_TERMINAL).rstrip()
@@ -933,7 +933,7 @@ def apply_model_switch(agent: Any) -> Optional[str]:
 
     Runs once per recorded header, between calls. The conversation keeps its history; only the id
     the next request carries changes, so a promoted account stops relying on the gateway's reverse
-    map. The config write is the same one a sign-in completion uses, so ``hermes model`` and the
+    map. The config write is the same one a sign-in completion uses, so ``eir model`` and the
     gateway's config re-read agree with the live session.
     """
     pending = getattr(agent, "_nous_pending_model_switch", None)
@@ -950,11 +950,11 @@ def apply_model_switch(agent: Any) -> Optional[str]:
     agent._nous_model_switch = (requested, backing)
     logger.info("Nous gateway asked to switch %s -> %s; applied for this session", requested, backing)
     try:
-        from hermes_cli.config import load_config_readonly
+        from eir_cli.config import load_config_readonly
         raw = load_config_readonly().get("model")
         model_cfg = raw if isinstance(raw, dict) else ({"default": raw} if isinstance(raw, str) else {})
         if str(model_cfg.get("default") or "").strip() == requested:
-            from hermes_cli.auth import _update_config_for_provider
+            from eir_cli.auth import _update_config_for_provider
             _update_config_for_provider(
                 "nous", str(getattr(agent, "base_url", "") or ""), default_model=backing)
             logger.info("Config default model moved %s -> %s", requested, backing)
@@ -991,7 +991,7 @@ def mark_guest_notice_shown() -> bool:
 def set_guest_flag(flag: str) -> Optional[dict[str, Any]]:
     """Set *flag* on the guest's ``providers.nous`` state in whichever store holds it, and return the
     updated state; None when there is no guest."""
-    from hermes_cli.auth import _provider_state_transaction
+    from eir_cli.auth import _provider_state_transaction
     with _provider_state_transaction("nous") as (auth_store, state, source_path):
         if not is_guest_state(state) or source_path is None:
             return None
@@ -1004,7 +1004,7 @@ def set_guest_flag(flag: str) -> Optional[dict[str, Any]]:
 
 def _save_guest_state(auth_store: dict[str, Any], state: dict[str, Any], source_path: Path) -> None:
     """Write the guest's ``providers.nous`` back to the store it was read from (the caller holds its lock)."""
-    from hermes_cli.auth import _auth_file_path, _load_auth_store, _same_path, _save_auth_store, _store_section
+    from eir_cli.auth import _auth_file_path, _load_auth_store, _same_path, _save_auth_store, _store_section
     if _same_path(source_path, _auth_file_path()):
         _store_section(auth_store, "providers")["nous"] = state
         _save_auth_store(auth_store)
@@ -1028,8 +1028,8 @@ def _account_state_from_token(
     timeout_seconds: float,
 ) -> dict[str, Any]:
     """The ``providers.nous`` shape for the signed-in account (same fields the device-code login writes)."""
-    from hermes_cli.auth import PROVIDER_REGISTRY, _coerce_ttl_seconds, _optional_base_url, _tls_state_from_verify
-    from hermes_cli.auth_nous import (
+    from eir_cli.auth import PROVIDER_REGISTRY, _coerce_ttl_seconds, _optional_base_url, _tls_state_from_verify
+    from eir_cli.auth_nous import (
         _NOUS_EMPTY_AGENT_KEY_FIELDS, _iso_after, _validate_nous_inference_url_from_network,
         refresh_nous_oauth_from_state)
     now = datetime.now(UTC)
@@ -1058,17 +1058,17 @@ def settle_after_upgrade(account_state: dict[str, Any]) -> dict[str, Any]:
     = welcome host. An account cannot keep either: the welcome host refuses account tokens, and the
     portal host serves ``nous/welcome`` as a paid model. When the config is on the free tier's route,
     ``model.base_url`` becomes the account's inference host and ``model.default`` the recommended
-    default for the account's tier (:func:`hermes_cli.models.recommended_nous_default_model`, the
+    default for the account's tier (:func:`eir_cli.models.recommended_nous_default_model`, the
     same pick as ``GET /api/model/recommended-default``), through the same config write a plain Nous
     login uses. A config on the user's own model and host is left alone.
 
-    Every sign-in completion (CLI ``hermes auth upgrade``, the desktop poller) calls this once, after
+    Every sign-in completion (CLI ``eir auth upgrade``, the desktop poller) calls this once, after
     ``persist_nous_credentials``. Returns ``{"model": str, "changed": bool}``: ``model`` is the default
     the config now carries (``""`` when it carries none); ``changed`` says whether this call wrote it.
     Never raises: a failed pick or write is logged and reported as ``changed: False`` so the sign-in
     itself still counts.
     """
-    from hermes_cli.config import load_config_readonly
+    from eir_cli.config import load_config_readonly
     try:
         raw = load_config_readonly().get("model")
     except Exception as exc:
@@ -1082,18 +1082,18 @@ def settle_after_upgrade(account_state: dict[str, Any]) -> dict[str, Any]:
         return {"model": current, "changed": False}
     model = current
     if on_welcome_model:
-        from hermes_cli.models import recommended_nous_default_model
+        from eir_cli.models import recommended_nous_default_model
         try:
             model = str(recommended_nous_default_model().get("model") or "")
         except Exception as exc:
             logger.debug("sign-in completion: recommended default unavailable: %s", exc)
             model = ""
     try:
-        from hermes_cli.auth import _update_config_for_provider
+        from eir_cli.auth import _update_config_for_provider
         # One write: host and default move together, so a failure leaves the config as it was
         # rather than the account host paired with the welcome model. No eligible recommendation
         # (Portal unreachable, or the plan and org policy admit nothing) clears the default in that
-        # same write; the runtime's silent default applies until the user picks one with `hermes model`.
+        # same write; the runtime's silent default applies until the user picks one with `eir model`.
         _update_config_for_provider(
             "nous", str(account_state.get("inference_base_url") or ""),
             default_model=model if on_welcome_model else None,
@@ -1106,19 +1106,19 @@ def settle_after_upgrade(account_state: dict[str, Any]) -> dict[str, Any]:
 
 def _poll_for_token(*args, **kwargs) -> dict[str, Any]:
     """Keep both the sign-in module seam and the device-flow seam live at call time."""
-    from hermes_cli.auth_device_flow import _poll_for_token as poll
+    from eir_cli.auth_device_flow import _poll_for_token as poll
     return poll(*args, **kwargs)
 
 
 def persist_nous_credentials(*args, **kwargs):
     """Keep the existing auth_nous persistence seam behind the sign-in entry point."""
-    from hermes_cli.auth_nous import persist_nous_credentials as persist
+    from eir_cli.auth_nous import persist_nous_credentials as persist
     return persist(*args, **kwargs)
 
 
 # Public sign-in imports remain here for existing callers and module-attribute patches.
 # The flow imports this module only inside calls, so either module can be imported first.
-from hermes_cli.anon_sign_in import (
+from eir_cli.anon_sign_in import (
     AlreadySignedIn,
     Cancelled,
     Code,
@@ -1148,7 +1148,7 @@ from hermes_cli.anon_sign_in import (
     format_wait_line,
     run_sign_in,
 )
-from hermes_cli.anon_sign_in_cli import (
+from eir_cli.anon_sign_in_cli import (
     drain_sign_in_copy,
     render_sign_in_cli,
     render_sign_in_cli_code,

@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from hermes_cli import runtime_provider as rp
+from eir_cli import runtime_provider as rp
 
 
 def test_configured_api_key_provider_without_key_fails_closed(monkeypatch):
@@ -17,7 +17,7 @@ def test_configured_api_key_provider_without_key_fails_closed(monkeypatch):
     )
     monkeypatch.setattr(rp, "load_pool", lambda _provider: SimpleNamespace(has_credentials=lambda: False))
     monkeypatch.setattr(
-        "hermes_cli.auth.resolve_api_key_provider_credentials",
+        "eir_cli.auth.resolve_api_key_provider_credentials",
         lambda _provider: {
             "provider": "deepseek",
             "api_key": "",
@@ -34,7 +34,7 @@ def test_noauth_lmstudio_still_resolves(monkeypatch):
     """The fail-closed key guard preserves LM Studio's no-auth contract."""
     monkeypatch.setattr(rp, "load_pool", lambda _provider: SimpleNamespace(has_credentials=lambda: False))
     monkeypatch.setattr(
-        "hermes_cli.auth.resolve_api_key_provider_credentials",
+        "eir_cli.auth.resolve_api_key_provider_credentials",
         lambda _provider: {
             "provider": "lmstudio",
             "api_key": "lmstudio-noauth",
@@ -86,7 +86,7 @@ def test_resolve_runtime_provider_uses_credential_pool(monkeypatch):
     assert resolved["source"] == "manual"
 
 
-def test_codex_pool_honors_hermes_codex_base_url(monkeypatch):
+def test_codex_pool_honors_eir_codex_base_url(monkeypatch):
     """The profile-wide Codex endpoint override must apply to pool credentials too."""
     class _Entry:
         access_token = "pool-token"
@@ -102,7 +102,7 @@ def test_codex_pool_honors_hermes_codex_base_url(monkeypatch):
 
     monkeypatch.setattr(rp, "resolve_provider", lambda *a, **k: "openai-codex")
     monkeypatch.setattr(rp, "load_pool", lambda provider: _Pool())
-    monkeypatch.setenv("HERMES_CODEX_BASE_URL", "http://127.0.0.1:8787/v1")
+    monkeypatch.setenv("EIR_CODEX_BASE_URL", "http://127.0.0.1:8787/v1")
 
     resolved = rp.resolve_runtime_provider(requested="openai-codex")
 
@@ -127,7 +127,7 @@ def test_codex_pool_honors_model_base_url(monkeypatch):
 
     monkeypatch.setattr(rp, "resolve_provider", lambda *a, **k: "openai-codex")
     monkeypatch.setattr(rp, "load_pool", lambda provider: _Pool())
-    monkeypatch.delenv("HERMES_CODEX_BASE_URL", raising=False)
+    monkeypatch.delenv("EIR_CODEX_BASE_URL", raising=False)
     monkeypatch.setattr(rp, "_get_model_config", lambda: {
         "provider": "openai-codex", "default": "gpt-5.3-codex", "base_url": "http://127.0.0.1:8400/backend-api/codex/"})
 
@@ -268,7 +268,7 @@ class TestCustomProviderPoolLoopbackNoKeyExemption:
 
 def test_qwen_oauth_auto_fallthrough_on_auth_failure(monkeypatch):
     """When requested_provider is 'auto' and Qwen creds fail, fall through."""
-    from hermes_cli.auth import AuthError
+    from eir_cli.auth import AuthError
 
     monkeypatch.setattr(rp, "resolve_provider", lambda *a, **k: "qwen-oauth")
     monkeypatch.setattr(
@@ -661,10 +661,10 @@ def test_openai_key_used_when_no_openrouter_key(monkeypatch):
 def test_real_openai_key_is_never_routed_or_sent_to_openrouter(monkeypatch):
     """A non-OpenRouter OPENAI_API_KEY with OPENAI_BASE_URL unset neither auto-selects OpenRouter
     nor becomes the bearer for openrouter.ai; auto-detection lands on openai-api as documented."""
-    from hermes_cli.auth import resolve_provider
-    from hermes_cli.runtime_provider_backends import _resolve_openrouter_runtime
+    from eir_cli.auth import resolve_provider
+    from eir_cli.runtime_provider_backends import _resolve_openrouter_runtime
     monkeypatch.setattr(rp, "_get_model_config", dict)
-    monkeypatch.setattr("hermes_cli.config.load_config", lambda: {"model": {}})
+    monkeypatch.setattr("eir_cli.config.load_config", lambda: {"model": {}})
     monkeypatch.setattr("agent.bedrock_adapter.has_aws_credentials", lambda *_a, **_kw: False)
     for var in ("OPENAI_BASE_URL", "OPENROUTER_BASE_URL", "OPENROUTER_API_KEY", "CUSTOM_BASE_URL"):
         monkeypatch.delenv(var, raising=False)
@@ -687,7 +687,7 @@ def test_real_openai_key_is_never_routed_or_sent_to_openrouter(monkeypatch):
 def test_openai_key_bound_to_another_host_never_reaches_openrouter(monkeypatch, openai_base_url, expected_key):
     """OPENAI_API_KEY is an OpenRouter fallback only while OPENAI_BASE_URL doesn't bind it elsewhere:
     a bound key follows its exact origin, so the same hostname over http:// or on another port is elsewhere."""
-    from hermes_cli.runtime_provider_backends import _resolve_openrouter_runtime
+    from eir_cli.runtime_provider_backends import _resolve_openrouter_runtime
     monkeypatch.setattr(rp, "_get_model_config", dict)
     monkeypatch.setenv("OPENAI_BASE_URL", openai_base_url)
     monkeypatch.delenv("OPENROUTER_BASE_URL", raising=False)
@@ -701,11 +701,11 @@ def test_openai_key_bound_to_another_host_never_reaches_openrouter(monkeypatch, 
 
 
 def test_openrouter_env_file_key_survives_exhausted_pool(monkeypatch):
-    """A key living only in ~/.hermes/.env must survive an exhausted pool entry.
+    """A key living only in ~/.eir/.env must survive an exhausted pool entry.
 
     Regression test for #117667: with the pool's OPENROUTER_API_KEY entry benched
     (select() -> None), the terminal resolver read os.environ only, so the documented
-    .env location was skipped and `hermes chat --provider openrouter` failed with
+    .env location was skipped and `eir chat --provider openrouter` failed with
     "No API key found" until the key was exported in the shell.
     """
     monkeypatch.setattr(rp, "resolve_provider", lambda *a, **k: "openrouter")
@@ -720,7 +720,7 @@ def test_openrouter_env_file_key_survives_exhausted_pool(monkeypatch):
     or_env_name = "OPENROUTER_" + "API_KEY"
     monkeypatch.delenv(or_env_name, raising=False)
     monkeypatch.setattr(
-        "hermes_cli.config.load_env", lambda: {or_env_name: "dotenv-or-key"}
+        "eir_cli.config.load_env", lambda: {or_env_name: "dotenv-or-key"}
     )
 
     resolved = rp.resolve_runtime_provider(requested="openrouter")
@@ -749,7 +749,7 @@ def test_openrouter_raw_op_ref_in_dotenv_loses_to_resolved_env(monkeypatch):
     or_env_name = "OPENROUTER_" + "API_KEY"
     monkeypatch.setenv(or_env_name, "resolved-or-key")
     monkeypatch.setattr(
-        "hermes_cli.config.load_env", lambda: {or_env_name: "op://Vault/Item/field"}
+        "eir_cli.config.load_env", lambda: {or_env_name: "op://Vault/Item/field"}
     )
 
     resolved = rp.resolve_runtime_provider(requested="openrouter")
@@ -762,7 +762,7 @@ def test_openai_env_file_key_used_as_fallback_without_openrouter_key(monkeypatch
 
     Covers the second candidate (runtime_provider_backends reads both keys through
     get_env_value_prefer_dotenv): with no OpenRouter key anywhere, a key living only
-    in ~/.hermes/.env still resolves the rung-8 fallback."""
+    in ~/.eir/.env still resolves the rung-8 fallback."""
     monkeypatch.setattr(rp, "resolve_provider", lambda *a, **k: "openrouter")
     monkeypatch.setattr(rp, "_get_model_config", dict)
     monkeypatch.setattr(
@@ -776,7 +776,7 @@ def test_openai_env_file_key_used_as_fallback_without_openrouter_key(monkeypatch
     monkeypatch.delenv(oa_env_name, raising=False)
     monkeypatch.delenv(or_env_name, raising=False)
     monkeypatch.setattr(
-        "hermes_cli.config.load_env", lambda: {oa_env_name: "sk-or-dotenv-openai-key"}
+        "eir_cli.config.load_env", lambda: {oa_env_name: "sk-or-dotenv-openai-key"}
     )
 
     resolved = rp.resolve_runtime_provider(requested="openrouter")
@@ -873,7 +873,7 @@ def test_codex_app_server_opt_in_routes_only_named_custom_providers(monkeypatch)
     resolved = rp.resolve_runtime_provider(requested="custom:my-gateway")
     assert (resolved["provider"], resolved["requested_provider"], resolved["api_mode"]) == (
         "custom", "custom:my-gateway", "codex_app_server")
-    assert resolved["api_key"] == "test-key"  # Hermes' own aux/fallback client keeps the credential
+    assert resolved["api_key"] == "test-key"  # Eir' own aux/fallback client keeps the credential
 
     anonymous = rp.resolve_runtime_provider(requested="custom", explicit_base_url="https://gateway.example.com/v1",
                                             explicit_api_key="k")
@@ -1297,7 +1297,7 @@ def test_explicit_openrouter_config_mirror_bypasses_pool(monkeypatch):
     assert resolved["api_key"] == "router-key"
     assert resolved.get("credential_pool") is None
 
-    # The canonical URL that `hermes setup` persists is NOT a mirror: the pool must still serve it.
+    # The canonical URL that `eir setup` persists is NOT a mirror: the pool must still serve it.
     monkeypatch.setattr(rp, "_get_model_config", lambda: {"provider": "openrouter", "base_url": "https://openrouter.ai/api/v1"})
     canonical = rp.resolve_runtime_provider(requested="openrouter")
     assert canonical["api_key"] == "pool-key" and canonical.get("credential_pool") is not None
@@ -1425,7 +1425,7 @@ def test_opencode_go_explicit_key_matches_env_key_route(monkeypatch, model):
 
 def test_auto_detected_nous_auth_failure_falls_through_to_openrouter(monkeypatch):
     """When auto-detect picks Nous but credentials are revoked, fall through to OpenRouter."""
-    from hermes_cli.auth import AuthError
+    from eir_cli.auth import AuthError
 
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-or-key")
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
@@ -1704,7 +1704,7 @@ class TestProviderEntryApiKeyEnvAlias:
     use `api_key_env`) resolve correctly."""
 
     def test_snake_case_api_key_env_normalizes_to_key_env(self):
-        from hermes_cli.config import _normalize_custom_provider_entry
+        from eir_cli.config import _normalize_custom_provider_entry
         entry = {
             "name": "vendor",
             "base_url": "https://api.vendor.example.com/v1",
@@ -1717,7 +1717,7 @@ class TestProviderEntryApiKeyEnvAlias:
 
 
     def test_extra_body_is_supported_schema(self):
-        from hermes_cli.config import (
+        from eir_cli.config import (
             _VALID_CUSTOM_PROVIDER_FIELDS,
             _normalize_custom_provider_entry,
         )
@@ -1745,7 +1745,7 @@ class TestProviderEntryApiKeyEnvAlias:
 
 def test_minimax_oauth_runtime_returns_anthropic_messages_mode(monkeypatch):
     """resolve_runtime_provider for minimax-oauth must return api_mode='anthropic_messages'."""
-    from hermes_cli.auth import MINIMAX_OAUTH_GLOBAL_INFERENCE
+    from eir_cli.auth import MINIMAX_OAUTH_GLOBAL_INFERENCE
 
     monkeypatch.setattr(rp, "resolve_provider", lambda *a, **k: "minimax-oauth")
     monkeypatch.setattr(rp, "_get_model_config", lambda: {"provider": "minimax-oauth"})
@@ -1768,7 +1768,7 @@ def test_minimax_oauth_runtime_returns_anthropic_messages_mode(monkeypatch):
         "source": "oauth",
     }
 
-    import hermes_cli.auth as auth_mod
+    import eir_cli.auth as auth_mod
     monkeypatch.setattr(auth_mod, "resolve_minimax_oauth_runtime_credentials",
                         lambda **k: fake_creds)
 
@@ -2202,7 +2202,7 @@ def test_removed_keyless_free_provider_points_at_its_replacements(name):
     """The keyless OpenCode free tier is gone (the relay 403s anonymous traffic), so a persisted
     ``model.provider`` — or ``--provider`` — still naming it must fail with the removal hint
     naming both surviving OpenCode providers, not a bare "Unknown provider"."""
-    from hermes_cli.auth import AuthError, resolve_provider
+    from eir_cli.auth import AuthError, resolve_provider
 
     with pytest.raises(AuthError) as excinfo:
         resolve_provider(name)
@@ -2231,7 +2231,7 @@ def test_bare_custom_resolves_model_key_env_for_configured_base_url(monkeypatch)
     monkeypatch.setenv("CUSTOM_BASE_URL", "https://other.example.test/v1")
     assert rp.resolve_runtime_provider(requested="custom")["api_key"] == "no-key-required"
 
-    # Direct-alias rung (`hermes --resume` provider change, `/model` direct aliases pass explicit_base_url):
+    # Direct-alias rung (`eir --resume` provider change, `/model` direct aliases pass explicit_base_url):
     # the declared key follows the configured endpoint and stays home for any other endpoint.
     monkeypatch.delenv("CUSTOM_BASE_URL", raising=False)
     direct = rp.resolve_runtime_provider(requested="custom", explicit_base_url="https://api.example.test/v1")
@@ -2248,7 +2248,7 @@ def test_configured_key_env_resolving_empty_is_logged(monkeypatch, caplog):
         {"name": "scw", "base_url": "https://api.example.test/v1", "key_env": "UNSET_LLM_KEY", "model": "m"},
         {"name": "local", "base_url": "http://127.0.0.1:8080/v1", "model": "m"}]})
     monkeypatch.delenv("UNSET_LLM_KEY", raising=False)
-    with caplog.at_level("WARNING", logger="hermes_cli.runtime_provider"):
+    with caplog.at_level("WARNING", logger="eir_cli.runtime_provider"):
         assert rp.resolve_runtime_provider(requested="custom:scw")["api_key"] == "no-key-required"
         assert rp.resolve_runtime_provider(requested="custom:local")["api_key"] == "no-key-required"
     hits = [r for r in caplog.records if "UNSET_LLM_KEY" in r.getMessage()]

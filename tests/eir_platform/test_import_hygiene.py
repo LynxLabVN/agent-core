@@ -6,26 +6,26 @@ import subprocess
 import sys
 
 
-def test_platform_modules_only_import_stdlib_and_hermes_platform() -> None:
+def test_platform_modules_only_import_stdlib_and_eir_platform() -> None:
     root = Path(__file__).resolve().parents[2]
     code = """
 import sys
 before = set(sys.modules)
-import hermes_platform.host.facts
-import hermes_platform.host.gpu_adapters
-import hermes_platform.host.runtime
-import hermes_platform.host.products
-import hermes_platform.host.summary
-import hermes_platform.declaration
-import hermes_platform.resolver
-import hermes_platform.resolver.app
-import hermes_platform.resolver.availability
-import hermes_platform.resolver.known_dirs
+import eir_platform.host.facts
+import eir_platform.host.gpu_adapters
+import eir_platform.host.runtime
+import eir_platform.host.products
+import eir_platform.host.summary
+import eir_platform.declaration
+import eir_platform.resolver
+import eir_platform.resolver.app
+import eir_platform.resolver.availability
+import eir_platform.resolver.known_dirs
 new_top_levels = {name.partition('.')[0] for name in set(sys.modules) - before}
 unexpected = sorted(
     name
     for name in new_top_levels
-    if name not in sys.stdlib_module_names and not name.startswith('hermes_platform')
+    if name not in sys.stdlib_module_names and not name.startswith('eir_platform')
 )
 assert not unexpected, unexpected
 """

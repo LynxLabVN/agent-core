@@ -1,4 +1,4 @@
-"""``hermes fallback check`` — readiness of every fallback-chain entry without an agent session (#63852).
+"""``eir fallback check`` — readiness of every fallback-chain entry without an agent session (#63852).
 
 Static mode resolves each entry with the switch's own kwargs; ``--live`` sends one request on the
 client the swap builds. The live request never goes through ``call_llm``: its recovery ladder would
@@ -73,7 +73,7 @@ class EntryCheck:
 def _redacted(text: Any, secrets: tuple[str, ...] = (), max_chars: Optional[int] = None) -> str:
     """Known credential values removed first (pattern redaction misses keys without a known
     prefix), then the support redactor."""
-    from hermes_cli.debug_redaction import redact_debug_support_text
+    from eir_cli.debug_redaction import redact_debug_support_text
     text = str(text or "")
     for secret in secrets:
         text = text.replace(secret, "***")
@@ -143,10 +143,10 @@ def _without_sdk_retries(client: Any) -> Any:
 
 def check_entry_static(entry: dict[str, Any]) -> EntryCheck:
     """Resolve ``entry`` the way the fallback switch does; never sends an inference request."""
-    from hermes_cli.auth import AuthError
-    from hermes_cli.fallback_config import fallback_entry_runtime_kwargs
-    from hermes_cli.runtime_provider import resolve_runtime_provider
-    from hermes_cli.runtime_readiness import missing_credentials_suffix, runtime_has_credentials
+    from eir_cli.auth import AuthError
+    from eir_cli.fallback_config import fallback_entry_runtime_kwargs
+    from eir_cli.runtime_provider import resolve_runtime_provider
+    from eir_cli.runtime_readiness import missing_credentials_suffix, runtime_has_credentials
 
     # Lowercased as the swap's callers pass it, so ``provider: MoA`` is ``moa`` everywhere below.
     result = EntryCheck(provider=str(entry.get("provider") or "").strip().lower(), model=str(entry.get("model") or ""))
@@ -179,8 +179,8 @@ def check_entry_static(entry: dict[str, Any]) -> EntryCheck:
 def check_entry_live(entry: dict[str, Any], result: EntryCheck) -> EntryCheck:
     """Send one minimal completion for ``entry`` (already statically ready) and record the verdict."""
     from agent.auxiliary_client import _build_call_kwargs, _create_with_progress_once, _elapsed_ms, _provider_requires_stream
-    from hermes_cli.fallback_config import resolve_entry_api_key
-    from hermes_cli.timeouts import get_provider_request_timeout
+    from eir_cli.fallback_config import resolve_entry_api_key
+    from eir_cli.timeouts import get_provider_request_timeout
     from agent.error_classifier import classify_api_error
     from agent.route_binding import resolve_route_entry_client
 
@@ -277,11 +277,11 @@ def _judge_answer(result: EntryCheck, raw: Any, model: str, client: Any, secrets
 
 def run_checks(chain: list[dict[str, Any]], *, live: bool) -> list[EntryCheck]:
     """Static checks in chain order; with ``live``, probe the statically ready entries in parallel."""
-    from hermes_cli.left_core_migration import installs_held
+    from eir_cli.left_core_migration import installs_held
     with installs_held():  # a diagnostic: resolving a provider whose plugin left core must not install it
         results = [check_entry_static(entry) for entry in chain]
     if live:
-        from hermes_cli.doctor_connectivity import run_probes
+        from eir_cli.doctor_connectivity import run_probes
         # Not one fixed route, so one request proves nothing: ``auto`` picks its backend per call (and can
         # walk the chain); ``moa`` is a fan-out preset whose facade only an agent binds. Both stay static.
         # IMDS stays on: an EC2 instance role is a real Bedrock credential for an inference request.
@@ -311,10 +311,10 @@ def _print_table(results: list[EntryCheck], *, live: bool) -> None:
 
 
 def cmd_fallback_check(args) -> None:
-    """``hermes fallback check [--live] [--json]``; exits 1 when any entry is not ready."""
-    from hermes_cli.config import load_config_readonly
-    from hermes_cli.fallback_config import get_fallback_chain
-    from hermes_cli.profiles import get_active_profile_name
+    """``eir fallback check [--live] [--json]``; exits 1 when any entry is not ready."""
+    from eir_cli.config import load_config_readonly
+    from eir_cli.fallback_config import get_fallback_chain
+    from eir_cli.profiles import get_active_profile_name
 
     chain = get_fallback_chain(load_config_readonly())
     results = run_checks(chain, live=args.live)
@@ -326,7 +326,7 @@ def cmd_fallback_check(args) -> None:
             "results": [{**dataclasses.asdict(r), "ready": r.ready, "status": r.status} for r in results],
         }, indent=2))
     elif not results:
-        print("\n  No fallback providers configured. Add one with: hermes fallback add\n")
+        print("\n  No fallback providers configured. Add one with: eir fallback add\n")
     else:
         _print_table(results, live=args.live)
     if not ready:

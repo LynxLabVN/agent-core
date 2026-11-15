@@ -8,10 +8,10 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Dict, Optional
 
-from hermes_state_common import _RESET_CHILD_SQL, _sql_json_extract
+from eir_state_common import _RESET_CHILD_SQL, _sql_json_extract
 
 # Same logger the code used before extraction (record parity).
-_log = logging.getLogger("hermes_cli.web_server")
+_log = logging.getLogger("eir_cli.web_server")
 
 _DESCENDANTS_SQL = f"""
             WITH RECURSIVE descendants(id, parent_session_id, started_at) AS (
@@ -35,7 +35,7 @@ _DESCENDANTS_SQL = f"""
 # Desktop 0.22.2's ``readableError`` keeps the HTTP ``detail`` and shows its "app and backend are
 # on different versions" toast (with an Update action) for "out of sync (different versions)".
 CLIENT_UPGRADE_REQUIRED = ('client_upgrade_required: this app is out of sync (different versions) '
-                           'with the Hermes backend; update the app to edit sessions')
+                           'with the Eir backend; update the app to edit sessions')
 
 
 def _session_latest_descendant(session_id: str, db):
@@ -86,9 +86,9 @@ def _session_mutation_context(request, profile):
     """Use the same principal and profile boundary for prepare and apply."""
     from fastapi import HTTPException
     from gateway.session_contract import SessionActor
-    from hermes_cli.web_server import _has_valid_session_token
-    from hermes_cli.web_server_cron import _cron_profile_home
-    from hermes_state import _default_db_path
+    from eir_cli.web_server import _has_valid_session_token
+    from eir_cli.web_server_cron import _cron_profile_home
+    from eir_state import _default_db_path
 
     native = getattr(request.state, 'native_http_principal', None)
     session = getattr(request.state, 'session', None)
@@ -158,7 +158,7 @@ def _mutate_offline_store(profile, actor, params):
     second writer beside it); revision/generation/idle guards are the gateway's own.
     """
     from fastapi import HTTPException
-    from hermes_state_runtime import begin_runtime_epoch, mutate_runtime_session
+    from eir_state_runtime import begin_runtime_epoch, mutate_runtime_session
 
     def run():
         db = _open_session_db_for_profile(profile, read_only=False)
@@ -169,7 +169,7 @@ def _mutate_offline_store(profile, actor, params):
                 if errors:
                     raise HTTPException(status_code=400, detail={'errors': errors})
                 from functools import partial
-                from hermes_state_mutation_binding import import_history_control
+                from eir_state_mutation_binding import import_history_control
                 write_guard = partial(import_history_control, actor=actor,
                                       session_ids=tuple(item['session']['id'] for item in normalized))
             with db._read_ctx() as conn:
@@ -188,7 +188,7 @@ def _mutate_offline_store(profile, actor, params):
 async def _mutate_via_gateway_owner(profile, actor, params):
     """Forward a standalone dashboard mutation to the live gateway owner.
 
-    While a gateway serves the same home, a separately launched ``hermes
+    While a gateway serves the same home, a separately launched ``eir
     dashboard`` is not the store owner, so the offline path's
     exclusive-maintenance reservation can never win and every write action
     dies on a bare 409 (#138915). The owner exposes the same revision-fenced
@@ -213,11 +213,11 @@ async def _mutate_via_gateway_owner(profile, actor, params):
     """
     from fastapi import HTTPException
     from gateway.runtime_ownership import OwnershipConflict
-    from hermes_cli.gateway_client import GatewayClientError, GatewayRPCError, connect_gateway
-    from hermes_cli.gateway_runtime import discover_gateway_endpoint
-    from hermes_cli.gateway_runtime_discovery import DiscoveryError
-    from hermes_cli.web_server_cron import _cron_profile_home
-    from hermes_state import _default_db_path
+    from eir_cli.gateway_client import GatewayClientError, GatewayRPCError, connect_gateway
+    from eir_cli.gateway_runtime import discover_gateway_endpoint
+    from eir_cli.gateway_runtime_discovery import DiscoveryError
+    from eir_cli.web_server_cron import _cron_profile_home
+    from eir_state import _default_db_path
 
     home = Path(_cron_profile_home(profile)[1]) if profile else Path(_default_db_path()).parent
     # Discovery is read-only and never starts a gateway.
@@ -275,9 +275,9 @@ async def _mutate_session_request(request, profile, session_id, *, request_id,
     from fastapi import HTTPException
     from gateway.session_contract import SessionRef
     from gateway.session_mutations import mutate_session
-    from hermes_cli.gateway_client import GatewayClientError
-    from hermes_state_mutation_guards import MUTATION_GUARD_REFUSALS
-    from hermes_state_runtime import RuntimeStoreError
+    from eir_cli.gateway_client import GatewayClientError
+    from eir_state_mutation_guards import MUTATION_GUARD_REFUSALS
+    from eir_state_runtime import RuntimeStoreError
 
     authority, actor = _session_mutation_context(request, profile)
     if operation == 'import' and authority is not None:
@@ -322,8 +322,8 @@ def _with_session_maintenance(profile, operation, *args):
     """Offline bulk actions reserve the exact owner lock through final DB close."""
     from fastapi import HTTPException
     from gateway.runtime_ownership import OwnershipConflict, exclusive_maintenance
-    from hermes_cli.web_server_cron import _cron_profile_home
-    from hermes_state import _default_db_path
+    from eir_cli.web_server_cron import _cron_profile_home
+    from eir_state import _default_db_path
 
     home = Path(_cron_profile_home(profile)[1]) if profile else Path(_default_db_path()).parent
     try:
@@ -338,7 +338,7 @@ def _with_session_maintenance(profile, operation, *args):
 
 def _session_db_read_probe_statements() -> tuple:
     """Probe the declared schema without reconciling it on a browsing request."""
-    from hermes_state_schema import schema_read_probe_statements
+    from eir_state_schema import schema_read_probe_statements
 
     return schema_read_probe_statements()
 
@@ -355,9 +355,9 @@ def _open_session_db_at_path(db_path: Path, *, read_only: bool):
     import sqlite3
 
     from fastapi import HTTPException
-    from hermes_state import SessionDB
-    from hermes_state_errors import is_transient_sqlite_error
-    from hermes_state_registry import acquire
+    from eir_state import SessionDB
+    from eir_state_errors import is_transient_sqlite_error
+    from eir_state_registry import acquire
 
     if not read_only:
         return acquire(db_path)
@@ -371,7 +371,7 @@ def _open_session_db_at_path(db_path: Path, *, read_only: bool):
             status_code=503,
             detail="Session store is not initialized. Start this profile's gateway to initialize it.")
 
-    from hermes_state_reconcile import (
+    from eir_state_reconcile import (
         DeclarativeDriftError, is_declarative_drift_error, reconcile_drift_for_browse,
     )
 
@@ -403,26 +403,26 @@ def _open_session_db_at_path(db_path: Path, *, read_only: bool):
                 raise HTTPException(status_code=503, detail=str(drift)) from exc
             return _open_probed()
     except (sqlite3.DatabaseError, UnicodeDecodeError) as exc:
-        from hermes_state_errors import is_malformed_db_error
+        from eir_state_errors import is_malformed_db_error
         if isinstance(exc, sqlite3.DatabaseError) and is_malformed_db_error(exc):
             # Same structured 503 the analytics routers publish (``corrupt_store_as_status``): a
-            # corrupt image names the repair (`hermes doctor`), never a generic "schema unavailable".
-            from hermes_cli.web_routers._common import corrupt_store_status
+            # corrupt image names the repair (`eir doctor`), never a generic "schema unavailable".
+            from eir_cli.web_routers._common import corrupt_store_status
             raise corrupt_store_status(db_path, exc) from exc
         if isinstance(exc, sqlite3.OperationalError) and is_transient_sqlite_error(exc):
             detail = "Session store is busy (disk I/O or lock). Retry; the list was not cleared."
         else:
             detail = (
                 "Session store schema is unavailable or corrupt. Start or restart this profile's "
-                "gateway to reconcile it; if it persists, run `hermes doctor` for diagnosis. "
+                "gateway to reconcile it; if it persists, run `eir doctor` for diagnosis. "
                 "Browsing does not repair the store.")
         raise HTTPException(status_code=503, detail=detail) from exc
 
 
 def _session_db_path_for_profile(profile: Optional[str]) -> Path:
     """state.db path for ``profile`` (None/empty = this process's own)."""
-    from hermes_cli.web_server_cron import _cron_profile_home
-    from hermes_state import _default_db_path
+    from eir_cli.web_server_cron import _cron_profile_home
+    from eir_state import _default_db_path
 
     if profile:
         _name, home = _cron_profile_home(profile)
@@ -459,26 +459,26 @@ def _maybe_auto_archive_for_profile(profile: Optional[str]) -> None:
             return
         _last_auto_archive_check[key] = now
 
-        from hermes_cli.config import load_config as _load_full_config
-        from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+        from eir_cli.config import load_config as _load_full_config
+        from eir_constants import reset_eir_home_override, set_eir_home_override
 
         # The config that governs a store is the one in that store's OWN home. A zero-arg
-        # load_config() resolves through the PROCESS HERMES_HOME, so the dashboard swept every
+        # load_config() resolves through the PROCESS EIR_HOME, so the dashboard swept every
         # profile's sessions with the launch profile's sessions.auto_archive/auto_archive_days —
         # one profile's retention silently decided another's.
         profile_home = _session_db_path_for_profile(profile).parent
-        _home_token = set_hermes_home_override(str(profile_home))
+        _home_token = set_eir_home_override(str(profile_home))
         try:
             cfg = (_load_full_config().get("sessions") or {})
         finally:
-            reset_hermes_home_override(_home_token)
+            reset_eir_home_override(_home_token)
         if not cfg.get("auto_archive", False):
             return
-        from hermes_cli.profiles import _check_gateway_running
+        from eir_cli.profiles import _check_gateway_running
 
         # A live gateway owns this profile's store and runs the same sweep on its own
         # housekeeping tick ("state.db maintenance tick" in gateway/run.py, profile-scoped so a
-        # multiplexed secondary's store is swept too). Opening it WRITABLE from `hermes
+        # multiplexed secondary's store is swept too). Opening it WRITABLE from `eir
         # serve` adds a second writer to a database another process is already archiving,
         # for zero extra coverage (#110405). `_check_gateway_running` is the canonical
         # per-profile predicate (`_maybe_run_skill_maintenance` below uses it): its
@@ -501,9 +501,9 @@ def _skill_maintenance_idle_for(started_at: float) -> Optional[float]:
     """Measure chat inactivity, not socket inactivity (Desktop stays connected)."""
     import tui_gateway.server as gateway
 
-    from hermes_constants import get_hermes_home
+    from eir_constants import get_eir_home
 
-    home = get_hermes_home().resolve()
+    home = get_eir_home().resolve()
     with gateway._sessions_lock:
         sessions = [session for session in gateway._sessions.values()
                     if Path(session.get("profile_home") or home).resolve() == home]
@@ -516,14 +516,14 @@ def _skill_maintenance_idle_for(started_at: float) -> Optional[float]:
 
 
 def _maybe_run_skill_maintenance(started_at: float) -> None:
-    from hermes_constants import get_hermes_home
-    from hermes_cli.profiles import _check_gateway_running
+    from eir_constants import get_eir_home
+    from eir_cli.profiles import _check_gateway_running
 
     # A live messaging gateway already owns these chores for this profile.
-    if _check_gateway_running(get_hermes_home()):
+    if _check_gateway_running(get_eir_home()):
         return
 
-    from hermes_cli.plugins_idle_tasks import run_idle_jobs
+    from eir_cli.plugins_idle_tasks import run_idle_jobs
 
     try:
         idle_for = _skill_maintenance_idle_for(started_at)

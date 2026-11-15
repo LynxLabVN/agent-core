@@ -1,4 +1,4 @@
-"""`hermes skin set` — deterministic single-color tweak of the active skin.
+"""`eir skin set` — deterministic single-color tweak of the active skin.
 
 The whole point is that changing one token never disturbs the rest of the look
 (background especially), which hand-authoring kept getting wrong.
@@ -7,20 +7,20 @@ The whole point is that changing one token never disturbs the rest of the look
 import os
 
 import pytest
-import hermes_yaml as yaml
+import eir_yaml as yaml
 
-from hermes_cli import skin_cmd
-from hermes_constants import get_hermes_home
+from eir_cli import skin_cmd
+from eir_constants import get_eir_home
 
 
 def _skins():
-    d = get_hermes_home() / "skins"
+    d = get_eir_home() / "skins"
     d.mkdir(parents=True, exist_ok=True)
     return d
 
 
 def _activate(name: str) -> None:
-    (get_hermes_home() / "config.yaml").write_text(f"display:\n  skin: {name}\n", encoding="utf-8")
+    (get_eir_home() / "config.yaml").write_text(f"display:\n  skin: {name}\n", encoding="utf-8")
 
 
 def test_set_edits_active_user_skin_in_place_preserving_everything_else():
@@ -52,7 +52,7 @@ def test_set_forks_a_builtin_without_inventing_a_background():
     assert "background" not in data["colors"]
     # full palette carried over, and it became active.
     assert data["colors"].get("banner_title")
-    assert (get_hermes_home() / "config.yaml").read_text().find("default-custom") != -1
+    assert (get_eir_home() / "config.yaml").read_text().find("default-custom") != -1
 
 
 def test_set_rejects_non_hex():

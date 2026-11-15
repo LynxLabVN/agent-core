@@ -1,4 +1,4 @@
-"""Catalog-aware ``hermes plugins`` surface (hermes_cli/plugins_cmd_catalog.py): a bare catalog name installs
+"""Catalog-aware ``eir plugins`` surface (eir_cli/plugins_cmd_catalog.py): a bare catalog name installs
 the PINNED sha and records provenance; the kill list blocks every install path (CLI needs an explicit
 bypass, dashboard/TUI have none); ``update`` re-pins instead of pulling. Real git, file:// repos."""
 
@@ -12,9 +12,9 @@ from pathlib import Path
 
 import pytest
 
-from hermes_cli import plugin_catalog as pc_cat
-from hermes_cli import plugins_cmd as pc
-from hermes_cli import plugins_cmd_catalog as cat
+from eir_cli import plugin_catalog as pc_cat
+from eir_cli import plugins_cmd as pc
+from eir_cli import plugins_cmd_catalog as cat
 from tests.pm._fixtures import client, isolated_python
 
 pytestmark = pytest.mark.skipif(shutil.which("git") is None, reason="git not available")
@@ -44,13 +44,13 @@ def world(client, tmp_path, monkeypatch):
     home = tmp_path / "home"
     plugins_dir = home / "plugins"
     plugins_dir.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     monkeypatch.setattr(pc, "_plugins_dir", lambda: plugins_dir)
     monkeypatch.setattr(pc, "_scan_on_install_enabled", lambda: False)
     monkeypatch.setattr(pc, "_console", lambda: type("C", (), {"print": lambda *a, **k: None})())
 
     def publish_without_environment(*_args, plugins=None, **_kwargs):
-        from hermes_cli.runtime_state import finish_publication
+        from eir_cli.runtime_state import finish_publication
         from pm import paths
         from pm.plugin_inputs import Selection, StagedUpdate
         from pm.publication import PluginSelection, StagedPlugin
@@ -85,7 +85,7 @@ def _head(path: Path) -> str:
 
 
 def test_catalog_platform_mismatch_refuses_before_install(world):
-    from hermes_platform.host.facts import os_family
+    from eir_platform.host.facts import os_family
     host = os_family()
     other = "linux" if host == "windows" else "windows"
     entry = pc_cat.PluginCatalogEntry(
@@ -135,7 +135,7 @@ def test_kill_list_blocks_cli_dashboard_and_tui_paths(world, monkeypatch):
 
 
 def test_the_catalog_name_you_installed_with_works_for_every_later_verb(world, tmp_path):
-    """17 catalog entries install under a different manifest name (`hermes-memory-wiki` lands as
+    """17 catalog entries install under a different manifest name (`eir-memory-wiki` lands as
     `plugins/memory-wiki`). Every later verb must accept the name the user typed at install, resolved
     through the installer's own record; a URL install shipping a forged sidecar must not claim it."""
     repo = world["repo"]
@@ -163,7 +163,7 @@ def test_the_catalog_name_you_installed_with_works_for_every_later_verb(world, t
 
 
 def test_custom_install_records_an_anonymous_extension_install_and_reinstall_none(world, monkeypatch):
-    import hermes_cli.observability.shared_metrics_events as events
+    import eir_cli.observability.shared_metrics_events as events
 
     calls = []
     monkeypatch.setattr(events, "record_extension_install", lambda **kw: calls.append(kw))
@@ -174,9 +174,9 @@ def test_custom_install_records_an_anonymous_extension_install_and_reinstall_non
 
 
 def test_owner_repo_hash_subdir_shorthand_resolves_like_the_catalog_spelling():
-    from hermes_cli.plugins_cmd import _resolve_git_url
-    assert _resolve_git_url("plastic-labs/honcho#hermes-plugin-honcho") == (
-        "https://github.com/plastic-labs/honcho.git", "hermes-plugin-honcho")
+    from eir_cli.plugins_cmd import _resolve_git_url
+    assert _resolve_git_url("plastic-labs/honcho#eir-plugin-honcho") == (
+        "https://github.com/plastic-labs/honcho.git", "eir-plugin-honcho")
     assert _resolve_git_url("owner/repo") == ("https://github.com/owner/repo.git", None)
 
 
@@ -194,7 +194,7 @@ def _install_url(repo: Path, name: str, files: dict) -> Path:
 
 def test_in_tree_sidecar_cannot_forge_catalog_provenance(world, tmp_path):
     """Provenance is the installer's metadata record, never a file the repo ships: a URL install carrying
-    its own .hermes-catalog.json is not a catalog install and does not mark the real entry installed."""
+    its own .eir-catalog.json is not a catalog install and does not mark the real entry installed."""
     forged = json.dumps({"catalog_name": "cat-plugin", "tier": "official", "sha": "0" * 40, "repo": "x"})
     target = _install_url(tmp_path / "evil", "evil-plugin", {cat.CATALOG_SIDECAR: forged})
     assert (target / cat.CATALOG_SIDECAR).exists()  # the file is there, and inert
@@ -361,8 +361,8 @@ def test_repin_keeps_a_wholly_ignored_data_dir_in_a_git_checkout(world):
 def test_kill_list_covers_update_enable_and_load_of_an_installed_plugin(world, tmp_path, monkeypatch):
     """A URL install whose name lands on the kill list AFTER install must stop pulling, cannot be enabled
     and is refused at load; an install made with --allow-removed keeps working."""
-    from hermes_cli.plugins_discovery import gate_manifest
-    from hermes_cli.plugins_manifest import PluginManifest
+    from eir_cli.plugins_discovery import gate_manifest
+    from eir_cli.plugins_manifest import PluginManifest
     target = _install_url(tmp_path / "later-killed", "killed", {})
     world["state"]["removed"].append(pc_cat.RemovedEntry(name="killed", reason="backdoor"))
     monkeypatch.setattr(pc_cat, "_live_cache_path", lambda: tmp_path / "no-cache.json")
@@ -386,7 +386,7 @@ def _recall_after_install(world, tmp_path, monkeypatch, name: str = "killed") ->
 
 
 def test_plugin_pack_install_refuses_a_recalled_plugin(world):
-    from hermes_cli.plugin_packs import PackPluginEntry, PluginPack, ResolvedPackPlugin, install_pack_plugins
+    from eir_cli.plugin_packs import PackPluginEntry, PluginPack, ResolvedPackPlugin, install_pack_plugins
     world["state"]["removed"].append(
         pc_cat.RemovedEntry(name="cat-plugin", repo=world["repo"].as_uri(), reason="malware"))
     entry = PackPluginEntry(ref=world["sha1"], repo=world["repo"].as_uri())
@@ -399,7 +399,7 @@ def test_plugin_pack_install_refuses_a_recalled_plugin(world):
 
 
 def test_plugin_pack_refuses_a_bare_name_whose_catalog_name_is_recalled(world, monkeypatch):
-    from hermes_cli.plugin_packs import PackPluginEntry, PluginPack, install_pack_plugins, resolve_pack_plugins
+    from eir_cli.plugin_packs import PackPluginEntry, PluginPack, install_pack_plugins, resolve_pack_plugins
     monkeypatch.setattr(pc_cat, "load_catalog", lambda catalog_dir=None: [pc_cat.PluginCatalogEntry(
         name="cat-entry", repo=world["repo"].as_uri(), sha=world["sha1"], description="d", maintainer="t")])
     world["state"]["removed"].append(pc_cat.RemovedEntry(name="cat-entry", reason="malware"))
@@ -435,7 +435,7 @@ def test_enable_of_a_recalled_plugin_installed_with_allow_removed_still_works(wo
 
 @pytest.mark.parametrize("exempt", [False, True])
 def test_plugins_picker_refuses_to_turn_on_a_recalled_plugin(world, tmp_path, monkeypatch, capsys, exempt):
-    """The bare `hermes plugins` picker saves ticked rows through admission, not `_set_plugin_enabled`, so it
+    """The bare `eir plugins` picker saves ticked rows through admission, not `_set_plugin_enabled`, so it
     checks the kill list itself before admission (real cmd_toggle, text fallback); --allow-removed still exempts."""
     _recall_after_install(world, tmp_path, monkeypatch)
     if exempt:
@@ -533,7 +533,7 @@ def test_memory_category_install_activates_via_memory_provider_not_plugins_enabl
                                                                                   init, enable):
     """A memory provider activates through memory.provider alone — the loader never consults
     plugins.enabled — so "Enable now?" must select the provider, and a decline must point at
-    `hermes memory setup`, never at the dead-end `plugins enable` hint. Catalog category "memory" also
+    `eir memory setup`, never at the dead-end `plugins enable` hint. Catalog category "memory" also
     holds hook plugins: those enable normally and leave the user's memory.provider alone, even when their
     docstring names MemoryProvider (the loader would return None for them)."""
     repo = world["repo"]
@@ -562,7 +562,7 @@ def test_memory_category_install_activates_via_memory_provider_not_plugins_enabl
     pc.cmd_install("cat-plugin", enable=enable)
     assert pc._get_current_memory_provider() == ("cat-plugin" if enable else "")
     assert pc._get_enabled_set() == set()
-    assert any("hermes memory setup" in line for line in printed)
+    assert any("eir memory setup" in line for line in printed)
     assert not any("plugins enable cat-plugin" in line for line in printed)
 
 
@@ -572,7 +572,7 @@ def test_url_install_of_a_memory_provider_dir_gets_the_provider_hint(world, tmp_
     provider activation path — the catalog category is a shortcut, not the only trigger. An explicit
     --enable must leave the provider loadable: a plugins.disabled entry would make the loader refuse it,
     and a reinstall must repair the old state that listed the provider in plugins.enabled instead."""
-    from hermes_cli.config import load_config, save_config
+    from eir_cli.config import load_config, save_config
     from plugins.memory import _explicitly_disabled, find_provider_dir
 
     repo = tmp_path / "mem-repo"
@@ -690,7 +690,7 @@ def test_brief_install_prints_the_pin_and_outcome_and_a_restart_hint_only_for_a_
     printed: list = []
     monkeypatch.setattr(pc, "_console", lambda: type("C", (), {"print": lambda self, *a, **k: printed.extend(a)})())
     monkeypatch.setattr("gateway.status.get_running_pid", lambda *a, **k: gateway_pid)  # no reload answered
-    monkeypatch.setattr("hermes_cli.gateway._installed_service_kind", lambda: None)
+    monkeypatch.setattr("eir_cli.gateway._installed_service_kind", lambda: None)
 
     pc.cmd_install("cat-plugin", enable=True, brief=True)
 

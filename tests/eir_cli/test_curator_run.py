@@ -1,4 +1,4 @@
-"""Tests for `hermes curator run` CLI behavior."""
+"""Tests for `eir curator run` CLI behavior."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ def _args(**kwargs):
 
 def test_run_defaults_to_synchronous(monkeypatch, capsys):
     import agent.curator as curator_state
-    import hermes_cli.curator as curator_cli
+    import eir_cli.curator as curator_cli
 
     calls = []
     monkeypatch.setattr(curator_state, "is_enabled", lambda: True)

@@ -10,16 +10,16 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
-from hermes_cli import gateway_connections as store
-from hermes_cli import gateway_connections_probe as probe
-from hermes_cli import gateway_connections_ssh as ssh
-from hermes_cli import web_server
+from eir_cli import gateway_connections as store
+from eir_cli import gateway_connections_probe as probe
+from eir_cli import gateway_connections_ssh as ssh
+from eir_cli import web_server
 
 
 @pytest.fixture
 def connection(monkeypatch, tmp_path):
     monkeypatch.setenv("HOME", str(tmp_path))
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path / ".eir"))
     return store.save_connection({"kind": "ssh", "label": "Fixture SSH", "host": "fixture.example",
                                   "user": "fixture", "remoteProfile": "research"})[0]
 
@@ -31,7 +31,7 @@ def status_server():
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
-            seen.append((self.path, self.headers.get("X-Hermes-Session-Token")))
+            seen.append((self.path, self.headers.get("X-Eir-Session-Token")))
             self.send_response(state["status"])
             self.send_header("Content-Type", "application/json")
             self.end_headers()

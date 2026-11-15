@@ -45,7 +45,7 @@ def stamp_product(root, product, out):
 
 
 def test_source_build_uses_selected_python_for_isolated_icon_child(tmp_path, monkeypatch):
-    from hermes_cli.source_build import source_build_env
+    from eir_cli.source_build import source_build_env
     from pm import paths
     from pm.environments import site_packages, venv_python
 
@@ -60,13 +60,13 @@ def test_source_build_uses_selected_python_for_isolated_icon_child(tmp_path, mon
     monkeypatch.syspath_prepend(str(selected))
 
     env = source_build_env()
-    assert env["HERMES_PYTHON"] == str(venv_python(venv))
-    subprocess.run([env["HERMES_PYTHON"], "-I", "-c",
+    assert env["EIR_PYTHON"] == str(venv_python(venv))
+    subprocess.run([env["EIR_PYTHON"], "-I", "-c",
                     "import icon_dependency; assert icon_dependency.ready"], check=True)
 
 
 def test_automatic_build_preserves_pm_admission_intent(monkeypatch):
-    from hermes_cli.source_build import source_build_env
+    from eir_cli.source_build import source_build_env
 
     intent = []
     def acquire(name, *, base_env, explicit, verify=True):
@@ -78,11 +78,11 @@ def test_automatic_build_preserves_pm_admission_intent(monkeypatch):
 
 
 def test_installed_pnpm_does_not_authorize_missing_workspace_dependencies(source_checkout, monkeypatch):
-    from hermes_cli.source_build import prepare_source_dependencies, source_build_env
+    from eir_cli.source_build import prepare_source_dependencies, source_build_env
 
     root, _ = source_checkout
     env = source_build_env()
-    monkeypatch.setenv("HERMES_DISABLE_LAZY_INSTALLS", "1")
+    monkeypatch.setenv("EIR_DISABLE_LAZY_INSTALLS", "1")
     with pytest.raises(subprocess.CalledProcessError):
         prepare_source_dependencies(root, ("ui-tui", "web"), env=env)
     assert _events(root) == []
@@ -98,11 +98,11 @@ def source_checkout(tmp_path, monkeypatch):
     assert node and pnpm, "source-build integration requires node and pnpm"
     home = tmp_path / "home"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.setenv("HERMES_RUNTIME_DIR", str(tmp_path / "tools"))
-    monkeypatch.setenv("HERMES_DISABLE_LAZY_INSTALLS", "0")
+    monkeypatch.setenv("EIR_HOME", str(home))
+    monkeypatch.setenv("EIR_RUNTIME_DIR", str(tmp_path / "tools"))
+    monkeypatch.setenv("EIR_DISABLE_LAZY_INSTALLS", "0")
     monkeypatch.setenv("ESBUILD_BINARY_PATH", "/wrong/esbuild")
-    monkeypatch.setenv("HERMES_PYTHON", "/wrong/python")
+    monkeypatch.setenv("EIR_PYTHON", "/wrong/python")
     (home / "npmrc").write_text(
         "fund=false\nnode-get-windows-binary-host-mirror=https://mirror.invalid/get-windows/\n"
         "//registry.invalid/:_authToken=npmrc-secret\nelectron-mirror=${MIRROR_BASE}/electron/\n"
@@ -150,7 +150,7 @@ def source_checkout(tmp_path, monkeypatch):
     (root / "log.mjs").write_text(
         "import { appendFileSync } from 'node:fs';\n"
         "appendFileSync('events.jsonl', JSON.stringify({step: process.argv[2], "
-        "python: process.env.HERMES_PYTHON, ci: process.env.CI, "
+        "python: process.env.EIR_PYTHON, ci: process.env.CI, "
         "esbuild: process.env.ESBUILD_BINARY_PATH, "
         "npmrc: process.env.NPM_CONFIG_USERCONFIG, store: process.env.pnpm_config_store_dir, "
         "mirror: process.env.npm_config_node_get_windows_binary_host_mirror, "
@@ -204,7 +204,7 @@ def source_products(source_checkout):
     for script, step, output in [
         ("generate-icons.mjs", "icons", "never-rendered-at-install"),
         ("build/tui.mjs", "tui", "ui-tui/dist/entry.js"),
-        ("build/web.mjs", "web", "hermes_cli/web_dist/index.html"),
+        ("build/web.mjs", "web", "eir_cli/web_dist/index.html"),
     ]:
         relative = "../../" if script.startswith("build/") else "../"
         (root / "scripts" / script).write_text(
@@ -216,7 +216,7 @@ def source_products(source_checkout):
         "import { build } from '../../product.mjs';\n"
         "const flag = '-c.directories.output=';\n"
         "const staging = process.argv.find(arg => arg.startsWith(flag)).slice(flag.length);\n"
-        "build('desktop', relative('../..', staging) + '/linux-unpacked/hermes');\n",
+        "build('desktop', relative('../..', staging) + '/linux-unpacked/eir');\n",
         encoding="utf-8",
     )
     (root / "scripts/build/build-desktop.mjs").write_text(
@@ -236,7 +236,7 @@ def _events(root):
 
 @pytest.mark.platforms("posix")
 def test_preparation_reuses_only_the_exact_completed_workspace_union(source_checkout):
-    from hermes_cli.source_build import prepare_source_dependencies, source_build_env
+    from eir_cli.source_build import prepare_source_dependencies, source_build_env
 
     root, acquired = source_checkout
     before = (root / "pnpm-lock.yaml").read_bytes()
@@ -244,10 +244,10 @@ def test_preparation_reuses_only_the_exact_completed_workspace_union(source_chec
     prepare_source_dependencies(root, ("ui-tui", "web"), env=env)
     first = _events(root)
     assert [event["step"] for event in first] == ["deps"]
-    assert first[0]["python"] == env["HERMES_PYTHON"]
+    assert first[0]["python"] == env["EIR_PYTHON"]
     assert first[0]["ci"] == "1"
     assert "esbuild" not in first[0]
-    assert first[0]["npmrc"] == str(Path(os.environ["HERMES_HOME"]) / "npmrc")
+    assert first[0]["npmrc"] == str(Path(os.environ["EIR_HOME"]) / "npmrc")
     # npmrc settings reach install scripts as npm did it (node-pre-gyp mirrors); credentials never do.
     assert first[0]["mirror"] == "https://mirror.invalid/get-windows/"
     assert first[0]["electron"] == "https://mirror.invalid/electron/"
@@ -255,9 +255,9 @@ def test_preparation_reuses_only_the_exact_completed_workspace_union(source_chec
     assert first[0]["leaked"] is False
     # Updates and builds keep pnpm's default download retries; only a launch lowers them.
     assert "retries" not in first[0]
-    # pnpm's store lives under the Hermes root, never the user's XDG data dir.
-    assert first[0]["store"] == str(Path(os.environ["HERMES_HOME"]) / "cache/pnpm/store")
-    assert (Path(os.environ["HERMES_HOME"]) / "cache/pnpm/store").is_dir()
+    # pnpm's store lives under the Eir root, never the user's XDG data dir.
+    assert first[0]["store"] == str(Path(os.environ["EIR_HOME"]) / "cache/pnpm/store")
+    assert (Path(os.environ["EIR_HOME"]) / "cache/pnpm/store").is_dir()
     assert (root / "ui-tui/node_modules/fixture-dep").exists()
     assert (root / "web/node_modules/fixture-dep").exists()
     assert not (root / "apps/desktop/node_modules").exists()
@@ -291,11 +291,11 @@ def test_preparation_reuses_only_the_exact_completed_workspace_union(source_chec
 @pytest.mark.platforms("linux")
 @pytest.mark.parametrize("desktop", [False, True])
 def test_update_builds_selected_products_after_one_union_preparation(source_products, desktop):
-    from hermes_cli.source_build import build_update_products
-    from hermes_cli.main_web_build import _web_ui_build_needed
+    from eir_cli.source_build import build_update_products
+    from eir_cli.main_web_build import _web_ui_build_needed
 
     root, acquired = source_products
-    app = root / "apps/desktop/release/linux-unpacked/hermes"
+    app = root / "apps/desktop/release/linux-unpacked/eir"
     app.parent.mkdir(parents=True)
     app.write_text("previous app")
     build_update_products(root, desktop=desktop)
@@ -303,7 +303,7 @@ def test_update_builds_selected_products_after_one_union_preparation(source_prod
     assert steps == ["deps", "tui", "web"] + (["desktop"] if desktop else [])
     assert acquired == ["pnpm"]
     assert (root / "ui-tui/dist/entry.js").read_text() == "tui"
-    assert (root / "hermes_cli/web_dist/index.html").read_text() == "web"
+    assert (root / "eir_cli/web_dist/index.html").read_text() == "web"
     assert not _web_ui_build_needed(root / "web")
     assert (root / "apps/desktop/node_modules").exists() == desktop
     assert not (root / "unrelated/node_modules").exists()
@@ -313,7 +313,7 @@ def test_update_builds_selected_products_after_one_union_preparation(source_prod
 
 @pytest.mark.platforms("linux")
 def test_update_recompiles_only_products_whose_inputs_changed(source_products):
-    from hermes_cli.source_build import build_update_products
+    from eir_cli.source_build import build_update_products
 
     root, _ = source_products
 
@@ -335,10 +335,10 @@ def test_update_recompiles_only_products_whose_inputs_changed(source_products):
 @pytest.mark.platforms("linux")
 @pytest.mark.parametrize("step", ["tui", "web", "desktop"])
 def test_update_failure_raises_without_retries_or_replacing_live_app(source_products, step):
-    from hermes_cli.source_build import ProductBuildError, build_update_products
+    from eir_cli.source_build import ProductBuildError, build_update_products
 
     root, acquired = source_products
-    app = root / "apps/desktop/release/linux-unpacked/hermes"
+    app = root / "apps/desktop/release/linux-unpacked/eir"
     app.parent.mkdir(parents=True)
     app.write_text("previous app")
     (root / f"fail-{step}").touch()
@@ -354,7 +354,7 @@ def test_update_failure_raises_without_retries_or_replacing_live_app(source_prod
     if step == "desktop":
         # A failed desktop build never replaces the live app nor stamps it.
         assert app.read_text() == "previous app"
-        assert not (Path(os.environ["HERMES_HOME"]) / "desktop-build-stamp.json").exists()
+        assert not (Path(os.environ["EIR_HOME"]) / "desktop-build-stamp.json").exists()
 
 
 @pytest.mark.platforms("linux")
@@ -362,8 +362,8 @@ def test_update_failure_raises_without_retries_or_replacing_live_app(source_prod
 def test_unbuilt_desktop_is_named_on_one_whole_line(source_products, monkeypatch, capsys, failure):
     # The Desktop hand-off keys on this line: the receipt follow-up is truncated and leads with
     # whichever product failed first, and a pnpm acquisition failure used to escape un-named.
-    import hermes_cli.main_install_repair as install_repair
-    from hermes_cli.source_build import ProductBuildError, build_update_products
+    import eir_cli.main_install_repair as install_repair
+    from eir_cli.source_build import ProductBuildError, build_update_products
 
     root, _ = source_products
 
@@ -390,7 +390,7 @@ def test_unbuilt_desktop_is_named_on_one_whole_line(source_products, monkeypatch
 def test_desktop_dependency_failure_still_builds_the_tui_and_web_ui(source_products, capsys):
     # A host whose compiler rejects a Desktop-only native addon (node-pty on g++ 9) used to lose
     # every frontend with it: the union install failed and nothing was built.
-    from hermes_cli.source_build import ProductBuildError, build_update_products
+    from eir_cli.source_build import ProductBuildError, build_update_products
 
     root, _ = source_products
     manifest = root / "apps/desktop/package.json"
@@ -403,7 +403,7 @@ def test_desktop_dependency_failure_still_builds_the_tui_and_web_ui(source_produ
     assert not (root / "apps/desktop/node_modules").exists()
     out = capsys.readouterr().out
     assert "Desktop app build owed: desktop dependencies failed" in out
-    assert "hermes uninstall --gui" in out
+    assert "eir uninstall --gui" in out
 
 
 @pytest.mark.platforms("linux")
@@ -414,18 +414,18 @@ def test_module_cli_builds_the_requested_products(source_products, desktop, monk
     root, acquired = source_products
     monkeypatch.setattr(sys, "argv", ["source_build", "--source", str(root)] + (["--desktop"] if desktop else []))
     # run_module exercises __main__ while substituting only tool acquisition.
-    monkeypatch.delitem(sys.modules, "hermes_cli.source_build", raising=False)
-    runpy.run_module("hermes_cli.source_build", run_name="__main__")
+    monkeypatch.delitem(sys.modules, "eir_cli.source_build", raising=False)
+    runpy.run_module("eir_cli.source_build", run_name="__main__")
     assert acquired == ["pnpm"]
-    assert (root / "hermes_cli/web_dist/index.html").is_file()
-    assert (root / "apps/desktop/release/linux-unpacked/hermes").exists() == desktop
+    assert (root / "eir_cli/web_dist/index.html").is_file()
+    assert (root / "apps/desktop/release/linux-unpacked/eir").exists() == desktop
 
 
 @pytest.mark.platforms("posix")
 def test_packaged_desktop_is_reused_only_while_it_names_head(tmp_path, monkeypatch):
     """The update skips the desktop build only when the shipped app's baked commit is HEAD
     and its receipt is current; a moved HEAD or an unreadable stamp means build."""
-    from hermes_cli import main_desktop
+    from eir_cli import main_desktop
 
     root = tmp_path / "checkout"
     root.mkdir()
@@ -433,7 +433,7 @@ def test_packaged_desktop_is_reused_only_while_it_names_head(tmp_path, monkeypat
     subprocess.run([*git[:3], "init", "-q"], check=True)
     subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "one"], check=True)
     desktop_dir = root / "apps/desktop"
-    exe = desktop_dir / "release/app/Hermes"
+    exe = desktop_dir / "release/app/Eir"
     monkeypatch.setattr(main_desktop, "_desktop_packaged_executable", lambda _d: exe)
     resources = main_desktop._packaged_resources_dir(desktop_dir)
     (resources / "app.asar.unpacked/dist").mkdir(parents=True)
@@ -459,14 +459,14 @@ def test_packaged_desktop_is_reused_only_while_it_names_head(tmp_path, monkeypat
 
 @pytest.mark.parametrize("enabled", [False, True])
 def test_update_rebuilds_the_webapp_bundle_a_home_serves(tmp_path, monkeypatch, enabled):
-    """``hermes update`` rebuilds ``apps/desktop/dist-webapp``, with the function ``hermes webapp``
+    """``eir update`` rebuilds ``apps/desktop/dist-webapp``, with the function ``eir webapp``
     uses, when any home sharing this install has ``webapp.enabled``: that home's gateway serves the
     bundle as built, so an old one would talk to the updated backend. Otherwise it is left alone."""
-    import hermes_cli.left_core_migration as left_core
-    import hermes_cli.main_install_repair as install_repair
-    import hermes_cli.memory_provider_migration as memory_migration
-    from hermes_cli import update_stage, webapp
-    from hermes_cli.source_build import build_update_products
+    import eir_cli.left_core_migration as left_core
+    import eir_cli.main_install_repair as install_repair
+    import eir_cli.memory_provider_migration as memory_migration
+    from eir_cli import update_stage, webapp
+    from eir_cli.source_build import build_update_products
     from pm import plugins_state
 
     root = tmp_path / "checkout"
@@ -492,16 +492,16 @@ def test_update_rebuilds_the_webapp_bundle_a_home_serves(tmp_path, monkeypatch, 
 
 @pytest.mark.parametrize("built", [True, False])
 def test_a_failed_webapp_rebuild_in_update_marks_the_served_bundle_out_of_date(tmp_path, monkeypatch, capsys, built):
-    """When ``hermes update`` cannot rebuild the Webapp bundle a home serves, the previous bundle
+    """When ``eir update`` cannot rebuild the Webapp bundle a home serves, the previous bundle
     stays on disk but is marked out of date: its gateway reports the Webapp unavailable and says to
-    run ``hermes webapp`` (which rebuilds it) instead of serving it against the updated backend. The
+    run ``eir webapp`` (which rebuilds it) instead of serving it against the updated backend. The
     update still reports the failure. With no bundle built there is nothing to mark."""
-    import hermes_cli.left_core_migration as left_core
-    import hermes_cli.main_install_repair as install_repair
-    import hermes_cli.memory_provider_migration as memory_migration
+    import eir_cli.left_core_migration as left_core
+    import eir_cli.main_install_repair as install_repair
+    import eir_cli.memory_provider_migration as memory_migration
     from gateway.webapp_listener import NOT_BUILT, bundle_missing_reason
-    from hermes_cli import update_stage, webapp
-    from hermes_cli.source_build import ProductBuildError, build_update_products
+    from eir_cli import update_stage, webapp
+    from eir_cli.source_build import ProductBuildError, build_update_products
     from pm import plugins_state
 
     root = tmp_path / "checkout"
@@ -530,9 +530,9 @@ def test_a_failed_webapp_rebuild_in_update_marks_the_served_bundle_out_of_date(t
         build_update_products(root, desktop=False)
 
     reason = bundle_missing_reason(dist)
-    assert reason is not None and reason.startswith(NOT_BUILT) and "hermes webapp" in reason
+    assert reason is not None and reason.startswith(NOT_BUILT) and "eir webapp" in reason
     if built:
         assert (dist / "index.html").read_text(encoding="utf-8") == "<!doctype html>"
-        assert "hermes webapp" in capsys.readouterr().out
+        assert "eir webapp" in capsys.readouterr().out
     else:
         assert sorted(root.rglob("*")) == before

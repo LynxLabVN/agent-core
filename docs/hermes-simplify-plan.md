@@ -1,4 +1,4 @@
-# PLAN CHI TIẾT — Hermes "Simplify" (bản để review)
+# PLAN CHI TIẾT — Eir "Simplify" (bản để review)
 
 > Trạng thái: CHỜ REVIEW. Chưa thi công.
 > Sau khi duyệt: switch agents ra khỏi Plan mode để bắt đầu Phase D0.
@@ -33,8 +33,8 @@
 |---|---|---|
 | `gateway/run.py` | 19,670 | god-file #1 |
 | `cli.py` | 15,944 | god-file #2 (AGENTS.md ghi sai ~11k) |
-| `hermes_cli/main.py` | 13,657 | god-file #3 |
-| `hermes_state.py` | 5,826 | |
+| `eir_cli/main.py` | 13,657 | god-file #3 |
+| `eir_state.py` | 5,826 | |
 | `run_agent.py` | 5,962 | AGENTS.md ghi sai ~12k — docs cần cập nhật |
 | Tool files | 89 file / ~67 tool / 33 toolset | phần lớn đã opt-in hoặc check_fn-gated |
 | Slash commands | 82 | nguồn nhiễu #2 |
@@ -49,7 +49,7 @@ Lõi agent (nén ngữ cảnh, prefix caching, skills, subagents, MCP catalog, 3
 
 | # | Quyết định |
 |---|---|
-| 1 | Desktop UI theo **Claude-style layout**, giữ brand Hermes (accent gold, nền trung tính ấm) |
+| 1 | Desktop UI theo **Claude-style layout**, giữ brand Eir (accent gold, nền trung tính ấm) |
 | 2 | Cron → **"Scheduled"** (nav) / **"Scheduled tasks"** (heading) / **"Schedule a task"** (CTA) / **"Nothing scheduled yet"** (empty state) |
 | 3 | Route `/cron`, tool `cronjob`, code symbols: KHÔNG đổi — chỉ label + alias |
 | 4 | Terminology pass: Gateway → "Connection", Toolset → "Tools" (label only) |
@@ -75,7 +75,7 @@ Lõi agent (nén ngữ cảnh, prefix caching, skills, subagents, MCP catalog, 3
 
 **Việc làm:**
 1. Tạo `src/themes/claude.ts` — design tokens:
-   - Palette: nền trung tính ấm (cream/off-white), text gần-đen, 1 accent = gold Hermes, trạng thái (success/warn/danger)
+   - Palette: nền trung tính ấm (cream/off-white), text gần-đen, 1 accent = gold Eir, trạng thái (success/warn/danger)
    - Spacing scale: 4/8/12/16/24/32
    - Radius: 8px (input/small) / 12px (card/composer) / full (pill)
    - Border: 1px mảnh, màu border ≈ nền tối 8%
@@ -104,7 +104,7 @@ Lõi agent (nén ngữ cảnh, prefix caching, skills, subagents, MCP catalog, 3
 
 ```
 ┌────────────────────────────────────────────────────────┐
-│ ☰  Hermes                    (⌘K)              ◔ ⚙ ✕  │
+│ ☰  Eir                    (⌘K)              ◔ ⚙ ✕  │
 ├─────────┬──────────────────────────────────────────────┤
 │ + New   │                                              │
 │         │        TRANSCRIPT (centered, max-width)      │
@@ -238,36 +238,36 @@ Lõi agent (nén ngữ cảnh, prefix caching, skills, subagents, MCP catalog, 3
 
 *(Desktop xong mới làm — desktop là primary surface.)*
 
-**Mục tiêu:** `hermes` = TUI; wizard 3 câu hỏi. Slash commands **giữ nguyên 82 lệnh** (quyết định 15/11/2026 — không tier hóa).
+**Mục tiêu:** `eir` = TUI; wizard 3 câu hỏi. Slash commands **giữ nguyên 82 lệnh** (quyết định 15/11/2026 — không tier hóa).
 
 ---
 
 ## 2.1. Đổi default UI sang TUI
 
-**Cơ chế hiện có (`hermes_cli/main.py:111-168`) — KHÔNG viết mới, chỉ đổi giá trị:**
+**Cơ chế hiện có (`eir_cli/main.py:111-168`) — KHÔNG viết mới, chỉ đổi giá trị:**
 
 ```
 Thứ tự chọn UI hôm nay:
-  1. `hermes --cli`          → classic CLI (prompt_toolkit)
-  2. `hermes --tui` hoặc env HERMES_TUI=1 → TUI (Ink)
+  1. `eir --cli`          → classic CLI (prompt_toolkit)
+  2. `eir --tui` hoặc env EIR_TUI=1 → TUI (Ink)
   3. KHÔNG set gì            → classic CLI   ← ĐỔI ĐIỂM DUY NHẤT ở đây
 
 Sau Phase 2.1:
-  1. `hermes --cli`          → classic CLI  (giữ nguyên)
-  2. `hermes --tui` / env    → TUI          (giữ nguyên)
+  1. `eir --cli`          → classic CLI  (giữ nguyên)
+  2. `eir --tui` / env    → TUI          (giữ nguyên)
   3. KHÔNG set gì            → TUI          ← mặc định mới
-  4. `hermes --classic`      → alias mới cho --cli (tên dễ hiểu hơn)
+  4. `eir --classic`      → alias mới cho --cli (tên dễ hiểu hơn)
 ```
 
 **Trải nghiệm user:**
 
 | Ai | Trước | Sau |
 |---|---|---|
-| User mới gõ `hermes` | CLI kawaii + 82 lệnh autocomplete | TUI sạch, composer như chat app |
-| User cũ muốn CLI cũ | mặc định | `hermes --classic` hoặc `display.interface: cli` 1 dòng |
-| Script/CI (`hermes ... > log`) | | Tự detect stdout redirect — giữ hành vi nhánh non-TTY như hiện tại (code đã có guard `HERMES_TUI_NO_EARLY_DISABLE`) |
+| User mới gõ `eir` | CLI kawaii + 82 lệnh autocomplete | TUI sạch, composer như chat app |
+| User cũ muốn CLI cũ | mặc định | `eir --classic` hoặc `display.interface: cli` 1 dòng |
+| Script/CI (`eir ... > log`) | | Tự detect stdout redirect — giữ hành vi nhánh non-TTY như hiện tại (code đã có guard `EIR_TUI_NO_EARLY_DISABLE`) |
 
-**Config viết trong `~/.hermes/config.yaml`:**
+**Config viết trong `~/.eir/config.yaml`:**
 ```yaml
 display:
   interface: cli   # opt-out — user cũ dán dòng này là về bản cũ
@@ -292,9 +292,9 @@ Lý do giữ: lệnh gõ tay luôn chạy được dù ẩn, nhưng ẩn gây "m
 
 ## 2.3. Fast wizard — 3 câu hỏi
 
-**Hiện trạng:** `hermes_cli/setup.py` 3,416 dòng, hỏi ~15+ mục (provider, model, key, memory, vision, tts, gateway, platform từng cái...).
+**Hiện trạng:** `eir_cli/setup.py` 3,416 dòng, hỏi ~15+ mục (provider, model, key, memory, vision, tts, gateway, platform từng cái...).
 
-**Fast path mới (mục `hermes setup` mặc định):**
+**Fast path mới (mục `eir setup` mặc định):**
 
 ```
 ┌ Bước 1/3 ────────────────────────────────────┐
@@ -312,7 +312,7 @@ Lý do giữ: lệnh gõ tay luôn chạy được dù ẩn, nhưng ẩn gây "m
 │   ~/Documents  [Enter dùng thư mục này]      │
 └──────────────────────────────────────────────┘
 
-→ ghi config tối thiểu vào ~/.hermes/config.yaml:
+→ ghi config tối thiểu vào ~/.eir/config.yaml:
   model: <chọn>          # + key vào .env
   # KHÔNG ghi gì khác — mọi thứ dùng DEFAULT_CONFIG
 
@@ -321,14 +321,14 @@ Lý do giữ: lệnh gõ tay luôn chạy được dù ẩn, nhưng ẩn gây "m
 
 **Điều kiện nhánh:**
 - Đã có config hợp lệ (`model` + key) → **bỏ qua wizard**, vào chat luôn (user cũ không bị hỏi lại)
-- `hermes setup --advanced` → wizard đầy đủ hôm nay (giữ nguyên 3,416 dòng, không đụng)
+- `eir setup --advanced` → wizard đầy đủ hôm nay (giữ nguyên 3,416 dòng, không đụng)
 
 **Final result Phase 2:**
 
 ```
-TRƯỚC: hermes → CLI quen thuộc, wizard 15 câu
-SAU:   hermes → TUI chat-app, wizard 3 câu ≤ 90s, 82 lệnh giữ nguyên
-       hermes --classic → nguyên trạng hôm nay
+TRƯỚC: eir → CLI quen thuộc, wizard 15 câu
+SAU:   eir → TUI chat-app, wizard 3 câu ≤ 90s, 82 lệnh giữ nguyên
+       eir --classic → nguyên trạng hôm nay
 ```
 
 **Accept mở rộng:**
@@ -336,7 +336,7 @@ SAU:   hermes → TUI chat-app, wizard 3 câu ≤ 90s, 82 lệnh giữ nguyên
 - [ ] `--classic` chạy nguyên vẹn; test suite CLI xanh không sửa
 - [ ] Slash commands: 0 thay đổi hành vi — autocomplete + `/help` nguyên trạng (test xanh KHÔNG sửa)
 - [ ] Wizard fast: ≤ 3 màn; user đã có config → skip hoàn toàn
-- [ ] E2E install → reply đầu ≤ 90s (temp HERMES_HOME)
+- [ ] E2E install → reply đầu ≤ 90s (temp EIR_HOME)
 
 **Ước lượng:** 3–4 ngày, 2 PR (PR1: default UI; PR2: fast wizard).
 
@@ -344,7 +344,7 @@ SAU:   hermes → TUI chat-app, wizard 3 câu ≤ 90s, 82 lệnh giữ nguyên
 
 # PHASE 3 — Tool profiles (BẢN CHI TIẾT)
 
-**Mục tiêu:** schema gửi đi mỗi API call chỉ chứa tool user thực dùng → rẻ hơn, model ít nhiễu hơn, UI `hermes tools` 1 phím chọn.
+**Mục tiêu:** schema gửi đi mỗi API call chỉ chứa tool user thực dùng → rẻ hơn, model ít nhiễu hơn, UI `eir tools` 1 phím chọn.
 
 ---
 
@@ -357,7 +357,7 @@ SAU:   hermes → TUI chat-app, wizard 3 câu ≤ 90s, 82 lệnh giữ nguyên
 | **starter** | user mới, chat thường ngày | ~15 (list dưới) |
 | **coding** | đang đứng trong repo/code workspace | starter + browser + vision + delegate + process (~30) — **toolset này ĐÃ TỒN TẠI** `toolsets.py:346`, chỉ áp mặc định đúng lúc |
 | **full** | power user | như hiện tại (~50) |
-| **custom** | tự chọn | danh sách tự định nghĩa qua `hermes tools` |
+| **custom** | tự chọn | danh sách tự định nghĩa qua `eir tools` |
 
 **Config:**
 ```yaml
@@ -422,9 +422,9 @@ Lợi ích kép: (1) chi phí giảm trực tiếp, (2) model chọn tool ít nh
 
 ---
 
-## 3.4. `hermes tools` — quick select profile
+## 3.4. `eir tools` — quick select profile
 
-**Hiện trạng:** curses UI (`hermes_cli/tools_config.py`, pattern chuẩn — KHÔNG simple_term_menu) hiện toolset từng cái, phải hiểu khái niệm.
+**Hiện trạng:** curses UI (`eir_cli/tools_config.py`, pattern chuẩn — KHÔNG simple_term_menu) hiện toolset từng cái, phải hiểu khái niệm.
 
 **Sau Phase 3:**
 
@@ -445,25 +445,25 @@ Chọn Custom → vào danh sách toolset từng cái (UI hiện tại giữ ngu
 
 ## 3.5. Config viewer — nhóm cốt / advanced
 
-**Hiện trạng:** `hermes_cli/config.py` ~3,000 dòng, DEFAULT_CONFIG ~40 section ngang hàng — đọc config như đọc code.
+**Hiện trạng:** `eir_cli/config.py` ~3,000 dòng, DEFAULT_CONFIG ~40 section ngang hàng — đọc config như đọc code.
 
 **Việc:** KHÔNG đổi cấu trúc DEFAULT_CONFIG (tránh migration đau). Chỉ thêm **thứ tự + metadata nhóm hiển thị**:
 
 - Nhóm "core hiển thị" (≤ 30 key): `model`, `agent.*` (max_iterations...), `terminal.cwd`, `tools.profile`, `display.interface`, `memory.provider`, `gateway.port`, cron cơ bản...
-- Còn lại đánh dấu `advanced` trong docs + `hermes config` viewer (2 cột: Core | Advanced)
+- Còn lại đánh dấu `advanced` trong docs + `eir config` viewer (2 cột: Core | Advanced)
 
 Key mới `tools.profile` → thêm vào DEFAULT_CONFIG, **không bump `_config_version`** (key mới đi qua deep-merge tự động — rule có sẵn trong AGENTS.md).
 
 ---
 
-## 3.6. (Tùy chọn — review thêm) Dọn `_HERMES_CORE_TOOLS`
+## 3.6. (Tùy chọn — review thêm) Dọn `_EIR_CORE_TOOLS`
 
 3 nhóm tool nằm trong bundle core nhưng đã gate sẵn bằng `check_fn`:
 
 | Tool | Gate hiện có | Đề xuất |
 |---|---|---|
 | `ha_*` (4) | `HASS_TOKEN` | Kéo khỏi core bundle → toolset `homeassistant` riêng, chỉ bật khi user cấu hình |
-| `kanban_*` (9) | env `HERMES_KANBAN_TASK` / toolset flag | Giữ nguyên (đã zero-footprint thực tế) — chỉ cân nhắc |
+| `kanban_*` (9) | env `EIR_KANBAN_TASK` / toolset flag | Giữ nguyên (đã zero-footprint thực tế) — chỉ cân nhắc |
 | `computer_use` | cua-driver installed | Kéo khỏi core → toolset `computer_use` riêng (đã có toolset) |
 
 Lợi ích chỉ là "sạch danh sách" (schema vốn 0 footprint khi gate đóng) — **duyệt hay bỏ đều được**, không chặn PR chính.
@@ -475,7 +475,7 @@ Lợi ích chỉ là "sạch danh sách" (schema vốn 0 footprint khi gate đó
 **Yêu cầu (user chốt 15/11/2026):** tool cơ bản của starter phải **pre-implement sẵn trong build** — cài xong chạy đúng ngay lần đầu, KHÔNG dựa vào lazy-install lúc đang chat, KHÔNG bắt user sửa gì.
 
 **Hiện trạng — lỗ hổng delivery:**
-- `web_search`/`web_extract` có 8 backend (parallel/firecrawl/tavily/exa/searxng/brave-free/ddgs/xai), fallback cuối là `firecrawl` (`web_tools.py:171`) — **cần API key**. Cài mới không key → tool lỗi hoặc phải lazy-install `ddgs` giữa hội thoại (bị chặn trong Docker: `HERMES_DISABLE_LAZY_INSTALLS=1`)
+- `web_search`/`web_extract` có 8 backend (parallel/firecrawl/tavily/exa/searxng/brave-free/ddgs/xai), fallback cuối là `firecrawl` (`web_tools.py:171`) — **cần API key**. Cài mới không key → tool lỗi hoặc phải lazy-install `ddgs` giữa hội thoại (bị chặn trong Docker: `EIR_DISABLE_LAZY_INSTALLS=1`)
 - Vậy starter "chạy đúng khi mở hộp" hiện KHÔNG đảm bảo với web tools
 
 **Việc làm — 3 lớp đảm bảo:**
@@ -489,13 +489,13 @@ Lợi ích chỉ là "sạch danh sách" (schema vốn 0 footprint khi gate đó
 | `ddgs` | khỏi `LAZY_DEPS` cho backend này (đã base) | không còn lazy prompt |
 
 **Lớp 2 — Build/install validation:**
-- Installer (`setup-hermes.sh`, PowerShell, Dockerfile) thêm bước post-install: `hermes doctor --profile starter` — verify 15/15 tool: register OK, schema collect OK, handler import OK, `ddgs` present, không tool nào cần prompt
+- Installer (`setup-eir.sh`, PowerShell, Dockerfile) thêm bước post-install: `eir doctor --profile starter` — verify 15/15 tool: register OK, schema collect OK, handler import OK, `ddgs` present, không tool nào cần prompt
 - Docker image: mặc định `tools.profile: starter` + deps starter baked trong image (image vốn seal lazy-install — giờ profile khớp luôn)
 - Fresh install (shell/PowerShell): `tools.profile` không set → hành vi default vẫn `full` cho user cũ; installer mới ghi `tools.profile: starter` vào config sau onboarding wizard (Phase 2.3 đã có model step — thêm 1 dòng ghi)
 
 **Lớp 3 — CI smoke test (`tests/tools/test_starter_delivery.py`):**
 ```python
-# Hợp đồng delivery — chạy trong env HERMES_DISABLE_LAZY_INSTALLS=1
+# Hợp đồng delivery — chạy trong env EIR_DISABLE_LAZY_INSTALLS=1
 def test_starter_tools_register_without_lazy_install(): ...
 def test_starter_deps_are_base_dependencies():
     # mỗi import của starter tool ⊆ pyproject base dependencies
@@ -513,7 +513,7 @@ Cài xong → mở chat → web_search chạy ngay (keyless ddgs)
 ```
 
 **Accept thêm (Phase 3):**
-- [ ] `pip install .[base]` thuần → `hermes doctor --profile starter` = 15/15 xanh, không chạm extras
+- [ ] `pip install .[base]` thuần → `eir doctor --profile starter` = 15/15 xanh, không chạm extras
 - [ ] Docker image: web_search chạy day-1 không key (E2E trong image)
 - [ ] Test suite `test_starter_delivery.py` xanh trong CI (no-network cho phần register; mock cho web)
 
@@ -525,19 +525,19 @@ Cài xong → mở chat → web_search chạy ngay (keyless ddgs)
 TRƯỚC: mọi user mang ~50 tool trong mọi call; web tool cài mới có thể lỗi/lazy-install giữa chat
 SAU:   user mới = 15 tool PRE-BAKED (cài xong chạy, search keyless day-1)
        dev = ~30 (auto coding); power = full (1 dòng config)
-       hermes tools = 4 lựa chọn profile 1 phím
+       eir tools = 4 lựa chọn profile 1 phím
 ```
 
 **Accept mở rộng:**
 - [ ] Profile áp CHỈ lúc đầu phiên; test assert: đổi profile giữa hội thoại bị chặn (bất biến caching)
 - [ ] Per-platform `enabled/disabled` lists vẫn override profile (test resolution 4 tầng, ≥ 5 case của bảng 3.2)
 - [ ] Đo schema token trước/sau, ghi baseline vào PR (mục tiêu starter ↓ ≥ 60%)
-- [ ] `hermes tools` quick select hoạt động; Custom = UI cũ nguyên vẹn
+- [ ] `eir tools` quick select hoạt động; Custom = UI cũ nguyên vẹn
 - [ ] User cũ nâng cấp: không có `tools.profile` trong config → giữ hành vi `full` (tương thích — KHÔNG ép đổi)
-- [ ] `hermes config` viewer hiện 2 nhóm Core/Advanced
-- [ ] **Delivery:** starter 15/15 tool xanh `hermes doctor` trên install thuần không key; web_search keyless day-1; web_extract không key = message hướng dẫn, không crash; 0 lazy prompt giữa chat (mục 3.7)
+- [ ] `eir config` viewer hiện 2 nhóm Core/Advanced
+- [ ] **Delivery:** starter 15/15 tool xanh `eir doctor` trên install thuần không key; web_search keyless day-1; web_extract không key = message hướng dẫn, không crash; 0 lazy prompt giữa chat (mục 3.7)
 
-**Ước lượng:** 1.5–2 tuần, 4–5 PR (PR1: profile resolution; PR2: hermes tools UI + config viewer; PR3: starter pre-bake + doctor + CI smoke; PR4: core trim tùy chọn).
+**Ước lượng:** 1.5–2 tuần, 4–5 PR (PR1: profile resolution; PR2: eir tools UI + config viewer; PR3: starter pre-bake + doctor + CI smoke; PR4: core trim tùy chọn).
 
 ---
 
@@ -546,20 +546,20 @@ SAU:   user mới = 15 tool PRE-BAKED (cài xong chạy, search keyless day-1)
 | File | Dòng | Tách thành |
 |---|---|---|
 | `gateway/run.py` | 19,670 | `gateway/runner/{dispatch, guards, deliveries, sessions, maintenance}.py` |
-| `cli.py` | 15,944 | `hermes_cli/repl/{command_dispatch, display, session_io}.py` |
-| `hermes_cli/main.py` | 13,657 | `hermes_cli/cmds/{model, gateway, cron, tools, skills, setup}.py` |
+| `cli.py` | 15,944 | `eir_cli/repl/{command_dispatch, display, session_io}.py` |
+| `eir_cli/main.py` | 13,657 | `eir_cli/cmds/{model, gateway, cron, tools, skills, setup}.py` |
 
 **Quy tắc thi công:**
 1. Mechanical moves ONLY — không đổi tên/hàm trong khi di chuyển
-2. Public import path giữ (`from cli import HermesCLI` không đổi) — facade + lazy import chống cycle
+2. Public import path giữ (`from cli import EirCLI` không đổi) — facade + lazy import chống cycle
 3. 1 god-file = 1 PR riêng
 4. Rubric repo ỦNG HỘ rõ ("refactor god-files into clean modules" = wanted work)
 
 **Final result:** không file > ~6k dòng; hành vi 100% giữ.
 
 **Accept:**
-- [ ] `import cli, hermes_cli.main, gateway.run` xanh
-- [ ] `scripts/run_tests.sh tests/gateway/ tests/hermes_cli/` xanh trước + sau từng PR
+- [ ] `import cli, eir_cli.main, gateway.run` xanh
+- [ ] `scripts/run_tests.sh tests/gateway/ tests/eir_cli/` xanh trước + sau từng PR
 - [ ] Smoke CLI + gateway + TUI backend
 
 **Ước lượng:** 2–3 tuần, 3–4 PR.
@@ -578,12 +578,12 @@ SAU:   user mới = 15 tool PRE-BAKED (cài xong chạy, search keyless day-1)
 
 - Sửa `i18n/en.ts` + mirror `ja`, `zh`, `zh-hant`, `types.ts`
 - Grep "Cron" ngoài màn advanced = 0 hit
-- Alias: `/scheduled`, `/jobs` thêm cho `/cron`; `hermes jobs` alias CLI
+- Alias: `/scheduled`, `/jobs` thêm cho `/cron`; `eir jobs` alias CLI
 
 **Verification (mỗi phase phải qua trước PR kế):**
 1. `scripts/run_tests.sh` (KHÔNG gọi pytest trực tiếp)
 2. Desktop: `npm run typecheck` + `npm test` (vitest repo-root)
-3. E2E thật, temp `HERMES_HOME`: install → onboarding → chat → tool → `/model` → Schedule a task → nhận delivery
+3. E2E thật, temp `EIR_HOME`: install → onboarding → chat → tool → `/model` → Schedule a task → nhận delivery
 4. Cache invariants: system prompt byte-stable; không toolset mutation giữa hội thoại; strict alternation
 5. Contract không đụng: `isDesktopSlashExtensionCommand`, `backendSupportsServe`, JSON-RPC transport (`requestGateway`), plugin surface, `desktop-slash-commands.test.ts`
 

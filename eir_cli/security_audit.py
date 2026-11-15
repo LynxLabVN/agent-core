@@ -1,4 +1,4 @@
-"""On-demand supply-chain audit for Hermes Agent installs.
+"""On-demand supply-chain audit for Eir Agent installs.
 
 Vulnerabilities are looked up against OSV.dev (``api.osv.dev/v1/querybatch`` + ``/v1/vulns/{id}``).
 Single-shot, on-demand, never daily — see ``references/security-disclosure-triage.md``.
@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, Optional
 
-from hermes_constants import get_hermes_home
+from eir_constants import get_eir_home
 
 OSV_BATCH_URL = "https://api.osv.dev/v1/querybatch"
 OSV_VULN_URL = "https://api.osv.dev/v1/vulns/{vid}"
@@ -64,10 +64,10 @@ def _discover_venv() -> list[Component]:
         except Exception:
             continue
         version = (dist.version or "").strip()
-        if name.lower().replace("_", "-") == "hermes-agent" and version == "0.0.0":
+        if name.lower().replace("_", "-") == "eir-agent" and version == "0.0.0":
             # pyproject declares 0.0.0 in source trees, which matches every advisory ever filed:
             # audit the running release instead, and skip the dist when no release is known.
-            from hermes_cli.version_info import get_version_info
+            from eir_cli.version_info import get_version_info
 
             version = get_version_info().base_version
             if version == "unknown":
@@ -110,11 +110,11 @@ _PLUGIN_PIN_FILES = (("requirements.txt", _parse_requirements), ("requirements-d
                      ("pyproject.toml", _parse_pyproject_pins))
 
 
-def _discover_plugins(hermes_home: Path) -> list[Component]:
-    """Python deps declared by plugins under ``~/.hermes/plugins``. Plugins typically don't install
+def _discover_plugins(eir_home: Path) -> list[Component]:
+    """Python deps declared by plugins under ``~/.eir/plugins``. Plugins typically don't install
     into the venv, so their stated requirements are audit surface the venv scan misses.
     """
-    plugins_dir = hermes_home / "plugins"
+    plugins_dir = eir_home / "plugins"
     if not plugins_dir.is_dir():
         return []
     out: list[Component] = []
@@ -157,7 +157,7 @@ def _extract_mcp_component(server_name: str, command: str, args: list[str]) -> O
 def _discover_mcp() -> list[Component]:
     """Pinned MCP server packages from ``config.yaml``."""
     try:
-        from hermes_cli.mcp_config import _get_mcp_servers
+        from eir_cli.mcp_config import _get_mcp_servers
     except Exception:
         return []
     servers = _get_mcp_servers()
@@ -233,10 +233,10 @@ def _osv_fetch_details(vuln_ids: Iterable[str]) -> dict[str, Vulnerability]:
 
 
 def _discover_components(
-    *, skip_venv: bool = False, skip_plugins: bool = False, skip_mcp: bool = False, hermes_home: Optional[Path] = None
+    *, skip_venv: bool = False, skip_plugins: bool = False, skip_mcp: bool = False, eir_home: Optional[Path] = None
 ) -> list[Component]:
     """Discover all scannable components across the enabled sources."""
-    home = hermes_home or Path(get_hermes_home())
+    home = eir_home or Path(get_eir_home())
     sources = ((skip_venv, _discover_venv), (skip_plugins, lambda: _discover_plugins(home)), (skip_mcp, _discover_mcp))
     return [c for skip, discover in sources if not skip for c in discover()]
 
@@ -292,8 +292,8 @@ def _render_json(findings: list[Finding], total_components: int) -> str:
 
 
 def cmd_security_audit(args: argparse.Namespace) -> int:
-    """Implementation of `hermes security audit`."""
-    home = Path(get_hermes_home())
+    """Implementation of `eir security audit`."""
+    home = Path(get_eir_home())
     output_json = bool(getattr(args, "json", False))
     fail_on = (getattr(args, "fail_on", None) or "critical").upper()
     if fail_on not in SEVERITY_ORDER:
@@ -301,7 +301,7 @@ def cmd_security_audit(args: argparse.Namespace) -> int:
         return 2
 
     skips = {k: bool(getattr(args, k, False)) for k in ("skip_venv", "skip_plugins", "skip_mcp")}
-    components = _discover_components(hermes_home=home, **skips)
+    components = _discover_components(eir_home=home, **skips)
     total = len(components)
     if total == 0:
         print(json.dumps({"total_components_scanned": 0, "finding_count": 0, "findings": []}) if output_json
@@ -309,7 +309,7 @@ def cmd_security_audit(args: argparse.Namespace) -> int:
         return 0
 
     try:
-        findings = run_audit(hermes_home=home, components=components)
+        findings = run_audit(eir_home=home, components=components)
     except RuntimeError as exc:
         print(f"audit failed: {exc}", file=sys.stderr)
         return 2

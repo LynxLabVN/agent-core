@@ -15,7 +15,7 @@ from typing import Any, Dict, Iterator, Optional
 
 logger = logging.getLogger(__name__)
 
-_MANAGED_FILES_ROOT_ENV = "HERMES_DASHBOARD_FILES_ROOT"
+_MANAGED_FILES_ROOT_ENV = "EIR_DASHBOARD_FILES_ROOT"
 _HOSTED_MANAGED_FILES_ROOT = Path("/opt/data")
 
 
@@ -199,27 +199,27 @@ def _agent_path_scope(profile_home: Path | None = None) -> Iterator[None]:
     Translation and the unmapped-path classification both run inside this scope, so they
     agree about the backend.
     """
-    from hermes_cli.config import get_hermes_home
-    from hermes_constants import (
-        get_hermes_home_override, get_process_hermes_home, reset_hermes_home_override,
-        set_hermes_home_override,
+    from eir_cli.config import get_eir_home
+    from eir_constants import (
+        get_eir_home_override, get_process_eir_home, reset_eir_home_override,
+        set_eir_home_override,
     )
     from tools.terminal_scope import get_terminal_scope, install_profile_terminal_scope, reset_terminal_scope
 
     home_token = scope_token = None
-    if profile_home is not None and Path(profile_home).resolve() != get_hermes_home().resolve():
-        home_token = set_hermes_home_override(str(profile_home))
+    if profile_home is not None and Path(profile_home).resolve() != get_eir_home().resolve():
+        home_token = set_eir_home_override(str(profile_home))
     try:
-        foreign_override = (get_hermes_home_override() is not None
-                            and get_hermes_home().resolve() != get_process_hermes_home().resolve())
+        foreign_override = (get_eir_home_override() is not None
+                            and get_eir_home().resolve() != get_process_eir_home().resolve())
         if home_token is not None or (foreign_override and get_terminal_scope() is None):
-            scope_token = install_profile_terminal_scope(get_hermes_home())
+            scope_token = install_profile_terminal_scope(get_eir_home())
         yield
     finally:
         if scope_token is not None:
             reset_terminal_scope(scope_token)
         if home_token is not None:
-            reset_hermes_home_override(home_token)
+            reset_eir_home_override(home_token)
 
 
 def _agent_container_path(
@@ -244,7 +244,7 @@ def _agent_container_path(
     if not raw.startswith("/") or raw.startswith("//") or ".." in raw.split("/"):
         return None
     try:
-        from hermes_cli.config import get_hermes_home
+        from eir_cli.config import get_eir_home
         from tools.terminal_scope import (
             build_profile_terminal_scope, get_terminal_scope, reset_terminal_scope,
         )
@@ -255,7 +255,7 @@ def _agent_container_path(
             translated = _translate_agent_path(candidate, workspace_key, own_sandbox_only, workspace_cwd)
             if translated is not None or get_terminal_scope() is not None:
                 return translated
-            home = get_hermes_home()
+            home = get_eir_home()
             token = bind_terminal_policy(build_profile_terminal_scope(home), profile_home=home)
             try:
                 return _translate_agent_path(candidate, workspace_key, own_sandbox_only, workspace_cwd)
@@ -373,33 +373,33 @@ def _path_text(raw_path: str | None) -> str:
     return text
 
 
-def _default_hermes_root_is_opt_data() -> bool:
-    raw = os.environ.get("HERMES_HOME", "").strip()
+def _default_eir_root_is_opt_data() -> bool:
+    raw = os.environ.get("EIR_HOME", "").strip()
     if not raw:
         return False
     try:
-        from hermes_constants import get_default_hermes_root
+        from eir_constants import get_default_eir_root
 
-        root = get_default_hermes_root().expanduser().resolve(strict=False)
+        root = get_default_eir_root().expanduser().resolve(strict=False)
     except (OSError, RuntimeError):
         root = Path(raw).expanduser().resolve(strict=False)
     return root == _HOSTED_MANAGED_FILES_ROOT
 
 
 def _dashboard_local_update_managed_externally() -> bool:
-    """True when the dashboard should not offer ``hermes update``.
+    """True when the dashboard should not offer ``eir update``.
 
     Containerized dashboards are updated by the outer launcher/image — except a
-    ``git`` install (bind-mounted checkout, e.g. the hermes-webui image), where
+    ``git`` install (bind-mounted checkout, e.g. the eir-webui image), where
     the update button is the correct path. pip stays blocked in containers: its
     apply path mutates the running container filesystem.
     """
-    from hermes_cli.web_server import PROJECT_ROOT
-    from hermes_cli.config import detect_install_method
-    if _default_hermes_root_is_opt_data():
+    from eir_cli.web_server import PROJECT_ROOT
+    from eir_cli.config import detect_install_method
+    if _default_eir_root_is_opt_data():
         return True
     try:
-        from hermes_constants import is_container
+        from eir_constants import is_container
 
         if not is_container():
             return False
@@ -420,9 +420,9 @@ def _managed_files_policy(request: Optional[Request], *, create_root: bool = Tru
         return ManagedFilesPolicy(default_path=root, locked_root=root, can_change_path=False)
 
     # Remote/OAuth access does not imply a hosted container (a gated macOS launchd
-    # install still browses its home). Lock to /opt/data only when the Hermes
-    # root actually IS /opt/data or HERMES_DASHBOARD_FILES_ROOT is set.
-    if _default_hermes_root_is_opt_data():
+    # install still browses its home). Lock to /opt/data only when the Eir
+    # root actually IS /opt/data or EIR_DASHBOARD_FILES_ROOT is set.
+    if _default_eir_root_is_opt_data():
         root = _ensure_managed_root(_HOSTED_MANAGED_FILES_ROOT) if create_root else _HOSTED_MANAGED_FILES_ROOT
         return ManagedFilesPolicy(default_path=root, locked_root=root, can_change_path=False)
 
@@ -481,7 +481,7 @@ def _managed_response_meta(policy: ManagedFilesPolicy) -> dict[str, Any]:
 
 
 def _hosted_fs_path_allowed(root: Path, target: Path) -> bool:
-    from hermes_cli.web_routers.files import _is_local_sensitive_path, _is_sensitive_path
+    from eir_cli.web_routers.files import _is_local_sensitive_path, _is_sensitive_path
 
     resolved = _canonical_path(target)
     return (_path_is_under(root, resolved)

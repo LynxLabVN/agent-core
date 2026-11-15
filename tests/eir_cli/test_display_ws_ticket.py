@@ -3,8 +3,8 @@ an expired ticket, or one for another provider is refused before any socket is d
 
 from __future__ import annotations
 
-from hermes_cli.dashboard_auth import ws_tickets
-from hermes_cli.web_routers import display
+from eir_cli.dashboard_auth import ws_tickets
+from eir_cli.web_routers import display
 
 
 class _Ws:
@@ -21,9 +21,9 @@ def test_display_ticket_must_be_a_bot_desktop_ticket_pinned_to_a_profile_home(mo
     assert display._consume_display_ticket(_Ws(display_ticket=unpinned)) is None
 
     good = ws_tickets.mint_ticket(user_id="display:v", provider="bot-desktop",
-                                  extra={"hermes_home": "/srv/hermes/bot-a", "viewer_id": "v"})
+                                  extra={"eir_home": "/srv/eir/bot-a", "viewer_id": "v"})
     info = display._consume_display_ticket(_Ws(display_ticket=good))
-    assert info and info["hermes_home"] == "/srv/hermes/bot-a" and info["viewer_id"] == "v"
+    assert info and info["eir_home"] == "/srv/eir/bot-a" and info["viewer_id"] == "v"
     assert display._consume_display_ticket(_Ws(display_ticket=good)) is None, "single use"
 
 
@@ -36,7 +36,7 @@ def test_a_bad_ticket_is_refused_with_a_close_frame_the_renderer_can_read(monkey
     from starlette.testclient import TestClient
     from starlette.websockets import WebSocketDisconnect
 
-    from hermes_cli import web_server
+    from eir_cli import web_server
 
     ws_tickets._reset_for_tests()
     prev = {k: getattr(web_server.app.state, k, None) for k in ("auth_required", "bound_host")}
@@ -45,7 +45,7 @@ def test_a_bad_ticket_is_refused_with_a_close_frame_the_renderer_can_read(monkey
     client = TestClient(web_server.app)
     try:
         used = ws_tickets.mint_ticket(user_id="display:v", provider="bot-desktop",
-                                      extra={"hermes_home": "/srv/hermes/bot-a", "viewer_id": "v"})
+                                      extra={"eir_home": "/srv/eir/bot-a", "viewer_id": "v"})
         ws_tickets.consume_ticket(used)
         with client.websocket_connect(f"/api/display/ws?display_ticket={used}") as conn:  # handshake completes
             with pytest.raises(WebSocketDisconnect) as exc:
@@ -68,7 +68,7 @@ def _viewer_app(monkeypatch):
     from fastapi import FastAPI
     from starlette.testclient import TestClient
 
-    from hermes_cli import web_server
+    from eir_cli import web_server
 
     async def watch(ws, _info):
         while (await ws.receive())["type"] != "websocket.disconnect":
@@ -85,15 +85,15 @@ def _viewer_app(monkeypatch):
 
 def _viewer_ticket(**extra):
     return ws_tickets.mint_ticket(user_id="display:v", provider="bot-desktop",
-                                  extra={"hermes_home": "/srv/hermes/bot-a", "viewer_id": "v", **extra})
+                                  extra={"eir_home": "/srv/eir/bot-a", "viewer_id": "v", **extra})
 
 
 def test_signing_out_closes_a_screen_viewer_a_browser_tab_opened(monkeypatch):
     """A viewer opened from a signed-in tab watches, and while it holds the lease drives, the agent's
     screen: it closes with the tab's other sockets when the browser signs out. A viewer a native
     client opened (no browser credential on its ticket) stays."""
-    from hermes_cli import browser_credential, web_server, web_session_sockets
-    from tests.hermes_cli.test_webapp_sign_out_sockets import _close_code
+    from eir_cli import browser_credential, web_server, web_session_sockets
+    from tests.eir_cli.test_webapp_sign_out_sockets import _close_code
 
     ws_tickets._reset_for_tests()
     client = _viewer_app(monkeypatch)
@@ -109,8 +109,8 @@ def test_signing_out_closes_a_screen_viewer_a_browser_tab_opened(monkeypatch):
 
 
 def test_a_screen_viewer_ticket_from_a_signed_out_tab_opens_nothing(monkeypatch):
-    from hermes_cli import browser_credential, web_server
-    from tests.hermes_cli.test_webapp_sign_out_sockets import _close_code
+    from eir_cli import browser_credential, web_server
+    from tests.eir_cli.test_webapp_sign_out_sockets import _close_code
 
     ws_tickets._reset_for_tests()
     client = _viewer_app(monkeypatch)

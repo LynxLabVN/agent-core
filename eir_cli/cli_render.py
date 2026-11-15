@@ -18,7 +18,7 @@ import time
 from contextlib import contextmanager, suppress
 from agent.i18n import t
 from agent.think_scrubber import THINK_TAG_NAMES
-from hermes_cli.banner import format_banner_version_label
+from eir_cli.banner import format_banner_version_label
 from rich.console import Console
 from rich.text import Text as _RichText
 from typing import Any
@@ -240,18 +240,18 @@ def _heal_cooked_mode_drift(fd: int) -> bool:
 def _detect_light_mode_uncached() -> bool:
     """The detection ladder documented above; may raise (caller maps errors to dark)."""
     from cli import _FALSE_RE, _LIGHT_DEFAULT_TERM_PROGRAMS, _TRUE_RE, _luminance_from_hex, _query_osc11_background
-    for var in ("HERMES_LIGHT", "HERMES_TUI_LIGHT"):
+    for var in ("EIR_LIGHT", "EIR_TUI_LIGHT"):
         v = (os.environ.get(var) or "").strip().lower()
         if _TRUE_RE.match(v):
             return True
         if _FALSE_RE.match(v):
             return False
-    theme = (os.environ.get("HERMES_TUI_THEME") or "").strip().lower()
+    theme = (os.environ.get("EIR_TUI_THEME") or "").strip().lower()
     if theme == "light":
         return True
     if theme == "dark":
         return False
-    bg_lum = _luminance_from_hex(os.environ.get("HERMES_TUI_BACKGROUND") or "")
+    bg_lum = _luminance_from_hex(os.environ.get("EIR_TUI_BACKGROUND") or "")
     if bg_lum is not None:
         return bg_lum >= 0.5
     last = (os.environ.get("COLORFGBG") or "").strip().split(";")[-1]
@@ -292,10 +292,10 @@ def _install_skin_light_mode_hook() -> None:
     """Wrap SkinConfig.get_color so EVERY skin color read goes through the light-mode remap. Idempotent."""
     from cli import _maybe_remap_for_light_mode
     try:
-        from hermes_cli.skin_engine import SkinConfig  # type: ignore[import]
+        from eir_cli.skin_engine import SkinConfig  # type: ignore[import]
     except Exception:
         return
-    if getattr(SkinConfig, "_hermes_light_mode_hook_installed", False):
+    if getattr(SkinConfig, "_eir_light_mode_hook_installed", False):
         return
     _orig_get_color = SkinConfig.get_color
 
@@ -307,7 +307,7 @@ def _install_skin_light_mode_hook() -> None:
             return value
 
     SkinConfig.get_color = _wrapped_get_color  # type: ignore[method-assign]
-    SkinConfig._hermes_light_mode_hook_installed = True  # type: ignore[attr-defined]
+    SkinConfig._eir_light_mode_hook_installed = True  # type: ignore[attr-defined]
 
 
 class _SkinAwareAnsi:
@@ -323,7 +323,7 @@ class _SkinAwareAnsi:
         from cli import _hex_to_ansi
         if self._cached is None:
             try:
-                from hermes_cli.skin_engine import get_active_skin
+                from eir_cli.skin_engine import get_active_skin
                 self._cached = _hex_to_ansi(
                     get_active_skin().get_color(self._skin_key, self._fallback_hex),
                     bold=self._bold,
@@ -367,7 +367,7 @@ _d = functools.partial(_tty_wrap, sgr="\x1b[2;3m")  # dim-italic when stdout is 
 def _accent_hex() -> str:
     """Return the active skin accent color for legacy CLI output lines."""
     try:
-        from hermes_cli.skin_engine import get_active_skin
+        from eir_cli.skin_engine import get_active_skin
         return get_active_skin().get_color("ui_accent", "#FFBF00")
     except Exception:
         return "#FFBF00"
@@ -919,7 +919,7 @@ class ChatConsole:
 def _build_compact_banner() -> str:
     """Build a compact banner that fits the current terminal width."""
     try:
-        from hermes_cli.skin_engine import get_active_skin
+        from eir_cli.skin_engine import get_active_skin
         _skin = get_active_skin()
     except Exception:
         _skin = None
@@ -932,14 +932,14 @@ def _build_compact_banner() -> str:
     dim_color = _color("banner_dim", "#B8860B")
 
     if (getattr(_skin, "name", "default") if _skin else "default") == "default":
-        tiny_line = "☤ NOUS HERMES"
+        tiny_line = "☤ NOUS EIR"
     else:
-        tiny_line = _skin.get_branding("agent_name", "Hermes Agent") if _skin else "Hermes Agent"
+        tiny_line = _skin.get_branding("agent_name", "Eir Agent") if _skin else "Eir Agent"
     line1 = t("cli.render.banner_tagline", name=tiny_line)
 
-    if os.environ.get("HERMES_FAST_STARTUP_BANNER") == "1":
-        from hermes_cli import __release_date__ as _release_date
-        from hermes_cli.version_info import get_version_info
+    if os.environ.get("EIR_FAST_STARTUP_BANNER") == "1":
+        from eir_cli import __release_date__ as _release_date
+        from eir_cli.version_info import get_version_info
 
         version_line = t("cli.render.banner_version", version=get_version_info().derived_version, date=_release_date)
     else:

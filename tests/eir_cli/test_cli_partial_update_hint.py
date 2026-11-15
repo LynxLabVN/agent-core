@@ -1,9 +1,9 @@
 """Chat startup must explain a mixed-version ImportError (#96900).
 
 A half-updated install can ship a newer ``cli.py`` (or launcher) importing
-config helpers that the older ``hermes_cli.config`` does not export. ``cmd_chat``
+config helpers that the older ``eir_cli.config`` does not export. ``cmd_chat``
 (around ``cli.main``) and the ``-z`` transport launch are the load-bearing catches:
-bare ``hermes`` and ``hermes chat`` (including the fast-chat launch path)
+bare ``eir`` and ``eir chat`` (including the fast-chat launch path)
 all go through it.
 """
 
@@ -14,7 +14,7 @@ import types
 
 import pytest
 
-from hermes_constants import emit_partial_update_hint
+from eir_constants import emit_partial_update_hint
 
 
 def _chat_args(**overrides):
@@ -51,21 +51,21 @@ def _chat_args(**overrides):
 
 def _missing_config_name_error(name: str = "resolve_turn_limit") -> ImportError:
     exc = ImportError(
-        f"cannot import name '{name}' from 'hermes_cli.config'"
+        f"cannot import name '{name}' from 'eir_cli.config'"
     )
-    exc.name = "hermes_cli.config"
+    exc.name = "eir_cli.config"
     return exc
 
 
 def _install_boom(monkeypatch, boom):
-    """``hermes chat`` runs main's ``cli.main``; ``-z`` keeps the gateway transport launcher."""
+    """``eir chat`` runs main's ``cli.main``; ``-z`` keeps the gateway transport launcher."""
     monkeypatch.setitem(sys.modules, "cli", types.SimpleNamespace(main=lambda **_kw: boom(None)))
-    monkeypatch.setattr("hermes_cli.gateway_chat.launch_from_args", boom)
+    monkeypatch.setattr("eir_cli.gateway_chat.launch_from_args", boom)
 
 
 @pytest.fixture
 def main_mod(monkeypatch):
-    import hermes_cli.main as mod
+    import eir_cli.main as mod
 
     monkeypatch.setattr(mod, "_has_any_provider_configured", lambda: True)
     monkeypatch.setattr(mod, "_sync_bundled_skills_for_startup", lambda: None)
@@ -82,7 +82,7 @@ def test_emit_hint_for_missing_resolve_turn_limit():
     assert emit_partial_update_hint(exc, file=buf) is True
     text = buf.getvalue()
     assert "resolve_turn_limit" in text
-    assert "hermes update" in text
+    assert "eir update" in text
 
 
 
@@ -114,7 +114,7 @@ def test_cmd_chat_prints_update_hint_when_config_helper_is_missing(
     assert excinfo.value.code == 1
     err = capsys.readouterr().err
     assert name in err
-    assert "hermes update" in err
+    assert "eir update" in err
 
 
 @pytest.mark.parametrize("entry", ["cmd_chat", "_run_oneshot_from_args"])

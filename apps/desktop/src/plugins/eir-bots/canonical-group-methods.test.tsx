@@ -3,7 +3,7 @@ import type { WritableAtom } from 'nanostores'
 import { afterEach, expect, it, vi } from 'vitest'
 
 const { request, socket } = vi.hoisted(() => ({ request: vi.fn(), socket: { gateway: null as null | WritableAtom<string>, connectionId: null as null | WritableAtom<null | string> } }))
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@eir/plugin-sdk', async () => {
   const { captureGroupRequests } = await import('./canonical-group-contract-test-utils')
   const { atom } = await import('nanostores')
   socket.gateway = atom('open')

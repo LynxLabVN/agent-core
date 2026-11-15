@@ -1,7 +1,7 @@
-"""``hermes gateway migrate --multiplex``: converge a per-profile-gateway install onto the ONE
+"""``eir gateway migrate --multiplex``: converge a per-profile-gateway install onto the ONE
 host gateway, with a table-driven preflight.
 
-Multiplex-only (Teknium ruling): exactly one ``hermes gateway run`` per host, serving every
+Multiplex-only (Teknium ruling): exactly one ``eir gateway run`` per host, serving every
 profile. This command is the supported convergence path, and it is defined by TOPOLOGY, not by a
 config flag — a host is converged when no secondary profile owns a gateway process or a supervisor
 unit any more. That makes it re-runnable: a half-migrated host (flag flipped, a unit left behind, a
@@ -16,7 +16,7 @@ compensates an already-destructive state instead of initiating one.
 
 The preflight reuses the gateway's own conflict logic (``GatewayRunner._adapter_credential_fingerprint``,
 ``platform_binds_port``, the adapters' ``serves_profile_prefix`` declaration) so its verdict matches
-what the multiplexer would do at startup. ``hermes update`` calls :func:`maybe_auto_migrate_after_update`.
+what the multiplexer would do at startup. ``eir update`` calls :func:`maybe_auto_migrate_after_update`.
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ from agent.deadline import poll_until
 logger = logging.getLogger(__name__)
 
 MANIFEST_NAME = "gateway_migration.json"
-MIGRATE_COMMAND = "hermes gateway migrate --multiplex"
+MIGRATE_COMMAND = "eir gateway migrate --multiplex"
 _SERVED_WAIT_SECONDS = 90.0
 
 
@@ -55,7 +55,7 @@ class ProfileGateway:
     services: list[tuple[str, bool]] = field(default_factory=list)
     run_as_user: Optional[str] = None  # User= recorded by a system-scope systemd unit
     uid: Optional[int] = None  # owner of the gateway process/unit; None = unknown (never "different")
-    runtime_home: Optional[Path] = None  # HERMES_HOME the installed unit pins, when it differs from ``home``
+    runtime_home: Optional[Path] = None  # EIR_HOME the installed unit pins, when it differs from ``home``
 
     @property
     def is_default(self) -> bool:
@@ -97,7 +97,7 @@ def _service_label(service: tuple[str, bool]) -> str:
 
 
 def _remove_verb(service: tuple[str, bool]) -> str:
-    """An s6 slot is parked down (it stays registered as the `hermes -p X gateway start` target), every
+    """An s6 slot is parked down (it stays registered as the `eir -p X gateway start` target), every
     other unit is uninstalled."""
     return "park" if service[0] == "s6" else "uninstall"
 
@@ -154,7 +154,7 @@ class MigrationPlan:
 
     @property
     def expected_served_names(self) -> set[str]:
-        from hermes_cli.profiles import profile_is_parked
+        from eir_cli.profiles import profile_is_parked
         return {p.name for p in self.profiles if p.is_default or not profile_is_parked(p.home)}
 
     @property
@@ -191,7 +191,7 @@ class MigrationPlan:
 
     def eligible_for_migration(self) -> bool:
         """>= 2 profiles, at least one secondary with its own gateway, multiplex off, no blockers.
-        This is the AUTO-migration (``hermes update``) bar; the explicit command also proceeds with
+        This is the AUTO-migration (``eir update``) bar; the explicit command also proceeds with
         zero standalone secondaries (see :func:`cmd_migrate`)."""
         return (
             len(self.profiles) >= 2 and bool(self.standalone_secondaries)
@@ -204,47 +204,47 @@ class MigrationPlan:
 
 @contextlib.contextmanager
 def _home_env(home: Path) -> Iterator[None]:
-    """Run service-manager helpers as if ``home`` were the active HERMES_HOME. Both the contextvar
-    override (``get_hermes_home``) and ``os.environ`` (``gateway.status`` identity files, unit
+    """Run service-manager helpers as if ``home`` were the active EIR_HOME. Both the contextvar
+    override (``get_eir_home``) and ``os.environ`` (``gateway.status`` identity files, unit
     generation) are switched, then restored.
 
-    The process keeps its LAUNCH identity while swapped (``pin_process_hermes_home``): ``os.environ``
+    The process keeps its LAUNCH identity while swapped (``pin_process_eir_home``): ``os.environ``
     still holds the launch profile's ``.env``, so a child spawned in here for ``home`` must see it as
     a routed home and take only ``home``'s own secrets — with the env var swapped, the routed-home
     checks read ``home`` as the launch profile and handed the launch profile's credentials to the
     default gateway."""
-    from hermes_constants import (
-        get_routing_process_hermes_home, pin_process_hermes_home, process_hermes_home_is_pinned,
-        reset_hermes_home_override, set_hermes_home_override,
+    from eir_constants import (
+        get_routing_process_eir_home, pin_process_eir_home, process_eir_home_is_pinned,
+        reset_eir_home_override, set_eir_home_override,
     )
-    import hermes_constants
-    previous = os.environ.get("HERMES_HOME")
-    pinned_here = not process_hermes_home_is_pinned()
+    import eir_constants
+    previous = os.environ.get("EIR_HOME")
+    pinned_here = not process_eir_home_is_pinned()
     if pinned_here:
-        pin_process_hermes_home(get_routing_process_hermes_home())
-    token = set_hermes_home_override(str(home))
-    os.environ["HERMES_HOME"] = str(home)
-    hermes_constants._default_hermes_root_memo = None
+        pin_process_eir_home(get_routing_process_eir_home())
+    token = set_eir_home_override(str(home))
+    os.environ["EIR_HOME"] = str(home)
+    eir_constants._default_eir_root_memo = None
     try:
         yield
     finally:
         if pinned_here:
-            pin_process_hermes_home(None)
-        reset_hermes_home_override(token)
+            pin_process_eir_home(None)
+        reset_eir_home_override(token)
         if previous is None:
-            os.environ.pop("HERMES_HOME", None)
+            os.environ.pop("EIR_HOME", None)
         else:
-            os.environ["HERMES_HOME"] = previous
-        hermes_constants._default_hermes_root_memo = None
+            os.environ["EIR_HOME"] = previous
+        eir_constants._default_eir_root_memo = None
 
 
 def _default_home() -> Path:
-    from hermes_constants import get_default_hermes_root
-    return get_default_hermes_root()
+    from eir_constants import get_default_eir_root
+    return get_default_eir_root()
 
 
 def _profile_homes() -> list[tuple[str, Path]]:
-    from hermes_cli.profiles import profiles_to_serve
+    from eir_cli.profiles import profiles_to_serve
     return list(profiles_to_serve(multiplex=True, include_parked=True))
 
 
@@ -277,7 +277,7 @@ def _own_gateway_pid(home: Path, owner) -> Optional[int]:
     Ownership is what this command may stop, and the host multiplexer is not owned by the profiles
     it serves: it is one process, launched from one home. Deriving ownership from
     :func:`_live_gateway_pid` made every secondary on a CONVERGED host report the host gateway's
-    PID, so the plan called the host half-migrated and each `hermes update` SIGTERMed the only
+    PID, so the plan called the host half-migrated and each `eir update` SIGTERMed the only
     gateway it had. The host process counts only for the home it was actually launched from; every
     other profile it serves owns nothing.
     """
@@ -285,13 +285,13 @@ def _own_gateway_pid(home: Path, owner) -> Optional[int]:
     if pid is None or owner is None or pid != owner.pid:
         return pid
     with contextlib.suppress(Exception):
-        from gateway.status import _same_hermes_home
-        return pid if _same_hermes_home(Path(owner.home), Path(home)) else None
+        from gateway.status import _same_eir_home
+        return pid if _same_eir_home(Path(owner.home), Path(home)) else None
     return None
 
 
 def _gateway_identity(home: Path, pid: Optional[int], services: list[tuple[str, bool]]) -> tuple[Optional[int], Path]:
-    from hermes_cli.gateway_migrate_guards import gateway_identity
+    from eir_cli.gateway_migrate_guards import gateway_identity
     return gateway_identity(home, pid, services)
 
 
@@ -301,12 +301,12 @@ def _installed_services(home: Path) -> list[tuple[str, bool]]:
     Under s6 the footprint is the SLOT: the root slot always (it is what a restart goes through),
     a named profile's slot only while it is UP — a registered-down slot is what the container's
     boot leaves behind for every named profile and is not a gateway."""
-    from hermes_cli import gateway as gw
+    from eir_cli import gateway as gw
     found: list[tuple[str, bool]] = []
     if gw._running_under_s6():
-        from hermes_cli.gateway_multiplex_s6 import named_slot_name, slot_is_up
-        from hermes_cli.service_manager import S6ServiceManager
-        from hermes_constants import profile_name_for_home
+        from eir_cli.gateway_multiplex_s6 import named_slot_name, slot_is_up
+        from eir_cli.service_manager import S6ServiceManager
+        from eir_constants import profile_name_for_home
         name = profile_name_for_home(home) or "default"
         slot_dir = S6ServiceManager().scandir / named_slot_name(name)
         if slot_dir.is_dir() and (name == "default" or slot_is_up(name)):
@@ -323,14 +323,14 @@ def _installed_services(home: Path) -> list[tuple[str, bool]]:
 
 
 def _windows_task_installed() -> bool:
-    """Is a per-profile Windows gateway installed for the ACTIVE ``HERMES_HOME``?
+    """Is a per-profile Windows gateway installed for the ACTIVE ``EIR_HOME``?
 
     ``get_task_name()`` is home-suffixed, so this answers per profile exactly the way the systemd
-    unit path does. Either half counts: ``hermes gateway install`` falls back to a Startup-folder
+    unit path does. Either half counts: ``eir gateway install`` falls back to a Startup-folder
     entry when it cannot register a scheduled task, and a migration that removed only the task
     would leave the fallback launching a second gateway at the next logon.
     """
-    from hermes_cli import gateway_windows as gww
+    from eir_cli import gateway_windows as gww
     with contextlib.suppress(Exception):
         return bool(gww.is_task_registered() or gww.is_startup_entry_installed())
     return False
@@ -340,7 +340,7 @@ def _systemd_service_user(home: Path, services: list[tuple[str, bool]]) -> Optio
     """Read ``User=`` before migration removes a system-scope unit."""
     if ("systemd", True) not in services:
         return None
-    from hermes_cli import gateway as gw
+    from eir_cli import gateway as gw
     with _home_env(home):
         return gw._read_systemd_user_from_unit(gw.get_systemd_unit_path(system=True))
 
@@ -349,7 +349,7 @@ def _service_op(kind: str, system: bool, verb: str, home: Path, *, run_as_user: 
     """``stop`` / ``uninstall`` / ``start`` / ``restart`` / ``install`` / ``enable`` on ``home``'s service."""
     if kind == "s6":
         return _s6_slot_op(verb, home)
-    from hermes_cli import gateway as gw
+    from eir_cli import gateway as gw
     with _home_env(home):
         if verb == "install":
             if kind == "launchd":
@@ -357,7 +357,7 @@ def _service_op(kind: str, system: bool, verb: str, home: Path, *, run_as_user: 
             elif kind == "windows":
                 # Non-interactive: the migration already asked; prompting here would hang a
                 # supervised/`--yes` run on a console that has no operator.
-                from hermes_cli import gateway_windows as gww
+                from eir_cli import gateway_windows as gww
                 gww.install(start_now=True, start_on_login=True)
             else:
                 gw.systemd_install(system=system, run_as_user=run_as_user, non_interactive=True)
@@ -380,16 +380,16 @@ def _service_op(kind: str, system: bool, verb: str, home: Path, *, run_as_user: 
 
 
 def _stop_gateway_process(home: Path) -> None:
-    from hermes_cli.profiles import _stop_gateway_process
+    from eir_cli.profiles import _stop_gateway_process
     _stop_gateway_process(home)
 
 
 def _s6_slot_op(verb: str, home: Path) -> None:
     """The s6 leg of :func:`_service_op`. A named profile's slot is never uninstalled: it stays
-    registered DOWN (``down`` file) as the target of a later ``hermes -p X gateway start``, exactly
+    registered DOWN (``down`` file) as the target of a later ``eir -p X gateway start``, exactly
     the shape the container's boot produces. The root slot is (re)started so it re-reads its config."""
-    from hermes_cli.gateway_multiplex_s6 import bring_root_slot_up, park_named_slot
-    from hermes_constants import profile_name_for_home
+    from eir_cli.gateway_multiplex_s6 import bring_root_slot_up, park_named_slot
+    from eir_constants import profile_name_for_home
     name = profile_name_for_home(home) or "default"
     if name == "default":
         if verb in ("start", "restart"):
@@ -400,7 +400,7 @@ def _s6_slot_op(verb: str, home: Path) -> None:
 
 
 def _spawn_detached_gateway(home: Path) -> bool:
-    from hermes_cli import gateway as gw
+    from eir_cli import gateway as gw
     with _home_env(home):
         return gw._spawn_detached_gateway()
 
@@ -409,14 +409,14 @@ def _read_multiplex_flag(default_home: Path) -> bool:
     """The operator's EXPLICIT opt-in only. The unset default (on) is settled by the default gateway at
     boot and refused while a secondary runs its own gateway — exactly the fleet this command folds —
     so the plan reads it as "not yet multiplexed" and the migration proceeds."""
-    from hermes_cli.gateway_multiplex_mode import explicit_multiplex_flag
+    from eir_cli.gateway_multiplex_mode import explicit_multiplex_flag
     return explicit_multiplex_flag(default_home) is True
 
 
 def _write_multiplex_flag(default_home: Path, value: bool) -> None:
     """Set ``gateway.multiplex_profiles`` in the DEFAULT profile's config.yaml through the config API
-    (same read-guard + nested-set + atomic write ``hermes config set`` uses; no raw YAML edits)."""
-    from hermes_cli.config import _set_nested, _write_user_config, require_readable_config_before_write
+    (same read-guard + nested-set + atomic write ``eir config set`` uses; no raw YAML edits)."""
+    from eir_cli.config import _set_nested, _write_user_config, require_readable_config_before_write
     cfg_path = default_home / "config.yaml"
     user_config = require_readable_config_before_write(cfg_path)
     # A stale top-level alias would shadow the nested key the docs describe.
@@ -441,8 +441,8 @@ def _profile_gateway_config(home: Path):
     """
     from gateway.config import load_gateway_config
     from gateway.run import _profile_runtime_scope
-    from hermes_cli.plugins_discovery import suppress_plugin_discovery
-    from hermes_cli.profiles import profile_is_parked
+    from eir_cli.plugins_discovery import suppress_plugin_discovery
+    from eir_cli.profiles import profile_is_parked
     scope = suppress_plugin_discovery() if profile_is_parked(home) else contextlib.nullcontext()
     with _profile_runtime_scope(home), scope:
         return load_gateway_config()
@@ -486,14 +486,14 @@ def _credential_claims(config) -> dict[tuple, str]:
 def _credential_key_names(platform_value: str) -> str:
     """Env key NAMES (never values) that make ``platform_value`` connect as a bot, e.g.
     ``TELEGRAM_BOT_TOKEN``; the platform id when no key is registered (config.yaml-only token)."""
-    from hermes_cli.profile_channels import credential_env_keys
+    from eir_cli.profile_channels import credential_env_keys
     names = sorted(key for key, pid in credential_env_keys().items() if pid == platform_value)
     return "/".join(names) or f"the {platform_value} token"
 
 
 def duplicate_credential_lines(configs: list[tuple[str, object]]) -> list[str]:
     """One finding per platform credential two profiles both hold, with the remedy. The SINGLE
-    source for the migrate preflight, ``hermes doctor`` and ``hermes gateway status``, so all three
+    source for the migrate preflight, ``eir doctor`` and ``eir gateway status``, so all three
     name the same duplicates the same way: profile names + key names only, never a value or hash."""
     owners: dict[tuple, str] = {}
     lines: list[str] = []
@@ -553,7 +553,7 @@ def platform_serves_profile_prefix(platform_value: str) -> bool:
     with contextlib.suppress(Exception):
         # Plugin-shipped adapters (sms, line, teams, feishu, wecom, ...) only exist in the registry
         # after discovery; a bare CLI process has not run it yet.
-        from hermes_cli.plugins import discover_plugins
+        from eir_cli.plugins import discover_plugins
         discover_plugins()  # idempotent
         from gateway.platform_registry import platform_registry
         entry = platform_registry.get(platform_value)
@@ -578,7 +578,7 @@ def _listener_url(default_cfg, platform_value: str, profile: str) -> str:
     host = extra.get("host") or host
     port = extra.get("port") or port
     tail = {"api_server": "/v1/...", "webhook": "/webhooks/<route>"}.get(platform_value, "/...")
-    from hermes_cli.url_utils import format_url_host
+    from eir_cli.url_utils import format_url_host
 
     return f"http://{format_url_host(host)}:{port}/p/{profile}{tail}"
 
@@ -629,7 +629,7 @@ def _load_profile_configs(plan: MigrationPlan) -> dict[str, object]:
 
 def build_migration_plan() -> MigrationPlan:
     """Enumerate profiles + their OWN gateway footprint, then run every preflight check."""
-    from hermes_cli.gateway_multiplex_served import recorded_served_profiles
+    from eir_cli.gateway_multiplex_served import recorded_served_profiles
     default_home = _default_home()
     # Probed ONCE: every profile's ownership verdict is relative to the same host process.
     owner = _host_gateway_owner()
@@ -646,7 +646,7 @@ def build_migration_plan() -> MigrationPlan:
         live_served=recorded_served_profiles(default_home),
         manifest=_read_manifest(default_home),
     )
-    from hermes_cli.profiles import profiles_to_serve
+    from eir_cli.profiles import profiles_to_serve
     foldable = {name for name, _home in _profile_homes()}
     plan.standalone_by_config = tuple(
         name for name, _home in profiles_to_serve(True, include_standalone=True)
@@ -658,10 +658,10 @@ def build_migration_plan() -> MigrationPlan:
     configs = _load_profile_configs(plan)
     for check in _PREFLIGHT_CHECKS:
         check(plan, configs)
-    from hermes_cli.gateway_migrate_guards import auto_migration_blockers
+    from eir_cli.gateway_migrate_guards import auto_migration_blockers
     # Notices, not blockers: the explicit command is the operator's decision; only the update hook
     # refuses to cross these boundaries on its own.
-    plan.notices.extend(f"Not migrated automatically by `hermes update`: {b}" for b in auto_migration_blockers(plan))
+    plan.notices.extend(f"Not migrated automatically by `eir update`: {b}" for b in auto_migration_blockers(plan))
     plan.notices.append(
         "Profiles created after the migration are served by the running multiplexer as soon as "
         "they exist (it rescans profiles/ on create/delete and every 30s)."
@@ -816,7 +816,7 @@ def format_update_warning(plan: MigrationPlan, auto_blockers: list[str]) -> list
         "  setup, but this install cannot be migrated automatically yet:",
         *[f"    • {b}" for b in (*plan.blockers, *auto_blockers)],
         f"  After fixing the above, run:  {MIGRATE_COMMAND}",
-        "  (`hermes update` will migrate automatically once nothing blocks it.)",
+        "  (`eir update` will migrate automatically once nothing blocks it.)",
     ]
 
 
@@ -846,7 +846,7 @@ def _manifest_not_yet_served(manifest: Optional[dict], live_served: Optional[lis
     Profiles created after the migration are not in the manifest, so they cannot flag it as interrupted."""
     if manifest is None:
         return False
-    from hermes_cli.profiles import profile_is_parked
+    from eir_cli.profiles import profile_is_parked
     recs = [r for r in (manifest.get("default"), *(_manifest_secondaries(manifest) or [])) if isinstance(r, dict)]
     migrated = {str(r.get("profile") or "default") for r in recs
                 if not r.get("home") or not profile_is_parked(Path(r["home"]))} | {"default"}
@@ -881,7 +881,7 @@ def _reconcile_standalone_runtime(default_home: Path, secondary_names: set[str])
 
 def _wait_for_served(default_home: Path, expected: set[str], timeout: float) -> Optional[list[str]]:
     """Poll the default's ``gateway_state.json`` until ``served_profiles`` covers ``expected``."""
-    from hermes_cli.gateway_multiplex_served import recorded_served_profiles
+    from eir_cli.gateway_multiplex_served import recorded_served_profiles
     deadline = time.monotonic() + timeout
     served: Optional[list[str]] = None
     while time.monotonic() < deadline:
@@ -960,8 +960,8 @@ def _preflight_apply(plan: MigrationPlan, target: Optional[tuple[str, bool]], ru
     working per-profile gateway is stopped: rollback is the fallback for surprises, not the plan.
     Mirrors the checks ``systemd_install``/``_service_call`` make on a system unit (root, resolvable
     ``User=``) and the config write's read-guard."""
-    from hermes_cli import gateway as gw
-    from hermes_cli.config import require_readable_config_before_write
+    from eir_cli import gateway as gw
+    from eir_cli.config import require_readable_config_before_write
     try:
         require_readable_config_before_write(plan.default_home / "config.yaml")
     except Exception as exc:
@@ -1092,7 +1092,7 @@ def apply_migration(plan: MigrationPlan, *, served_wait: float = _SERVED_WAIT_SE
         return True
     missing = sorted(expected - set(served or []))
     _print(["", f"⚠ Migration applied, but the default gateway has not confirmed serving: {', '.join(missing)}",
-            "  Check `hermes gateway status` and the gateway log; the flag and manifest are in place.",
+            "  Check `eir gateway status` and the gateway log; the flag and manifest are in place.",
             f"  Re-run {MIGRATE_COMMAND} once it is healthy — it resumes from the manifest."])
     return False
 
@@ -1126,7 +1126,7 @@ def rollback_migration(default_home: Optional[Path] = None) -> bool:
     or the retired ``false``; both resolve to multiplex at boot once nothing blocks it).
 
     Returns True only when a gateway is VERIFIABLY live again; the manifest is kept otherwise so
-    the next ``hermes gateway migrate --multiplex`` resumes.
+    the next ``eir gateway migrate --multiplex`` resumes.
     """
     default_home = default_home or _default_home()
     manifest = _read_manifest(default_home)
@@ -1190,7 +1190,7 @@ def rollback_migration(default_home: Optional[Path] = None) -> bool:
     live = _wait_for_live_gateway(default_home, _COMPENSATOR_WAIT_SECONDS)
     if live is None:
         print(f"  ✗ default: no gateway confirmed serving this host within {_COMPENSATOR_WAIT_SECONDS:.0f}s "
-              f"(check `hermes gateway status` and the gateway log)")
+              f"(check `eir gateway status` and the gateway log)")
         print(incomplete)
         return False
     _manifest_path(default_home).unlink(missing_ok=True)
@@ -1212,14 +1212,14 @@ def _host_supports_migration() -> Optional[str]:
     Windows IS handled (per-profile Scheduled Tasks and the Startup-folder fallback are removed
     like any other unit). s6 IS handled too, in-process: a named profile's slot that is UP is
     parked (``s6-svc -d`` + ``down`` file) and its autostart intent folded into the root slot the
-    same way the container's boot does it (``hermes_cli.gateway_multiplex_s6``). What cannot be
+    same way the container's boot does it (``eir_cli.gateway_multiplex_s6``). What cannot be
     done from here is register a slot the boot never created — that is the one refusal left.
     """
-    from hermes_cli import gateway as gw
+    from eir_cli import gateway as gw
     if not gw._running_under_s6():
         return None
-    from hermes_cli.gateway_multiplex_s6 import named_slot_name
-    from hermes_cli.service_manager import S6ServiceManager
+    from eir_cli.gateway_multiplex_s6 import named_slot_name
+    from eir_cli.service_manager import S6ServiceManager
     scandir = S6ServiceManager().scandir
     if not (scandir / named_slot_name("default")).is_dir():
         return (f"s6-supervised container without a root gateway slot ({scandir / named_slot_name('default')}); "
@@ -1228,9 +1228,9 @@ def _host_supports_migration() -> Optional[str]:
 
 
 def cmd_migrate(args) -> None:
-    """``hermes gateway migrate [--multiplex] [--dry-run] [--yes]``; ``--backends`` is a report that changes no service."""
+    """``eir gateway migrate [--multiplex] [--dry-run] [--yes]``; ``--backends`` is a report that changes no service."""
     if getattr(args, "backends", False):
-        from hermes_cli.gateway_migrate_backends import cmd_backends_report
+        from eir_cli.gateway_migrate_backends import cmd_backends_report
         cmd_backends_report(args)
         return
     if getattr(args, "json", False):
@@ -1255,7 +1255,7 @@ def cmd_migrate(args) -> None:
     # Zero standalone secondaries is still a migration when the user asks for it explicitly: the flag
     # goes on and the default gateway restarts (the update hook keeps treating that case as a no-op).
     if not getattr(args, "yes", False) and sys.stdin.isatty():
-        from hermes_cli.setup import prompt_yes_no
+        from eir_cli.setup import prompt_yes_no
         if not prompt_yes_no("Apply this migration now?", True):
             print("Aborted; nothing changed.")
             return
@@ -1264,11 +1264,11 @@ def cmd_migrate(args) -> None:
 
 
 def maybe_auto_migrate_after_update() -> None:
-    """``hermes update`` hook: with >= 2 profiles, per-profile gateways present and multiplex off,
+    """``eir update`` hook: with >= 2 profiles, per-profile gateways present and multiplex off,
     migrate automatically when unblocked (deterministic, never prompts) or print the blocker block.
     ``gateway.auto_multiplex_migration: false`` on the default profile opts out; a secondary behind a
-    service-domain / UNIX-user / HERMES_HOME boundary blocks this path only (the explicit command decides)."""
-    from hermes_cli.gateway_migrate_guards import auto_migration_blockers, auto_migration_opted_out
+    service-domain / UNIX-user / EIR_HOME boundary blocks this path only (the explicit command decides)."""
+    from eir_cli.gateway_migrate_guards import auto_migration_blockers, auto_migration_opted_out
     if _host_supports_migration() is not None or auto_migration_opted_out(_default_home()):
         return
     plan = build_migration_plan()
@@ -1280,7 +1280,7 @@ def maybe_auto_migrate_after_update() -> None:
     resuming = plan.manifest is not None
     if not plan.standalone_secondaries and not resuming:
         return
-    from hermes_cli.gateway_migrate_guards import masked_default_unit
+    from eir_cli.gateway_migrate_guards import masked_default_unit
     masked = None if resuming else masked_default_unit(plan.default_home)
     if masked is not None:
         print(f"\n  ℹ Per-profile gateways kept: the default gateway unit is masked ({masked}).\n"

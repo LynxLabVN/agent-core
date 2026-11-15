@@ -1,22 +1,22 @@
 /**
- * windows-hermes-path.ts
+ * windows-eir-path.ts
  *
- * Pure, dependency-injected pieces of Windows `hermes` resolution pulled out
+ * Pure, dependency-injected pieces of Windows `eir` resolution pulled out
  * of main.ts's findOnPath(), handOffWindowsBootstrapRecovery(), and
- * unwrapWindowsVenvHermesCommand(). Each of the three functions here pins one
+ * unwrapWindowsVenvEirCommand(). Each of the three functions here pins one
  * of the Windows resolution bugs that caused desktop reinstall loops:
  *
  *   1. buildPathExtCandidates() — findOnPath() tried the empty extension
- *      FIRST, so an extensionless Git-Bash `hermes` shim shadowed the real
- *      hermes.cmd/hermes.exe; the shim then failed the --version probe and
+ *      FIRST, so an extensionless Git-Bash `eir` shim shadowed the real
+ *      eir.cmd/eir.exe; the shim then failed the --version probe and
  *      the desktop fell through to a spurious bootstrap/repair. The fix:
  *      PATHEXT extensions first, empty extension LAST.
  *   2. chooseUpdaterArgs() — handOffWindowsBootstrapRecovery() must separate
  *      install provenance from updater viability. A bootstrap-complete marker
  *      can outlive a deleted venv, while the updater needs BOTH the venv Python
- *      and Hermes launcher. Marker-only or partial runtimes must use --repair;
+ *      and Eir launcher. Marker-only or partial runtimes must use --repair;
  *      only a runnable pair can use --update.
- *   3. resolveVenvHermesCommand() — unwrapWindowsVenvHermesCommand() returned
+ *   3. resolveVenvEirCommand() — unwrapWindowsVenvEirCommand() returned
  *      the venv python with NO runtime probe (bypassing the caller's
  *      --version check too), so a venv broken mid-update (e.g. missing
  *      python-dotenv) was re-selected forever: Retry / "Repair install"
@@ -35,8 +35,8 @@
  * On Windows this MUST try PATHEXT extensions (.COM;.EXE;.BAT;.CMD by
  * default) BEFORE the bare/empty-extension name: a real command resolves via
  * its .exe/.cmd per Windows command-resolution semantics, and an
- * extensionless file (e.g. a Git-Bash shell-script shim named `hermes`) must
- * not shadow `hermes.cmd`/`hermes.exe`. The empty entry is kept LAST so
+ * extensionless file (e.g. a Git-Bash shell-script shim named `eir`) must
+ * not shadow `eir.cmd`/`eir.exe`. The empty entry is kept LAST so
  * callers that already include the extension (py.exe, pwsh.exe,
  * powershell.exe) still resolve.
  *
@@ -58,7 +58,7 @@ export function buildPathExtCandidates(pathext: string | undefined, isWindows: b
 /**
  * Choose the Windows bootstrap-recovery invocation. The gentle in-place
  * updater can only start when both pieces of its runtime contract exist: the
- * venv Python interpreter and the Hermes launcher that drives `hermes update`.
+ * venv Python interpreter and the Eir launcher that drives `eir update`.
  * A bootstrap-complete marker proves install provenance, not current runtime
  * usability, and may remain after the venv is removed or quarantined.
  *
@@ -74,12 +74,12 @@ export function chooseUpdaterArgs(signals: BootstrapRecoverySignals, branch: str
   return signals.runtimeUsable ? ['--update', '--branch', branch] : ['--repair', '--branch', branch]
 }
 
-export interface ResolveVenvHermesCommandDeps {
+export interface ResolveVenvEirCommandDeps {
   isWindows: boolean
   isCommandScript: (command: string) => boolean
   fileExists: (filePath: string) => boolean
   directoryExists: (filePath: string) => boolean
-  canImportHermesCli: (python: string, opts?: { env?: Record<string, string>; cwd?: string }) => Promise<boolean>
+  canImportEirCli: (python: string, opts?: { env?: Record<string, string>; cwd?: string }) => Promise<boolean>
   getVenvPython: (venvRoot: string) => string
   buildDesktopBackendEnv: () => Record<string, string>
   resolvePath: (...segments: string[]) => string
@@ -89,11 +89,11 @@ export interface ResolveVenvHermesCommandDeps {
 }
 
 /**
- * If `command` is a Windows venv `hermes`/`hermes.exe` console-script shim
- * (i.e. `<venvRoot>/Scripts/hermes(.exe)`), resolve it to the underlying
- * venv python invoked as `python -m hermes_cli.main <backendArgs>` — but
- * ONLY after smoke-testing that interpreter with canImportHermesCli(). A
- * venv whose update died mid-`pip install` still has python.exe + hermes.exe
+ * If `command` is a Windows venv `eir`/`eir.exe` console-script shim
+ * (i.e. `<venvRoot>/Scripts/eir(.exe)`), resolve it to the underlying
+ * venv python invoked as `python -m eir_cli.main <backendArgs>` — but
+ * ONLY after smoke-testing that interpreter with canImportEirCli(). A
+ * venv whose update died mid-`pip install` still has python.exe + eir.exe
  * on disk, but the backend dies on its first import (e.g.
  * ModuleNotFoundError: dotenv) before the gateway ever binds. Returning it
  * unprobed also bypasses the caller's `--version` probe, so Retry/"Repair
@@ -103,14 +103,14 @@ export interface ResolveVenvHermesCommandDeps {
  * Mirrors isSourceRuntimeUsable() in main.ts: probes with the checkout on PYTHONPATH so
  * a healthy source-tree venv passes.
  *
- * Returns null when `command` is not a venv hermes shim, the underlying
+ * Returns null when `command` is not a venv eir shim, the underlying
  * python doesn't exist, or the import probe fails. Otherwise returns the
  * resolved backend descriptor.
  */
-export async function resolveVenvHermesCommand(
+export async function resolveVenvEirCommand(
   command: string,
   backendArgs: string[],
-  deps: ResolveVenvHermesCommandDeps
+  deps: ResolveVenvEirCommandDeps
 ): Promise<{
   label: string
   command: string
@@ -126,7 +126,7 @@ export async function resolveVenvHermesCommand(
     isCommandScript,
     fileExists,
     directoryExists,
-    canImportHermesCli,
+    canImportEirCli,
     getVenvPython,
     buildDesktopBackendEnv,
     resolvePath,
@@ -141,7 +141,7 @@ export async function resolveVenvHermesCommand(
 
   const resolved = resolvePath(String(command))
 
-  if (!/^hermes(?:\.exe)?$/i.test(basename(resolved))) {
+  if (!/^eir(?:\.exe)?$/i.test(basename(resolved))) {
     return null
   }
 
@@ -162,18 +162,18 @@ export async function resolveVenvHermesCommand(
 
   // Probe with the same semantics the real spawn uses: venv interpreter,
   // cwd at the checkout root, no PYTHONPATH.
-  if (!(await canImportHermesCli(python, { cwd: directoryExists(root) ? root : undefined }))) {
+  if (!(await canImportEirCli(python, { cwd: directoryExists(root) ? root : undefined }))) {
     rememberLog?.(
-      `Ignoring venv Hermes at ${python}: runtime import probe failed (broken/partial venv); falling through to bootstrap.`
+      `Ignoring venv Eir at ${python}: runtime import probe failed (broken/partial venv); falling through to bootstrap.`
     )
 
     return null
   }
 
   return {
-    label: `existing Hermes Python at ${python}`,
+    label: `existing Eir Python at ${python}`,
     command: python,
-    args: ['-m', 'hermes_cli.main', ...backendArgs],
+    args: ['-m', 'eir_cli.main', ...backendArgs],
     bootstrap: false,
     env: buildDesktopBackendEnv(),
     kind: 'python',

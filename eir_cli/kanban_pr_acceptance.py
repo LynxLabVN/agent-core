@@ -98,12 +98,12 @@ def _gh_env(profile_home: str | None) -> dict[str, str] | None:
     if not profile_home:
         return None
     from agent.secret_scope import build_profile_secret_scope
-    from tools.environments.local import _is_routed_home, hermes_subprocess_env, served_profile_child_env
-    base = hermes_subprocess_env(inherit_credentials=False)
+    from tools.environments.local import _is_routed_home, eir_subprocess_env, served_profile_child_env
+    base = eir_subprocess_env(inherit_credentials=False)
     routed = _is_routed_home(profile_home)
     if routed:
         # The launcher's own gh login must not reach the child: GH_TOKEN/GITHUB_TOKEN are
-        # already scrubbed by hermes_subprocess_env, but the enterprise trio (GH_HOST,
+        # already scrubbed by eir_subprocess_env, but the enterprise trio (GH_HOST,
         # GH_/GITHUB_ENTERPRISE_TOKEN) is on no strip list, and a surviving ambient token
         # would reach the child (#122689, the GHE case). The target's own github.com login keys
         # are re-added from its secret scope below.
@@ -128,7 +128,7 @@ def _assignee_profile_home(assignee: str | None) -> str | None:
     identity failure (``auth``), never a silent fall-through to the ambient login."""
     if not assignee:
         return None
-    from hermes_cli.profiles import normalize_profile_name, resolve_profile_env
+    from eir_cli.profiles import normalize_profile_name, resolve_profile_env
     try:
         return resolve_profile_env(normalize_profile_name(assignee))
     except (FileNotFoundError, ValueError):

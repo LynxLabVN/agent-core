@@ -1,9 +1,9 @@
-"""Skills configuration for Hermes Agent. `hermes skills` enters this module."""
+"""Skills configuration for Eir Agent. `eir skills` enters this module."""
 from typing import List, Optional, Set
 
-from hermes_cli.config import cfg_get, load_config, save_config
-from hermes_cli.colors import Colors, color
-from hermes_cli.platforms import PLATFORMS as _PLATFORMS
+from eir_cli.config import cfg_get, load_config, save_config
+from eir_cli.colors import Colors, color
+from eir_cli.platforms import PLATFORMS as _PLATFORMS
 
 # {key: label} view of the messaging platforms (``PLATFORMS.items()`` / ``.get(key)`` below).
 PLATFORMS = {k: info.label for k, info in _PLATFORMS.items() if k != "api_server"}
@@ -41,7 +41,7 @@ def get_disabled_skills(config: dict, platform: Optional[str] = None) -> set[str
 
 
 def save_disabled_skills(config: dict, disabled: set[str], platform: Optional[str] = None):
-    """Persist disabled skill names to config; essential skills (e.g. ``hermes-agent``) are
+    """Persist disabled skill names to config; essential skills (e.g. ``eir-agent``) are
     silently dropped — they cannot be disabled from any surface."""
     from agent.skill_utils import ESSENTIAL_SKILLS
     disabled = set(disabled) - ESSENTIAL_SKILLS
@@ -91,7 +91,7 @@ def _select_platform() -> Optional[str]:
 
 def _toggle_by_category(skills: list[dict], disabled: set[str]) -> set[str]:
     """Toggle all skills in a category at once."""
-    from hermes_cli.curses_ui import curses_checklist
+    from eir_cli.curses_ui import curses_checklist
     categories = _get_categories(skills)
     cat_skills = [{s["name"] for s in skills if (s["category"] or "uncategorized") == cat}
                   for cat in categories]
@@ -111,8 +111,8 @@ def _toggle_by_category(skills: list[dict], disabled: set[str]) -> set[str]:
 
 
 def skills_command(args=None):
-    """Entry point for `hermes skills`."""
-    from hermes_cli.curses_ui import curses_checklist
+    """Entry point for `eir skills`."""
+    from eir_cli.curses_ui import curses_checklist
     config = load_config()
     skills = _list_all_skills()
     if not skills:

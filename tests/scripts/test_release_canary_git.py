@@ -186,7 +186,7 @@ def _every_download(tag):
     version = tag[1:]
     names = [
         f"releases/tag/{tag}/{app}-{version}-{os_name}-{arch}.{extension}"
-        for app in ("HermesBundled", "HermesLight")
+        for app in ("EirBundled", "EirLight")
         for os_name, arch, extension in (("mac", "arm64", "dmg"), ("win", "x64", "msix"), ("win", "arm64", "msix"),
                                          ("linux", "x64", "AppImage"), ("linux", "arm64", "AppImage"))
     ]
@@ -221,7 +221,7 @@ def test_canary_tag_pushed_without_a_draft_is_recovered_on_a_busy_repository(can
     git("tag", "v1.2.3")
     git("commit", "--allow-empty", "-qm", "feat: next")
     tag = "v1.2.3+canary.20260818T103000Z"
-    git("tag", "-a", tag, "-m", "Hermes Agent canary 20260818T103000Z")
+    git("tag", "-a", tag, "-m", "Eir Agent canary 20260818T103000Z")
     git("push", "origin", f"refs/tags/{tag}")
 
     release.cmd_canary(SimpleNamespace(date="20260819T103000Z", publish=True, no_changelog=False, remote="origin"))

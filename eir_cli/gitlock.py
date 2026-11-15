@@ -13,13 +13,13 @@ import time
 from pathlib import Path
 from typing import Callable, Iterable, List, Optional
 
-from hermes_cli._subprocess_compat import (
+from eir_cli._subprocess_compat import (
     NO_LAZY_FETCH_ENV,
     bounded_probe_run,
     noninteractive_git_env,
     windows_hide_flags,
 )
-from hermes_cli.update_custody import run_git
+from eir_cli.update_custody import run_git
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ STALE_TMP_PACK_MIN_AGE_SECONDS = STALE_LOCK_MIN_AGE_SECONDS
 # ``shallow.lock`` is the one observed in the wild; the others are the same class of failure
 # (interrupted git operation). Locks held by a live git process are protected by the process guard.
 LOCK_NAMES = ("shallow.lock", "index.lock", "HEAD.lock", "MERGE_HEAD.lock")
-# Object-store indexes a killed git (Hermes kills git trees on timeout) leaves locked. Each lock fails
+# Object-store indexes a killed git (Eir kills git trees on timeout) leaves locked. Each lock fails
 # every later write of that file, so the commit-graph that keeps ``git tag --merged`` and ancestry
 # walks fast stops refreshing for good (one sat on a real checkout for two months).
 OBJECT_STORE_LOCK_NAMES = (
@@ -70,7 +70,7 @@ def _git_proc_running() -> bool:
             pass
         else:
             return _psutil_git_running(psutil)
-    from hermes_cli._early_recovery import _git_program
+    from eir_cli._early_recovery import _git_program
 
     try:
         # One shared spawn for both probes: the argv is the platform fork, the
@@ -89,7 +89,7 @@ def _git_proc_running() -> bool:
 
 
 def _psutil_git_running(psutil) -> bool:
-    from hermes_cli._early_recovery import _git_program
+    from eir_cli._early_recovery import _git_program
 
     try:
         for proc in psutil.process_iter():
@@ -162,7 +162,7 @@ def clear_stale_git_locks(repo_root: Path, *, min_age_seconds: Optional[int] = N
 
 def clear_stale_object_store_locks(git_dir: Path) -> list[str]:
     """``OBJECT_STORE_LOCK_NAMES`` only, under ``git_dir`` itself (a linked worktree's or submodule's
-    common dir), for repos Hermes does not own: index.lock / HEAD.lock there are the user's git's."""
+    common dir), for repos Eir does not own: index.lock / HEAD.lock there are the user's git's."""
     return _sweep_locks(Path(git_dir), OBJECT_STORE_LOCK_NAMES, None)
 
 
@@ -171,7 +171,7 @@ def release_dead_index_lock(repo_root: Path) -> bool:
 
     A git killed while it held the index lock (an update's tree killed by the user, a probe killed
     by its own timeout) leaves it behind, and every later merge/stash/reset refuses with "File
-    exists". The age floor above keeps such a lock for 10 minutes, so the next ``hermes update``
+    exists". The age floor above keeps such a lock for 10 minutes, so the next ``eir update``
     died at its fast-forward (#132089; the Windows crash cell ``mid_fetch``).
 
     Two conditions, both required. A killed update run must be behind the lock
@@ -212,7 +212,7 @@ def release_dead_fetch_locks(repo_root: Path) -> list[str]:
 
 
 def _release_killed_update_locks(root: Path, candidates: Callable[[Path], Iterable[Path]]) -> list[str]:
-    from hermes_cli._early_recovery import _git_dir, _release_dead_lock, interrupted_pull_marker
+    from eir_cli._early_recovery import _git_dir, _release_dead_lock, interrupted_pull_marker
 
     git_dir = _git_dir(root)
     if interrupted_pull_marker(root).exists():
@@ -247,7 +247,7 @@ def _killed_update_owns(lock: Path) -> bool:
     """
     import json
 
-    from hermes_cli import update_receipt
+    from eir_cli import update_receipt
 
     try:
         written = lock.stat().st_mtime
@@ -289,11 +289,11 @@ def _windows_git_in_checkout(root: Path) -> bool | None:
     """Whether any git (``git.exe``, a dashed ``git-<sub>.exe``) works in ``root``; None when unknowable.
 
     Works in: its cwd, a path argument or a ``GIT_DIR``-style variable is inside the checkout or
-    its git dir, compared by path components (``hermes-backup`` is not inside ``hermes``). Scoped to
+    its git dir, compared by path components (``eir-backup`` is not inside ``eir``). Scoped to
     the checkout: a system-wide check would keep the lock whenever any editor or terminal elsewhere
     runs git, which on Windows is most of the time. A git whose cwd cannot be read keeps the lock.
     """
-    from hermes_cli._early_recovery import _NEVER_LOCKS, _checkout_places, _git_dir, _git_program, \
+    from eir_cli._early_recovery import _NEVER_LOCKS, _checkout_places, _git_dir, _git_program, \
         _git_subcommand_of, git_works_in
 
     try:
@@ -566,7 +566,7 @@ class _ShallowLock:
         except OSError as exc:
             raise RuntimeError(f"cannot create shallow lock: {exc}") from exc
         try:
-            os.write(fd, b"hermes shallow maintenance\n")
+            os.write(fd, b"eir shallow maintenance\n")
         except OSError as exc:
             # A leaked fd would read as a live holder (and pin the file on Windows).
             os.close(fd)
@@ -642,7 +642,7 @@ def repair_broken_shallow_boundaries(repo_root: Path) -> int:
             if not repaired:
                 return 0
             _write_shallow(shallow_path, "\n".join(sorted(existing | repaired)) + "\n",
-                           suffix=".hermes-repair")
+                           suffix=".eir-repair")
             # Self-check under the same lock hold (rev-list never takes
             # shallow.lock): the rollback cannot be defeated by lock contention.
             if not _git_stdout_lines(repo_root, ["rev-list", "--count", "--all", "--reflog"]):
@@ -662,7 +662,7 @@ def prune_stale_shallow_grafts(repo_root: Path) -> int:
     Every ``git fetch --depth 1`` appends the fetched tip to ``.git/shallow`` as a new
     graft and never removes the previous one, so a long-lived shallow installer checkout
     accumulates one graft per update check (57 observed in the wild). The stale grafts
-    break ``merge-base`` and push ``hermes update`` into the orphan-divergence reset path
+    break ``merge-base`` and push ``eir update`` into the orphan-divergence reset path
     on every run. Keep only the boundaries that still protect referenced tips (HEAD,
     FETCH_HEAD, and every ref tip): the dropped commits are already unreachable and their
     objects are left for ``git gc``. Fetch reflogs naming a dropped graft are expired
@@ -705,7 +705,7 @@ def prune_stale_shallow_grafts(repo_root: Path) -> int:
                         cwd=str(repo_root), capture_output=True, timeout=10,
                         creationflags=windows_hide_flags(),
                     )
-            _write_shallow(shallow_path, "\n".join(sorted(keep)) + "\n", suffix=".hermes-prune")
+            _write_shallow(shallow_path, "\n".join(sorted(keep)) + "\n", suffix=".eir-prune")
             # Fail-safe: if any reachable walk now crosses a boundary we wrongly
             # removed, put the grafts back — a growing file beats a broken repo.
             # Runs under the same lock hold (rev-list never takes shallow.lock) so
@@ -896,7 +896,7 @@ def convert_treeless_checkout_first(repo_root: Path) -> None:
     downloads trees again (#129514: 434 GB, disk full mid-update). Runs in the dependency-free
     bootstrap interpreter.
     """
-    from hermes_cli._subprocess_compat import no_prompt_git_kwargs
+    from eir_cli._subprocess_compat import no_prompt_git_kwargs
 
     try:
         if convert_treeless_checkout(repo_root, **no_prompt_git_kwargs()):

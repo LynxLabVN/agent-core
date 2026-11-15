@@ -1,7 +1,7 @@
-"""Behaviour contracts for the gateway SSH attach path (hermes_cli/gateway_connections_ssh*.py).
+"""Behaviour contracts for the gateway SSH attach path (eir_cli/gateway_connections_ssh*.py).
 
 The remote-shell pieces are exercised by running them in a real local ``sh``/``dash`` against a
-temp ``HOME`` with a fake ``hermes`` executable, so the spawn command, lockfile publication and
+temp ``HOME`` with a fake ``eir`` executable, so the spawn command, lockfile publication and
 marker gate are proven by execution rather than by string shape.
 """
 
@@ -17,8 +17,8 @@ from pathlib import Path
 
 import pytest
 
-from hermes_cli import gateway_connections_ssh as facade
-from hermes_cli.gateway_connections_ssh_remote import (
+from eir_cli import gateway_connections_ssh as facade
+from eir_cli.gateway_connections_ssh_remote import (
     READY_RE,
     LockfileSkew,
     SpawnPlan,
@@ -33,7 +33,7 @@ from hermes_cli.gateway_connections_ssh_remote import (
     spawn_log_path,
     spawn_token_path,
 )
-from hermes_cli.gateway_connections_ssh_transport import (
+from eir_cli.gateway_connections_ssh_transport import (
     SshConnection,
     SshEndpoint,
     SshReachError,
@@ -130,7 +130,7 @@ def test_unsafe_key_paths_are_rejected(key):
 
 
 def test_redaction_masks_tokens_and_host_field_passwords():
-    text = ("HERMES_DASHBOARD_SESSION_TOKEN=abc X-Hermes-Session-Token: def "
+    text = ("EIR_DASHBOARD_SESSION_TOKEN=abc X-Eir-Session-Token: def "
             "Authorization: Bearer ghi /x?token=jkl me@box:secret me@box:22")
     out = redact_secrets(text)
     for secret in ("abc", "def", "ghi", "jkl", "secret"):
@@ -212,7 +212,7 @@ def test_control_socket_is_stable_and_scoped_by_owner_and_key():
 def test_a_profile_home_shares_its_roots_ownership_id(tmp_path, monkeypatch):
     root = tmp_path / "home"
     (root / "profiles" / "work").mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(root / "profiles" / "work"))
+    monkeypatch.setenv("EIR_HOME", str(root / "profiles" / "work"))
     assert facade.store_root() == root.resolve()
     oid = facade.ownership_id(facade.store_root(), "c1")
     assert len(oid) == 32 and oid == facade.ownership_id(root.resolve(), "c1")
@@ -231,7 +231,7 @@ def test_unknown_connection_has_no_status_and_nothing_to_disconnect():
 
 def _lock(**overrides) -> dict:
     lock = {"schemaVersion": 2, "ownershipId": OID, "spawnNonce": NONCE, "pid": 4242, "port": 5555,
-            "profile": "", "hermesPath": "~/bin/hermes", "hermesHome": "~/.hermes",
+            "profile": "", "eirPath": "~/bin/eir", "eirHome": "~/.eir",
             "logPath": spawn_log_path(OID, NONCE), "tokenFingerprint": fingerprint_token("t"),
             "protocolVersion": 1, "devServer": "", "startedAt": "2026-01-01T00:00:00.000Z"}
     lock.update(overrides)
@@ -266,12 +266,12 @@ def test_absent_or_protocol_stale_own_lockfiles_read_as_no_record(text):
 # ---------------------------------------------------------------------------
 
 
-def _plan(home: Path, hermes: Path, nonce: str = NONCE) -> SpawnPlan:
-    return SpawnPlan(hermes_path=str(hermes), profile="Work", spawn_nonce=nonce, ownership_id=OID,
+def _plan(home: Path, eir: Path, nonce: str = NONCE) -> SpawnPlan:
+    return SpawnPlan(eir_path=str(eir), profile="Work", spawn_nonce=nonce, ownership_id=OID,
                      token_file_path=spawn_token_path(OID, nonce), log_path=spawn_log_path(OID, nonce),
-                     hermes_home=str(home / ".hermes"),
+                     eir_home=str(home / ".eir"),
                      lock_metadata={"ownershipId": OID, "spawnNonce": nonce, "port": 0, "profile": "Work",
-                                    "hermesPath": str(hermes), "hermesHome": str(home / ".hermes"),
+                                    "eirPath": str(eir), "eirHome": str(home / ".eir"),
                                     "logPath": spawn_log_path(OID, nonce),
                                     "tokenFingerprint": fingerprint_token("t"), "protocolVersion": 1,
                                     "devServer": "", "startedAt": "2026-01-01T00:00:00.000Z"})
@@ -280,14 +280,14 @@ def _plan(home: Path, hermes: Path, nonce: str = NONCE) -> SpawnPlan:
 @pytest.fixture
 def remote_home(tmp_path):
     home = tmp_path / "rhome"
-    (home / ".hermes").mkdir(parents=True)
-    hermes = tmp_path / "bin" / "hermes"
-    hermes.parent.mkdir()
+    (home / ".eir").mkdir(parents=True)
+    eir = tmp_path / "bin" / "eir"
+    eir.parent.mkdir()
     # Records its argv + env, announces a port the way serve does, then idles like a backend.
-    hermes.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$HOME/argv"; echo "DESKTOP=$HERMES_DESKTOP" >> "$HOME/argv"\n'
-                      'echo "noise HERMES_DASHBOARD_READY port=43210"\nexec sleep 60\n')
-    hermes.chmod(0o755)
-    return home, hermes
+    eir.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$HOME/argv"; echo "DESKTOP=$EIR_DESKTOP" >> "$HOME/argv"\n'
+                      'echo "noise EIR_DASHBOARD_READY port=43210"\nexec sleep 60\n')
+    eir.chmod(0o755)
+    return home, eir
 
 
 def _run_remote(shell: str, command: str, home: Path) -> subprocess.CompletedProcess:
@@ -305,16 +305,16 @@ def _kill(pid: int) -> None:
 @pytest.mark.platforms("posix")
 @pytest.mark.parametrize("shell", POSIX_SHELLS)
 def test_spawn_command_parses_under_posix_sh(shell, remote_home):
-    home, hermes = remote_home
-    assert subprocess.run([shell, "-n", "-c", build_spawn_command(_plan(home, hermes))], check=False).returncode == 0
+    home, eir = remote_home
+    assert subprocess.run([shell, "-n", "-c", build_spawn_command(_plan(home, eir))], check=False).returncode == 0
 
 
 @pytest.mark.platforms("posix")
 @pytest.mark.live_system_guard_bypass  # the serve is setsid-detached by design; the test reaps its own child
 @pytest.mark.parametrize("shell", POSIX_SHELLS)
 def test_spawn_command_detaches_serve_and_publishes_its_pid(shell, remote_home):
-    home, hermes = remote_home
-    result = _run_remote(shell, build_spawn_command(_plan(home, hermes)), home)
+    home, eir = remote_home
+    result = _run_remote(shell, build_spawn_command(_plan(home, eir)), home)
     assert result.returncode == 0, result.stderr
     pid = int(result.stdout.strip().splitlines()[-1])
     try:
@@ -333,7 +333,7 @@ def test_spawn_command_detaches_serve_and_publishes_its_pid(shell, remote_home):
         assert int(READY_RE.search(log.read_text()).group(1)) == 43210
 
         # A live published owner makes a second spawn back off instead of starting a twin.
-        second = _run_remote(shell, build_spawn_command(_plan(home, hermes, "0011223344556677")), home)
+        second = _run_remote(shell, build_spawn_command(_plan(home, eir, "0011223344556677")), home)
         assert second.stdout.strip().splitlines()[-1] == "EXISTING"
     finally:
         _kill(pid)
@@ -353,16 +353,16 @@ class _LocalShell:
 
 @pytest.mark.platforms("posix")
 @pytest.mark.live_system_guard_bypass  # the serve is setsid-detached by design; the test reaps its own child
-def test_a_quote_in_the_hermes_path_still_proves_ownership_of_our_serve(tmp_path):
-    from hermes_cli.gateway_connections_ssh_remote import pid_is_our_serve
+def test_a_quote_in_the_eir_path_still_proves_ownership_of_our_serve(tmp_path):
+    from eir_cli.gateway_connections_ssh_remote import pid_is_our_serve
 
     home = tmp_path / "rhome"
-    (home / ".hermes").mkdir(parents=True)
-    hermes = tmp_path / "it's bin" / "hermes"
-    hermes.parent.mkdir()
-    hermes.write_text("#!/usr/bin/env python3\nimport time\ntime.sleep(60)\n")  # keeps its serve argv
-    hermes.chmod(0o755)
-    result = _run_remote("sh", build_spawn_command(_plan(home, hermes)), home)
+    (home / ".eir").mkdir(parents=True)
+    eir = tmp_path / "it's bin" / "eir"
+    eir.parent.mkdir()
+    eir.write_text("#!/usr/bin/env python3\nimport time\ntime.sleep(60)\n")  # keeps its serve argv
+    eir.chmod(0o755)
+    result = _run_remote("sh", build_spawn_command(_plan(home, eir)), home)
     assert result.returncode == 0, result.stderr
     pid = int(result.stdout.strip().splitlines()[-1])
     try:
@@ -377,10 +377,10 @@ def test_a_quote_in_the_hermes_path_still_proves_ownership_of_our_serve(tmp_path
 
 @pytest.mark.platforms("posix")
 def test_spawn_command_refuses_while_an_update_marker_is_live(remote_home):
-    home, hermes = remote_home
-    marker = Path(remote_install_root(str(home / ".hermes"))) / ".hermes-update-in-progress"
+    home, eir = remote_home
+    marker = Path(remote_install_root(str(home / ".eir"))) / ".eir-update-in-progress"
     marker.write_text(f"{os.getpid()}\n{int(time.time())}\n")
-    result = _run_remote("sh", build_spawn_command(_plan(home, hermes)), home)
+    result = _run_remote("sh", build_spawn_command(_plan(home, eir)), home)
     assert result.returncode == 75 and f"LIVE:{os.getpid()}" in result.stderr
     assert not (home / lockfile_path(OID).removeprefix("~/")).exists()
     assert not (home / "argv").exists()
@@ -414,7 +414,7 @@ def test_expand_remote_path_expands_home_only_at_the_tilde(tmp_path):
     assert out.stdout == f"{tmp_path}/a b/$c"
 
 
-@pytest.mark.parametrize("path", ["", "relative/hermes", "~user/x", "/a\nb"])
+@pytest.mark.parametrize("path", ["", "relative/eir", "~user/x", "/a\nb"])
 def test_unsafe_remote_paths_are_rejected(path):
     with pytest.raises(SshReachError):
         expand_remote_path(path)
@@ -426,10 +426,10 @@ def test_unsafe_remote_paths_are_rejected(path):
 
 
 @pytest.mark.parametrize("log,port", [
-    ("boot\nHERMES_DASHBOARD_READY port=4100\n", 4100),
-    ("partial line HERMES_BACKEND_READY port=4200", 4200),
-    ("XHERMES_DASHBOARD_READY port=4300", None),
-    ("HERMES_DASHBOARD_READY port=", None),
+    ("boot\nEIR_DASHBOARD_READY port=4100\n", 4100),
+    ("partial line EIR_BACKEND_READY port=4200", 4200),
+    ("XEIR_DASHBOARD_READY port=4300", None),
+    ("EIR_DASHBOARD_READY port=", None),
 ])
 def test_ready_port_is_scraped_from_merged_output(log, port):
     match = READY_RE.search(log)

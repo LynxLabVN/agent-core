@@ -1,6 +1,6 @@
 """Profile display_name (#45624): presentation-only label in profile.yaml.
 
-The canonical profile id ("default" for ~/.hermes) is never touched —
+The canonical profile id ("default" for ~/.eir) is never touched —
 resolution, comparison, and spawn paths must be provably unaffected.
 """
 
@@ -9,9 +9,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-import hermes_yaml as yaml
+import eir_yaml as yaml
 
-from hermes_cli.profiles import (
+from eir_cli.profiles import (
     create_profile,
     format_profile_label,
     get_profile_dir,
@@ -27,20 +27,20 @@ from hermes_cli.profiles import (
 
 @pytest.fixture()
 def profile_env(tmp_path, monkeypatch):
-    """Isolated environment: Path.home() and HERMES_HOME under tmp_path."""
+    """Isolated environment: Path.home() and EIR_HOME under tmp_path."""
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    default_home = tmp_path / ".hermes"
+    default_home = tmp_path / ".eir"
     default_home.mkdir(exist_ok=True)
-    monkeypatch.setenv("HERMES_HOME", str(default_home))
+    monkeypatch.setenv("EIR_HOME", str(default_home))
     return default_home
 
 
 def _get_api_profiles(profile_env, monkeypatch) -> list:
     """Rows of a real ``GET /api/profiles`` against the isolated home."""
-    import hermes_state
+    import eir_state
     from starlette.testclient import TestClient
-    from hermes_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
-    monkeypatch.setattr(hermes_state, "DEFAULT_DB_PATH", profile_env / "state.db")
+    from eir_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
+    monkeypatch.setattr(eir_state, "DEFAULT_DB_PATH", profile_env / "state.db")
     resp = TestClient(app).get("/api/profiles", headers={_SESSION_HEADER_NAME: _SESSION_TOKEN})
     assert resp.status_code == 200, resp.text
     return resp.json()["profiles"]
@@ -57,12 +57,12 @@ class TestMetaAndValidation:
     def test_missing_file_defaults_empty(self, profile_env):
         assert read_profile_meta(profile_env)["display_name"] == ""
 
-    def test_bot_title_read_from_hermes_bots_ui_meta(self, profile_env):
+    def test_bot_title_read_from_eir_bots_ui_meta(self, profile_env):
         (profile_env / "profile.yaml").write_text(
-            "ui_meta:\n  hermes-bots:\n    title: JordyV\n", encoding="utf-8")
+            "ui_meta:\n  eir-bots:\n    title: JordyV\n", encoding="utf-8")
         assert read_profile_meta(profile_env)["bot_title"] == "JordyV"
         # The web/Desktop roster carries it through the same dict the chips read.
-        from hermes_cli.web_routers.profiles import _profile_to_dict
+        from eir_cli.web_routers.profiles import _profile_to_dict
         assert _profile_to_dict(list_profiles()[0])["bot_title"] == "JordyV"
 
     def test_bot_title_absent_when_no_bots_meta(self, profile_env):
@@ -72,33 +72,33 @@ class TestMetaAndValidation:
 
     def test_bot_title_never_raises_on_malformed_shapes(self, profile_env):
         (profile_env / "profile.yaml").write_text(
-            "ui_meta: hermes-bots\n", encoding="utf-8")  # ui_meta is a scalar
+            "ui_meta: eir-bots\n", encoding="utf-8")  # ui_meta is a scalar
         assert read_profile_meta(profile_env)["bot_title"] == ""
         (profile_env / "profile.yaml").write_text(
-            "ui_meta:\n  hermes-bots: 7\n", encoding="utf-8")  # not a mapping
+            "ui_meta:\n  eir-bots: 7\n", encoding="utf-8")  # not a mapping
         assert read_profile_meta(profile_env)["bot_title"] == ""
 
     def test_roster_rows_carry_only_bot_mode_ui_meta(self, profile_env, monkeypatch):
         # A secondary Desktop connection seats bots in sections from /api/profiles (#154536);
         # other plugins' ui_meta (group-chat logs, images) stays off that 5s poll.
         (profile_env / "profile.yaml").write_text(
-            "ui_meta:\n  hermes-bots:\n    title: Builder\n    sectionId: jm\n    sectionName: JM\n"
-            "    created: 2026-11-12\n  hermes-bots-groups:\n    rooms: {r1: {log: [hi]}}\n", encoding="utf-8")
-        from hermes_cli import profiles
-        from hermes_cli.web_server_profiles import _fallback_profile_dicts
-        expected = {"hermes-bots": {"title": "Builder", "sectionId": "jm", "sectionName": "JM",
+            "ui_meta:\n  eir-bots:\n    title: Builder\n    sectionId: jm\n    sectionName: JM\n"
+            "    created: 2026-11-12\n  eir-bots-groups:\n    rooms: {r1: {log: [hi]}}\n", encoding="utf-8")
+        from eir_cli import profiles
+        from eir_cli.web_server_profiles import _fallback_profile_dicts
+        expected = {"eir-bots": {"title": "Builder", "sectionId": "jm", "sectionName": "JM",
                                     "created": "2026-11-12"}}
-        import hermes_cli.web_routers.profiles as router  # the normal path, not the fallback
+        import eir_cli.web_routers.profiles as router  # the normal path, not the fallback
         monkeypatch.setattr(router, "_fallback_profile_dicts", lambda _mod: pytest.fail("fallback served"))
         assert _get_api_profiles(profile_env, monkeypatch)[0]["ui_meta"] == expected
         assert _fallback_profile_dicts(profiles)[0]["ui_meta"] == expected
         # Each caller gets its own copy of the cached value.
-        read_profile_meta(profile_env)["ui_meta"]["hermes-bots"]["sectionId"] = "poisoned"
+        read_profile_meta(profile_env)["ui_meta"]["eir-bots"]["sectionId"] = "poisoned"
         assert read_profile_meta(profile_env)["ui_meta"] == expected
 
     def test_non_json_bot_mode_ui_meta_never_fails_the_list(self, profile_env, monkeypatch):
         (profile_env / "profile.yaml").write_text(
-            "ui_meta:\n  hermes-bots:\n    title: NaN Bot\n    score: .nan\n", encoding="utf-8")
+            "ui_meta:\n  eir-bots:\n    title: NaN Bot\n    score: .nan\n", encoding="utf-8")
         row = _get_api_profiles(profile_env, monkeypatch)[0]
         assert row["ui_meta"] == {} and row["bot_title"] == "NaN Bot"
 
@@ -156,7 +156,7 @@ class TestRenameDefault:
         self, profile_env, monkeypatch
     ):
         monkeypatch.setattr(
-            "hermes_cli.profiles.check_alias_collision", lambda name: "skip"
+            "eir_cli.profiles.check_alias_collision", lambda name: "skip"
         )
         create_profile("oldname", no_alias=True)
         write_profile_meta(get_profile_dir("oldname"), display_name="Old Friend")

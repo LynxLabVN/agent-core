@@ -2,7 +2,7 @@
 
 import pytest
 
-from hermes_cli.models import resolve_fast_mode_overrides
+from eir_cli.models import resolve_fast_mode_overrides
 
 
 @pytest.mark.parametrize("provider", ["openai", "openai-api", None])

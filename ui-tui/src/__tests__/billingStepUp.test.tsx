@@ -1,18 +1,18 @@
 import { PassThrough } from 'stream'
 
-import { renderSync } from '@hermes/ink'
-import { stripAnsi } from '@hermes/shared/ansi'
+import { renderSync } from '@eir/ink'
+import { stripAnsi } from '@eir/shared/ansi'
 import React from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
 // Stub useInput so the overlay doesn't enter raw mode under renderSync.
-vi.mock('@hermes/ink', async importOriginal => {
+vi.mock('@eir/ink', async importOriginal => {
   const mod = await importOriginal()
 
   return { ...mod, useInput: () => {} }
 })
 
-import type { BillingStateResponse } from '@hermes/shared/gateway-types'
+import type { BillingStateResponse } from '@eir/shared/gateway-types'
 
 import type { BillingOverlayState } from '../app/interfaces.js'
 import { BillingOverlay } from '../components/billingOverlay.js'

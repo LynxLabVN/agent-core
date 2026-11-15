@@ -12,8 +12,8 @@ import functools
 from fnmatch import fnmatch
 from pathlib import Path
 
-from hermes_agent.compat.finder import current_name
-from hermes_agent.compat.moves import MOVES
+from eir_agent.compat.finder import current_name
+from eir_agent.compat.moves import MOVES
 
 
 def _directory(path: str, table: dict[str, str]) -> str:
@@ -63,10 +63,10 @@ def _undo(name: str, step) -> str:
 class PathMoves:
     def __init__(self, moves: dict[str, str]) -> None:
         self.moves = moves
-        # After a second move both the first name and the intermediate one under hermes_agent/ map to
-        # the last name; the first name, which lies outside hermes_agent/, is the original.
+        # After a second move both the first name and the intermediate one under eir_agent/ map to
+        # the last name; the first name, which lies outside eir_agent/, is the original.
         self.inverse: dict[str, str] = {}
-        for old, new in sorted(moves.items(), key=lambda item: item[0].startswith("hermes_agent.")):
+        for old, new in sorted(moves.items(), key=lambda item: item[0].startswith("eir_agent.")):
             self.inverse.setdefault(new, old)
 
     def current(self, path: str) -> str:
@@ -101,7 +101,7 @@ class PathMoves:
 @functools.cache
 def tree_moves(root: Path) -> PathMoves:
     """``MOVES`` as the checkout at ``root`` holds it, for a guard that scans a tree other than its own."""
-    moves_file = root / "hermes_agent" / "compat" / "moves.py"
+    moves_file = root / "eir_agent" / "compat" / "moves.py"
     return PathMoves(moves_from_source(moves_file.read_text(encoding="utf-8-sig") if moves_file.is_file() else None))
 
 

@@ -15,17 +15,17 @@ import pytest
 
 @pytest.fixture
 def home(tmp_path, monkeypatch):
-    home = tmp_path / "hermes"
+    home = tmp_path / "eir"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.delenv("HERMES_WRITE_SAFE_ROOT", raising=False)
+    monkeypatch.setenv("EIR_HOME", str(home))
+    monkeypatch.delenv("EIR_WRITE_SAFE_ROOT", raising=False)
     return home
 
 
 def _written_stores(home: Path) -> list[Path]:
     from agent.vault_store import VaultStore
     from gateway import pairing
-    from hermes_cli.web_server_messaging import _whatsapp_session_path
+    from eir_cli.web_server_messaging import _whatsapp_session_path
     from plugins.platforms.matrix.adapter import MatrixAdapter
 
     assert pairing.PAIRING_DIR is None
@@ -41,7 +41,7 @@ def _written_stores(home: Path) -> list[Path]:
 
 
 def test_op_env_is_the_file_the_loader_bootstraps_from(home, monkeypatch):
-    from hermes_cli.env_loader import _bootstrap_env
+    from eir_cli.env_loader import _bootstrap_env
 
     monkeypatch.delenv("OP_SERVICE_ACCOUNT_TOKEN", raising=False)
     (home / ".op.env").write_text("OP_SERVICE_ACCOUNT_TOKEN=FAKE-op-token\n", encoding="utf-8")
@@ -55,12 +55,12 @@ def test_every_surface_refuses_the_stores(home, monkeypatch):
 def _assert_refused_everywhere(home, monkeypatch, paths):
     import agent.file_safety as fs
     from gateway.platforms import base
-    from hermes_cli.web_routers.files import _is_sensitive_path
+    from eir_cli.web_routers.files import _is_sensitive_path
 
-    monkeypatch.setattr(fs, "_hermes_home_path", lambda: home)
-    monkeypatch.setattr(fs, "_hermes_root_path", lambda: home)
-    monkeypatch.setattr(base, "_HERMES_HOME", home)
-    monkeypatch.setattr(base, "_HERMES_ROOT", home)
+    monkeypatch.setattr(fs, "_eir_home_path", lambda: home)
+    monkeypatch.setattr(fs, "_eir_root_path", lambda: home)
+    monkeypatch.setattr(base, "_EIR_HOME", home)
+    monkeypatch.setattr(base, "_EIR_ROOT", home)
     leaks = []
     for path in paths:
         assert path.is_relative_to(home), path
@@ -77,7 +77,7 @@ def _assert_refused_everywhere(home, monkeypatch, paths):
 
 
 def test_legacy_layout_stores_are_refused(home, monkeypatch):
-    """A home that predates ``platforms/`` keeps its stores at the old paths (get_hermes_dir)."""
+    """A home that predates ``platforms/`` keeps its stores at the old paths (get_eir_dir)."""
     for legacy in ("pairing", "whatsapp/session", "matrix/store"):
         (home / legacy).mkdir(parents=True)
         (home / legacy / "seed").write_text("x", encoding="utf-8")
@@ -94,7 +94,7 @@ def test_case_variants_of_the_stores_are_refused(home, monkeypatch):
 
 
 def test_ordinary_files_with_similar_names_stay_usable(home):
-    from hermes_cli.web_routers.files import _is_sensitive_path
+    from eir_cli.web_routers.files import _is_sensitive_path
 
     for rel in ("notes/vault/todo.md", "projects/session/log.txt", "docs/store/readme.md"):
         assert not _is_sensitive_path(home / rel), rel
@@ -103,4 +103,4 @@ def test_ordinary_files_with_similar_names_stay_usable(home):
 def test_terminal_write_to_op_env_needs_approval():
     from tools.approval_detection import detect_dangerous_command
 
-    assert detect_dangerous_command("echo X > ~/.hermes/.op.env")[0] is True
+    assert detect_dangerous_command("echo X > ~/.eir/.op.env")[0] is True

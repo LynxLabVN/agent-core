@@ -1,4 +1,4 @@
-"""``hermes update`` / ``hermes migrate relay``: legacy ``HERMES_NEMO_RELAY_ATIF_*``/``ATOF_*`` vars
+"""``eir update`` / ``eir migrate relay``: legacy ``EIR_NEMO_RELAY_ATIF_*``/``ATOF_*`` vars
 become a validated ``relay-plugins.toml`` per profile home, selected from ``.env``."""
 
 from __future__ import annotations
@@ -8,22 +8,22 @@ from pathlib import Path
 
 import pytest
 
-from hermes_cli.relay_plugin_migrate import (
+from eir_cli.relay_plugin_migrate import (
     RELAY_PLUGINS_TOML_NAME, migrate_all_profile_relay_envs, migrate_profile_relay_env,
     validate_relay_plugin_payload)
-from hermes_cli.relay_plugin_cutover import RELAY_PLUGINS_CONFIG_ENV, configured_legacy_relay_env_vars
+from eir_cli.relay_plugin_cutover import RELAY_PLUGINS_CONFIG_ENV, configured_legacy_relay_env_vars
 
 nemo_relay = pytest.importorskip("nemo_relay")
 
 LEGACY_ENV = """OPENAI_API_KEY=sk-test
-HERMES_NEMO_RELAY_ATOF_ENABLED=1
-HERMES_NEMO_RELAY_ATOF_OUTPUT_DIRECTORY={home}/telemetry/atof
-HERMES_NEMO_RELAY_ATOF_FILENAME=hermes-atof.jsonl
-HERMES_NEMO_RELAY_ATOF_MODE=append
-HERMES_NEMO_RELAY_ATIF_ENABLED=1
-HERMES_NEMO_RELAY_ATIF_OUTPUT_DIRECTORY={home}/telemetry/atif
-HERMES_NEMO_RELAY_ATIF_FILENAME_TEMPLATE=trajectory-{{session_id}}.json
-HERMES_NEMO_RELAY_ATIF_SUBAGENT_EXPORT_MODE=all
+EIR_NEMO_RELAY_ATOF_ENABLED=1
+EIR_NEMO_RELAY_ATOF_OUTPUT_DIRECTORY={home}/telemetry/atof
+EIR_NEMO_RELAY_ATOF_FILENAME=eir-atof.jsonl
+EIR_NEMO_RELAY_ATOF_MODE=append
+EIR_NEMO_RELAY_ATIF_ENABLED=1
+EIR_NEMO_RELAY_ATIF_OUTPUT_DIRECTORY={home}/telemetry/atif
+EIR_NEMO_RELAY_ATIF_FILENAME_TEMPLATE=trajectory-{{session_id}}.json
+EIR_NEMO_RELAY_ATIF_SUBAGENT_EXPORT_MODE=all
 """
 
 
@@ -38,10 +38,10 @@ def _parse_env(path: Path) -> dict[str, str]:
 
 @pytest.fixture
 def profile_env(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     home.mkdir()
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     return home
 
 
@@ -55,7 +55,7 @@ def test_legacy_env_becomes_validated_toml_selected_from_env(profile_env):
     toml_path = profile_env / RELAY_PLUGINS_TOML_NAME
     document = tomllib.loads(toml_path.read_text(encoding="utf-8"))
     sink = document["components"][0]["config"]["atof"]["sinks"][0]
-    assert sink["type"] == "file" and sink["filename"] == "hermes-atof.jsonl"
+    assert sink["type"] == "file" and sink["filename"] == "eir-atof.jsonl"
     assert document["components"][0]["config"]["atif"]["filename_template"] == "trajectory-{session_id}.json"
     # Migrated exporters never sent OTLP; Relay 0.10's env-driven auto-export must stay off.
     assert document["components"][0]["config"]["opentelemetry"]["enabled"] is False
@@ -68,7 +68,7 @@ def test_legacy_env_becomes_validated_toml_selected_from_env(profile_env):
     assert env[RELAY_PLUGINS_CONFIG_ENV] == str(toml_path)
     assert env["OPENAI_API_KEY"] == "sk-test"
     assert configured_legacy_relay_env_vars(env) == ()
-    assert "# migrated to relay-plugins.toml: HERMES_NEMO_RELAY_ATOF_ENABLED=1" in (profile_env / ".env").read_text(encoding="utf-8")
+    assert "# migrated to relay-plugins.toml: EIR_NEMO_RELAY_ATOF_ENABLED=1" in (profile_env / ".env").read_text(encoding="utf-8")
     assert migrate_profile_relay_env(profile_env).skipped_reason == "no legacy exporter variables"
 
 

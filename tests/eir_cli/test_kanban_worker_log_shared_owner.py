@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from hermes_cli import kanban_worker_log as kwl
+from eir_cli import kanban_worker_log as kwl
 
 pytestmark = pytest.mark.platforms("posix")
 

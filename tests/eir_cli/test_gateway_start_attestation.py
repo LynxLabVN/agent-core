@@ -18,7 +18,7 @@ import json
 
 import pytest
 
-from hermes_cli import gateway_windows
+from eir_cli import gateway_windows
 
 
 # ---------------------------------------------------------------------------
@@ -35,7 +35,7 @@ def _install_pid_sequence(monkeypatch, snapshots):
         calls["n"] += 1
         return list(snapshots[idx])
 
-    monkeypatch.setattr("hermes_cli.gateway.find_gateway_pids", _fake)
+    monkeypatch.setattr("eir_cli.gateway.find_gateway_pids", _fake)
     return calls
 
 
@@ -83,16 +83,16 @@ def test_report_gateway_start_failure_is_loud_not_checkmark(monkeypatch, tmp_pat
         gateway_windows, "_wait_for_gateway_ready", lambda *a, **k: []
     )
     monkeypatch.setattr(
-        "hermes_cli.config.get_hermes_home", lambda: str(tmp_path)
+        "eir_cli.config.get_eir_home", lambda: str(tmp_path)
     )
     monkeypatch.setattr(gateway_windows, "is_task_registered", lambda: True)
-    monkeypatch.setattr(gateway_windows, "get_task_name", lambda: "Hermes_Gateway_x")
+    monkeypatch.setattr(gateway_windows, "get_task_name", lambda: "Eir_Gateway_x")
 
     gateway_windows._report_gateway_start("direct spawn (PID 7)")
     out = capsys.readouterr().out
     assert "✓" not in out
     assert "FAILED" in out
-    assert "schtasks /Run /TN Hermes_Gateway_x" in out
+    assert "schtasks /Run /TN Eir_Gateway_x" in out
 
 
 # ---------------------------------------------------------------------------
@@ -102,7 +102,7 @@ def test_report_gateway_start_failure_is_loud_not_checkmark(monkeypatch, tmp_pat
 
 @pytest.fixture
 def attest_home(monkeypatch, tmp_path):
-    monkeypatch.setattr("hermes_cli.config.get_hermes_home", lambda: str(tmp_path))
+    monkeypatch.setattr("eir_cli.config.get_eir_home", lambda: str(tmp_path))
     monkeypatch.setattr(gateway_windows, "is_task_registered", lambda: False)
     return tmp_path
 
@@ -155,11 +155,11 @@ def test_attestation_silent_after_clean_ledger_exit(attest_home):
 def test_attestation_warning_includes_schtasks_recovery(monkeypatch, attest_home):
     monkeypatch.setattr(gateway_windows, "is_task_registered", lambda: True)
     monkeypatch.setattr(
-        gateway_windows, "get_task_name", lambda: "Hermes_Gateway_arthur_tutor"
+        gateway_windows, "get_task_name", lambda: "Eir_Gateway_arthur_tutor"
     )
     gateway_windows._write_start_attestation([888], "direct spawn (PID 888)")
     warning = gateway_windows.check_start_attestation(current_pids=[])
-    assert "schtasks /Run /TN Hermes_Gateway_arthur_tutor" in warning
+    assert "schtasks /Run /TN Eir_Gateway_arthur_tutor" in warning
 
 
 def test_attestation_tolerates_missing_and_garbage_marker(attest_home):
@@ -179,7 +179,7 @@ def test_breakaway_fallback_warns_even_on_success(monkeypatch, attest_home, caps
         gateway_windows, "_wait_for_gateway_ready", lambda *a, **k: [99]
     )
     monkeypatch.setattr(gateway_windows, "is_task_registered", lambda: True)
-    monkeypatch.setattr(gateway_windows, "get_task_name", lambda: "Hermes_Gateway")
+    monkeypatch.setattr(gateway_windows, "get_task_name", lambda: "Eir_Gateway")
     gateway_windows._LAST_SPAWN_BREAKAWAY_FALLBACK["fallback"] = True
     try:
         gateway_windows._report_gateway_start("direct spawn (PID 99)")
@@ -188,7 +188,7 @@ def test_breakaway_fallback_warns_even_on_success(monkeypatch, attest_home, caps
     out = capsys.readouterr().out
     assert "✓" in out
     assert "could not break away" in out
-    assert "schtasks /Run /TN Hermes_Gateway" in out
+    assert "schtasks /Run /TN Eir_Gateway" in out
 
 
 # ---------------------------------------------------------------------------
@@ -197,7 +197,7 @@ def test_breakaway_fallback_warns_even_on_success(monkeypatch, attest_home, caps
 
 
 def test_attested_probe_fails_closed_without_a_well_formed_dead_attestation(attest_home):
-    """``hermes update`` uses this probe to override Desktop-owned lifecycle suppression
+    """``eir update`` uses this probe to override Desktop-owned lifecycle suppression
     (#109538), so only a *detectable* death may read True: no marker, malformed ``pids``,
     a gateway alive now, or a clean ledger exit all read False. The probe must also be
     read-only — consuming the marker here would silence the CLI-start warning that reports
@@ -257,7 +257,7 @@ def test_attestation_bound_to_create_time_is_no_authority_once_the_sentinel_move
     the sentinel. A marker bound to 111's process birth fails closed: another PID or another birth
     time reads as undecidable, never as dead. (Birth, not the ledger's ``start_time``: that is stamped
     seconds later, once imports finish.)"""
-    monkeypatch.setattr("hermes_cli.process_identity._process_create_time", lambda pid=None: 1000.0)
+    monkeypatch.setattr("eir_cli.process_identity._process_create_time", lambda pid=None: 1000.0)
     gateway_windows._write_start_attestation([111], "direct spawn (PID 111)")
     marker = json.loads((attest_home / "state" / "gateway.start-attestation.json").read_text(encoding="utf-8"))
     assert marker["create_times"] == {"111": 1000.0}
@@ -277,7 +277,7 @@ def test_attestation_bound_to_create_time_keeps_authority_for_its_own_incarnatio
     incarnation: gone with no clean exit → dead. Its own clean exit (create_time carried by
     ``mark_exited``) → planned stop. A sentinel from a gateway older than the identity stamp, and
     older markers without ``create_times``, keep PID-only matching."""
-    monkeypatch.setattr("hermes_cli.process_identity._process_create_time", lambda pid=None: 1000.0)
+    monkeypatch.setattr("eir_cli.process_identity._process_create_time", lambda pid=None: 1000.0)
     gateway_windows._write_start_attestation([111], "direct spawn (PID 111)")
     _sentinel(attest_home, phase="running", pid=111, create_time=1001.5)
     assert gateway_windows.attested_death_generation(current_pids=[]) is not None

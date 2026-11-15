@@ -9,7 +9,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 // keeps a slow poll because a push can be lost.
 const request = vi.hoisted(() => vi.fn())
 const listeners = vi.hoisted(() => new Map<string, Set<(event: Record<string, unknown>) => void>>())
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@eir/plugin-sdk', async () => {
   const { pluginSdkMock, createGroupGateway } = await import('./group-test-utils')
   const gateway = createGroupGateway()
   const { en } = await import('@/i18n/en')
@@ -63,10 +63,10 @@ const stateReads = () => request.mock.calls.filter(call => call[1] === 'groups.s
 const logReads = () => request.mock.calls.filter(call => call[1] === 'groups.log').map(call => call[2].since_seq)
 const emit = (type: string, event: Record<string, unknown> = {}) => act(() => { for (const listener of listeners.get(type) ?? []) {listener({ type, ...event })} })
 
-beforeEach(() => { Object.defineProperty(window, 'hermesDesktop', { configurable: true, writable: true, value: undefined }) })
+beforeEach(() => { Object.defineProperty(window, 'eirDesktop', { configurable: true, writable: true, value: undefined }) })
 // Tests override host.retainProfile; put the shared mock's own back after each, so a failed assertion can't leak an
 // override into the next test.
-const sdkHost = async () => (await import('@hermes/plugin-sdk')).host as { retainProfile?: unknown }
+const sdkHost = async () => (await import('@eir/plugin-sdk')).host as { retainProfile?: unknown }
 const defaultRetain = sdkHost().then(host => host.retainProfile)
 afterEach(async () => {
   cleanup(); request.mockReset(); listeners.clear(); localStorage.clear(); vi.useRealTimers()
@@ -292,7 +292,7 @@ it('keeps the same log array when a read brings nothing new', async () => {
 
 it('holds the room route\'s socket open while the view is shown, so its pushes arrive', async () => {
   serveRoom({ log: [message(1)], changeEvents: true })
-  const sdk = await import('@hermes/plugin-sdk')
+  const sdk = await import('@eir/plugin-sdk')
   const released = vi.fn()
   const retain = vi.fn(async (): Promise<() => void> => released)
   Object.assign(sdk.host, { retainProfile: retain })
@@ -383,7 +383,7 @@ it('retries a failed read on the fast poll, not the backstop, even on a backend 
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
   const room = { log: [message(1)], changeEvents: true }
   serveRoom(room)
-  const sdk = await import('@hermes/plugin-sdk')
+  const sdk = await import('@eir/plugin-sdk')
   Object.assign(sdk.host, { retainProfile: vi.fn(async () => () => undefined) })  // a held lease: the slow backstop is in play
   render(<CanonicalGroupWorkspace binding={binding} />)
   await vi.waitFor(() => expect(screen.getByText('m1')).toBeTruthy())
@@ -403,7 +403,7 @@ it('retries a failed Refresh on the fast poll too, not only a failed poll', asyn
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
   const room = { log: [message(1)], changeEvents: true }
   serveRoom(room)
-  const sdk = await import('@hermes/plugin-sdk')
+  const sdk = await import('@eir/plugin-sdk')
   Object.assign(sdk.host, { retainProfile: vi.fn(async () => () => undefined) })  // a held lease: the slow backstop is in play
   const serve = request.getMockImplementation()!
   let down = false
@@ -472,7 +472,7 @@ it('drops a read that started before an action settled, so its stale status cann
 it('asks again for a socket lease that failed when its route reconnects, and a read\'s own reconnect is not a re-read', async () => {
   const room = { log: [message(1)], changeEvents: true }
   serveRoom(room)
-  const sdk = await import('@hermes/plugin-sdk')
+  const sdk = await import('@eir/plugin-sdk')
   const released = vi.fn()
   const retain = vi.fn<() => Promise<() => void>>().mockRejectedValueOnce(new Error('route unreachable')).mockResolvedValue(released)
   Object.assign(sdk.host, { retainProfile: retain })
@@ -502,7 +502,7 @@ it('asks again for a socket lease that failed when its route reconnects, and a r
 it('re-reads on a reconnect that lands after its read\'s state answer, which may have missed pushes', async () => {
   const room = { log: [message(1)], changeEvents: true }
   serveRoom(room)
-  const sdk = await import('@hermes/plugin-sdk')
+  const sdk = await import('@eir/plugin-sdk')
   Object.assign(sdk.host, { retainProfile: vi.fn(async () => () => undefined) })  // the lease holds the socket open
   render(<CanonicalGroupWorkspace binding={binding} />)
   await screen.findByText('m1')
@@ -533,7 +533,7 @@ it('re-reads on a reconnect that lands after its read\'s state answer, which may
 it('without a socket lease, its log request\'s own redial is not a reconnect, so a failing log read does not loop', async () => {
   const room = { log: [message(1)], changeEvents: true }
   serveRoom(room)
-  const sdk = await import('@hermes/plugin-sdk')
+  const sdk = await import('@eir/plugin-sdk')
   Object.assign(sdk.host, { retainProfile: vi.fn(async () => { throw new Error('route unreachable') }) })
   render(<CanonicalGroupWorkspace binding={binding} />)
   await screen.findByText('m1')
@@ -560,7 +560,7 @@ it('stays on the fast poll while its route\'s socket lease is missing, since no 
   vi.useFakeTimers({ shouldAdvanceTime: true })
 
   serveRoom({ log: [message(1)], changeEvents: true })
-  const sdk = await import('@hermes/plugin-sdk')
+  const sdk = await import('@eir/plugin-sdk')
   Object.assign(sdk.host, { retainProfile: vi.fn(async () => { throw new Error('route unreachable') }) })
   render(<CanonicalGroupWorkspace binding={binding} />)
   await screen.findByText('m1')
@@ -573,7 +573,7 @@ it('moves to the slow backstop once the lease holds and the backend pushes', asy
   vi.useFakeTimers({ shouldAdvanceTime: true })
 
   serveRoom({ log: [message(1)], changeEvents: true })
-  const sdk = await import('@hermes/plugin-sdk')
+  const sdk = await import('@eir/plugin-sdk')
   Object.assign(sdk.host, { retainProfile: vi.fn(async () => () => undefined) })
   render(<CanonicalGroupWorkspace binding={binding} />)
   await screen.findByText('m1')

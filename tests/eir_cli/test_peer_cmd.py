@@ -1,4 +1,4 @@
-"""Tests for ``hermes peer`` — cross-machine bot-to-bot DMs."""
+"""Tests for ``eir peer`` — cross-machine bot-to-bot DMs."""
 
 import json
 import threading
@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 from agent.turn_author import TURN_AUTHOR_ENV
-from hermes_cli.subcommands import peer as peer_cmd
+from eir_cli.subcommands import peer as peer_cmd
 
 
 # ── target parsing ───────────────────────────────────────────────────────────
@@ -79,20 +79,20 @@ class _ProfilePeer(BaseHTTPRequestHandler):
         pass
 
 
-_NOT_SERVED = {"error": {"message": "Profile 'hermes' exists on this host but this gateway does not serve it"}}
+_NOT_SERVED = {"error": {"message": "Profile 'eir' exists on this host but this gateway does not serve it"}}
 
 
 @pytest.mark.parametrize("served,probe_status,refusal,expected", [
-    ({"default", "hermes"}, 200, None, "hermes"),   # a real legacy 'hermes' profile keeps precedence
-    # An older peer's generic 404 also covers a real 'hermes' profile it parks or runs standalone:
+    ({"default", "eir"}, 200, None, "eir"),   # a real legacy 'eir' profile keeps precedence
+    # An older peer's generic 404 also covers a real 'eir' profile it parks or runs standalone:
     # ambiguous, so it is an error naming box/default, never a guessed delivery into the default.
     ({"default"}, 200, None, None),
-    ({"default", "hermes"}, 503, None, "hermes"),   # a transient failure is no verdict, so never reroute
+    ({"default", "eir"}, 503, None, "eir"),   # a transient failure is no verdict, so never reroute
     ({"default"}, 200, _NOT_SERVED, None),          # it has one but does not serve it: an error, not default
 ])
-def test_hermes_handle_reaches_the_profile_the_peer_serves(
+def test_eir_handle_reaches_the_profile_the_peer_serves(
         monkeypatch, capsys, served, probe_status, refusal, expected):
-    """``box/hermes`` names the peer's real 'hermes' profile when it has one; the client never
+    """``box/eir`` names the peer's real 'eir' profile when it has one; the client never
     reroutes it to /p/default on its own (an upgraded peer aliases the handle server-side); dm,
     status and stop all address the same mirror."""
     _ProfilePeer.served, _ProfilePeer.probe_status, _ProfilePeer.hits = served, probe_status, []
@@ -103,9 +103,9 @@ def test_hermes_handle_reaches_the_profile_the_peer_serves(
     monkeypatch.setattr(peer_cmd, "_peer_secret", lambda name: "secret-key-123456")
     try:
         replies = [
-            peer_cmd.cmd_peer(SimpleNamespace(peer_action="dm", target="box/hermes", message="hi", json=True)),
-            peer_cmd.cmd_peer(SimpleNamespace(peer_action="status", target="box/hermes", run_id="run_1", json=True)),
-            peer_cmd.cmd_peer(SimpleNamespace(peer_action="stop", target="box/hermes", run_id="run_1", json=True)),
+            peer_cmd.cmd_peer(SimpleNamespace(peer_action="dm", target="box/eir", message="hi", json=True)),
+            peer_cmd.cmd_peer(SimpleNamespace(peer_action="status", target="box/eir", run_id="run_1", json=True)),
+            peer_cmd.cmd_peer(SimpleNamespace(peer_action="stop", target="box/eir", run_id="run_1", json=True)),
         ]
     finally:
         server.shutdown()
@@ -114,8 +114,8 @@ def test_hermes_handle_reaches_the_profile_the_peer_serves(
     if expected is None:
         assert (replies, out) == ([1, 1, 1], [])
         # A generic 404 is ambiguous (names box/default); a distinct refusal is relayed as the peer said it.
-        assert ("Profile 'hermes' exists" if refusal else "box/default") in err
-        assert {hit.split("/")[2] for hit in _ProfilePeer.hits} == {"hermes"}
+        assert ("Profile 'eir' exists" if refusal else "box/default") in err
+        assert {hit.split("/")[2] for hit in _ProfilePeer.hits} == {"eir"}
         return
     assert replies == [0, 0, 0]
     assert [out[0]["reply"], out[1]["status"], out[2]["status"]] == [
@@ -123,12 +123,12 @@ def test_hermes_handle_reaches_the_profile_the_peer_serves(
     assert {hit.split("/")[2] for hit in _ProfilePeer.hits if not hit.endswith("/health")} == {expected}
 
 
-@pytest.mark.parametrize("target", ["box/Hermes", "box/HERMES"])
-def test_mixed_case_hermes_target_reaches_the_peers_real_hermes_profile(monkeypatch, capsys, target):
-    """Profile ids are lowercase, so ``box/Hermes`` is ``box/hermes``. A peer comparing prefixes
-    exactly (every peer before the case fix) answers ``/p/Hermes`` with its unknown-profile 404,
-    which the @hermes fallback read as "no hermes here" and rerouted the DM to the default."""
-    _ProfilePeer.served, _ProfilePeer.probe_status, _ProfilePeer.hits = {"default", "hermes"}, 200, []
+@pytest.mark.parametrize("target", ["box/Eir", "box/EIR"])
+def test_mixed_case_eir_target_reaches_the_peers_real_eir_profile(monkeypatch, capsys, target):
+    """Profile ids are lowercase, so ``box/Eir`` is ``box/eir``. A peer comparing prefixes
+    exactly (every peer before the case fix) answers ``/p/Eir`` with its unknown-profile 404,
+    which the @eir fallback read as "no eir here" and rerouted the DM to the default."""
+    _ProfilePeer.served, _ProfilePeer.probe_status, _ProfilePeer.hits = {"default", "eir"}, 200, []
     _ProfilePeer.refusal = {"error": "Unknown or unconfigured profile"}
     server = HTTPServer(("127.0.0.1", 0), _ProfilePeer)
     threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -138,7 +138,7 @@ def test_mixed_case_hermes_target_reaches_the_peers_real_hermes_profile(monkeypa
         rc = peer_cmd.cmd_peer(SimpleNamespace(peer_action="dm", target=target, message="hi", json=True))
     finally:
         server.shutdown()
-    assert (rc, json.loads(capsys.readouterr().out)["reply"]) == (0, "from hermes")
+    assert (rc, json.loads(capsys.readouterr().out)["reply"]) == (0, "from eir")
 
 
 # ── registry round-trip (isolated config) ────────────────────────────────────
@@ -225,7 +225,7 @@ class _FakePeer(BaseHTTPRequestHandler):
             )
         if self.path == "/v1/runs/run_1":
             return self._json({
-                "object": "hermes.run",
+                "object": "eir.run",
                 "run_id": "run_1",
                 "status": type(self).run_status,
                 "session_id": "bc_existing",
@@ -245,13 +245,13 @@ class _FakePeer(BaseHTTPRequestHandler):
             type(self).sessions.append("bc_1")
             # REAL api_server create shape: the row is wrapped under "session"
             # (verified live Aug 2026 — a flat fake hid a parser bug).
-            return self._json({"object": "hermes.session", "session": {"id": "bc_1", "title": body.get("title")}}, 201)
+            return self._json({"object": "eir.session", "session": {"id": "bc_1", "title": body.get("title")}}, 201)
 
         if self.path.startswith("/api/sessions/") and self.path.endswith("/chat"):
             type(self).chats.append(body.get("message"))
             type(self).chat_bodies.append(body)
             return self._json({
-                "object": "hermes.session.chat.completion",
+                "object": "eir.session.chat.completion",
                 "session_id": "bc_1",
                 "message": {
                     "role": "assistant",
@@ -325,8 +325,8 @@ def test_dm_creates_bot_chat_then_chats(monkeypatch, capsys, fake_peer_server):
 def test_dm_hides_a_bare_silence_marker_from_the_sending_agent(monkeypatch, capsys, fake_peer_server):
     """A successful bare NO_REPLY/[SILENT] marker is a delivery decision, not
     a message — same rule as the gateway's live Bot Chat completion, the
-    Desktop bot_relay.deliver RPC and the one-shot local `hermes chat -Q`
-    transport (tools/bot_mode_dm.py::_run_local_turn). `hermes peer dm` is a
+    Desktop bot_relay.deliver RPC and the one-shot local `eir chat -Q`
+    transport (tools/bot_mode_dm.py::_run_local_turn). `eir peer dm` is a
     4th Bot Mode delivery door and, before this fix, printed the raw marker
     to the sending agent as if it were a real reply."""
     _FakePeer.chat_reply_content = "NO_REPLY"
@@ -386,7 +386,7 @@ def test_dm_reuses_existing_bot_chat(monkeypatch, capsys, fake_peer_server):
     assert _FakePeer.sessions == ["bc_existing"]
 
 
-# ── per-turn author (HERMES_TURN_AUTHOR set by the message_agent runner) ─────
+# ── per-turn author (EIR_TURN_AUTHOR set by the message_agent runner) ─────
 
 
 AUTHOR = {"id": "bot:dixie", "name": "dixie", "is_bot": True}
@@ -628,7 +628,7 @@ def test_stop_requests_exact_async_run(monkeypatch, capsys, fake_peer_server):
 
 class _AttackerOrigin(BaseHTTPRequestHandler):
     """A second real HTTP server standing in for an attacker-controlled host
-    a compromised/MITM'd peer could redirect a ``hermes peer dm`` request to."""
+    a compromised/MITM'd peer could redirect a ``eir peer dm`` request to."""
 
     auth_seen: list = []
 
@@ -647,7 +647,7 @@ class _AttackerOrigin(BaseHTTPRequestHandler):
 
 class _RedirectingPeer(BaseHTTPRequestHandler):
     """A "peer" that 302-redirects every request to a different origin —
-    the shape of a compromised peer or a LAN MITM answering ``hermes peer
+    the shape of a compromised peer or a LAN MITM answering ``eir peer
     add``'s registered URL."""
 
     redirect_target: str = ""
@@ -751,7 +751,7 @@ def test_request_non_json_error_sanitized(monkeypatch):
     def _fake_open(req, timeout=None):
         yield _Resp()
 
-    import hermes_cli.urllib_security as us
+    import eir_cli.urllib_security as us
     monkeypatch.setattr(us, "open_credentialed_url", _fake_open)
     with pytest.raises(RuntimeError) as ei:
         peer_cmd._request("http://x/v1/x", "k")

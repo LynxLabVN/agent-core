@@ -91,7 +91,7 @@ class NousToolAccessInfo:
 
 _ANON_ACCOUNT_TIER = "anonymous"
 # Every billing / top-up / entitlement surface says exactly this for the free tier (R-USR-1).
-FREE_TIER_NEEDS_ACCOUNT = "This needs a Nous account. Run `hermes auth upgrade`."
+FREE_TIER_NEEDS_ACCOUNT = "This needs a Nous account. Run `eir auth upgrade`."
 FREE_TIER_NEEDS_ACCOUNT_CHAT = "This needs a Nous account. Use /login to sign in."
 
 
@@ -173,7 +173,7 @@ class NousPortalAccountInfo:
 def nous_portal_billing_url(account_info: Optional[NousPortalAccountInfo] = None) -> str:
     """Return the billing URL for a normalized Nous account snapshot."""
     try:
-        from hermes_cli.auth import DEFAULT_NOUS_PORTAL_URL
+        from eir_cli.auth import DEFAULT_NOUS_PORTAL_URL
     except Exception:
         DEFAULT_NOUS_PORTAL_URL = "https://portal.nousresearch.com"
 
@@ -259,38 +259,38 @@ def format_nous_portal_entitlement_message(
             return None
     if account_info is None:
         return (
-            f"Hermes could not verify your Nous Portal entitlement, so {capability} is unavailable. "
-            f"Run `hermes model` to refresh your login, or check billing at {billing_url}."
+            f"Eir could not verify your Nous Portal entitlement, so {capability} is unavailable. "
+            f"Run `eir model` to refresh your login, or check billing at {billing_url}."
         )
     if not account_info.logged_in:
         if account_info.inference_credential_present:
             return (
-                f"Nous inference credentials are configured, but Hermes cannot verify your Nous Portal "
-                f"paid access for {capability}. Log in with `hermes model` to enable Portal-managed "
+                f"Nous inference credentials are configured, but Eir cannot verify your Nous Portal "
+                f"paid access for {capability}. Log in with `eir model` to enable Portal-managed "
                 f"features. Billing and credits are managed at {billing_url}."
             )
         return (
-            f"Log in to Nous Portal to use {capability}: run `hermes model`. "
+            f"Log in to Nous Portal to use {capability}: run `eir model`. "
             f"Billing and credits are managed at {billing_url}."
         )
     if account_info.paid_service_access is None:
-        detail = f"Hermes could not verify your Nous Portal paid access, so {capability} is unavailable."
+        detail = f"Eir could not verify your Nous Portal paid access, so {capability} is unavailable."
         if account_info.error:
             detail += f" Account lookup failed: {account_info.error}."
         if include_refresh_hint:
-            detail += " Run `hermes model` to refresh your session."
+            detail += " Run `eir model` to refresh your session."
         return detail + f" Check billing at {billing_url}."
     access = account_info.paid_service_access_info
     reason = access.reason if access else None
     if reason == "account_missing":
         return (
-            f"Hermes could not find a Nous Portal account or organisation for this login, so {capability} "
-            f"is unavailable. Run `hermes model` to authenticate again; if the problem persists, contact Nous support."
+            f"Eir could not find a Nous Portal account or organisation for this login, so {capability} "
+            f"is unavailable. Run `eir model` to authenticate again; if the problem persists, contact Nous support."
         )
     if reason == "no_usable_credits" or account_info.paid_service_access is False:
         message = _no_paid_access_message(account_info, capability, billing_url, in_chat=in_chat)
         if include_refresh_hint and not account_info.fresh:
-            message += " If you recently bought credits, run `hermes model` to refresh Hermes."
+            message += " If you recently bought credits, run `eir model` to refresh Eir."
         return message
     return (
         f"Your Nous Portal account does not currently have paid service access, "
@@ -322,7 +322,7 @@ def _no_paid_access_message(
         return (
             f"Your Nous Portal access is paused because you've exceeded the per-member spend cap set by "
             f"your organisation.{cap_detail}{credit_detail} Ask your organisation admin to raise the "
-            f"member spend cap at {billing_url}, then run `hermes model` to refresh."
+            f"member spend cap at {billing_url}, then run `eir model` to refresh."
         )
     if active and paid:
         return (
@@ -359,7 +359,7 @@ def get_nous_portal_account_info(*, force_fresh: bool = False, min_jwt_ttl_secon
     authoritative). ``force_fresh=True`` always calls ``/api/oauth/account`` and bypasses the cache.
     """
     try:
-        from hermes_cli.auth import get_provider_auth_state
+        from eir_cli.auth import get_provider_auth_state
 
         state = get_provider_auth_state("nous") or {}
     except Exception as exc:
@@ -367,7 +367,7 @@ def get_nous_portal_account_info(*, force_fresh: bool = False, min_jwt_ttl_secon
 
     # A guest that has only used connectors holds just a connectors-only token (same claims). With
     # the free tier off a guest is not an account login: the pool and logged-out answers apply.
-    from hermes_cli.anon_auth import guest_without_free_tier, held_connectors_token
+    from eir_cli.anon_auth import guest_without_free_tier, held_connectors_token
 
     access_token = "" if guest_without_free_tier(state) else (held_connectors_token(state) or "")
     portal_base_url = _portal_base_url(state)
@@ -390,7 +390,7 @@ def nous_policy_present() -> Optional[bool]:
     ``None`` is unknown (older mint / unreadable claim) and must not be reported as "no policy".
     """
     try:
-        from hermes_cli.auth import get_provider_auth_state, _decode_jwt_claims
+        from eir_cli.auth import get_provider_auth_state, _decode_jwt_claims
 
         access_token = (get_provider_auth_state("nous") or {}).get("access_token")
         if not _nonblank(access_token):
@@ -426,7 +426,7 @@ def cached_nous_portal_account_info(*, any_age: bool = False) -> Optional[NousPo
 
 def _account_identity(access_token: str, portal_base_url: Optional[str]) -> str:
     """Portal + the token's user and org (stable across a refresh); an opaque token falls back to its hash."""
-    from hermes_cli.auth_constants import _decode_jwt_claims
+    from eir_cli.auth_constants import _decode_jwt_claims
 
     claims = _decode_jwt_claims(access_token)
     sub, org = claims.get("sub"), claims.get("org_id")
@@ -440,7 +440,7 @@ def _account_identity(access_token: str, portal_base_url: Optional[str]) -> str:
 def _current_account_identity() -> Optional[str]:
     """``_account_identity`` for the persisted Nous login, without a refresh or network call. None
     when logged out."""
-    from hermes_cli.auth import get_provider_auth_state
+    from eir_cli.auth import get_provider_auth_state
 
     state = get_provider_auth_state("nous") or {}
     access_token = state.get("access_token")
@@ -468,7 +468,7 @@ def _fresh_account_info(state: dict[str, Any], force_fresh: bool, portal_base_ur
     global _account_info_cache, _account_info_identity
 
     try:
-        from hermes_cli.auth import get_provider_auth_state, resolve_nous_access_token
+        from eir_cli.auth import get_provider_auth_state, resolve_nous_access_token
 
         access_token = resolve_nous_access_token()
         refreshed_state = get_provider_auth_state("nous") or state
@@ -498,8 +498,8 @@ def stored_token_account_info() -> Optional[NousPortalAccountInfo]:
     """The portal account read with the profile's stored Nous token as it is: None when signed out, a guest
     without inference, or a token about to expire. Never refreshes: a refresh writes the auth store, and a
     balance read for a session on another provider must not touch the Nous credential."""
-    from hermes_cli.anon_auth import guest_without_free_tier, held_connectors_token
-    from hermes_cli.auth import get_provider_auth_state
+    from eir_cli.anon_auth import guest_without_free_tier, held_connectors_token
+    from eir_cli.auth import get_provider_auth_state
     state = get_provider_auth_state("nous") or {}
     if guest_without_free_tier(state) or not (token := held_connectors_token(state, skew_seconds=60)):
         return None
@@ -614,7 +614,7 @@ def _info_from_valid_jwt(
     token: str, state: dict[str, Any], portal_base_url: Optional[str], min_jwt_ttl_seconds: int
 ) -> Optional[NousPortalAccountInfo]:
     try:
-        from hermes_cli.auth import _decode_jwt_claims
+        from eir_cli.auth import _decode_jwt_claims
     except Exception:
         return None
     claims = _decode_jwt_claims(token)
@@ -723,13 +723,13 @@ def _dict_or_empty(value: Any) -> dict[str, Any]:
 
 
 def resolve_nous_portal_base_url() -> str:
-    from hermes_cli.auth import _nous_portal_base_url, get_provider_auth_state
+    from eir_cli.auth import _nous_portal_base_url, get_provider_auth_state
 
     return _nous_portal_base_url(get_provider_auth_state("nous") or {})
 
 
 def _portal_base_url(state: dict[str, Any]) -> Optional[str]:
-    from hermes_cli.auth_nous import _nous_portal_env_override
+    from eir_cli.auth_nous import _nous_portal_env_override
 
     value = _nous_portal_env_override() or state.get("portal_base_url")
     return value.strip().rstrip("/") if _nonblank(value) else None

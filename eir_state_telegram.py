@@ -1,4 +1,4 @@
-"""Telegram DM topic-mode mixin for :class:`hermes_state.SessionDB`."""
+"""Telegram DM topic-mode mixin for :class:`eir_state.SessionDB`."""
 
 from __future__ import annotations
 
@@ -8,11 +8,11 @@ import sqlite3
 import time
 from typing import Any, Dict, List, Optional
 
-from hermes_state_common import _sql_preview_raw, _sql_session_last_active
-from hermes_state_errors import StateDbReplacedError
+from eir_state_common import _sql_preview_raw, _sql_session_last_active
+from eir_state_errors import StateDbReplacedError
 
-# caplog tests pin the "hermes_state" logger name.
-logger = logging.getLogger("hermes_state")
+# caplog tests pin the "eir_state" logger name.
+logger = logging.getLogger("eir_state")
 
 
 def _normalize_telegram_topic_profile_name(profile_name: Optional[str] = None) -> str:
@@ -306,7 +306,7 @@ class SessionTelegramTopicsMixin:
         session_id: str, managed_mode: str = "auto", profile_name: str = "default",
         expected_session_id: Optional[str] = None, move_session: bool = False,
     ) -> bool:
-        """Bind one Telegram DM topic thread to one Hermes session. A session may be linked to
+        """Bind one Telegram DM topic thread to one Eir session. A session may be linked to
         only one topic: rebinding the same pair is idempotent; linking the session to a
         different topic raises ValueError, unless ``move_session`` (a handoff moves the
         conversation) and that topic is in the same profile: its row is dropped in this transaction.

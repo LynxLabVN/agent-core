@@ -1,6 +1,6 @@
 """Audit log for dashboard-auth events.
 
-Profile-aware location: ``$HERMES_HOME/logs/dashboard-auth.log``.
+Profile-aware location: ``$EIR_HOME/logs/dashboard-auth.log``.
 Format: one JSON object per line. Token-like kwargs are dropped before
 serialisation so we never leak refresh tokens or JWTs to disk.
 """
@@ -10,15 +10,15 @@ import json
 from pathlib import Path
 import pytest
 
-from hermes_cli.dashboard_auth.audit import audit_log, AuditEvent
+from eir_cli.dashboard_auth.audit import audit_log, AuditEvent
 
 
 @pytest.fixture
 def profile_home(tmp_path, monkeypatch):
-    """Redirect $HERMES_HOME and ~ to a tmp dir for the duration of the test."""
-    home = tmp_path / ".hermes"
+    """Redirect $EIR_HOME and ~ to a tmp dir for the duration of the test."""
+    home = tmp_path / ".eir"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     # Some code paths fall back to Path.home() — patch that too.
     monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
     return home
@@ -69,7 +69,7 @@ def test_audit_writes_jsonlines(profile_home):
 
 def test_audit_rotates_when_over_max_bytes(profile_home, monkeypatch):
     """Rotation is bounded: at most ``_BACKUP_COUNT`` ``.N`` files, current log under the cap."""
-    import hermes_cli.dashboard_auth.audit as audit_module
+    import eir_cli.dashboard_auth.audit as audit_module
 
     monkeypatch.setattr(audit_module, "_MAX_BYTES", 2000)
     monkeypatch.setattr(audit_module, "_BACKUP_COUNT", 3)
@@ -88,7 +88,7 @@ def test_audit_rotates_when_over_max_bytes(profile_home, monkeypatch):
 def test_audit_rotates_on_crossing_write(profile_home, monkeypatch):
     """A write that pushes the file to/past the cap must rotate BEFORE appending (the pending
     line's bytes count toward the threshold), not stay over the cap until the next event."""
-    import hermes_cli.dashboard_auth.audit as audit_module
+    import eir_cli.dashboard_auth.audit as audit_module
 
     monkeypatch.setattr(audit_module, "_MAX_BYTES", 200)
     monkeypatch.setattr(audit_module, "_BACKUP_COUNT", 3)

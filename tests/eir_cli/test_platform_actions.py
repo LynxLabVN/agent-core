@@ -22,13 +22,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from gateway.config import Platform
-from hermes_cli.platform_actions import PlatformActions
+from eir_cli.platform_actions import PlatformActions
 
 
 def _grant(granted: bool):
     """Patch the capability check the facade performs."""
     return patch(
-        "hermes_cli.plugin_capabilities.plugin_capability_granted",
+        "eir_cli.plugin_capabilities.plugin_capability_granted",
         return_value=granted,
     )
 
@@ -86,7 +86,7 @@ class TestGateDefaultOff:
         """No patching of the check itself: an empty config entry denies."""
         actions = PlatformActions("some-plugin")
         with patch(
-            "hermes_cli.plugin_capabilities._plugin_entry", return_value={}
+            "eir_cli.plugin_capabilities._plugin_entry", return_value={}
         ):
             result = asyncio.run(
                 actions.set_thread_title("telegram", "1", "2", "t")
@@ -101,7 +101,7 @@ class TestGateDefaultOff:
         actions = PlatformActions("some-plugin")
         adapter = _telegram_adapter()
         with patch(
-            "hermes_cli.plugin_capabilities._plugin_entry",
+            "eir_cli.plugin_capabilities._plugin_entry",
             return_value={"allow_platform_actions": True},
         ), _runner_with({Platform.TELEGRAM: adapter}):
             result = asyncio.run(
@@ -113,7 +113,7 @@ class TestGateDefaultOff:
         actions = PlatformActions("some-plugin")
         adapter = _telegram_adapter()
         with patch(
-            "hermes_cli.plugin_capabilities._plugin_entry",
+            "eir_cli.plugin_capabilities._plugin_entry",
             return_value={"granted_capabilities": ["gateway.platform_actions"]},
         ), _runner_with({Platform.TELEGRAM: adapter}):
             result = asyncio.run(
@@ -124,7 +124,7 @@ class TestGateDefaultOff:
     def test_capability_check_failure_fails_closed(self):
         actions = PlatformActions("some-plugin")
         with patch(
-            "hermes_cli.plugin_capabilities.plugin_capability_granted",
+            "eir_cli.plugin_capabilities.plugin_capability_granted",
             side_effect=RuntimeError("corrupt config"),
         ):
             result = asyncio.run(
@@ -280,7 +280,7 @@ class TestMultiplexProfileRouting:
                 default={Platform.TELEGRAM: default_adapter},
                 profiles={"team-b": {Platform.TELEGRAM: team_b_adapter}},
             ),
-            patch("hermes_cli.profiles.get_active_profile_name", return_value="team-b"),
+            patch("eir_cli.profiles.get_active_profile_name", return_value="team-b"),
         ):
             result = asyncio.run(actions.add_reaction("telegram", "1", "2", "x"))
         assert result["ok"] is True
@@ -301,7 +301,7 @@ class TestMultiplexProfileRouting:
         with (
             _grant(True),
             _multiplex_runner_with(default={Platform.TELEGRAM: default_adapter}, profiles={}),
-            patch("hermes_cli.profiles.get_active_profile_name", **resolver),
+            patch("eir_cli.profiles.get_active_profile_name", **resolver),
         ):
             result = asyncio.run(actions.add_reaction("telegram", "1", "2", "x"))
         assert result["error"] == "adapter_not_registered"
@@ -321,7 +321,7 @@ class TestMultiplexProfileRouting:
         with (
             _grant(True),
             _multiplex_runner_with(default={Platform.TELEGRAM: primary}, profiles={"sec": {}}, config=cfg),
-            patch("hermes_cli.profiles.get_active_profile_name", return_value="sec"),
+            patch("eir_cli.profiles.get_active_profile_name", return_value="sec"),
             patch("gateway.run._multiplex_profile_homes", return_value=[("sec", tmp_path / "sec")]),
         ):
             assert asyncio.run(actions.add_reaction("telegram", "100", "2", "x"))["ok"] is True
@@ -352,7 +352,7 @@ class TestMultiplexProfileRouting:
                 _grant(True),
                 _multiplex_runner_with(default={Platform.TELEGRAM: primary, Platform.SLACK: slack},
                                        profiles={"sec": {}}, config=cfg),
-                patch("hermes_cli.profiles.get_active_profile_name", return_value="sec"),
+                patch("eir_cli.profiles.get_active_profile_name", return_value="sec"),
                 patch("gateway.run._multiplex_profile_homes", return_value=[("sec", tmp_path / "sec")]),
             ):
                 own = asyncio.run(actions.add_reaction("telegram", "100", "2", "x"))
@@ -382,7 +382,7 @@ class TestMultiplexProfileRouting:
         with (
             _grant(True),
             _multiplex_runner_with(default={Platform.DISCORD: primary}, profiles={"sec": {}}, config=cfg),
-            patch("hermes_cli.profiles.get_active_profile_name", return_value="sec"),
+            patch("eir_cli.profiles.get_active_profile_name", return_value="sec"),
             patch("gateway.run._multiplex_profile_homes", return_value=[("sec", tmp_path / "sec")]),
         ):
             result = asyncio.run(actions.set_thread_title("discord", "111", "999", "pwned"))
@@ -394,7 +394,7 @@ class TestMultiplexProfileRouting:
 
 class TestPluginContextWiring:
     def test_ctx_platform_actions_bound_to_plugin_id(self):
-        from hermes_cli.plugins import PluginContext, PluginManager, PluginManifest
+        from eir_cli.plugins import PluginContext, PluginManager, PluginManifest
 
         manager = PluginManager()
         ctx = PluginContext(

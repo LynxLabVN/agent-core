@@ -1,4 +1,4 @@
-"""Tests for the startup security posture audit (hermes_cli.security_audit_startup)."""
+"""Tests for the startup security posture audit (eir_cli.security_audit_startup)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-import hermes_cli.security_audit_startup as audit
+import eir_cli.security_audit_startup as audit
 
 
 @pytest.fixture(autouse=True)
@@ -44,7 +44,7 @@ def test_run_security_audit_aggregates(monkeypatch, tmp_path):
     monkeypatch.setattr(audit, "_is_root", lambda: True)
     monkeypatch.setattr(audit, "_iter_sshd_config_lines", lambda: ["PasswordAuthentication yes"])
     monkeypatch.setattr(audit, "_in_container", lambda: False)
-    findings = audit.run_security_audit(hermes_home=tmp_path, config={})
+    findings = audit.run_security_audit(eir_home=tmp_path, config={})
     assert len(findings) == 2  # root + ssh
 
 
@@ -52,7 +52,7 @@ def test_run_security_audit_clean_posture(monkeypatch, tmp_path):
     monkeypatch.setattr(audit, "_is_root", lambda: False)
     monkeypatch.setattr(audit, "_iter_sshd_config_lines", lambda: ["PasswordAuthentication no"])
     monkeypatch.setattr(audit, "_in_container", lambda: False)
-    assert audit.run_security_audit(hermes_home=tmp_path, config={}) == []
+    assert audit.run_security_audit(eir_home=tmp_path, config={}) == []
 
 
 def test_log_startup_security_warnings_emits_and_is_idempotent(monkeypatch, tmp_path, caplog):
@@ -62,15 +62,15 @@ def test_log_startup_security_warnings_emits_and_is_idempotent(monkeypatch, tmp_
     monkeypatch.setattr(audit, "_iter_sshd_config_lines", list)
     monkeypatch.setattr(audit, "_in_container", lambda: False)
 
-    with caplog.at_level(logging.WARNING, logger="hermes.security_audit"):
-        first = audit.log_startup_security_warnings(hermes_home=tmp_path, config={})
+    with caplog.at_level(logging.WARNING, logger="eir.security_audit"):
+        first = audit.log_startup_security_warnings(eir_home=tmp_path, config={})
     assert len(first) == 1
     assert any("ROOT" in r.message for r in caplog.records)
 
     # Second call is a no-op (idempotent within a process) unless forced.
-    second = audit.log_startup_security_warnings(hermes_home=tmp_path, config={})
+    second = audit.log_startup_security_warnings(eir_home=tmp_path, config={})
     assert second == []
-    forced = audit.log_startup_security_warnings(hermes_home=tmp_path, config={}, force=True)
+    forced = audit.log_startup_security_warnings(eir_home=tmp_path, config={}, force=True)
     assert len(forced) == 1
 
 

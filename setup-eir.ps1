@@ -1,5 +1,5 @@
 # ============================================================================
-# Hermes Agent Setup Script (Windows) — THE dev-environment entry point.
+# Eir Agent Setup Script (Windows) — THE dev-environment entry point.
 # ============================================================================
 # Sets up the pm-managed development environment from a fresh clone:
 #   1. Stage the pinned uv from pm/lock.json (sha256-verified, into the pm
@@ -16,7 +16,7 @@ param([switch]$RuntimeOnly, [string]$TestExtras = '')
 $ErrorActionPreference = 'Stop'
 
 Write-Host ''
-Write-Host 'Hermes Agent Setup' -ForegroundColor Cyan
+Write-Host 'Eir Agent Setup' -ForegroundColor Cyan
 Write-Host ''
 
 $repo = $PSScriptRoot
@@ -40,7 +40,7 @@ if (-not $artifact) { throw "no uv artifact for $target" }
 $pyPin = $lock.packages.python
 $pyVersion = if ($pyPin) { ($pyPin.version -split '\+')[0] -replace '^(\d+\.\d+).*', '$1' } else { '3.11' }
 
-$store = if ($env:HERMES_RUNTIME_DIR) { $env:HERMES_RUNTIME_DIR } else { Join-Path $HOME '.hermes/tools' }
+$store = if ($env:EIR_RUNTIME_DIR) { $env:EIR_RUNTIME_DIR } else { Join-Path $HOME '.eir/tools' }
 $entry = Join-Path $store "uv-$($uvPin.version)-$target"
 $uv = Join-Path $entry 'uv.exe'
 
@@ -48,7 +48,7 @@ if (Test-Path $uv) {
     Write-Host ("pinned uv found: " + (& $uv --version)) -ForegroundColor Green
 } else {
     Write-Host "Staging pinned uv $($uvPin.version) ($target) into the pm store..." -ForegroundColor Cyan
-    $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("hermes-setup-" + [guid]::NewGuid().ToString('n'))
+    $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("eir-setup-" + [guid]::NewGuid().ToString('n'))
     New-Item -ItemType Directory -Path $tmp | Out-Null
     try {
         $archive = Join-Path $tmp ([uri]$artifact.url).Segments[-1]
@@ -120,9 +120,9 @@ if (-not (Test-Path $envFile)) {
 }
 
 # ---------------------------------------------------------------------------
-# Seed bundled skills into ~/.hermes/skills/
+# Seed bundled skills into ~/.eir/skills/
 # ---------------------------------------------------------------------------
-$skillsDir = if ($env:HERMES_HOME) { Join-Path $env:HERMES_HOME 'skills' } else { Join-Path $HOME '.hermes/skills' }
+$skillsDir = if ($env:EIR_HOME) { Join-Path $env:EIR_HOME 'skills' } else { Join-Path $HOME '.eir/skills' }
 New-Item -ItemType Directory -Force -Path $skillsDir | Out-Null
 $sync = Join-Path $repo 'tools/skills_sync.py'
 $venvPy = Join-Path $repo 'venv/Scripts/python.exe'
@@ -143,14 +143,14 @@ Write-Host '  1. Activate the dev environment (venv-style, in THIS session):'
 Write-Host '     .\activate.ps1'
 Write-Host ''
 Write-Host '  2. Run the setup wizard to configure API keys:'
-Write-Host '     hermes setup'
+Write-Host '     eir setup'
 Write-Host ''
 Write-Host '  3. Start chatting:'
-Write-Host '     hermes'
+Write-Host '     eir'
 Write-Host ''
 Write-Host 'Other commands:'
-Write-Host '  hermes pm install     # Re-run the tool + dependency install'
-Write-Host '  hermes status         # Check configuration'
-Write-Host '  hermes doctor         # Diagnose issues'
+Write-Host '  eir pm install     # Re-run the tool + dependency install'
+Write-Host '  eir status         # Check configuration'
+Write-Host '  eir doctor         # Diagnose issues'
 Write-Host '  deactivate            # Undo the activation (restore PATH etc.)'
 Write-Host ''

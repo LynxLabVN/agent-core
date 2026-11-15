@@ -1,5 +1,5 @@
 """Unattended plugin updates: catalog installs ride ``plugins.auto_apply``, one updater per plugin, the
-Desktop/TUI RPC switch + update-all, and the catalog notice after ``hermes update``."""
+Desktop/TUI RPC switch + update-all, and the catalog notice after ``eir update``."""
 
 from __future__ import annotations
 
@@ -11,16 +11,16 @@ import pytest
 
 @pytest.fixture
 def home(tmp_path, monkeypatch):
-    home = tmp_path / "hermes-home"
+    home = tmp_path / "eir-home"
     (home / "plugins").mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     return home
 
 
 class _Row:
     def __init__(self, name, klass, update_available=True):
         self.name, self.klass, self.update_available = name, klass, update_available
-        self.needs_fixing = self.reason = self.min_hermes = None
+        self.needs_fixing = self.reason = self.min_eir = None
         self.current, self.latest = "a" * 40, "b" * 40
 
     def to_json(self):
@@ -29,7 +29,7 @@ class _Row:
 
 def test_auto_apply_moves_catalog_installs_too(home):
     """A catalog install is re-pinned by auto-apply like a git install; pip rows still never move."""
-    from hermes_cli import plugins_cadence as cad
+    from eir_cli import plugins_cadence as cad
 
     applied = []
     rows = [_Row("git-plug", "git"), _Row("catalog-plug", "catalog"), _Row("pip-plug", "pip")]
@@ -41,8 +41,8 @@ def test_auto_apply_moves_catalog_installs_too(home):
 
 def test_second_updater_of_the_same_plugin_is_refused_without_touching_it(home):
     """The gateway's auto-apply tick holds the plugin; a Desktop click on Update changes nothing."""
-    from hermes_cli.plugins_auto_update import plugin_update_lock
-    from hermes_cli.plugins_cmd_update import dashboard_update_user_plugin
+    from eir_cli.plugins_auto_update import plugin_update_lock
+    from eir_cli.plugins_cmd_update import dashboard_update_user_plugin
 
     target = home / "plugins" / "busy-plug"
     target.mkdir()
@@ -69,7 +69,7 @@ def test_second_updater_of_the_same_plugin_is_refused_without_touching_it(home):
 def test_rpc_switch_and_update_all_round_trip(home, monkeypatch):
     """Desktop's switch writes the profile's plugins.auto_apply; Update all reports each plugin and
     never accepts a widened pin on the user's behalf."""
-    from hermes_cli import plugins_cmd_update, plugins_updates
+    from eir_cli import plugins_cmd_update, plugins_updates
     from tui_gateway import server
 
     def rpc(**params):
@@ -93,9 +93,9 @@ def test_rpc_switch_and_update_all_round_trip(home, monkeypatch):
     assert calls == [("fresh", {"unattended": True}), ("widened", {"unattended": True})]  # no accept_capabilities / force
 
 
-def test_hermes_update_names_catalog_pins_it_moved_and_rearms_the_check(home, monkeypatch, capsys):
-    from hermes_cli import plugin_catalog
-    from hermes_cli.plugins_auto_update import report_catalog_updates_after_hermes_update
+def test_eir_update_names_catalog_pins_it_moved_and_rearms_the_check(home, monkeypatch, capsys):
+    from eir_cli import plugin_catalog
+    from eir_cli.plugins_auto_update import report_catalog_updates_after_eir_update
 
     new_pin = "c" * 40
     entry = plugin_catalog.PluginCatalogEntry(name="cat-plug", repo="https://example.invalid/r", sha=new_pin,
@@ -108,13 +108,13 @@ def test_hermes_update_names_catalog_pins_it_moved_and_rearms_the_check(home, mo
     marker.parent.mkdir()
     marker.write_text("1", encoding="utf-8")
 
-    report_catalog_updates_after_hermes_update(home, [])
+    report_catalog_updates_after_eir_update(home, [])
     assert "1 plugin update(s) from the new catalog in this profile: cat-plug" in capsys.readouterr().out
     assert not marker.exists()
 
 
 def _held_install_metadata(home):
-    """`hermes plugins install cat-plug --ref <older sha>`: pinned, off the catalog pin (empty `pin`), next
+    """`eir plugins install cat-plug --ref <older sha>`: pinned, off the catalog pin (empty `pin`), next
     to a catalog install that is simply behind its pin."""
     (home / "plugins" / ".install-metadata.json").write_text(json.dumps({
         "held": {"pinned": True, "revision": "a" * 40,
@@ -126,7 +126,7 @@ def _held_install_metadata(home):
 def test_auto_apply_leaves_a_catalog_install_held_with_ref_alone(home, caplog):
     """A user who rolled a catalog plugin back with --ref keeps it there: the tick moves only the
     install that is merely behind its pin, and names the held one."""
-    from hermes_cli import plugins_cadence as cad
+    from eir_cli import plugins_cadence as cad
 
     _held_install_metadata(home)
     applied = []
@@ -139,9 +139,9 @@ def test_auto_apply_leaves_a_catalog_install_held_with_ref_alone(home, caplog):
     assert "held with --ref" in caplog.text
 
 
-def test_update_all_and_hermes_update_notice_skip_a_held_catalog_install(home, monkeypatch, capsys):
-    from hermes_cli import plugin_catalog, plugins_cmd_update, plugins_updates
-    from hermes_cli.plugins_auto_update import catalog_pins_behind, update_all_unattended
+def test_update_all_and_eir_update_notice_skip_a_held_catalog_install(home, monkeypatch, capsys):
+    from eir_cli import plugin_catalog, plugins_cmd_update, plugins_updates
+    from eir_cli.plugins_auto_update import catalog_pins_behind, update_all_unattended
 
     _held_install_metadata(home)
     monkeypatch.setattr(plugins_updates, "run_checks", lambda _dir: [_Row("held", "catalog"), _Row("behind", "catalog")])
@@ -160,8 +160,8 @@ def test_update_all_and_hermes_update_notice_skip_a_held_catalog_install(home, m
 
 def test_widened_pin_is_one_review_line_not_a_traceback(home, caplog):
     """The real tick seam lets a widened catalog pin surface as a pending review naming the command."""
-    from hermes_cli import plugins_auto_update, plugins_cadence as cad
-    from hermes_cli.plugins_cmd_catalog import RepinConsentRequired
+    from eir_cli import plugins_auto_update, plugins_cadence as cad
+    from eir_cli.plugins_cmd_catalog import RepinConsentRequired
 
     def widened(name):
         raise RepinConsentRequired(name, "c" * 40, {"tools": ["new_tool"]})
@@ -172,15 +172,15 @@ def test_widened_pin_is_one_review_line_not_a_traceback(home, caplog):
                                 config_get=lambda _s, key: True if key == "auto_apply" else 24)
     lines = [r for r in caplog.records if "wide" in r.getMessage()]
     assert [r.getMessage() for r in lines if "review" in r.getMessage()] == [
-        "plugin wide has an update that needs your review: run `hermes plugins update wide`"]
+        "plugin wide has an update that needs your review: run `eir plugins update wide`"]
     assert not any(r.exc_info for r in lines)
 
 
 def test_gateway_tick_seam_raises_the_review_instead_of_exiting(home, monkeypatch):
     """`maybe_run_gateway_check`'s default apply hands the refusal back (cmd_update turned it into
     SystemExit, which the tick logged as a failure with a traceback)."""
-    from hermes_cli import plugins_auto_update, plugins_cmd_update
-    from hermes_cli.plugins_cmd_catalog import RepinConsentRequired
+    from eir_cli import plugins_auto_update, plugins_cmd_update
+    from eir_cli.plugins_cmd_catalog import RepinConsentRequired
 
     (home / "plugins" / "wide").mkdir()
     calls = []

@@ -10,11 +10,11 @@ import subprocess
 import urllib.error
 import urllib.request
 
-from hermes_cli.update_channel import STABLE_TAG_RE, is_canary_tag
+from eir_cli.update_channel import STABLE_TAG_RE, is_canary_tag
 
 logger = logging.getLogger(__name__)
 _PUBLIC_BASE = "https://hermes-assets.nousresearch.com"
-OFFICIAL_REPOSITORY = "NousResearch/hermes-agent"
+OFFICIAL_REPOSITORY = "NousResearch/eir-agent"
 _GITHUB_ORIGIN = re.compile(
     r"^(?:https://github\.com/|git@github\.com:|ssh://git@github\.com/)"
     r"([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)(?:\.git)?/?$", re.IGNORECASE,
@@ -25,7 +25,7 @@ _SHA = re.compile(r"[0-9a-f]{40}")
 def source_repository(git_cmd=None, cwd=None) -> str:
     """GitHub forks own their releases; other origins must mirror official tags."""
     if git_cmd is not None:
-        from hermes_cli.source_check import source_git_env
+        from eir_cli.source_check import source_git_env
 
         result = subprocess.run(
             [*git_cmd, "config", "--get", "remote.origin.url"], cwd=cwd,
@@ -61,7 +61,7 @@ class SourceTarget:
     def label(self) -> str:
         if self.ahead:
             return (f"{self.channel} v{self.version}; this checkout is newer and waits for the next release"
-                    " (`hermes update --set-channel main` follows every commit)")
+                    " (`eir update --set-channel main` follows every commit)")
         return f"{self.channel} v{self.version} ({self.commit[:12]})" if self.commit else self.channel
 
 
@@ -73,7 +73,7 @@ def _resolve_channel(name: str, repository: str):
     GitHub fallback is allowed when a record is unavailable; the one exception
     is an unpublished ``main`` record, which resolves to the main branch.
     """
-    from hermes_cli.release_channels import ChannelReader
+    from eir_cli.release_channels import ChannelReader
 
     return ChannelReader(_PUBLIC_BASE, repository=repository).resolve(name)
 
@@ -102,7 +102,7 @@ def _probe(git_cmd, cwd, *args):
     Before the updater's fetch the release commit is usually absent, and git 2.43 spends 7-12 s
     of CPU on a blobless clone failing to find it even with lazy fetch off (#137646).
     """
-    from hermes_cli.source_check import source_git_env
+    from eir_cli.source_check import source_git_env
 
     try:
         return subprocess.run(
@@ -120,7 +120,7 @@ def _head_containing(git_cmd, cwd, commit: str, repository: str) -> str | None:
     An unchosen default must never move a checkout backward on a guess, so an
     unknown relation (shallow history, GitHub unreachable) keeps HEAD.
     """
-    from hermes_cli.source_check import _github_compare, source_git_env
+    from eir_cli.source_check import _github_compare, source_git_env
 
     head = subprocess.run(
         [*git_cmd, "rev-parse", "HEAD"], cwd=cwd, capture_output=True, text=True, encoding="utf-8",
@@ -142,7 +142,7 @@ def _head_containing(git_cmd, cwd, commit: str, repository: str) -> str | None:
 
 
 def _resolve_source_target(channel: str, git_cmd=None, cwd=None, *, repository=None) -> SourceTarget:
-    from hermes_cli.release_channels import validate_name
+    from eir_cli.release_channels import validate_name
 
     validate_name(channel)
     repository = repository or source_repository(git_cmd, cwd)
@@ -181,10 +181,10 @@ def _resolve_source_target(channel: str, git_cmd=None, cwd=None, *, repository=N
 def _describe_release_failure(failure: BaseException) -> str:
     """A transport failure names its cause (a rate limit is not "no release")."""
     if isinstance(failure, (urllib.error.URLError, TimeoutError)):
-        from hermes_cli.github_api import describe_github_failure
+        from eir_cli.github_api import describe_github_failure
 
         # The request that failed, not the configuration: a rejected token retries anonymously.
-        return describe_github_failure(failure, authenticated=getattr(failure, "hermes_authenticated", False))
+        return describe_github_failure(failure, authenticated=getattr(failure, "eir_authenticated", False))
     return f"No published stable release could be verified: {failure}"
 
 
@@ -218,7 +218,7 @@ def _refuse_retirement_downgrade(request: dict, terminal: dict, git_cmd, cwd) ->
         if tuple(map(int, installed_version.split("."))) > tuple(map(int, request["sourceVersion"].split("."))):
             raise ValueError("Source retirement would downgrade a newer source version; select the destination channel explicitly")
     if git_cmd is not None:
-        from hermes_cli.source_check import source_git_env
+        from eir_cli.source_check import source_git_env
 
         result = subprocess.run(
             [*git_cmd, "rev-list", "--ancestry-path", f"{request['commit']}..HEAD"], cwd=cwd,
@@ -248,7 +248,7 @@ def _refuse_retirement_downgrade(request: dict, terminal: dict, git_cmd, cwd) ->
 
 def _read(url: str, *, missing_ok: bool = False) -> str | None:
     request = urllib.request.Request(url, headers={
-        "User-Agent": "hermes-update", "Cache-Control": "no-cache",
+        "User-Agent": "eir-update", "Cache-Control": "no-cache",
         "Accept": "application/json, text/html",
     })
     try:
@@ -267,7 +267,7 @@ class _BuildMetadata(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         fields = dict(attrs)
-        if tag == "meta" and fields.get("name") == "hermes-build":
+        if tag == "meta" and fields.get("name") == "eir-build":
             self.tags.append(fields.get("content"))
 
 
@@ -291,7 +291,7 @@ def _json(url: str):
     Anonymous api.github.com is 60 requests/hour per address, so an unauthenticated
     stable lookup fails for everyone behind one office, CI or container exit.
     """
-    from hermes_cli.source_check import _request
+    from eir_cli.source_check import _request
 
     return json.loads(_request(url))
 
@@ -358,7 +358,7 @@ def _resolve_release(channel: str, git_cmd=None, cwd=None, *, repository=None,
     if not isinstance(sha, str) or not _SHA.fullmatch(sha):
         raise ValueError(f"No published commit for release {tag}")
     if git_cmd is not None:
-        from hermes_cli.source_check import source_git_env
+        from eir_cli.source_check import source_git_env
 
         ref = f"refs/tags/{tag}"
         result = subprocess.run(

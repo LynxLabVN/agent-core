@@ -10,7 +10,7 @@ from tests.gateway.test_display_config import assert_keeps_platform_display_defa
 
 
 def _config_edit(tmp_path, monkeypatch, cfg, *, template):
-    """`hermes config edit` on a home with no config.yaml (seeds via seed_config_file, like `doctor --fix`)."""
+    """`eir config edit` on a home with no config.yaml (seeds via seed_config_file, like `doctor --fix`)."""
     monkeypatch.setenv("EDITOR", "true")
     monkeypatch.setattr(cfg.subprocess, "run", lambda *a, **k: None)
     if not template:
@@ -19,8 +19,8 @@ def _config_edit(tmp_path, monkeypatch, cfg, *, template):
 
 
 def _setup_agent_enter(tmp_path, monkeypatch, cfg):
-    """`hermes setup agent` on a fresh home, pressing Enter (the offered default) on every prompt."""
-    from hermes_cli import setup
+    """`eir setup agent` on a fresh home, pressing Enter (the offered default) on every prompt."""
+    from eir_cli import setup
 
     monkeypatch.setattr(setup, "prompt", lambda question, default=None, *a, **k: default or "")
     monkeypatch.setattr(setup, "prompt_yes_no", lambda *a, **k: False)
@@ -29,13 +29,13 @@ def _setup_agent_enter(tmp_path, monkeypatch, cfg):
 
 def _apply_default_agent_settings(tmp_path, monkeypatch, cfg):
     """Quick and full first-time setup."""
-    from hermes_cli.setup import _apply_default_agent_settings
+    from eir_cli.setup import _apply_default_agent_settings
 
     _apply_default_agent_settings(cfg.load_config())
 
 
 def _blank_slate(tmp_path, monkeypatch, cfg):
-    from hermes_cli.setup_quick import _blank_slate_minimize_config
+    from eir_cli.setup_quick import _blank_slate_minimize_config
 
     config = cfg.load_config()
     _blank_slate_minimize_config(config)
@@ -43,15 +43,15 @@ def _blank_slate(tmp_path, monkeypatch, cfg):
 
 
 def _doctor_fix(tmp_path, monkeypatch, cfg):
-    """`hermes doctor --fix` on a home with no config.yaml: the real config-file check, fix enabled."""
-    from hermes_cli import doctor
-    from hermes_cli.doctor_config import _check_config_file
+    """`eir doctor --fix` on a home with no config.yaml: the real config-file check, fix enabled."""
+    from eir_cli import doctor
+    from eir_cli.doctor_config import _check_config_file
 
     root = tmp_path / "checkout"  # only the template, so a stray cli-config.yaml cannot short-circuit the seed
     root.mkdir()
     shutil.copy2(cfg.get_project_root() / "cli-config.yaml.example", root / "cli-config.yaml.example")
-    home = cfg.get_hermes_home()
-    monkeypatch.setattr(doctor, "HERMES_HOME", home)
+    home = cfg.get_eir_home()
+    monkeypatch.setattr(doctor, "EIR_HOME", home)
     monkeypatch.setattr(doctor, "PROJECT_ROOT", root)
     assert _check_config_file(True).fixed == 1
     if os.name == "posix":
@@ -70,12 +70,12 @@ SEEDERS = {
 
 @pytest.mark.parametrize("seeder", list(SEEDERS))
 def test_every_seeder_keeps_every_platform_display_default(tmp_path, monkeypatch, seeder):
-    import hermes_cli.config as cfg
+    import eir_cli.config as cfg
     from gateway.run import _load_gateway_config
 
     home = tmp_path / "home"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
 
     SEEDERS[seeder](tmp_path, monkeypatch, cfg)
 
@@ -87,28 +87,28 @@ def test_every_seeder_keeps_every_platform_display_default(tmp_path, monkeypatch
 def test_config_edit_refusal_without_a_config_file_exits_nonzero(tmp_path, monkeypatch, capsys):
     """A backend with no local file (Remote Config) refuses `config edit` with rc 1, so a script
     cannot read the refusal as a successful edit (teknium1 P3 on #122509)."""
-    import hermes_cli.config as cfg
+    import eir_cli.config as cfg
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     monkeypatch.setattr(cfg, "is_managed", lambda: False)
     monkeypatch.setattr(cfg, "supports_file_tooling", lambda: False)
     monkeypatch.setattr(cfg.subprocess, "run", lambda *a, **k: pytest.fail("no editor may open"))
     with pytest.raises(SystemExit) as exc:
         cfg.edit_config()
     assert exc.value.code == 1
-    assert "hermes config set" in capsys.readouterr().err
+    assert "eir config set" in capsys.readouterr().err
     assert not (tmp_path / "config.yaml").exists()
 
 
 def test_template_seeded_config_keeps_the_update_backup_default(tmp_path, monkeypatch):
     from argparse import Namespace
 
-    import hermes_cli.config as cfg
-    from hermes_cli.config_defaults import DEFAULT_CONFIG
-    from hermes_cli.update_cmd_maint import _resolve_pre_update_backup_mode
+    import eir_cli.config as cfg
+    from eir_cli.config_defaults import DEFAULT_CONFIG
+    from eir_cli.update_cmd_maint import _resolve_pre_update_backup_mode
 
     home = tmp_path / "home"
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     assert cfg.seed_config_file(home / "config.yaml")
 
     assert _resolve_pre_update_backup_mode(Namespace(no_backup=False, backup=False)) == \

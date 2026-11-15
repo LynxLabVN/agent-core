@@ -3,7 +3,7 @@
 Config migration owns backup/rollback; skills sync owns content merging; the
 SQLite guard detects damage without repairing it. Boot bounds these home
 steps per revision. The explicit scope CLI also provisions runtimes through
-PM. Launcher publication belongs to hermes_cli._launchers.
+PM. Launcher publication belongs to eir_cli._launchers.
 """
 from __future__ import annotations
 
@@ -14,8 +14,8 @@ from datetime import datetime, timezone, UTC
 from pathlib import Path
 from typing import Iterable
 
-from hermes_cli._launchers import expose_cli
-from hermes_cli.default_plugins import step_install_default_plugins
+from eir_cli._launchers import expose_cli
+from eir_cli.default_plugins import step_install_default_plugins
 from pm.paths import install_root
 
 logger = logging.getLogger(__name__)
@@ -45,7 +45,7 @@ def _backup_existing(paths: Iterable[Path]) -> dict:
             continue
         dest = _backup_path(path, stamp)
         shutil.copy2(path, dest)
-        from hermes_cli.config import _secure_file  # copy2 keeps the source's (possibly 0644) mode
+        from eir_cli.config import _secure_file  # copy2 keeps the source's (possibly 0644) mode
 
         _secure_file(dest)
         backups[path] = dest
@@ -72,18 +72,18 @@ def step_migrate_config() -> dict:
     the result carries ``failed_step`` so boot retries it on the next start.
     No-op when the on-disk version is current (the 99% case).
     """
-    from hermes_cli.config import (
+    from eir_cli.config import (
         check_config_version,
         get_config_path,
         get_env_path,
         migrate_config,
     )
-    from hermes_cli.config_migrations import (
+    from eir_cli.config_migrations import (
         SUPPORT_FLOOR_VERSION,
         support_floor_message,
     )
-    from hermes_cli.config_migrations_browser import agent_browser_env_pending
-    from hermes_cli.config_version_stamp import read_config_version_stamp, stamp_missing_config
+    from eir_cli.config_migrations_browser import agent_browser_env_pending
+    from eir_cli.config_version_stamp import read_config_version_stamp, stamp_missing_config
 
     stamp_missing_config()  # a missing config.yaml reads as current below
     stamp, latest_ver = read_config_version_stamp()
@@ -114,8 +114,8 @@ def step_migrate_config() -> dict:
             f"(still {post_ver}); restored: "
             + (", ".join(str(p) for p in restored) if restored else "none")
         )
-    # `hermes update` prints what a quiet migration changed; boot has no terminal to print it to.
-    from hermes_cli.left_core_migration import defer_startup_notice
+    # `eir update` prints what a quiet migration changed; boot has no terminal to print it to.
+    from eir_cli.left_core_migration import defer_startup_notice
     for notice in results.get("notices") or ():
         defer_startup_notice(notice)
     if failed is not None:
@@ -165,14 +165,14 @@ def step_state_db_guard() -> dict:
     """Verify the active home's state.db is intact.
 
     Boot bootstrap has no pre-update snapshot to restore from (that pairing
-    lives in ``hermes update``), so this is detection: a corrupt db is
+    lives in ``eir update``), so this is detection: a corrupt db is
     surfaced loudly in the log instead of the user silently losing session
     search. Read-only, idempotent.
     """
-    from hermes_constants import get_hermes_home
-    from hermes_cli.backup import verify_sqlite_integrity
+    from eir_constants import get_eir_home
+    from eir_cli.backup import verify_sqlite_integrity
 
-    state_path = get_hermes_home() / "state.db"
+    state_path = get_eir_home() / "state.db"
     if not state_path.exists():
         return {"ok": True, "skipped": "no-state-db"}
     result = verify_sqlite_integrity(state_path, check_header=True, run_pragma=True)
@@ -181,7 +181,7 @@ def step_state_db_guard() -> dict:
     message = result.get("message", "unknown error")
     logger.error(
         "state.db failed integrity check after a code update: %s — "
-        "restore a backup with `hermes backup` tooling or contact support",
+        "restore a backup with `eir backup` tooling or contact support",
         message,
     )
     return {"ok": False, "error": message}
@@ -190,14 +190,14 @@ def step_state_db_guard() -> dict:
 def step_drop_live_plugin_catalog() -> dict:
     """Drop the active home's cached live plugin catalog after a code change.
 
-    Bundled/sealed app updates never run ``hermes update``'s maintenance tail,
+    Bundled/sealed app updates never run ``eir update``'s maintenance tail,
     so without this a pre-update snapshot out-votes the newer in-tree catalog
     for the rest of its TTL (#119340). Per home, like the boot record.
     """
-    from hermes_constants import get_hermes_home
-    from hermes_cli.plugin_catalog import invalidate_live_cache_for_home
+    from eir_constants import get_eir_home
+    from eir_cli.plugin_catalog import invalidate_live_cache_for_home
 
-    invalidate_live_cache_for_home(get_hermes_home())
+    invalidate_live_cache_for_home(get_eir_home())
     return {"ok": True}
 
 
@@ -207,13 +207,13 @@ def step_adopt_blessed_checkout(project_root: Path | None = None) -> dict:
     Main-era curl|sh / Setup installs created a ``.git`` checkout at a
     blessed managed root but never wrote a stamp — under the stamp-pure
     ladder they would all classify as "somebody's working tree" and
-    `hermes update` would refuse them. This step writes the missing fact
+    `eir update` would refuse them. This step writes the missing fact
     exactly once: blessed root + ``.git`` + no stamp → a minimal stamp
     with ``updateMechanism: self``.
 
     The blessed-root table lives HERE and only here — it is a one-time
     birth certificate for shipped installs, not a classification rung
-    (hermes_cli.steward never path-matches). Once pre-stamp installs
+    (eir_cli.steward never path-matches). Once pre-stamp installs
     are extinct this step and the table can be deleted.
 
     * ``.git`` anywhere else → never adopted.
@@ -226,14 +226,14 @@ def step_adopt_blessed_checkout(project_root: Path | None = None) -> dict:
     import json
     import tempfile
 
-    from hermes_constants import get_hermes_home
+    from eir_constants import get_eir_home
 
     root = install_root() if project_root is None else Path(project_root)
 
     # The blessed roots: the canonical locations installers create.
     blessed = (
-        get_hermes_home() / "hermes-agent",
-        Path("/usr/local/lib/hermes-agent"),
+        get_eir_home() / "eir-agent",
+        Path("/usr/local/lib/eir-agent"),
     )
 
     if not (root / ".git").exists():
@@ -259,7 +259,7 @@ def step_adopt_blessed_checkout(project_root: Path | None = None) -> dict:
     if not is_blessed:
         return {"ok": True, "skipped": "not-a-blessed-root"}
 
-    from hermes_cli.source_stamp import write_source_stamp
+    from eir_cli.source_stamp import write_source_stamp
 
     try:
         # Full checkout identity when git can answer; the birth-certificate
@@ -374,7 +374,7 @@ def main(argv: list | None = None) -> int:
     """Run the selected maintenance registry and report its failures."""
     import argparse
 
-    parser = argparse.ArgumentParser(prog="hermes_cli.post_update")
+    parser = argparse.ArgumentParser(prog="eir_cli.post_update")
     parser.add_argument("--scope", choices=("home", "machine", "all"), default="all")
     args = parser.parse_args(argv)
 

@@ -21,8 +21,8 @@ if "dotenv" not in sys.modules:
     fake_dotenv.load_dotenv = lambda *args, **kwargs: None
     sys.modules["dotenv"] = fake_dotenv
 
-from hermes_cli.auth import resolve_api_key_provider_credentials
-from hermes_cli.models import normalize_provider
+from eir_cli.auth import resolve_api_key_provider_credentials
+from eir_cli.models import normalize_provider
 
 
 @pytest.fixture(autouse=True)
@@ -41,7 +41,7 @@ class TestFireworksAliases:
 
     @pytest.mark.parametrize("alias", ["fireworks", "fireworks-ai", "fw"])
     def test_providers_normalize_provider(self, alias):
-        from hermes_cli.providers import normalize_provider as normalize_in_providers
+        from eir_cli.providers import normalize_provider as normalize_in_providers
 
         assert normalize_in_providers(alias) == "fireworks"
 
@@ -50,7 +50,7 @@ class TestFireworksAliases:
 
 class TestFireworksConfigRegistry:
     def test_optional_env_vars_include_fireworks(self):
-        from hermes_cli.config import OPTIONAL_ENV_VARS
+        from eir_cli.config import OPTIONAL_ENV_VARS
 
         assert "FIREWORKS_API_KEY" in OPTIONAL_ENV_VARS
         assert OPTIONAL_ENV_VARS["FIREWORKS_API_KEY"]["category"] == "provider"
@@ -67,9 +67,9 @@ class TestFireworksDoctor:
         """Fireworks' native model IDs are slash-form (accounts/fireworks/...),
         so doctor must NOT warn that provider should be 'openrouter' / the prefix
         dropped — that heuristic is for aggregator vendor slugs only."""
-        from hermes_cli import doctor as doctor_mod
+        from eir_cli import doctor as doctor_mod
 
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".eir"
         home.mkdir(parents=True)
         (home / "config.yaml").write_text(
             "model:\n"
@@ -82,7 +82,7 @@ class TestFireworksDoctor:
         project = tmp_path / "project"
         project.mkdir()
 
-        monkeypatch.setattr(doctor_mod, "HERMES_HOME", home)
+        monkeypatch.setattr(doctor_mod, "EIR_HOME", home)
         monkeypatch.setattr(doctor_mod, "PROJECT_ROOT", project)
         monkeypatch.setattr(doctor_mod, "_DHH", str(home))
         monkeypatch.setenv("FIREWORKS_API_KEY", "fw_test")
@@ -97,7 +97,7 @@ class TestFireworksDoctor:
             types.SimpleNamespace(check_tool_availability=lambda *a, **k: ([], []), TOOLSET_REQUIREMENTS={}),
         )
         with contextlib.suppress(Exception):
-            from hermes_cli import auth as _auth_mod
+            from eir_cli import auth as _auth_mod
 
             monkeypatch.setattr(_auth_mod, "get_nous_auth_status", dict)
             monkeypatch.setattr(_auth_mod, "get_codex_auth_status", dict)
@@ -137,16 +137,16 @@ class TestFireworksAuxiliary:
         assert client is not None
         headers = kwargs.get("default_headers", {})
         assert headers["HTTP-Referer"] == "https://hermes-agent.nousresearch.com"
-        assert headers["X-Title"] == "Hermes Agent"
+        assert headers["X-Title"] == "Eir Agent"
         assert kwargs["base_url"] == "https://api.fireworks.ai/inference/v1"
 
-    def test_client_sends_hermes_user_agent(self, monkeypatch):
+    def test_client_sends_eir_user_agent(self, monkeypatch):
         """The profile's User-Agent survives the generic default_headers
         fallback and reaches OpenAI client construction."""
         monkeypatch.setenv("FIREWORKS_API_KEY", "fw_test_key")
         _client, _model, kwargs = self._resolve("fireworks")
         headers = kwargs.get("default_headers", {})
-        assert headers["User-Agent"].startswith("HermesAgent/")
+        assert headers["User-Agent"].startswith("EirAgent/")
 
 
 class TestFireworksModelMetadata:

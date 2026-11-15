@@ -6,8 +6,8 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from hermes_cli.local_runtime import bootstrap
-from hermes_cli.web_routers import local_models
+from eir_cli.local_runtime import bootstrap
+from eir_cli.web_routers import local_models
 
 
 pytestmark = pytest.mark.platforms("any")

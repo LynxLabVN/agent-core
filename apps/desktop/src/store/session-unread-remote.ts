@@ -21,7 +21,7 @@
  */
 import { atom } from 'nanostores'
 
-import { setSessionUnreadRemote } from '@/hermes'
+import { setSessionUnreadRemote } from '@/eir'
 
 import { $cronSessions, $messagingSessions, $sessions, ownerLookupSessionRows, setCronSessions, setMessagingSessions, setSessions } from './session'
 

@@ -6,25 +6,25 @@ import os
 from fastapi import HTTPException
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 from agent.process_transport import is_local_server
-from hermes_cli.config import (
+from eir_cli.config import (
     DEFAULT_CONFIG,
     cfg_get,
     clear_model_endpoint_credentials,
     find_provider_entry,
     read_raw_config,
 )
-from hermes_cli.config_backend import refusing_locked_omissions
-from hermes_cli.config_route_guard import clear_aux_credentials_on_route_change
-from hermes_cli.web_server_memory import _normalize_memory_provider_name
+from eir_cli.config_backend import refusing_locked_omissions
+from eir_cli.config_route_guard import clear_aux_credentials_on_route_change
+from eir_cli.web_server_memory import _normalize_memory_provider_name
 from tools.transcription_common import STT_MODEL_CATALOG
 from tools.wake_word import _PROVIDER_PREFERENCE
 from utils import same_base_url_origin
 
 if TYPE_CHECKING:
-    from hermes_cli.model_switch import ModelSwitchResult
+    from eir_cli.model_switch import ModelSwitchResult
 
 # Same logger the code used before extraction (record parity).
-_log = logging.getLogger("hermes_cli.web_server")
+_log = logging.getLogger("eir_cli.web_server")
 
 
 # ---------------------------------------------------------------------------
@@ -97,8 +97,8 @@ _SCHEMA_OVERRIDES: dict[str, dict[str, Any]] = {
     "proxy.enabled": {
         "type": "boolean",
         "description": (
-            "Docker-only egress credential firewall. Requires `hermes egress setup` "
-            "and `hermes egress start`; Modal/SSH/Daytona are not wired yet."
+            "Docker-only egress credential firewall. Requires `eir egress setup` "
+            "and `eir egress start`; Modal/SSH/Daytona are not wired yet."
         ),
         "category": "security",
     },
@@ -113,8 +113,8 @@ _SCHEMA_OVERRIDES: dict[str, dict[str, Any]] = {
     "auth.adopt_external_logins": {
         "type": "boolean",
         "description": (
-            "Borrow and refresh the Codex CLI / Claude Code logins when Hermes has no usable login of its own. "
-            "Off: Hermes uses only its own logins (`hermes auth add <provider>`)."
+            "Borrow and refresh the Codex CLI / Claude Code logins when Eir has no usable login of its own. "
+            "Off: Eir uses only its own logins (`eir auth add <provider>`)."
         ),
         "category": "security",
     },
@@ -155,7 +155,7 @@ _SCHEMA_OVERRIDES: dict[str, dict[str, Any]] = {
         "", "minimal", "low", "medium", "high", "xhigh", "max", "ultra",
     ),
     "updates.non_interactive_local_changes": _select(
-        "When the chat app / gateway updates Hermes (no terminal prompt), "
+        "When the chat app / gateway updates Eir (no terminal prompt), "
         "what to do with uncommitted local source edits. 'stash' keeps them "
         "and re-applies them after the update; 'discard' throws them away. "
         "Terminal updates always ask, regardless of this setting.",
@@ -164,7 +164,7 @@ _SCHEMA_OVERRIDES: dict[str, dict[str, Any]] = {
     "updates.refresh_cua_driver": {
         "type": "boolean",
         "description": (
-            "Refresh an already-installed cua-driver during hermes update. "
+            "Refresh an already-installed cua-driver during eir update. "
             "Disable this on non-admin macOS accounts where /Applications is "
             "not writable."
         ),
@@ -374,8 +374,8 @@ def _schema_with_dynamic_provider_options() -> dict[str, dict[str, Any]]:
     that reads the schema. ``CONFIG_SCHEMA`` is never mutated; changed entries are
     shallow-copied onto a copied mapping.
     """
-    from hermes_cli.web_server_profiles import _plugin_terminal_backend_rows
-    from hermes_cli.config import load_config
+    from eir_cli.web_server_profiles import _plugin_terminal_backend_rows
+    from eir_cli.config import load_config
     try:
         cfg = load_config()
     except Exception:  # pragma: no cover - schema must survive config errors
@@ -410,9 +410,9 @@ def _validated_main_model_selection(
     cfg: dict, provider: str, model: str, base_url: str = "", api_key: str = "",
     explicit_endpoint: Optional[bool] = None,
 ) -> "ModelSwitchResult":
-    """:func:`hermes_cli.model_assignment.validated_main_model_selection` for a dashboard route: a
+    """:func:`eir_cli.model_assignment.validated_main_model_selection` for a dashboard route: a
     rejected pick is a 400 with the switch's reason."""
-    from hermes_cli.model_assignment import ModelAssignmentRejected, validated_main_model_selection
+    from eir_cli.model_assignment import ModelAssignmentRejected, validated_main_model_selection
     try:
         return validated_main_model_selection(cfg, provider, model, base_url, api_key, explicit_endpoint)
     except ModelAssignmentRejected as exc:
@@ -440,7 +440,7 @@ def _normalize_config_for_web(config: dict[str, Any]) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 # Canonical auxiliary task slots. Keep in sync with DEFAULT_CONFIG["auxiliary"]
-# in hermes_cli/config.py — listed here for deterministic ordering in the UI.
+# in eir_cli/config.py — listed here for deterministic ordering in the UI.
 _AUX_TASK_SLOTS: tuple[str, ...] = (
     "vision", "compression", "approval", "mcp", "title_generation", "review", "voice_chat",
     "triage_specifier", "kanban_decomposer", "profile_describer", "curator",
@@ -449,7 +449,7 @@ _AUX_TASK_SLOTS: tuple[str, ...] = (
 
 def _plugin_aux_tasks() -> list[dict[str, Any]]:
     """Auxiliary tasks registered by plugins (``PluginContext.register_auxiliary_task``) for the
-    Hermes home active in this context.
+    Eir home active in this context.
 
     Callers run inside ``_profile_scope`` / ``_config_profile_scope``, and ``get_plugin_manager()``
     keys its manager on the same context-local home, so a request for profile B enumerates
@@ -457,7 +457,7 @@ def _plugin_aux_tasks() -> list[dict[str, Any]]:
     fail-soft: the built-in slots must keep working without plugins.
     """
     try:
-        from hermes_cli.plugins import get_plugin_auxiliary_tasks
+        from eir_cli.plugins import get_plugin_auxiliary_tasks
         return [dict(entry) for entry in get_plugin_auxiliary_tasks()
                 if entry.get("key") and entry["key"] not in _AUX_TASK_SLOTS]
     except Exception:  # health: allow BLE001 -- plugin discovery must never break the built-in slots
@@ -467,7 +467,7 @@ def _plugin_aux_tasks() -> list[dict[str, Any]]:
 
 def _aux_task_slots() -> tuple[str, ...]:
     """Every auxiliary slot the dashboard may read or assign: built-ins first (UI order), then
-    plugin-registered keys. The picker in ``hermes model`` (``main_provider_setup._all_aux_tasks``)
+    plugin-registered keys. The picker in ``eir model`` (``main_provider_setup._all_aux_tasks``)
     folds plugin tasks in the same way; the dashboard must not disagree with it."""
     return _AUX_TASK_SLOTS + tuple(entry["key"] for entry in _plugin_aux_tasks())
 
@@ -475,8 +475,8 @@ def _aux_task_slots() -> tuple[str, ...]:
 def _dashboard_code_skew_guard() -> Optional[str]:
     """Return a "restart required" message when this process runs stale code, else None.
 
-    Long-lived dashboard / Desktop-owned ``hermes serve`` processes freeze ``sys.modules``
-    at boot; after ``hermes update`` replaces the checkout, a first-time lazy import can
+    Long-lived dashboard / Desktop-owned ``eir serve`` processes freeze ``sys.modules``
+    at boot; after ``eir update`` replaces the checkout, a first-time lazy import can
     resolve a fresh consumer module against a stale cached dependency -> ImportError.
     Mirrors the gateway's ``_model_switch_skew_guard``: refuse the risky call with an
     actionable message. Never a false positive (non-git installs return None).
@@ -499,19 +499,19 @@ def _dashboard_code_skew_guard() -> Optional[str]:
 
 def _dashboard_skew_restart_hint() -> str:
     """Restart advice matching how this process is owned — the same app backs the browser
-    dashboard and Desktop-owned ``hermes serve``; naming a systemd unit would mislead
+    dashboard and Desktop-owned ``eir serve``; naming a systemd unit would mislead
     macOS/launchd hosts and Desktop SSH backends.
 
     See #97046.
     """
-    if os.environ.get("HERMES_SERVE_HEADLESS") == "1":
+    if os.environ.get("EIR_SERVE_HEADLESS") == "1":
         return (
             "restart the Desktop-owned backend to load the new code "
-            "(use Restart backend in Hermes Desktop, or quit and reopen the app)"
+            "(use Restart backend in Eir Desktop, or quit and reopen the app)"
         )
     return (
-        "restart this Hermes process to load the new code "
-        "(hermes dashboard --port <port>, or the equivalent service restart for this install)"
+        "restart this Eir process to load the new code "
+        "(eir dashboard --port <port>, or the equivalent service restart for this install)"
     )
 
 
@@ -523,7 +523,7 @@ def _resolve_assignment_credentials(model_cfg: dict, provider: str, provider_ent
     it on every re-apply). Prefer the raw template; fall back to the expanded value only when
     the raw yaml itself stores the key as a literal (no new exposure).
     """
-    from hermes_cli.model_assignment import drop_model_key
+    from eir_cli.model_assignment import drop_model_key
     try:
         _stored, raw_entry = find_provider_entry(read_raw_config().get("providers"), provider)
     except Exception:
@@ -546,8 +546,8 @@ def _apply_nous_gateway_defaults(cfg: dict) -> list:
     *unconfigured* tools through the Nous Tool Gateway. Purely additive — tools with a direct
     key or explicit backend are skipped. Failures never block saving the assignment."""
     try:
-        from hermes_cli.nous_subscription import apply_nous_managed_defaults
-        from hermes_cli.tools_config import _get_platform_tools
+        from eir_cli.nous_subscription import apply_nous_managed_defaults
+        from eir_cli.tools_config import _get_platform_tools
 
         enabled = _get_platform_tools(cfg, "cli", include_default_mcp_servers=False)
         return sorted(apply_nous_managed_defaults(cfg, enabled_toolsets=enabled, force_fresh=True))
@@ -582,7 +582,7 @@ def _endpoint_known_to_config(cfg: dict, base_url: str) -> bool:
 
 def _register_custom_endpoint(base_url: str, api_key: str, model: str) -> None:
     """Register a named ``custom_providers`` entry for a custom/local endpoint (mirrors the
-    ``hermes model`` custom flow) so the picker gets a proper ready row instead of a "needs
+    ``eir model`` custom flow) so the picker gets a proper ready row instead of a "needs
     setup" dead-end. Dedups by base_url; never blocks the already-persisted assignment.
 
     SKIPPED when the endpoint is already a fact in the config (#76324): the CLI gateway setup
@@ -593,9 +593,9 @@ def _register_custom_endpoint(base_url: str, api_key: str, model: str) -> None:
     saved the secret to ``.env``) becomes the row's ``key_env`` (#77471).
     """
     try:
-        from hermes_cli.main_provider_setup import _auto_provider_name, _save_custom_provider
+        from eir_cli.main_provider_setup import _auto_provider_name, _save_custom_provider
 
-        from hermes_cli.config_secret_refs import is_env_reference
+        from eir_cli.config_secret_refs import is_env_reference
         key_env = api_key.strip()[2:-1] if is_env_reference(api_key) else ""
         _save_custom_provider(base_url, "" if key_env else api_key, model, name=_auto_provider_name(base_url),
                               key_env=key_env)
@@ -642,7 +642,7 @@ def _prepare_main_assignment(cfg: dict, provider: str, model: str, base_url: str
     """Validation half of a main-slot assignment: ``(effective base_url, switch result)``.
     ``switch_model`` fetches catalogs / probes endpoints, so callers run this BEFORE taking
     ``CONFIG_MUTATION_LOCK``; it writes nothing."""
-    from hermes_cli.model_assignment import is_explicit_custom_endpoint, normalize_main_model_assignment
+    from eir_cli.model_assignment import is_explicit_custom_endpoint, normalize_main_model_assignment
     if not provider or not model:
         raise HTTPException(status_code=400, detail="provider and model required for main")
     explicit_endpoint = is_explicit_custom_endpoint(provider, base_url)
@@ -661,9 +661,9 @@ def _prepare_main_assignment(cfg: dict, provider: str, model: str, base_url: str
 
 def _apply_main_assignment_sync(cfg: dict, provider: str, model: str, base_url: str, api_key: str,
                                 prepared: "Optional[tuple[str, ModelSwitchResult]]" = None) -> dict:
-    from hermes_cli.config import save_config
-    from hermes_cli.free_tier_bootstrap import reconcile_record
-    from hermes_cli.model_assignment import (
+    from eir_cli.config import save_config
+    from eir_cli.free_tier_bootstrap import reconcile_record
+    from eir_cli.model_assignment import (
         BARE_CUSTOM_SELECTORS, apply_main_model_assignment, entry_points_elsewhere, is_explicit_custom_endpoint,
     )
     # Recorded from the SUBMITTED args, before preparation fills a URL from a named entry.
@@ -681,7 +681,7 @@ def _apply_main_assignment_sync(cfg: dict, provider: str, model: str, base_url: 
     # The submitted key goes to .env; model.api_key and the registered row hold only its reference.
     stored_key, env_name, shared_envs = api_key, "", []
     if api_key.strip():
-        from hermes_cli.config_secret_refs import (
+        from eir_cli.config_secret_refs import (
             endpoint_api_key_env, known_endpoint_key_env, secret_ref_for, shared_endpoint_key_envs,
         )
         shared_envs = shared_endpoint_key_envs(cfg, result.base_url)
@@ -702,7 +702,7 @@ def _apply_main_assignment_sync(cfg: dict, provider: str, model: str, base_url: 
     if shared_envs and stored_key != api_key:
         # This endpoint's rows (and the key_env just copied from one) leave the variable it shares
         # with another endpoint for the one holding the submitted key.
-        from hermes_cli.config_secret_refs import repoint_endpoint_key_env
+        from eir_cli.config_secret_refs import repoint_endpoint_key_env
         for shared_env in shared_envs:
             repoint_endpoint_key_env(cfg, result.base_url, shared_env, env_name)
 
@@ -739,17 +739,17 @@ def _normalize_aux_reasoning_effort(value: Optional[str]) -> Optional[str]:
     canonical level (``none`` for a disable), 400 on an unknown level."""
     if value is None:
         return None
-    from hermes_constants import parse_reasoning_effort
+    from eir_constants import parse_reasoning_effort
     parsed = parse_reasoning_effort(value)
     if parsed is None:
-        from hermes_constants import VALID_REASONING_EFFORTS
+        from eir_constants import VALID_REASONING_EFFORTS
         raise HTTPException(status_code=400,
                             detail=f"reasoning_effort must be one of: none, {', '.join(VALID_REASONING_EFFORTS)}")
     return "none" if parsed.get("enabled") is False else parsed["effort"]
 
 
 def _aux_default_effort(slot: str) -> str:
-    from hermes_cli.config_defaults import DEFAULT_CONFIG
+    from eir_cli.config_defaults import DEFAULT_CONFIG
     block = (DEFAULT_CONFIG.get("auxiliary") or {}).get(slot)
     return str(block.get("reasoning_effort") or "") if isinstance(block, dict) else ""
 
@@ -757,8 +757,8 @@ def _aux_default_effort(slot: str) -> str:
 def _refuse_unwritable_aux_keys(slots: list, api_key: str) -> None:
     """400 before ANY slot's key reaches ``.env`` when the write lock forbids one slot's variable,
     so an all-tasks save never leaves an earlier slot's line behind with config.yaml unsaved."""
-    from hermes_cli.config import require_env_writable
-    from hermes_cli.config_secret_refs import aux_api_key_env, is_env_reference, refs_supported
+    from eir_cli.config import require_env_writable
+    from eir_cli.config_secret_refs import aux_api_key_env, is_env_reference, refs_supported
     if is_env_reference(api_key) or not refs_supported():
         return
     for slot in slots:
@@ -770,7 +770,7 @@ def _refuse_unwritable_aux_keys(slots: list, api_key: str) -> None:
 
 def _apply_aux_assignment_sync(cfg: dict, provider: str, model: str, task: str, base_url: str, api_key: str,
                                reasoning_effort: Optional[str] = _UNSET) -> dict:
-    from hermes_cli.config import save_config
+    from eir_cli.config import save_config
     aux = cfg.get("auxiliary")
     if not isinstance(aux, dict):
         aux = {}
@@ -826,7 +826,7 @@ def _apply_aux_assignment_sync(cfg: dict, provider: str, model: str, task: str, 
                 clear_model_endpoint_credentials(slot_cfg, clear_api_mode=False)
             slot_cfg["base_url"] = base_url
             if api_key:
-                from hermes_cli.config_secret_refs import aux_api_key_env, secret_ref_for
+                from eir_cli.config_secret_refs import aux_api_key_env, secret_ref_for
                 try:
                     slot_cfg["api_key"] = secret_ref_for(aux_api_key_env(slot), api_key)
                 except ValueError as exc:  # .env write lock: the refusal names the variable, never the key
@@ -862,7 +862,7 @@ def _apply_model_assignment_sync(
     the requested profile. Raises HTTPException for validation errors. ``prepared`` is a
     ``_prepare_main_assignment`` result computed outside the config lock.
     """
-    from hermes_cli.config import load_config
+    from eir_cli.config import load_config
     cfg = load_config()
     if scope == "main":
         return _apply_main_assignment_sync(cfg, provider, model, base_url, api_key, prepared)
@@ -882,7 +882,7 @@ def _infer_provider_on_model_change(model_val: str, prev_provider: str) -> tuple
     if not name:
         return "", name
     try:
-        from hermes_cli.models import _AGGREGATOR_PROVIDERS, detect_provider_for_model, normalize_provider
+        from eir_cli.models import _AGGREGATOR_PROVIDERS, detect_provider_for_model, normalize_provider
     except Exception:
         return "", name
 
@@ -895,7 +895,7 @@ def _infer_provider_on_model_change(model_val: str, prev_provider: str) -> tuple
 
     if "/" in name:
         try:
-            from hermes_cli.models_detect import provider_has_credentials
+            from eir_cli.models_detect import provider_has_credentials
 
             cur_is_aggregator = normalize_provider(prev_provider) in _AGGREGATOR_PROVIDERS
             # A vendor slug on a native provider is a guess at an aggregator; never guess one the
@@ -920,7 +920,7 @@ def _denormalize_config_from_web(config: dict[str, Any]) -> dict[str, Any]:
     removed). A partial update (Settings autosave diff) that OMITS the key means "unchanged"
     and must leave the on-disk override alone — not be treated as an explicit 0.
     """
-    from hermes_cli.config import load_config
+    from eir_cli.config import load_config
     config = dict(config)
     config.pop("_model_meta", None)
 
@@ -951,7 +951,7 @@ def _denormalize_config_from_web(config: dict[str, Any]) -> dict[str, Any]:
             if model_val != prev_default and prev_provider:
                 new_provider, resolved_model = _infer_provider_on_model_change(model_val, prev_provider)
                 if new_provider and new_provider.strip().lower() != prev_provider.lower():
-                    from hermes_cli.model_assignment import apply_main_model_assignment, normalize_main_model_assignment
+                    from eir_cli.model_assignment import apply_main_model_assignment, normalize_main_model_assignment
                     norm_provider, norm_model = normalize_main_model_assignment(new_provider, resolved_model)
                     result = _validated_main_model_selection(disk_cfg, norm_provider, norm_model)
                     disk_model = apply_main_model_assignment(disk_model, result)

@@ -10,9 +10,9 @@ from agent.context_compressor import (
     SUMMARY_PREFIX,
     _SUMMARY_END_MARKER,
 )
-from hermes_state import SessionDB
+from eir_state import SessionDB
 
-from tests.hermes_cli.test_cli_init import _make_cli
+from tests.eir_cli.test_cli_init import _make_cli
 
 
 def _composite_carrier(ask="REAL ASK"):

@@ -1,5 +1,5 @@
 """Plugin idle tasks run on their own thread: the host's poll (gateway housekeeping, CLI startup,
-``hermes serve``'s ticker) starts each due run and returns at once, the claim still keeps one run
+``eir serve``'s ticker) starts each due run and returns at once, the claim still keeps one run
 at a time, and the worker records the run and releases the claim whatever ``fn`` does."""
 
 from __future__ import annotations
@@ -12,8 +12,8 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from agent.idle_schedule import CLAIM_STALE_SECONDS
-from hermes_cli.plugins import PluginContext, PluginManager, PluginManifest
-from hermes_cli.plugins_idle_tasks import load_state, run_plugin_idle_tasks
+from eir_cli.plugins import PluginContext, PluginManager, PluginManifest
+from eir_cli.plugins_idle_tasks import load_state, run_plugin_idle_tasks
 
 T0 = datetime(2026, 10, 1, 12, 0, tzinfo=UTC)
 IDLE = 3 * 3600.0
@@ -21,7 +21,7 @@ IDLE = 3 * 3600.0
 
 @pytest.fixture
 def home(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     return tmp_path
 
 
@@ -110,7 +110,7 @@ def test_the_claim_is_released_and_the_run_recorded_after_an_exception(home):
 
 
 def test_the_worker_keeps_the_profile_scope_of_the_poll(home, tmp_path):
-    from hermes_constants import get_hermes_home, reset_hermes_home_override, set_hermes_home_override
+    from eir_constants import get_eir_home, reset_eir_home_override, set_eir_home_override
 
     coder = tmp_path / "profiles" / "coder"
     coder.mkdir(parents=True)
@@ -118,16 +118,16 @@ def test_the_worker_keeps_the_profile_scope_of_the_poll(home, tmp_path):
 
     def fn(run):
         release.wait(5)  # read the home only after the poller has left the profile's scope
-        seen.append(get_hermes_home())
+        seen.append(get_eir_home())
 
-    token = set_hermes_home_override(coder)
+    token = set_eir_home_override(coder)
     try:
         manager, ctx = _ctx(PluginManager(scope_key=str(coder)))
         ctx.register_idle_task("suggest", fn, interval_hours=1, first_run="immediate")
         state_path = ctx.state.data_dir / "idle-tasks" / "suggest.json"
         started = _poll(manager, T0)
     finally:
-        reset_hermes_home_override(token)
+        reset_eir_home_override(token)
         release.set()
     started["wisdom:suggest"].join(10)
 

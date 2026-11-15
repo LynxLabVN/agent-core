@@ -1,6 +1,6 @@
 """Closed action handlers inside the runtime mutation receipt transaction."""
 import time
-from hermes_state_runtime import RuntimeStoreError
+from eir_state_runtime import RuntimeStoreError
 
 METADATA_FIELDS = {'title': str, 'archived': bool, 'hidden': bool, 'pinned': bool, 'unread': bool}
 
@@ -12,7 +12,7 @@ def validate_action(operation, payload):
     # ``reasoning``: a level picked with the model, committed in the same selection.
     if (operation == 'model' and 'model' in payload and not set(payload) - {'model', 'provider', 'confirm', 'reasoning'}
             and all(isinstance(v, str) and v.strip() for v in payload.values())):
-        from hermes_constants import parse_reasoning_effort
+        from eir_constants import parse_reasoning_effort
         if 'reasoning' not in payload or parse_reasoning_effort(payload['reasoning']) is not None:
             return
     if operation == 'branch' and _valid_branch_payload(payload):
@@ -22,7 +22,7 @@ def validate_action(operation, payload):
     if operation == 'reasoning' and set(payload) == {'effort'} and payload['effort'] is None:
         return  # ``/reasoning reset``: the session's level goes back to the profile
     if operation == 'reasoning' and set(payload) == {'effort'} and isinstance(payload['effort'], str):
-        from hermes_constants import parse_reasoning_effort
+        from eir_constants import parse_reasoning_effort
         if parse_reasoning_effort(payload['effort']) is not None:
             return
     if operation == 'workspace' and set(payload) == {'cwd'} and isinstance(payload['cwd'], str) and payload['cwd'].strip():
@@ -88,15 +88,15 @@ def _valid_compress_payload(payload):
 
 def apply_action(db, conn, session_id, operation, payload, *, prepared=None):
     if operation == 'compress':
-        from hermes_state_mutation_compress import compress_in_transaction
+        from eir_state_mutation_compress import compress_in_transaction
         return compress_in_transaction(db, conn, session_id, payload, prepared)
     if operation in {'model', 'reasoning', 'workspace', 'editor_mcp', 'edit_policy'}:
-        from hermes_state_mutation_prepared import POLICY_HANDLERS
+        from eir_state_mutation_prepared import POLICY_HANDLERS
         return POLICY_HANDLERS[operation](db, conn, session_id, payload, prepared)
     if operation == 'branch':
-        from hermes_state_mutation_branch import branch_in_transaction
+        from eir_state_mutation_branch import branch_in_transaction
         return branch_in_transaction(db, conn, session_id, payload, prepared)
-    from hermes_state_mutation_reset import reset_in_transaction
+    from eir_state_mutation_reset import reset_in_transaction
     handlers = {'delete': _delete, 'import': _import, 'rewind': _rewind, 'reset': reset_in_transaction}
     if operation in handlers:
         return handlers[operation](db, conn, session_id, payload)
@@ -121,14 +121,14 @@ def apply_action(db, conn, session_id, operation, payload, *, prepared=None):
 def _delete(db, conn, session_id, payload):
     # Terminal admission/worker rows become digest tombstones so exact retries and
     # adoption checks still resolve after the transcript is gone.
-    from hermes_state_mutation_retirement import delete_in_transaction
+    from eir_state_mutation_retirement import delete_in_transaction
     return delete_in_transaction(db, conn, session_id, payload)
 
 
 def _rewind(db, conn, session_id, payload):
-    from hermes_state_mutation_guards import require_idle
-    from hermes_state_mutation_transcript import rewind_in_transaction
-    from hermes_state_local_lineage import local_physical_target
+    from eir_state_mutation_guards import require_idle
+    from eir_state_mutation_transcript import rewind_in_transaction
+    from eir_state_local_lineage import local_physical_target
     physical = local_physical_target(conn, session_id)
     require_idle(db, conn, list({session_id, physical}))
     # The client names the row: like a branch boundary it must be an active row of the physical
@@ -178,8 +178,8 @@ def _summarized_by_compaction(conn, physical, message_id):
         return row['active'] == 0 and row['compacted'] == 1
     if not (row['active'] == 1 or row['compacted'] == 1):
         return False
-    from hermes_state_sessions import _expand_compression_lineage_ids
-    from hermes_state_compression import _CHAIN_CAP
+    from eir_state_sessions import _expand_compression_lineage_ids
+    from eir_state_compression import _CHAIN_CAP
     lineage, frontier = {physical}, [physical]
     for _ in range(_CHAIN_CAP):
         frontier = [sid for sid in _expand_compression_lineage_ids(conn, frontier) if sid not in lineage]
@@ -209,7 +209,7 @@ def _import(db, conn, session_id, payload):
     for item in normalized:
         raw = item['session']
         sid = raw['id']
-        from hermes_state_mutation_retirement import RETIRED_PREFIX
+        from eir_state_mutation_retirement import RETIRED_PREFIX
         if conn.execute('SELECT 1 FROM state_meta WHERE key=?', (RETIRED_PREFIX + sid,)).fetchone():
             # Refused by name at import time: a row restored beside the fence would refuse every turn.
             raise RuntimeStoreError('admission_conflict', field='sessions',
@@ -225,7 +225,7 @@ def _import(db, conn, session_id, payload):
     # controls: its import binding names the child's owner (written by import_history_control in this
     # transaction). Linking under any other row would graft the import onto a foreign chain,
     # which a later chain-aware delete of the import would then remove.
-    from hermes_state_mutation_binding import bindings_agree, history_binding
+    from eir_state_mutation_binding import bindings_agree, history_binding
     # Rows imported now, not payload ids: a payload naming an existing foreign id skips that row.
     fresh = set(imported)
     foreign = [(sid, parent) for sid, parent in parents if parent not in fresh and (

@@ -15,8 +15,8 @@ from pathlib import Path
 
 import pytest
 
-import hermes_yaml as yaml
-from tests.hermes_cli.plugin_worker_support import (
+import eir_yaml as yaml
+from tests.eir_cli.plugin_worker_support import (
     isolated_python as isolated_python,  # noqa: PLC0414 -- the self-alias is load-bearing: it suppresses F811 for the pytest fixture parameter shadowing this import
     plugin_world as plugin_world,  # noqa: PLC0414 -- the self-alias is load-bearing: it suppresses F811 for the pytest fixture parameter shadowing this import
 )
@@ -51,8 +51,8 @@ def _rpc(action: str, **params):
 @pytest.fixture
 def world(tmp_path, monkeypatch):
     """``(home, repo, pin)``: a repo published through catalog entry ``demo``; ``pin(sha)`` re-pins it."""
-    from hermes_cli import plugins_cmd, plugins_cmd_catalog
-    from hermes_cli.plugin_catalog import PluginCatalogEntry
+    from eir_cli import plugins_cmd, plugins_cmd_catalog
+    from eir_cli.plugin_catalog import PluginCatalogEntry
     repo = tmp_path / "demo"
     repo.mkdir()
     _git(repo, "init", "-q", "-b", "main")
@@ -66,8 +66,8 @@ def world(tmp_path, monkeypatch):
     def pin(sha: str) -> None:
         current["demo"] = PluginCatalogEntry(name="demo", repo=URL, sha=sha, description="d", maintainer="m")
     monkeypatch.setattr(plugins_cmd_catalog, "get_live_catalog_entry", lambda name: current.get(name))
-    from hermes_constants import get_hermes_home
-    return get_hermes_home(), repo, pin
+    from eir_constants import get_eir_home
+    return get_eir_home(), repo, pin
 
 
 def _record(home: Path) -> dict:
@@ -100,7 +100,7 @@ def test_a_disabled_tree_at_another_commit_is_not_enabled_for_the_reviewed_one(w
 
     assert "already exists" in result["error"]["message"]
     assert _record(home)["revision"] == old
-    from hermes_cli.plugins_cmd import _get_enabled_set
+    from eir_cli.plugins_cmd import _get_enabled_set
     assert "demo" not in _get_enabled_set()
 
 
@@ -151,11 +151,11 @@ def test_a_disabled_tree_at_an_annotated_tag_pin_is_reused_for_that_pin(world):
 def test_a_default_plugin_installs_at_its_homes_catalog_pin_never_as_a_held_ref(world, monkeypatch):
     """The pass selected a newer pin than this home's catalog cache names. An explicit ref would record the
     install off-pin, like a user's ``--ref`` hold that unattended updates never move."""
-    from hermes_cli import default_plugins
-    from hermes_cli.plugin_catalog import PluginCatalogEntry
-    from hermes_cli.plugins_auto_update import held_with_ref
+    from eir_cli import default_plugins
+    from eir_cli.plugin_catalog import PluginCatalogEntry
+    from eir_cli.plugins_auto_update import held_with_ref
     home, repo, pin = world
-    monkeypatch.delenv("HERMES_DISABLE_LAZY_INSTALLS", raising=False)
+    monkeypatch.delenv("EIR_DISABLE_LAZY_INSTALLS", raising=False)
     old = _commit(repo, "old")
     selected = PluginCatalogEntry(name="demo", repo=URL, sha=_commit(repo, "selected"), description="d", maintainer="m")
     pin(old)  # this home's catalog cache still names the older pin
@@ -170,11 +170,11 @@ def test_a_default_plugin_installs_at_its_homes_catalog_pin_never_as_a_held_ref(
 def test_a_tree_a_refused_default_left_is_enabled_by_the_retry(world, monkeypatch, repin):
     """The retry enables the default whether the catalog re-pinned since (a newer commit) or pins an
     annotated tag (the record holds its commit as ``sha``), never answering "already exists" forever."""
-    from hermes_cli import default_plugins
-    from hermes_cli.memory_provider_migration import _note_failure
-    from hermes_cli.plugin_catalog import PluginCatalogEntry
+    from eir_cli import default_plugins
+    from eir_cli.memory_provider_migration import _note_failure
+    from eir_cli.plugin_catalog import PluginCatalogEntry
     home, repo, pin = world
-    monkeypatch.delenv("HERMES_DISABLE_LAZY_INSTALLS", raising=False)
+    monkeypatch.delenv("EIR_DISABLE_LAZY_INSTALLS", raising=False)
     first = _commit(repo, "first")
     if repin == "annotated-tag":
         _git(repo, "tag", "-a", "v1.0", first, "-m", "v1.0")
@@ -194,11 +194,11 @@ def test_a_tree_a_refused_default_left_is_enabled_by_the_retry(world, monkeypatc
 def test_a_leftover_default_whose_replacement_failed_is_retried(world, monkeypatch):
     """The retry removes the leftover tree before installing. When that install fails (offline), the next
     pass retries: the missing tree is this attempt's removal, not the user's."""
-    from hermes_cli import default_plugins, plugins_cmd
-    from hermes_cli.memory_provider_migration import _note_failure
-    from hermes_cli.plugin_catalog import PluginCatalogEntry
+    from eir_cli import default_plugins, plugins_cmd
+    from eir_cli.memory_provider_migration import _note_failure
+    from eir_cli.plugin_catalog import PluginCatalogEntry
     home, repo, pin = world
-    monkeypatch.delenv("HERMES_DISABLE_LAZY_INSTALLS", raising=False)
+    monkeypatch.delenv("EIR_DISABLE_LAZY_INSTALLS", raising=False)
     entry = PluginCatalogEntry(name="demo", repo=URL, sha=_commit(repo, "first"), description="d", maintainer="m")
     pin(entry.sha)
     assert _rpc("install", enable=False)["result"]["ok"] is True

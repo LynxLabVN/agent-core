@@ -1,4 +1,4 @@
-"""Dispatcher and maintenance verbs for ``hermes kanban``: ``dispatch``,
+"""Dispatcher and maintenance verbs for ``eir kanban``: ``dispatch``,
 ``daemon`` (deprecated standalone loop), ``tail``/``watch`` event streaming,
 ``gc`` and ``repair``.
 """
@@ -12,17 +12,17 @@ import sys
 import time
 from pathlib import Path
 
-from hermes_cli import kanban_db as kb
-from hermes_cli import kanban_db_connect as kbc
-from hermes_cli import kanban_db_dispatch as kbd
-from hermes_cli import kanban_db_workspace as kbw
-from hermes_cli.kanban_output import _err, _fmt_ts, _print_json
+from eir_cli import kanban_db as kb
+from eir_cli import kanban_db_connect as kbc
+from eir_cli import kanban_db_dispatch as kbd
+from eir_cli import kanban_db_workspace as kbw
+from eir_cli.kanban_output import _err, _fmt_ts, _print_json
 
 
 def _kanban_config() -> dict:
     """``config.yaml`` ``kanban:`` section, or ``{}`` when config can't be loaded."""
     try:
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
         cfg = load_config()
         return (cfg.get("kanban", {}) if isinstance(cfg, dict) else {}) or {}
     except Exception:
@@ -62,7 +62,7 @@ def _cmd_dispatch(args: argparse.Namespace) -> int:
     # kanban.max_in_progress_per_profile and kanban.max_spawn with the same
     # semantics as the gateway dispatch path.
     try:
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
         _cfg = load_config()
         _kanban_cfg = _cfg.get("kanban", {}) if isinstance(_cfg, dict) else {}
         default_assignee = (_kanban_cfg.get("default_assignee") or "").strip() or None
@@ -158,8 +158,8 @@ def _cmd_dispatch(args: argparse.Namespace) -> int:
 
 
 _DAEMON_DEPRECATED = (
-    "hermes kanban daemon: DEPRECATED — the dispatcher now runs\ninside the gateway. To use "
-    "kanban:\n\n    hermes gateway start       # starts the gateway + embedded dispatcher\n\nReady "
+    "eir kanban daemon: DEPRECATED — the dispatcher now runs\ninside the gateway. To use "
+    "kanban:\n\n    eir gateway start       # starts the gateway + embedded dispatcher\n\nReady "
     "tasks will be picked up on the next dispatcher tick\n(default: every 60 seconds). Configure "
     "via config.yaml:\n\n    kanban:\n      dispatch_in_gateway: true      # default\n      "
     "dispatch_interval_seconds: 60\n      failure_limit: 2              # consecutive non-success "
@@ -228,8 +228,8 @@ def _cmd_daemon(args: argparse.Namespace) -> int:
                 print(
                     f"[{_fmt_ts(now)}] WARN dispatcher stuck: ready queue non-empty for "
                     f"{health_state['bad_ticks']} consecutive ticks but 0 workers spawned "
-                    f"successfully.{held} Check profile health (venv, PATH, credentials) and `hermes "
-                    f"kanban list --status ready` / `hermes kanban list --status blocked` for "
+                    f"successfully.{held} Check profile health (venv, PATH, credentials) and `eir "
+                    f"kanban list --status ready` / `eir kanban list --status blocked` for "
                     f"recent spawn_failed tasks.",
                     file=sys.stderr, flush=True,
                 )

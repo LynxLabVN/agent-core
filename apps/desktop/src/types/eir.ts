@@ -1,4 +1,4 @@
-import type { ConnectionRequestPayload, FreeTierChallengePayload, ToolLabel } from '@hermes/shared'
+import type { ConnectionRequestPayload, FreeTierChallengePayload, ToolLabel } from '@eir/shared'
 
 import type { ToolResultMetadata } from '@/lib/tool-result-metadata'
 
@@ -97,7 +97,7 @@ export interface OAuthProviderStatus {
 export interface OAuthProvider {
   cli_command: string
   /** Shell command that clears an external provider's credentials, run in the
-   *  embedded terminal. Null when Hermes doesn't know how to remove it. */
+   *  embedded terminal. Null when Eir doesn't know how to remove it. */
   disconnect_command?: null | string
   disconnect_hint?: null | string
   disconnectable?: boolean
@@ -161,7 +161,7 @@ export interface OAuthPollResponse {
 }
 
 /** The free tier's apps moving to the account that replaced it
- *  (`hermes_cli/guest_handoff.py`, `wire_status`). `lines` is the backend's
+ *  (`eir_cli/guest_handoff.py`, `wire_status`). `lines` is the backend's
  *  own copy for this state, the same lines the terminal prints. */
 export interface AppHandoffStatus {
   account_email?: null | string
@@ -191,7 +191,7 @@ export interface FreeTierStatus {
   notice_pending: boolean
   /** Present only while `enabled` and no identity exists: why the last attempt
    *  to create one failed. `error_code` is one of the backend's `anon_*` codes
-   *  (`hermes_cli/anon_auth.py`), `error` its sentence, `retryable` whether a
+   *  (`eir_cli/anon_auth.py`), `error` its sentence, `retryable` whether a
    *  later attempt can succeed, `retry_after` the seconds still to wait. */
   error?: string
   error_code?: string
@@ -223,8 +223,8 @@ export interface EnvVarInfo {
   is_password: boolean
   is_set: boolean
   // Backend-derived provider grouping hints (from the unified provider catalog
-  // in hermes_cli/provider_catalog.py). When present, the Keys tab groups by
-  // this provider identity — the SAME one `hermes model` uses — instead of
+  // in eir_cli/provider_catalog.py). When present, the Keys tab groups by
+  // this provider identity — the SAME one `eir model` uses — instead of
   // desktop-only env-var prefix guesses. Empty for non-provider env vars.
   provider?: string
   provider_label?: string
@@ -278,7 +278,7 @@ export interface MemoryProviderConfig {
 }
 
 /** Transport pinned on a custom endpoint; `''` = let the runtime auto-detect. Same
- * choices as `hermes model`'s custom-provider setup (#93622). */
+ * choices as `eir model`'s custom-provider setup (#93622). */
 export type CustomEndpointApiMode = '' | 'anthropic_messages' | 'chat_completions' | 'codex_responses'
 
 /** One `/v1/models` row; a gateway may advertise a reasoning alias
@@ -478,7 +478,7 @@ export interface TelegramOnboardingApplyResponse {
   restart_started?: boolean
 }
 
-export interface HermesConfig {
+export interface EirConfig {
   agent?: {
     reasoning_effort?: string
     personalities?: Record<string, unknown>
@@ -519,7 +519,7 @@ export interface HermesConfig {
   }
 }
 
-export type HermesConfigRecord = Record<string, unknown>
+export type EirConfigRecord = Record<string, unknown>
 
 export interface ModelInfoResponse {
   auto_context_length?: number
@@ -1160,7 +1160,7 @@ export interface ProfileCreatePayload {
 export interface ProfileInfo {
   /** Presentation-only label override (profile.yaml display_name). */
   display_name?: string
-  /** Bot Mode title (profile.yaml ui_meta['hermes-bots'].title) — the name the
+  /** Bot Mode title (profile.yaml ui_meta['eir-bots'].title) — the name the
    *  Bots roster shows for this profile. Presentation-only. */
   bot_title?: string
   has_env: boolean
@@ -1178,7 +1178,7 @@ export interface ProfileSetupCommand {
 
 // The desktop appearance/interface overlay bundled into a profile export as
 // `desktop.json`. Everything optional — an archive exported by an older (or
-// non-desktop) Hermes simply carries none of it. See store/profile-share.ts.
+// non-desktop) Eir simply carries none of it. See store/profile-share.ts.
 export interface ProfileDesktopOverlay {
   /** Overlay schema version (1). */
   version?: number
@@ -1190,7 +1190,7 @@ export interface ProfileDesktopOverlay {
   themes?: Record<string, unknown>
   /** Rail color override for this profile. */
   profileColor?: null | string
-  /** Layout tree (hermes.desktop.layoutTree.v2 shape). */
+  /** Layout tree (eir.desktop.layoutTree.v2 shape). */
   layoutTree?: unknown
   /** Active layout preset id. */
   layoutPreset?: string
@@ -1198,7 +1198,7 @@ export interface ProfileDesktopOverlay {
 
 // ── Projects ───────────────────────────────────────────────────────────────
 // A first-class, per-profile, human-named workspace spanning one or more
-// folders. Mirrors hermes_cli/projects_db.Project.to_dict().
+// folders. Mirrors eir_cli/projects_db.Project.to_dict().
 export interface ProjectFolder {
   path: string
   label: null | string
@@ -1241,7 +1241,7 @@ export interface SkillInfo {
   name: string
   /** Total observed activity (use + view + patch). Absent on older backends. */
   usage?: number
-  /** 'agent' = learned/local (editable), 'bundled' = ships with Hermes, 'hub' = installed,
+  /** 'agent' = learned/local (editable), 'bundled' = ships with Eir, 'hub' = installed,
    * 'external' = mounted from skills.external_dirs (externally authored, still editable). */
   provenance?: 'agent' | 'bundled' | 'external' | 'hub'
   /** User lock: the AGENT may not change this skill (the user still can). Absent on older backends. */
@@ -1249,7 +1249,7 @@ export interface SkillInfo {
 }
 
 /** One entry of the built-in optional-skills catalog (optional-skills/ in the
- *  repo) — official skills that ship with Hermes but install on demand. */
+ *  repo) — official skills that ship with Eir but install on demand. */
 export interface OfficialSkillInfo {
   category: string
   description: string
@@ -1288,7 +1288,7 @@ export interface ToolProvider {
   post_setup: string | null
   requires_nous_auth: boolean
   /** True when this is the provider currently written to config (mirrors the
-   *  CLI `hermes tools` active-provider detection). */
+   *  CLI `eir tools` active-provider detection). */
   is_active: boolean
   /** Honest readiness computed server-side (keys ∧ Nous entitlement ∧
    *  post-setup install state). Optional for older backends. */
@@ -1379,7 +1379,7 @@ export interface ToolsetModelsResponse {
  *  cua-driver runs on macOS, Windows, and Linux. `ready` is the single OS-aware
  *  readiness signal: on macOS both TCC grants (Accessibility + Screen
  *  Recording, which attach to cua-driver's own `com.trycua.driver` identity,
- *  not Hermes); elsewhere, driver health from `cua-driver doctor`. `null`
+ *  not Eir); elsewhere, driver health from `cua-driver doctor`. `null`
  *  means unknown (binary missing / probe failed). */
 export interface ComputerUsePermissionSource {
   attribution?: string
@@ -1476,7 +1476,7 @@ export interface StatusResponse {
   gateway_shared_with?: string[] | null
   gateway_state: string | null
   gateway_updated_at: string | null
-  hermes_home: string
+  eir_home: string
   latest_config_version: number
   release_date: string
   version: string
@@ -1617,9 +1617,9 @@ export interface ActionStatusResponse {
   name: string
   pid: number | null
   running: boolean
-  /** hermes-update only: durable completion identity recovered from update.log. */
+  /** eir-update only: durable completion identity recovered from update.log. */
   action_id?: string
-  /** hermes-update only: summary of the durable update receipt (#91277 bullet 3) —
+  /** eir-update only: summary of the durable update receipt (#91277 bullet 3) —
    *  the authoritative outcome record, present even when the dashboard
    *  restarted itself mid-action and lost its in-memory registries. */
   receipt?: UpdateReceiptSummary
@@ -1632,7 +1632,7 @@ export interface BackendUpdateCommit {
   at: number
 }
 
-/** Shape of `GET /api/hermes/update/check` — the backend's own update state.
+/** Shape of `GET /api/eir/update/check` — the backend's own update state.
  *  Used by the desktop's remote update overlay so the backend version (not the
  *  Electron client clone) drives "what's changed + Install" in remote mode. */
 export interface BackendUpdateCheckResponse {
@@ -1642,7 +1642,7 @@ export interface BackendUpdateCheckResponse {
   update_available: boolean
   /** A stable release this build already contains: applying it moves back. */
   rollback_to?: null | string
-  /** A stable release `hermes update` refuses: the backend stays on its build. */
+  /** A stable release `eir update` refuses: the backend stays on its build. */
   held?: 'downgrade' | null
   /** Update-available only; absent on older backends. */
   channel?: string

@@ -1,10 +1,10 @@
 """End-to-end tests for lazy cryptography loading.
 
 These tests invoke the real CLI paths as subprocesses to verify:
-1. `hermes secrets bitwarden setup --help` works (dispatch path)
-2. `hermes update --check` works (update path)
-3. `hermes secrets bitwarden disable` works (handler execution)
-4. `hermes secrets onepassword status` works (lazy backend loads on demand)
+1. `eir secrets bitwarden setup --help` works (dispatch path)
+2. `eir update --check` works (update path)
+3. `eir secrets bitwarden disable` works (handler execution)
+4. `eir secrets onepassword status` works (lazy backend loads on demand)
 
 Unlike test_lazy_secrets_import.py (which inspects sys.modules), these
 run the actual commands and verify exit codes — the exact paths the
@@ -19,13 +19,13 @@ from pathlib import Path
 import pytest
 
 
-def _run_hermes(args: list[str], timeout: int = 30) -> subprocess.CompletedProcess[str]:
-    """Run hermes CLI as a subprocess from repo root.
+def _run_eir(args: list[str], timeout: int = 30) -> subprocess.CompletedProcess[str]:
+    """Run eir CLI as a subprocess from repo root.
 
     The child runs with all git remote URLs rewritten to an unreachable
     local path (GIT_CONFIG_* env overrides). These tests assert the
     lazy-crypto / no-self-lock invariants of the dispatch path, NOT update
-    connectivity — but ``hermes update --check`` really does ``git fetch``
+    connectivity — but ``eir update --check`` really does ``git fetch``
     against github.com when run bare. Under remote throttling that fetch
     can exceed the subprocess timeout and TimeoutExpired the test (exactly
     what happened on CI during the 2026-08-17 GitHub incident: both update
@@ -42,9 +42,9 @@ def _run_hermes(args: list[str], timeout: int = 30) -> subprocess.CompletedProce
             # Rewrite every https:// and ssh remote to a nonexistent local
             # path so any fetch fails in milliseconds without touching the
             # network. insteadOf matching is prefix-based.
-            "GIT_CONFIG_KEY_0": "url.file:///nonexistent-hermes-test-remote/.insteadOf",
+            "GIT_CONFIG_KEY_0": "url.file:///nonexistent-eir-test-remote/.insteadOf",
             "GIT_CONFIG_VALUE_0": "https://",
-            "GIT_CONFIG_KEY_1": "url.file:///nonexistent-hermes-test-remote/.insteadOf",
+            "GIT_CONFIG_KEY_1": "url.file:///nonexistent-eir-test-remote/.insteadOf",
             "GIT_CONFIG_VALUE_1": "git@",
             # The channel resolver reads GitHub's API over urllib, which the git
             # rewrite cannot reach: a dead local proxy fails it just as fast.
@@ -55,7 +55,7 @@ def _run_hermes(args: list[str], timeout: int = 30) -> subprocess.CompletedProce
         }
     )
     return subprocess.run(
-        [sys.executable, "-m", "hermes_cli.main"] + args,
+        [sys.executable, "-m", "eir_cli.main"] + args,
         capture_output=True,
         text=True,
         cwd=str(repo_root),
@@ -69,12 +69,12 @@ class TestSecretsDispatchE2E:
     """End-to-end secrets dispatch — the path that must not self-lock."""
 
     def test_bitwarden_setup_help(self) -> None:
-        """`hermes secrets bitwarden setup --help` must exit 0 and print usage.
+        """`eir secrets bitwarden setup --help` must exit 0 and print usage.
 
         This is the exact path that triggered the #86781 self-lock loop on
         Windows: setup/parser nested under lazy-loaded backend.
         """
-        result = _run_hermes(["secrets", "bitwarden", "setup", "--help"])
+        result = _run_eir(["secrets", "bitwarden", "setup", "--help"])
         assert result.returncode == 0, (
             f"bitwarden setup --help failed:\n"
             f"stdout: {result.stdout}\n"
@@ -83,8 +83,8 @@ class TestSecretsDispatchE2E:
         assert "usage" in result.stdout.lower()
 
     def test_bitwarden_status(self) -> None:
-        """`hermes secrets bitwarden status` must exit 0 (runs lazy backend)."""
-        result = _run_hermes(["secrets", "bitwarden", "status"])
+        """`eir secrets bitwarden status` must exit 0 (runs lazy backend)."""
+        result = _run_eir(["secrets", "bitwarden", "status"])
         # status may return non-zero if not configured, but must NOT crash
         # with import errors, recursion, or missing subcommand
         assert result.returncode in (0, 1), (
@@ -97,8 +97,8 @@ class TestSecretsDispatchE2E:
         assert "cannot import name" not in result.stderr
 
     def test_bitwarden_disable(self) -> None:
-        """`hermes secrets bitwarden disable` must exit 0."""
-        result = _run_hermes(["secrets", "bitwarden", "disable"])
+        """`eir secrets bitwarden disable` must exit 0."""
+        result = _run_eir(["secrets", "bitwarden", "disable"])
         assert result.returncode == 0, (
             f"bitwarden disable failed:\n"
             f"stdout: {result.stdout}\n"
@@ -106,8 +106,8 @@ class TestSecretsDispatchE2E:
         )
 
     def test_onepassword_status(self) -> None:
-        """`hermes secrets onepassword status` must exit 0 (1Password lazy backend)."""
-        result = _run_hermes(["secrets", "onepassword", "status"])
+        """`eir secrets onepassword status` must exit 0 (1Password lazy backend)."""
+        result = _run_eir(["secrets", "onepassword", "status"])
         assert result.returncode in (0, 1), (
             f"onepassword status crashed:\n"
             f"stdout: {result.stdout}\n"
@@ -120,15 +120,15 @@ class TestSecretsDispatchE2E:
 class TestUpdatePathE2E:
     """Update path — must not load cryptography.
 
-    These tests invoke the real `hermes update --check` path as a subprocess.
+    These tests invoke the real `eir update --check` path as a subprocess.
     The conftest.py live-system guard blocks this because the command string
     contains "update"; we bypass with the pytest mark.
     """
 
     @pytest.mark.live_system_guard_bypass
     def test_update_check_clean(self) -> None:
-        """`hermes update --check` must not load cryptography._rust."""
-        result = _run_hermes(["update", "--check"])
+        """`eir update --check` must not load cryptography._rust."""
+        result = _run_eir(["update", "--check"])
         assert result.returncode in (0, 1, 2), (
             f"update --check crashed:\n"
             f"stdout: {result.stdout}\n"
@@ -141,7 +141,7 @@ class TestUpdatePathE2E:
 
     @pytest.mark.live_system_guard_bypass
     def test_main_update_check_crypto_absent_in_sys_modules(self) -> None:
-        """Decisive invariant: invoking main() with argv=['hermes','update','--check']
+        """Decisive invariant: invoking main() with argv=['eir','update','--check']
         leaves cryptography.hazmat.bindings._rust absent from sys.modules.
 
         This is the exact invariant review flagged as unproven (#86782 review
@@ -168,16 +168,16 @@ def capture_update_check(*args, **kwargs):
     # Short-circuit: don't actually call the network in tests.
     return 0
 
-sys.argv = ['hermes', 'update', '--check']
+sys.argv = ['eir', 'update', '--check']
 
-import hermes_cli.main as m
+import eir_cli.main as m
 
 # Patch the update handler so main() exercises its parser + dispatch
 # without doing network I/O.  cmd_update (in main.py) calls
 # _self()._cmd_update_check(branch=..., branch_explicit=...) where _self()
-# resolves the hermes_cli.main module's lazily re-exported attribute —
+# resolves the eir_cli.main module's lazily re-exported attribute —
 # so the patch must land on update_cmd._cmd_update_check.
-with patch('hermes_cli.update_cmd._cmd_update_check', capture_update_check):
+with patch('eir_cli.update_cmd._cmd_update_check', capture_update_check):
     try:
         m.main()
     except SystemExit as e:

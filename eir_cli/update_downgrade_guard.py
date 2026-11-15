@@ -21,7 +21,7 @@ _RUNTIME_SCHEMA_MARKER = "CREATE TABLE IF NOT EXISTS session_admissions"
 # Where a tree keeps its state-store modules: the root today, the package once they move into it.
 # Literal per-location patterns serve as git pathspecs, fnmatch patterns and Path.glob patterns alike;
 # a ``:(glob)**`` pathspec would also match tests/ and is not honoured by ``rev-list --objects``.
-STATE_MODULES = ("hermes_state*.py", "hermes_agent/hermes_state*.py", "hermes_agent/hermes_state/*.py")
+STATE_MODULES = ("eir_state*.py", "eir_agent/eir_state*.py", "eir_agent/eir_state/*.py")
 _LEDGER_PROBE = ("SELECT EXISTS(SELECT 1 FROM session_admissions) "
                  "OR EXISTS(SELECT 1 FROM worker_executions)")
 _DOCS = "https://hermes-agent.nousresearch.com/docs/getting-started/updating#rolling-back-to-an-older-release"
@@ -30,7 +30,7 @@ _DOCS = "https://hermes-agent.nousresearch.com/docs/getting-started/updating#rol
 def _updater_git(git_cmd, root: Path) -> Callable[..., int]:
     import subprocess
 
-    from hermes_cli.update_custody import run_git
+    from eir_cli.update_custody import run_git
 
     def git(*args: str) -> int:
         try:
@@ -71,9 +71,9 @@ def target_predates_runtime(git_cmd, root: Path, target_ref: str, *,
 def _has_ledger_rows(db_path: Path) -> bool:
     if not db_path.is_file():
         return False
-    from hermes_state_holders import read_only_db_uri
+    from eir_state_holders import read_only_db_uri
     try:
-        from hermes_cli.sqlite_safe_read import connect_tracked
+        from eir_cli.sqlite_safe_read import connect_tracked
 
         with closing(connect_tracked(read_only_db_uri(db_path), uri=True, timeout=5.0, tracking_path=db_path,
                                      connect_fn=sqlite3.connect)) as conn:
@@ -84,8 +84,8 @@ def _has_ledger_rows(db_path: Path) -> bool:
 
 def _pre_runtime_snapshot(home: Path) -> str | None:
     """Newest quick snapshot of ``home`` holding a state.db from before the runtime ledger."""
-    from hermes_cli.backup import _quick_snapshot_root
-    from hermes_state_holders import read_only_db_uri
+    from eir_cli.backup import _quick_snapshot_root
+    from eir_state_holders import read_only_db_uri
     root = _quick_snapshot_root(home)
     for snap in sorted(root.iterdir(), reverse=True) if root.is_dir() else ():
         db = snap / "state.db"
@@ -101,9 +101,9 @@ def _pre_runtime_snapshot(home: Path) -> str | None:
 
 
 def _named_profile(home: Path) -> str:
-    """The ``-p`` name that opens ``home`` (``hermes -p acme update`` passes ``profiles/acme``);
-    ``""`` for the default root or a custom HERMES_HOME, which bare ``hermes`` opens."""
-    from hermes_cli.profiles import _PROFILE_ID_RE, _get_profiles_root
+    """The ``-p`` name that opens ``home`` (``eir -p acme update`` passes ``profiles/acme``);
+    ``""`` for the default root or a custom EIR_HOME, which bare ``eir`` opens."""
+    from eir_cli.profiles import _PROFILE_ID_RE, _get_profiles_root
     parent = _get_profiles_root().resolve()
     resolved = home.resolve()
     named = resolved.parent == parent and _PROFILE_ID_RE.match(resolved.name) and resolved.name != "default"
@@ -111,17 +111,17 @@ def _named_profile(home: Path) -> str:
 
 
 def _ledgered_profiles(home: Path | None) -> list[tuple[str, Path]]:
-    from hermes_cli.backup import _sibling_profile_homes
-    from hermes_constants import get_hermes_home
+    from eir_cli.backup import _sibling_profile_homes
+    from eir_constants import get_eir_home
 
-    home = Path(home or get_hermes_home())
+    home = Path(home or get_eir_home())
     profiles = [(_named_profile(home), home), *_sibling_profile_homes(home)]
     return [(name, h) for name, h in profiles if _has_ledger_rows(h / "state.db")]
 
 
 def would_refuse(root: Path, target_ref: str, home: Path | None = None, *, git: Callable[..., int],
                  remote: Optional[Callable[[str], Optional[bool]]] = None) -> bool:
-    """Whether ``hermes update`` would refuse ``target_ref`` here: the update check's read-only twin of
+    """Whether ``eir update`` would refuse ``target_ref`` here: the update check's read-only twin of
     :func:`downgrade_refusal`, so a release the updater refuses is never offered as an update.
     The store scan runs first, so ``remote`` is only consulted when some store has runtime history."""
     return bool(_ledgered_profiles(home)) and target_predates_runtime(
@@ -138,13 +138,13 @@ def downgrade_refusal(git_cmd, root: Path, target_ref: str, home: Path | None = 
              "these session stores now use. Downgrading is unsupported.",
              *(f"  {h / 'state.db'} has gateway runtime history." for _name, h in ledgered),
              "  The older release could not delete or prune those sessions.",
-             "  To go back anyway: run `hermes gateway stop`, check out the older release with git, then put back "
+             "  To go back anyway: run `eir gateway stop`, check out the older release with git, then put back "
              "each store's copy from before the upgrade:"]
     for name, h in ledgered:
         snapshot = _pre_runtime_snapshot(h)
-        hermes = f"hermes -p {name}" if name else "hermes"
-        lines.append(f"    {h}: run `{hermes}` and enter `/snapshot restore {snapshot}`." if snapshot else
+        eir = f"eir -p {name}" if name else "eir"
+        lines.append(f"    {h}: run `{eir}` and enter `/snapshot restore {snapshot}`." if snapshot else
                      f"    {h}: no pre-update snapshot predates the upgrade; restore a full backup taken before "
-                     f"it with `{hermes} import <backup.zip>`.")
+                     f"it with `{eir} import <backup.zip>`.")
     lines += ["  Sessions created since the upgrade are not in that copy.", f"  Guide: {_DOCS}"]
     return "\n".join(lines)

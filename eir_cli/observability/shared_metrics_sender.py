@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone, UTC
 
 from agent.retry_utils import parse_retry_after_seconds
-from hermes_cli.sqlite_util import write_txn
+from eir_cli.sqlite_util import write_txn
 
 from .shared_metrics import _isoformat, _utc_now
 
@@ -93,7 +93,7 @@ def _post(endpoint: str, payload: bytes, *, timeout: int) -> _Response:
     """POST one package. Raises on transport failure; never on HTTP status."""
     headers = {
         "Content-Type": "application/json",
-        "User-Agent": "hermes-agent-shared-metrics/1",
+        "User-Agent": "eir-agent-shared-metrics/1",
     }
     body = payload
     if len(payload) > GZIP_THRESHOLD_BYTES:

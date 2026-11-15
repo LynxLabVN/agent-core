@@ -10,9 +10,9 @@ from dataclasses import dataclass
 import re
 from typing import Literal, Protocol
 
-from hermes_platform.host import facts
-from hermes_platform.resolver.app import AppDef, AppResolver
-from hermes_platform.resolver.core import Candidate, CheckState, Resolution
+from eir_platform.host import facts
+from eir_platform.resolver.app import AppDef, AppResolver
+from eir_platform.resolver.core import Candidate, CheckState, Resolution
 
 AvailabilityState = Literal[
     "available",
@@ -28,7 +28,7 @@ OFFERABLE: frozenset[str] = frozenset({"available", "no_requirements"})
 
 
 class _HasRequirements(Protocol):
-    """The slice of a catalog entry `availability` reads; keeps this module free of `hermes_cli` imports."""
+    """The slice of a catalog entry `availability` reads; keeps this module free of `eir_cli` imports."""
 
     @property
     def requires_app(self) -> bool: ...

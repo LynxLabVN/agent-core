@@ -1,4 +1,4 @@
-"""Shared argparse helpers for the ``hermes_cli/subcommands/*`` builders.
+"""Shared argparse helpers for the ``eir_cli/subcommands/*`` builders.
 
 Import-cycle-free (no ``main`` import); ``main.py`` re-exports for compatibility.
 """
@@ -13,7 +13,7 @@ def add_accept_hooks_flag(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--accept-hooks", action="store_true", default=argparse.SUPPRESS,
         help="Auto-approve unseen shell hooks without a TTY prompt "
-            "(equivalent to HERMES_ACCEPT_HOOKS=1 / hooks_auto_accept: true).")
+            "(equivalent to EIR_ACCEPT_HOOKS=1 / hooks_auto_accept: true).")
 
 
 def add_yes_flag(parser: argparse.ArgumentParser, help: str = "Skip confirmation prompt") -> None:

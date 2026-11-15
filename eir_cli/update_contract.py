@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional
 
-from hermes_cli.steward import STEWARD_APT_TERMUX, STEWARD_DESKTOP, STEWARD_DOCKER, STEWARD_NIX
+from eir_cli.steward import STEWARD_APT_TERMUX, STEWARD_DESKTOP, STEWARD_DOCKER, STEWARD_NIX
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ COMMIT_BUILD_UPDATE_MESSAGE = (
 
 
 def is_commit_build(project_root: Path) -> bool:
-    from hermes_cli.steward import read_install_stamp
+    from eir_cli.steward import read_install_stamp
 
     return read_install_stamp(project_root).get("source") == "commit-build"
 
@@ -38,7 +38,7 @@ class UpdateRefusal:
 
 def _refusal(code: str, method: str, message: Optional[Callable[[str], str]] = None) -> UpdateRefusal:
     """Refusal for ``method``: ``message(command)`` if given, else docker's full message / the bare command."""
-    from hermes_cli.config import format_docker_update_message, recommended_update_command_for_method
+    from eir_cli.config import format_docker_update_message, recommended_update_command_for_method
 
     command = recommended_update_command_for_method(method)
     if message is not None:
@@ -60,7 +60,7 @@ _STEWARD_UPDATE_METHODS: dict[str, str] = {
 
 def _steward_refusal(steward: str) -> UpdateRefusal:
     """Refusal for a tree sealed by ``steward``."""
-    from hermes_cli.steward import steward_update_message
+    from eir_cli.steward import steward_update_message
 
     method = _STEWARD_UPDATE_METHODS.get(steward)
     if method == "docker":
@@ -69,7 +69,7 @@ def _steward_refusal(steward: str) -> UpdateRefusal:
         return _refusal(steward, method, lambda _command: steward_update_message(steward))
     # desktop-app and future package managers have no CLI remediation: the
     # steward's own instructions are the remediation, and
-    # recommended_update_command_for_method would falsely answer "hermes
+    # recommended_update_command_for_method would falsely answer "eir
     # update" for methods it doesn't know.
     command = (
         "Manage updates from within the desktop app"
@@ -90,7 +90,7 @@ def evaluate_update_admission(project_root: Path) -> Optional[UpdateRefusal]:
 
     # Layer 1: baked provenance marker — authoritative when present.
     try:
-        from hermes_cli.image_provenance import read_image_provenance
+        from eir_cli.image_provenance import read_image_provenance
 
         provenance = read_image_provenance()
         if provenance is not None:
@@ -113,14 +113,14 @@ def evaluate_update_admission(project_root: Path) -> Optional[UpdateRefusal]:
     # rung that covers ``desktop-app``, which the heuristics below never
     # detect (the payload has no .install_method stamp and no .git).
     try:
-        from hermes_cli.steward import sealed_steward
+        from eir_cli.steward import sealed_steward
 
         steward = sealed_steward(project_root)
         if steward is None:
-            from hermes_constants import is_termux
+            from eir_constants import is_termux
 
             if is_termux():
-                from hermes_cli.steward import SOURCE_ON_TERMUX_UPDATE_COMMAND, SOURCE_ON_TERMUX_UPDATE_MESSAGE
+                from eir_cli.steward import SOURCE_ON_TERMUX_UPDATE_COMMAND, SOURCE_ON_TERMUX_UPDATE_MESSAGE
 
                 return UpdateRefusal(
                     code=STEWARD_APT_TERMUX,
@@ -134,7 +134,7 @@ def evaluate_update_admission(project_root: Path) -> Optional[UpdateRefusal]:
 
     # Layer 3: pre-existing filesystem heuristics, verbatim semantics.
     try:
-        from hermes_cli.config import detect_install_method, is_nix_install_method
+        from eir_cli.config import detect_install_method, is_nix_install_method
 
         method = detect_install_method(project_root)
         if method == "docker":
@@ -153,7 +153,7 @@ def record_refusal_receipt(refusal: UpdateRefusal) -> None:
     place, use <command>") instead of a silent nothing. Best-effort; never raises.
     """
     try:
-        from hermes_cli.update_receipt import begin_update_receipt, finalize_update_receipt, record_step
+        from eir_cli.update_receipt import begin_update_receipt, finalize_update_receipt, record_step
 
         begin_update_receipt()
         detail = f"not updatable in place ({refusal.code})"

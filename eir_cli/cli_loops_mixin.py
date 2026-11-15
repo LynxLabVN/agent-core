@@ -1,5 +1,5 @@
 """Simple slash-command wrappers plus goal/heartbeat/loop manager hooks for the interactive CLI.
-Mixin on ``HermesCLI``; cli.py symbols are imported lazily inside methods (import cycle)."""
+Mixin on ``EirCLI``; cli.py symbols are imported lazily inside methods (import cycle)."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import threading
 import time
 
 from agent.i18n import t
-from hermes_cli.gateway_client import GatewayClientError
+from eir_cli.gateway_client import GatewayClientError
 from rich.markup import escape as _escape
 
 
@@ -68,7 +68,7 @@ def _goal_blocks_loop_tick(mgr) -> bool:
     is the gateway's (it reads the goal row and its barrier where they live)."""
     if hasattr(mgr, "goal_blocks_tick"):
         return mgr.goal_blocks_tick()
-    from hermes_cli.loops import goal_blocks_loop_tick
+    from eir_cli.loops import goal_blocks_loop_tick
     return goal_blocks_loop_tick(mgr.session_id)
 
 
@@ -100,7 +100,7 @@ class CLILoopsMixin:
 
     def _cmd_clear(self, cmd_original: str):
         from cli import ChatConsole, _build_compact_banner, _clear_output_history, _cprint, get_tool_definitions
-        from hermes_cli.banner import build_welcome_banner
+        from eir_cli.banner import build_welcome_banner
         if self._confirm_destructive_slash(
             "clear",
             "This clears the screen and starts a new session.\n"
@@ -127,7 +127,7 @@ class CLILoopsMixin:
         # The banner plan startup uses (show_banner): a gateway session's banner is the new
         # session's snapshot (its tools, MCP included, and main's short label), never this
         # process's registry.
-        from hermes_cli.cli_info_mixin import banner_plan
+        from eir_cli.cli_info_mixin import banner_plan
         plan = banner_plan(self, cc)
         if plan.banner_kw is None:
             cc.print(_build_compact_banner())
@@ -142,7 +142,7 @@ class CLILoopsMixin:
 
     def _cmd_title(self, cmd_original: str):
         from cli import _cprint
-        from hermes_state import format_session_db_unavailable
+        from eir_state import format_session_db_unavailable
         parts = cmd_original.split(maxsplit=1)
         if len(parts) == 1:
             # No argument: show current title and session ID.
@@ -169,7 +169,7 @@ class CLILoopsMixin:
         # long) prints that one reason and stops — never a second, contradictory
         # "empty after cleanup" error (SC-05).
         try:
-            from hermes_state import SessionDB
+            from eir_state import SessionDB
             new_title = SessionDB.sanitize_title(raw_title)
         except ValueError as e:
             _cprint(f"  {e}")
@@ -211,7 +211,7 @@ class CLILoopsMixin:
     def _record_model_friction(self, signal: str, turns: int = 1) -> None:
         # The TUI slash worker's shadow CLI has no metrics surface: tui_gateway counts what it executes.
         if self._slash_metrics_surface:
-            from hermes_cli.observability.shared_metrics_model import record_model_friction
+            from eir_cli.observability.shared_metrics_model import record_model_friction
             record_model_friction(
                 signal, session_id=getattr(self, "session_id", None), agent=getattr(self, "agent", None),
                 provider=getattr(self, "provider", None), model=getattr(self, "model", None), turns=turns)
@@ -247,7 +247,7 @@ class CLILoopsMixin:
         turns_undone = self.undo_last(_undo_n)
         if turns_undone:  # None when nothing was rewound
             self._record_model_friction("undo", turns_undone)
-            from hermes_cli.cli_undo_hint import print_undo_rollback_hint
+            from eir_cli.cli_undo_hint import print_undo_rollback_hint
             print_undo_rollback_hint(self, before, turns_undone)
 
     def _cmd_skills(self, cmd_original: str):
@@ -255,7 +255,7 @@ class CLILoopsMixin:
             self._handle_skills_command(cmd_original)
 
     def _cmd_egress(self, cmd_original: str):
-        from hermes_cli.slash_exec import CommandContext, execute_command
+        from eir_cli.slash_exec import CommandContext, execute_command
         text = execute_command("egress", CommandContext(surface="cli")).text
         self._console_print(text, highlight=False, markup=False)
 
@@ -269,11 +269,11 @@ class CLILoopsMixin:
         return not self._handle_update_command()
 
     def _cmd_version(self, cmd_original: str):
-        from hermes_cli.main import _print_version_info
+        from eir_cli.main import _print_version_info
         _print_version_info(check_updates=True)
 
     def _cmd_reload(self, cmd_original: str):
-        from hermes_cli.config import reload_env
+        from eir_cli.config import reload_env
         count = reload_env()
         print(f"  {t('cli.reload.env_reloaded', count=count)}")
 
@@ -282,40 +282,40 @@ class CLILoopsMixin:
             self._reload_skills()
 
     def _cmd_plugins(self, cmd_original: str):
-        from hermes_constants import display_hermes_home
+        from eir_constants import display_eir_home
         parts = cmd_original.split()[1:]
         if parts and parts[0] in ("update", "auto-update"):
-            from hermes_cli.plugins_auto_update import plugins_slash_action
+            from eir_cli.plugins_auto_update import plugins_slash_action
             with self._busy_command(self._slow_command_status(cmd_original)):
                 for line in plugins_slash_action(parts):
                     print(line)
             return
         try:
-            # Discover from disk (bundled + user) like `hermes plugins list`, so
+            # Discover from disk (bundled + user) like `eir plugins list`, so
             # installed-but-not-enabled plugins show up; the plugin manager only knows
             # *loaded* plugins and made fresh installs look like "nothing installed".
-            from hermes_cli.plugins_cmd import (
+            from eir_cli.plugins_cmd import (
                 _discover_all_plugins, _get_disabled_set, _get_enabled_set, _plugin_status)
             entries = _discover_all_plugins()
             enabled = _get_enabled_set()
             disabled = _get_disabled_set()
 
             # `/plugins` is a quick glance: user plugins only, bundled ones summarized
-            # on one line (full catalog behind `hermes plugins list`).
+            # on one line (full catalog behind `eir plugins list`).
             user_entries = [e for e in entries if e[3] != "bundled"]
             bundled_count = len(entries) - len(user_entries)
             if not user_entries:
                 print(t("cli.plugins.none_installed"))
                 print(f"  {t('cli.plugins.install_hint')}")
-                print(f"  {t('cli.plugins.drop_dir_hint', path=f'{display_hermes_home()}/plugins/')}")
+                print(f"  {t('cli.plugins.drop_dir_hint', path=f'{display_eir_home()}/plugins/')}")
                 if bundled_count:
                     print(f"  {t('cli.plugins.bundled_available', count=bundled_count)}")
                 return
-            from hermes_cli import gateway_plugin_commands
+            from eir_cli import gateway_plugin_commands
             loaded = gateway_plugin_commands.loaded(self)  # the gateway's; None off the gateway
             if loaded is None:
                 try:  # loaded-plugin details (tools/hooks/commands counts, errors) by name
-                    from hermes_cli.plugins import get_plugin_manager
+                    from eir_cli.plugins import get_plugin_manager
                     loaded = {p["name"]: p for p in get_plugin_manager().list_plugins()}
                 except Exception:
                     loaded = {}
@@ -361,7 +361,7 @@ class CLILoopsMixin:
 
     def _gateway_queue_store(self):
         """The gateway session store when this CLI is a viewer of the gateway's session, else None."""
-        from hermes_cli.gateway_tools_notify import gateway_store
+        from eir_cli.gateway_tools_notify import gateway_store
         return gateway_store(self) if getattr(self, "session_id", None) else None
 
     def _queue_items(self) -> list:
@@ -370,7 +370,7 @@ class CLILoopsMixin:
         items: list = []
         store = self._gateway_queue_store()
         if store is not None:
-            from hermes_cli import gateway_queue
+            from eir_cli import gateway_queue
             items = list(gateway_queue.queued_rows(self, store))
         return items + [(None, item) for item in self._pending_input_items()]
 
@@ -381,7 +381,7 @@ class CLILoopsMixin:
         if store is not None:
             # #134889 N5: the gateway's durable FIFO holds it (committed at accept, kept across an owner
             # restart, run once after the current turn), never this process.
-            from hermes_cli import gateway_queue
+            from eir_cli import gateway_queue
             try:
                 gateway_queue.submit_queued(self, store, payload)
             except gateway_queue.QueueOutcomeUnknown as exc:  # sent, no answer: it may be queued
@@ -409,8 +409,8 @@ class CLILoopsMixin:
     def _queue_gateway_call(self, verb, index, *args):
         """One owner verb on queued item ``index``; its refusal is printed (in its own words), never raised."""
         from cli import _cprint
-        from hermes_cli import gateway_queue
-        from hermes_cli.gateway_client import GatewayRPCError
+        from eir_cli import gateway_queue
+        from eir_cli.gateway_client import GatewayRPCError
         try:
             return getattr(gateway_queue, verb)(self, self._gateway_queue_store(), *args)
         except GatewayRPCError as exc:
@@ -598,10 +598,10 @@ class CLILoopsMixin:
 
     def _automation_connection(self):
         """``(gateway, connection)``: on a gateway session store the managers are the gateway's
-        (``hermes_cli.gateway_automation``), and none exists until the gateway session is open, so this
+        (``eir_cli.gateway_automation``), and none exists until the gateway session is open, so this
         process never opens state.db read-write nor calls the goal judge. Off the gateway (tests, the
         TUI slash worker's shadow CLI) main's in-process managers apply."""
-        from hermes_cli.gateway_session_store import GatewaySessionStore
+        from eir_cli.gateway_session_store import GatewaySessionStore
         store = getattr(self, "_session_db", None)
         if not isinstance(store, GatewaySessionStore):
             return False, None
@@ -622,7 +622,7 @@ class CLILoopsMixin:
     def _get_goal_manager(self):
         """GoalManager bound to the current session_id (see ``_session_bound_manager``)."""
         def max_turns():
-            from hermes_cli.config import load_config
+            from eir_cli.config import load_config
             try:
                 goals_cfg = (load_config() or {}).get("goals") or {}
                 return int(goals_cfg.get("max_turns", 20) or 20)
@@ -630,33 +630,33 @@ class CLILoopsMixin:
                 return 20
 
         def load():
-            from hermes_cli.goals import GoalManager
+            from eir_cli.goals import GoalManager
             return lambda sid: GoalManager(session_id=sid, default_max_turns=max_turns())
 
         def remote(sid, connection):
-            from hermes_cli.gateway_automation import GatewayGoalManager
+            from eir_cli.gateway_automation import GatewayGoalManager
             return GatewayGoalManager(sid, connection)
         return self._automation_manager("_goal_manager", "goal manager", load, remote)
 
     def _get_heartbeat_manager(self):
         """HeartbeatManager bound to the current session_id (see ``_session_bound_manager``)."""
         def load():
-            from hermes_cli.heartbeat import HeartbeatManager
+            from eir_cli.heartbeat import HeartbeatManager
             return lambda sid: HeartbeatManager(session_id=sid)
 
         def remote(sid, connection):
-            from hermes_cli.gateway_automation import GatewayHeartbeatManager
+            from eir_cli.gateway_automation import GatewayHeartbeatManager
             return GatewayHeartbeatManager(sid, connection)
         return self._automation_manager("_heartbeat_manager", "heartbeat manager", load, remote)
 
     def _get_loop_manager(self):
         """LoopManager bound to the current session_id (see ``_session_bound_manager``)."""
         def load():
-            from hermes_cli.loops import LoopManager
+            from eir_cli.loops import LoopManager
             return lambda sid: LoopManager(session_id=sid)
 
         def remote(sid, connection):
-            from hermes_cli.gateway_automation import GatewayLoopManager
+            from eir_cli.gateway_automation import GatewayLoopManager
             return GatewayLoopManager(sid, connection)
         return self._automation_manager("_loop_manager", "loop manager", load, remote)
 
@@ -668,8 +668,8 @@ class CLILoopsMixin:
         if getattr(self, "_heartbeat_watchdog_started", False):
             return
         self._heartbeat_watchdog_started = True
-        from hermes_cli.gateway_automation import GatewayHeartbeatManager
-        from hermes_cli.heartbeat import POLL_SECONDS
+        from eir_cli.gateway_automation import GatewayHeartbeatManager
+        from eir_cli.heartbeat import POLL_SECONDS
 
         def _loop():
             try:
@@ -876,7 +876,7 @@ class CLILoopsMixin:
             return
         _active_deleg = 0
         try:
-            from hermes_cli.goals import count_active_delegations, gather_background_processes as _gather_bg
+            from eir_cli.goals import count_active_delegations, gather_background_processes as _gather_bg
             # Only THIS session's processes: subagents' pollers must not park the parent's goal.
             _bg_procs = _gather_bg(owner_task_id=getattr(self, "session_id", None) or None)
             _active_deleg = count_active_delegations(getattr(self.agent, "session_id", None))

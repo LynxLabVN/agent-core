@@ -2,11 +2,11 @@
 
 import pytest
 
-from hermes_cli import plugin_catalog as pc
-from hermes_cli import plugin_catalog_presence as presence_mod
+from eir_cli import plugin_catalog as pc
+from eir_cli import plugin_catalog_presence as presence_mod
 
 SHA = "0" * 40
-NEEDS_APP = {"extensions": {"com.nousresearch.hermes": {"servers": {"srv": {
+NEEDS_APP = {"extensions": {"com.nousresearch.eir": {"servers": {"srv": {
     "app": {"darwin": {"presence": "executable", "location": "/nonexistent/fx-app"},
             "linux": {"presence": "executable", "location": "/nonexistent/fx-app"},
             "win32": {"presence": "executable", "location": "C:/nonexistent/fx-app.exe"}},
@@ -22,7 +22,7 @@ def _entry(name, *, onboarding=True, platforms=(), title=""):
 
 @pytest.fixture
 def catalog(monkeypatch):
-    from hermes_platform.host import facts
+    from eir_platform.host import facts
 
     here = {"darwin": "macos", "win32": "windows"}.get(facts.os_family(), "linux")
     other = "windows" if here != "windows" else "macos"
@@ -52,7 +52,7 @@ def test_unreadable_liveness_is_unknown_never_present(tmp_path, monkeypatch):
     the module contract is that an unreadable declaration is unknown."""
     import sys
 
-    from hermes_platform.declaration import parse_declaration
+    from eir_platform.declaration import parse_declaration
 
     exe = tmp_path / "app"
     exe.write_text("", encoding="utf-8")

@@ -1,7 +1,7 @@
-"""Top-level argparse construction for the hermes CLI.
+"""Top-level argparse construction for the eir CLI.
 
 Only the top-level parser and the ``chat`` subparser live here. Every other subparser (model,
-gateway, sessions, …) is built by ``hermes_cli/subcommands/<group>.py`` and wired in
+gateway, sessions, …) is built by ``eir_cli/subcommands/<group>.py`` and wired in
 ``main._build_cli_parser`` with its ``cmd_*`` handler injected.
 """
 
@@ -12,12 +12,12 @@ import sys
 from functools import lru_cache
 
 # `--profile` / `-p` is consumed by ``main._apply_profile_override`` before argparse runs
-# (it sets ``HERMES_HOME`` and strips itself from ``sys.argv``), so it isn't on the parser.
+# (it sets ``EIR_HOME`` and strips itself from ``sys.argv``), so it isn't on the parser.
 # Listed here so all "carry over on relaunch" metadata lives in one file.
 PRE_ARGPARSE_INHERITED_FLAGS: list[tuple[str, bool]] = [("--profile", True), ("-p", True)]
 
 # Static snapshot fallback for ``top_level_value_flag_sets`` — used only if introspecting the
-# live parser fails. The derived path is authoritative; tests/hermes_cli/
+# live parser fails. The derived path is authoritative; tests/eir_cli/
 # test_top_level_value_flags_parity.py fails CI if the parser grows a value-taking flag this
 # snapshot lacks AND derivation regresses.
 _VALUE_FLAGS_FALLBACK: frozenset[str] = frozenset({
@@ -28,16 +28,16 @@ _OPTIONAL_VALUE_FLAGS_FALLBACK: frozenset[str] = frozenset({"-c", "--continue"})
 
 
 def _cfg_path() -> str:
-    """``~/.hermes/config.yaml`` spelled for the active profile, for help text.
+    """``~/.eir/config.yaml`` spelled for the active profile, for help text.
 
     ``main._apply_profile_override`` builds this parser (via ``top_level_value_flag_sets``) BEFORE
-    it re-homes the process to the sticky ``active_profile``; ``get_hermes_home()`` would emit the
-    "[HERMES_HOME fallback] ... wrong profile" warning on every ``hermes`` command for that
+    it re-homes the process to the sticky ``active_profile``; ``get_eir_home()`` would emit the
+    "[EIR_HOME fallback] ... wrong profile" warning on every ``eir`` command for that
     throwaway help string. Read the process home directly: after the override it IS the profile home.
     """
-    from hermes_constants import display_hermes_home, get_process_hermes_home
+    from eir_constants import display_eir_home, get_process_eir_home
 
-    return f"{display_hermes_home(get_process_hermes_home())}/config.yaml"
+    return f"{display_eir_home(get_process_eir_home())}/config.yaml"
 
 
 @lru_cache(maxsize=1)
@@ -46,7 +46,7 @@ def top_level_value_flag_sets() -> tuple[frozenset[str], frozenset[str]]:
 
     Introspects ``build_top_level_parser()`` (every option with nargs != 0) so the argv scanners in
     ``main.py`` (``_first_positional_argv``, ``_apply_profile_override``) can never drift from the
-    argparse surface — the drift that made ``hermes --reasoning high chat …`` misread ``high`` as
+    argparse surface — the drift that made ``eir --reasoning high chat …`` misread ``high`` as
     the subcommand and forced eager plugin discovery.
 
     Mirrors the ``update_cmd._holder_value_flags`` precedent, including the handwritten-snapshot fallback
@@ -82,7 +82,7 @@ def command_argv(argv: list[str]) -> list[str]:
 
 
 def _inherited_flag(parser, *args, **kwargs):
-    """``parser.add_argument`` + tag the Action ``inherit_on_relaunch`` for ``hermes_cli.relaunch``."""
+    """``parser.add_argument`` + tag the Action ``inherit_on_relaunch`` for ``eir_cli.relaunch``."""
     action = parser.add_argument(*args, **kwargs)
     action.inherit_on_relaunch = True
     return action
@@ -90,56 +90,56 @@ def _inherited_flag(parser, *args, **kwargs):
 
 _EPILOGUE = """
 Examples:
-    hermes                        Start interactive chat
-    hermes chat -q "Hello"        Single query mode
-    hermes --tui                  Launch the modern TUI (or set display.interface: tui)
-    hermes --cli                  Force the classic REPL (overrides display.interface: tui)
-    hermes -c                     Resume the most recent session
-    hermes -c "my project"        Resume a session by name (latest in lineage)
-    hermes --resume <session_id>  Resume a specific session by ID
-    hermes --resume latest        Resume the most recent session (same as -c)
-    hermes --tui --resume latest --in ./dir   Resume ./dir's latest session in the TUI
-    hermes setup                  Run setup wizard
-    hermes logout                 Clear stored authentication
-    hermes auth add <provider>    Add a pooled credential
-    hermes auth list              List pooled credentials
-    hermes auth remove <p> <t>    Remove pooled credential by index, id, or label
-    hermes auth reset <p> [t]     Clear exhaustion status for a provider, or one credential
-    hermes auth priority <p> <t> <n>  Move a pooled credential to priority n (0 = tried first)
-    hermes auth refresh <p> [t]   Refresh a pooled OAuth credential and clear its cooldown
-    hermes model                  Select default model
-    hermes fallback [list]        Show fallback provider chain
-    hermes fallback add           Add a fallback provider (same picker as `hermes model`)
-    hermes fallback remove        Remove a fallback provider from the chain
-    hermes fallback check [--live]  Check each fallback entry can be used (exit 1 if not)
-    hermes config                 View configuration
-    hermes config edit            Edit config in $EDITOR
-    hermes config set model gpt-4 Set a config value
-    hermes gateway                Run messaging gateway
-    hermes gateway install        Install gateway background service
-    hermes gateway start          Start the installed gateway service
-    hermes gateway stop           Stop the gateway service
-    hermes gateway status         Show gateway status
-    hermes -p <profile> <cmd>     Run any command against a named profile's
-                                  home (also --profile) — e.g. hermes -p coder gateway stop
-    hermes -s hermes-agent-dev,github-auth
-    hermes -w                     Start in isolated git worktree
-    hermes sessions list          List past sessions
-    hermes sessions browse        Interactive session picker
-    hermes sessions rename ID T   Rename/title a session
-    hermes logs                   View agent.log (last 50 lines)
-    hermes logs -f                Follow agent.log in real time
-    hermes logs errors            View errors.log
-    hermes logs --since 1h        Lines from the last hour
-    hermes debug share             Upload debug report for support
-    hermes console                Open the safe Hermes command console
-    hermes update                 Update to latest version
-    hermes dashboard              Start web UI dashboard (port 9119)
-    hermes dashboard --stop       Stop running dashboard processes
-    hermes dashboard --status     List running dashboard processes
+    eir                        Start interactive chat
+    eir chat -q "Hello"        Single query mode
+    eir --tui                  Launch the modern TUI (or set display.interface: tui)
+    eir --cli                  Force the classic REPL (overrides display.interface: tui)
+    eir -c                     Resume the most recent session
+    eir -c "my project"        Resume a session by name (latest in lineage)
+    eir --resume <session_id>  Resume a specific session by ID
+    eir --resume latest        Resume the most recent session (same as -c)
+    eir --tui --resume latest --in ./dir   Resume ./dir's latest session in the TUI
+    eir setup                  Run setup wizard
+    eir logout                 Clear stored authentication
+    eir auth add <provider>    Add a pooled credential
+    eir auth list              List pooled credentials
+    eir auth remove <p> <t>    Remove pooled credential by index, id, or label
+    eir auth reset <p> [t]     Clear exhaustion status for a provider, or one credential
+    eir auth priority <p> <t> <n>  Move a pooled credential to priority n (0 = tried first)
+    eir auth refresh <p> [t]   Refresh a pooled OAuth credential and clear its cooldown
+    eir model                  Select default model
+    eir fallback [list]        Show fallback provider chain
+    eir fallback add           Add a fallback provider (same picker as `eir model`)
+    eir fallback remove        Remove a fallback provider from the chain
+    eir fallback check [--live]  Check each fallback entry can be used (exit 1 if not)
+    eir config                 View configuration
+    eir config edit            Edit config in $EDITOR
+    eir config set model gpt-4 Set a config value
+    eir gateway                Run messaging gateway
+    eir gateway install        Install gateway background service
+    eir gateway start          Start the installed gateway service
+    eir gateway stop           Stop the gateway service
+    eir gateway status         Show gateway status
+    eir -p <profile> <cmd>     Run any command against a named profile's
+                                  home (also --profile) — e.g. eir -p coder gateway stop
+    eir -s eir-agent-dev,github-auth
+    eir -w                     Start in isolated git worktree
+    eir sessions list          List past sessions
+    eir sessions browse        Interactive session picker
+    eir sessions rename ID T   Rename/title a session
+    eir logs                   View agent.log (last 50 lines)
+    eir logs -f                Follow agent.log in real time
+    eir logs errors            View errors.log
+    eir logs --since 1h        Lines from the last hour
+    eir debug share             Upload debug report for support
+    eir console                Open the safe Eir command console
+    eir update                 Update to latest version
+    eir dashboard              Start web UI dashboard (port 9119)
+    eir dashboard --stop       Stop running dashboard processes
+    eir dashboard --status     List running dashboard processes
 
 For more help on a command:
-    hermes <command> --help
+    eir <command> --help
 """
 
 
@@ -166,11 +166,11 @@ def _add_top_level_flags(parser: argparse.ArgumentParser) -> None:
     # `chat` subcommand; if neither -z nor a subcommand consumes them, they fall through as None.
     inherited(parser, "-m", "--model", default=None, help=(
         "Model override for this invocation (e.g. anthropic/claude-sonnet-4.6). "
-        "Applies to -z/--oneshot and --tui. Also settable via HERMES_INFERENCE_MODEL env var."))
+        "Applies to -z/--oneshot and --tui. Also settable via EIR_INFERENCE_MODEL env var."))
     inherited(parser, "--provider", default=None, help=(
         "Provider override for this invocation (e.g. openrouter, anthropic). "
         "Applies to -z/--oneshot and --tui. The persistent provider lives in config.yaml "
-        "under model.provider — use `hermes setup` or edit the file to change it."))
+        "under model.provider — use `eir setup` or edit the file to change it."))
     inherited(parser, "--reasoning", default=None, metavar="LEVEL", help=(
         "Reasoning effort for this invocation: none, minimal, low, medium, "
         "high, xhigh, max, or ultra. Overrides agent.reasoning_effort in "
@@ -194,7 +194,7 @@ def _add_top_level_flags(parser: argparse.ArgumentParser) -> None:
         help="Run in an isolated git worktree (for parallel agents)")
     inherited(parser, "--accept-hooks", action="store_true", default=False, help=(
         "Auto-approve any unseen shell hooks declared in config.yaml "
-        "without a TTY prompt.  Equivalent to HERMES_ACCEPT_HOOKS=1 or "
+        "without a TTY prompt.  Equivalent to EIR_ACCEPT_HOOKS=1 or "
         "hooks_auto_accept: true in config.yaml.  Use on CI / headless "
         "runs that can't prompt."))
     inherited(parser, "--skills", "-s", action="append", default=None,
@@ -225,15 +225,15 @@ def _build_chat_parser(subparsers) -> argparse.ArgumentParser:
     """The ``chat`` subparser (also the implicit default command).
 
     Flags ALSO declared on the top-level parser use ``default=argparse.SUPPRESS``: for
-    ``hermes -m foo chat`` argparse first sets ``args.model`` from the top-level parser, then
+    ``eir -m foo chat`` argparse first sets ``args.model`` from the top-level parser, then
     dispatches to the chat subparser, which shares the namespace and ``dest`` — a plain ``None``
     default would silently clobber the top-level value. SUPPRESS keeps the subparser action a no-op
-    unless the flag is actually passed after the subcommand (tests/hermes_cli/
+    unless the flag is actually passed after the subcommand (tests/eir_cli/
     test_argparse_flag_propagation.py).
     """
     chat_parser = subparsers.add_parser(
         "chat", help="Interactive chat with the agent",
-        description="Start an interactive chat session with Hermes Agent")
+        description="Start an interactive chat session with Eir Agent")
     add, inherited, SUPPRESS = chat_parser.add_argument, _inherited_flag, argparse.SUPPRESS
     _query_group = chat_parser.add_mutually_exclusive_group()
     _query_group.add_argument("-q", "--query", help=(
@@ -296,7 +296,7 @@ def _build_chat_parser(subparsers) -> argparse.ArgumentParser:
         help="Run in an isolated git worktree (for parallel agents on the same repo)")
     inherited(chat_parser, "--accept-hooks", action="store_true", default=SUPPRESS, help=(
         "Auto-approve any unseen shell hooks declared in config.yaml "
-        "without a TTY prompt (see also HERMES_ACCEPT_HOOKS env var and "
+        "without a TTY prompt (see also EIR_ACCEPT_HOOKS env var and "
         "hooks_auto_accept: in config.yaml)."))
     inherited(chat_parser, "--checkpoints", action="store_true", default=SUPPRESS,
               help="Enable filesystem checkpoints before destructive file operations (use /rollback to restore)")
@@ -318,7 +318,7 @@ def _build_chat_parser(subparsers) -> argparse.ArgumentParser:
     inherited(chat_parser, "--ignore-rules", action="store_true", default=SUPPRESS,
               help="Skip auto-injection of AGENTS.md, SOUL.md, .cursorrules, memory, and preloaded skills. Combine with --ignore-user-config for a fully isolated run.")
     inherited(chat_parser, "--safe-mode", action="store_true", default=SUPPRESS,
-              help="Troubleshooting mode: disable ALL customizations — user config, AGENTS.md/memory injection, plugins, and MCP servers (implies --ignore-user-config and --ignore-rules). Use to isolate whether a problem comes from your setup or from Hermes itself.")
+              help="Troubleshooting mode: disable ALL customizations — user config, AGENTS.md/memory injection, plugins, and MCP servers (implies --ignore-user-config and --ignore-rules). Use to isolate whether a problem comes from your setup or from Eir itself.")
     add("--source", default=None,
         help="Session source tag for filtering (default: cli). Use 'tool' for third-party integrations that should not appear in user session lists.")
     inherited(chat_parser, "--tui", action="store_true", default=SUPPRESS,
@@ -334,26 +334,26 @@ def _build_chat_parser(subparsers) -> argparse.ArgumentParser:
 
 def _plugin_command_install_hint(prog: str, value: str):
     """Install command when *value* names a catalog memory plugin that resolves nowhere: its
-    ``hermes <name>`` command exists only once the plugin is installed. Top level only; never raises."""
-    if prog != "hermes" or not re.fullmatch(r"[a-z0-9_-]{1,64}", value):
+    ``eir <name>`` command exists only once the plugin is installed. Top level only; never raises."""
+    if prog != "eir" or not re.fullmatch(r"[a-z0-9_-]{1,64}", value):
         return None
     try:
         from plugins.memory import find_provider_dir
         if find_provider_dir(value) is not None:
             return None
-        from hermes_cli.memory_provider_migration import catalog_install_hint
+        from eir_cli.memory_provider_migration import catalog_install_hint
         return catalog_install_hint(value, category="memory")
     except Exception:
         return None
 
 
 def _moved_command_hint(prog: str, value: str) -> str:
-    """Where a command that left core went (``hermes auth spotify``, ``hermes mcp serve``, ...)."""
-    from hermes_cli.left_core_migration import moved_command_hint
+    """Where a command that left core went (``eir auth spotify``, ``eir mcp serve``, ...)."""
+    from eir_cli.left_core_migration import moved_command_hint
     return moved_command_hint(prog, value)
 
 
-class HermesArgumentParser(argparse.ArgumentParser):
+class EirArgumentParser(argparse.ArgumentParser):
     """argparse parser whose unknown-subcommand error is three short lines, not a 70-name dump.
 
     Stock argparse prints the full usage block plus ``(choose from 'chat', 'model', …)`` when
@@ -364,14 +364,14 @@ class HermesArgumentParser(argparse.ArgumentParser):
 
     def _check_value(self, action, value):
         if isinstance(action, argparse._SubParsersAction) and value not in action.choices:
-            # ``self.prog`` is "hermes" at the top level and "hermes gateway" for a nested group
+            # ``self.prog`` is "eir" at the top level and "eir gateway" for a nested group
             # (argparse hands add_parser() the parent's class), so the copy stays correct for both.
             lines = [f"{self.prog}: '{value}' is not a `{self.prog}` command."]
             close = difflib.get_close_matches(str(value), list(action.choices), n=3, cutoff=0.6)
             install = _plugin_command_install_hint(self.prog, str(value))
             moved = "" if install else _moved_command_hint(self.prog, str(value))
             if install:
-                # A provider that left core (``hermes honcho``) registers its command only once installed.
+                # A provider that left core (``eir honcho``) registers its command only once installed.
                 lines.append(f"The '{value}' memory plugin is not installed. Install it with: {install}")
             elif moved:
                 lines.append(moved)
@@ -389,27 +389,27 @@ def build_top_level_parser():
     ``chat_parser.set_defaults(func= cmd_chat)`` and registers further subparsers via
     ``subparsers.add_parser(...)``.
     """
-    parser = HermesArgumentParser(
-        prog="hermes", description="Hermes Agent - AI assistant with tool-calling capabilities",
+    parser = EirArgumentParser(
+        prog="eir", description="Eir Agent - AI assistant with tool-calling capabilities",
         formatter_class=argparse.RawDescriptionHelpFormatter, epilog=_EPILOGUE)
     _add_top_level_flags(parser)
-    # metavar keeps the usage line to ``hermes [...] <command>`` instead of the brace list of
-    # every subcommand name; ``hermes --help`` still lists each command with its help row.
+    # metavar keeps the usage line to ``eir [...] <command>`` instead of the brace list of
+    # every subcommand name; ``eir --help`` still lists each command with its help row.
     subparsers = parser.add_subparsers(dest="command", help="Command to run", metavar="<command>")
     return parser, subparsers, _build_chat_parser(subparsers)
 
 
 # Pre-parse of `-p`/`--profile` (main._apply_profile_override); shared with the container boot
 # reconciler, which reads the container CMD without importing the side-effectful CLI entry point.
-_PROFILE_NAME_RE = r"^[a-z0-9][a-z0-9_-]{0,63}$"  # mirrors hermes_cli.profiles._PROFILE_ID_RE
+_PROFILE_NAME_RE = r"^[a-z0-9][a-z0-9_-]{0,63}$"  # mirrors eir_cli.profiles._PROFILE_ID_RE
 
 
 def _inside_mcp_add_args(argv: list, index: int) -> bool:
-    """True once argv reaches `hermes mcp add ... --args <command argv>`.
+    """True once argv reaches `eir mcp add ... --args <command argv>`.
 
     ``mcp add --args`` is command-argv passthrough. Flags after that point
     belong to the child MCP command (for example Docker MCP Toolkit's
-    ``--profile``), not to Hermes' own profile selector.
+    ``--profile``), not to Eir' own profile selector.
     """
     try:
         mcp_index = argv.index("mcp", 0, index)
@@ -419,20 +419,20 @@ def _inside_mcp_add_args(argv: list, index: int) -> bool:
     return True
 
 
-def _looks_like_hermes_invocation() -> bool:
-    """False when ``sys.argv`` belongs to a test runner rather than a ``hermes`` run.
+def _looks_like_eir_invocation() -> bool:
+    """False when ``sys.argv`` belongs to a test runner rather than a ``eir`` run.
 
     pytest's own ``-p no:xdist`` reaches ``scan_profile_flag`` through ``sys.argv`` at import
-    time; it must stay a silent skip, while a real ``hermes -p 'Work Bot'`` must fail loudly.
+    time; it must stay a silent skip, while a real ``eir -p 'Work Bot'`` must fail loudly.
     """
     return "pytest" not in (sys.argv[0] or "")
 
 
 def _exit_invalid_profile_name(value: str) -> None:
-    from hermes_cli.profiles import _invalid_profile_name_error
+    from eir_cli.profiles import _invalid_profile_name_error
 
     print(f"Error: {_invalid_profile_name_error(value)}", file=sys.stderr)
-    print("Run `hermes profile list` to see your profiles.", file=sys.stderr)
+    print("Run `eir profile list` to see your profiles.", file=sys.stderr)
     sys.exit(2)
 
 
@@ -445,15 +445,15 @@ def _looks_like_option_value(value: str) -> bool:
 def scan_profile_flag(argv: list) -> tuple:
     """Find -p/--profile/--profile= in argv -> (name, tokens_consumed, index).
 
-    Historically the flag worked even after the subcommand (`hermes chat -p
+    Historically the flag worked even after the subcommand (`eir chat -p
     coder`), so scan broadly; stop at ``--`` and at the `mcp add --args`
     passthrough region. The value is normalised (strip + casefold, matching
     ``profiles.normalize_profile_name``) before validation so ``-p Work`` selects
     ``work``. A value that cannot be a profile name is rejected so
     resolve_profile_env never sys.exits on it; the rejection is explained (exit 2)
     only when the flag comes BEFORE the first subcommand token under a real
-    ``hermes`` run — after a subcommand, ``-p`` may belong to that subcommand or a
-    plugin (`hermes kanban ... -p 8080`), and option-looking values (``no:xdist``,
+    ``eir`` run — after a subcommand, ``-p`` may belong to that subcommand or a
+    plugin (`eir kanban ... -p 8080`), and option-looking values (``no:xdist``,
     ``--flag``) are always a silent skip.
     """
     value_flags, optional_value_flags = top_level_value_flag_sets()
@@ -468,7 +468,7 @@ def scan_profile_flag(argv: list) -> tuple:
             value = raw.strip().casefold()
             if re.match(_PROFILE_NAME_RE, value):
                 return value, 2, i
-            if not saw_subcommand and not _looks_like_option_value(raw) and _looks_like_hermes_invocation():
+            if not saw_subcommand and not _looks_like_option_value(raw) and _looks_like_eir_invocation():
                 _exit_invalid_profile_name(raw)
             break
         if arg.startswith("--profile="):
@@ -507,7 +507,7 @@ def gateway_run_no_supervise(argv) -> bool:
     import contextlib
     import io
 
-    from hermes_cli.subcommands.gateway import build_gateway_parser
+    from eir_cli.subcommands.gateway import build_gateway_parser
 
     args = list(argv)
     scanned = scan_profile_flag_quietly(args)

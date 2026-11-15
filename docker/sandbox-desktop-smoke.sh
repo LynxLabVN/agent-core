@@ -38,9 +38,9 @@ echo "== 2. launcher.sh publishes a display"
 docker cp "$HERE/tools/bot_desktop/launcher.sh" "$NAME:/tmp/launcher.sh"
 docker cp "$HERE/tools/bot_desktop/wallpaper.png" "$NAME:/tmp/wallpaper.png"
 docker exec -u pn -d "$NAME" bash -c '
-  mkdir -p /tmp/bd && HERMES_BD_PROFILE=smoke HERMES_BD_DISPLAY_NUM=20 HERMES_BD_SOCKET=/tmp/bd/rfb.sock \
-  HERMES_BD_XAUTH=/tmp/bd/Xauthority HERMES_BD_ENV_FILE=/tmp/bd/env HERMES_BD_CONFIG_HOME=/tmp/bd/xdg \
-  HERMES_BD_WALLPAPER=/tmp/wallpaper.png bash /tmp/launcher.sh >/tmp/bd/launcher.log 2>&1'
+  mkdir -p /tmp/bd && EIR_BD_PROFILE=smoke EIR_BD_DISPLAY_NUM=20 EIR_BD_SOCKET=/tmp/bd/rfb.sock \
+  EIR_BD_XAUTH=/tmp/bd/Xauthority EIR_BD_ENV_FILE=/tmp/bd/env EIR_BD_CONFIG_HOME=/tmp/bd/xdg \
+  EIR_BD_WALLPAPER=/tmp/wallpaper.png bash /tmp/launcher.sh >/tmp/bd/launcher.log 2>&1'
 for _ in $(seq 1 60); do
   docker exec -u pn "$NAME" test -S /tmp/bd/rfb.sock -a -f /tmp/bd/env 2>/dev/null && break
   sleep 0.5

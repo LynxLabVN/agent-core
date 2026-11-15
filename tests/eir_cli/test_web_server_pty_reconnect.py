@@ -6,7 +6,7 @@ from pathlib import Path
 from urllib.parse import urlencode
 
 import pytest
-import hermes_cli.web_server_chat as _web_server_chat
+import eir_cli.web_server_chat as _web_server_chat
 
 
 pytestmark = pytest.mark.platforms("posix")  # PTY bridge is POSIX-only
@@ -38,10 +38,10 @@ class _OneFrameBridge:
 
 
 @pytest.fixture
-def pty_client(monkeypatch, _isolate_hermes_home):
+def pty_client(monkeypatch, _isolate_eir_home):
     from starlette.testclient import TestClient
 
-    import hermes_cli.web_server as ws
+    import eir_cli.web_server as ws
 
     monkeypatch.setattr(ws, "_DASHBOARD_EMBEDDED_CHAT_ENABLED", True)
     monkeypatch.setattr(_web_server_chat.PtyBridge, "spawn", _OneFrameBridge.spawn)
@@ -70,7 +70,7 @@ def test_fresh_param_ignores_channel_active_session_file(pty_client, monkeypatch
     def fake_resolve(resume=None, sidecar_url=None, profile=None, active_session_file=None):
         captured["active_session_file"] = active_session_file
         captured["resume"] = resume
-        return (["fake-hermes-tui"], None, None)
+        return (["fake-eir-tui"], None, None)
 
     monkeypatch.setattr(_web_server_chat, "_resolve_chat_argv", fake_resolve)
 
@@ -97,7 +97,7 @@ def test_active_session_fallback_sends_resume_control_message(pty_client, monkey
     active_file.write_text(json.dumps({"session_id": "sess-old"}), encoding="utf-8")
 
     monkeypatch.setattr(
-        _web_server_chat, "_resolve_chat_argv", lambda **kw: (["fake-hermes-tui"], None, None)
+        _web_server_chat, "_resolve_chat_argv", lambda **kw: (["fake-eir-tui"], None, None)
     )
 
     with client.websocket_connect(_url(token, channel=channel)) as conn:
@@ -111,7 +111,7 @@ def test_explicit_resume_sends_no_control_message(pty_client, monkeypatch):
     channel = "explicit-resume-chan"
 
     monkeypatch.setattr(
-        _web_server_chat, "_resolve_chat_argv", lambda **kw: (["fake-hermes-tui"], None, None)
+        _web_server_chat, "_resolve_chat_argv", lambda **kw: (["fake-eir-tui"], None, None)
     )
 
     with client.websocket_connect(
@@ -142,7 +142,7 @@ def test_child_eof_closes_socket_and_bridge(pty_client, monkeypatch):
 
     monkeypatch.setattr(_web_server_chat.PtyBridge, "spawn", _RecordingBridge.spawn)
     monkeypatch.setattr(
-        _web_server_chat, "_resolve_chat_argv", lambda **kw: (["fake-hermes-tui"], None, None)
+        _web_server_chat, "_resolve_chat_argv", lambda **kw: (["fake-eir-tui"], None, None)
     )
 
     # The client never sends a disconnect of its own — it only reads the one
@@ -172,7 +172,7 @@ def test_profile_switch_closes_previous_profile_keepalive_pty(pty_client, monkey
     Regression for #125287: the profile switch spawned a new keep-alive PTY under
     ``token\\0profile`` and left the previous profile's TUI alive (detached) for the
     registry TTL, still holding that chat's active-session lease, so returning to the
-    chat was refused with "open in another Hermes window".
+    chat was refused with "open in another Eir window".
     """
     import time
 
@@ -197,7 +197,7 @@ def test_profile_switch_closes_previous_profile_keepalive_pty(pty_client, monkey
 
     monkeypatch.setattr(_web_server_chat.PtyBridge, "spawn", _IdleBridge.spawn)
     monkeypatch.setattr(
-        _web_server_chat, "_resolve_chat_argv", lambda **kw: (["fake-hermes-tui"], None, None)
+        _web_server_chat, "_resolve_chat_argv", lambda **kw: (["fake-eir-tui"], None, None)
     )
     attach = "attach-125287"
     try:

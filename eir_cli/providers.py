@@ -1,4 +1,4 @@
-"""Single source of truth for provider identity in Hermes Agent."""
+"""Single source of truth for provider identity in Eir Agent."""
 
 from __future__ import annotations
 
@@ -11,11 +11,11 @@ from utils import base_url_host_matches, base_url_hostname
 logger = logging.getLogger(__name__)
 
 
-# -- Hermes overlay: metadata models.dev doesn't provide ----------------------
+# -- Eir overlay: metadata models.dev doesn't provide ----------------------
 
 @dataclass(frozen=True)
-class HermesOverlay:
-    """Hermes-specific provider metadata layered on top of models.dev."""
+class EirOverlay:
+    """Eir-specific provider metadata layered on top of models.dev."""
 
     transport: str = "openai_chat"        # openai_chat | anthropic_messages | codex_responses
     is_aggregator: bool = False
@@ -25,71 +25,71 @@ class HermesOverlay:
     base_url_env_var: str = ""            # env var for user-custom base URL
 
 
-HERMES_OVERLAYS: dict[str, HermesOverlay] = {
-    "moa": HermesOverlay(auth_type="virtual", base_url_override="moa://local"),
-    "openrouter": HermesOverlay(is_aggregator=True, base_url_env_var="OPENROUTER_BASE_URL"),
-    "nous": HermesOverlay(auth_type="oauth_device_code", base_url_override="https://inference-api.nousresearch.com/v1"),
-    "openai-codex": HermesOverlay(transport="codex_responses", auth_type="oauth_external",
+EIR_OVERLAYS: dict[str, EirOverlay] = {
+    "moa": EirOverlay(auth_type="virtual", base_url_override="moa://local"),
+    "openrouter": EirOverlay(is_aggregator=True, base_url_env_var="OPENROUTER_BASE_URL"),
+    "nous": EirOverlay(auth_type="oauth_device_code", base_url_override="https://inference-api.nousresearch.com/v1"),
+    "openai-codex": EirOverlay(transport="codex_responses", auth_type="oauth_external",
                                   base_url_override="https://chatgpt.com/backend-api/codex"),
-    "openai-api": HermesOverlay(transport="codex_responses", base_url_override="https://api.openai.com/v1",
+    "openai-api": EirOverlay(transport="codex_responses", base_url_override="https://api.openai.com/v1",
                                 base_url_env_var="OPENAI_BASE_URL"),
-    "xai-oauth": HermesOverlay(transport="codex_responses", auth_type="oauth_external",
+    "xai-oauth": EirOverlay(transport="codex_responses", auth_type="oauth_external",
                                base_url_override="https://api.x.ai/v1", base_url_env_var="XAI_BASE_URL"),
-    "qwen-oauth": HermesOverlay(auth_type="oauth_external", base_url_override="https://portal.qwen.ai/v1",
-                                base_url_env_var="HERMES_QWEN_BASE_URL"),
-    "lmstudio": HermesOverlay(extra_env_vars=("LM_API_KEY",), base_url_override="http://127.0.0.1:1234/v1",
+    "qwen-oauth": EirOverlay(auth_type="oauth_external", base_url_override="https://portal.qwen.ai/v1",
+                                base_url_env_var="EIR_QWEN_BASE_URL"),
+    "lmstudio": EirOverlay(extra_env_vars=("LM_API_KEY",), base_url_override="http://127.0.0.1:1234/v1",
                               base_url_env_var="LM_BASE_URL"),
-    "anthropic": HermesOverlay(transport="anthropic_messages", extra_env_vars=("ANTHROPIC_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN")),
-    "zai": HermesOverlay(extra_env_vars=("GLM_API_KEY", "ZAI_API_KEY", "Z_AI_API_KEY"), base_url_env_var="GLM_BASE_URL"),
-    "kimi-for-coding": HermesOverlay(base_url_env_var="KIMI_BASE_URL"),
-    "stepfun": HermesOverlay(extra_env_vars=("STEPFUN_API_KEY",),
+    "anthropic": EirOverlay(transport="anthropic_messages", extra_env_vars=("ANTHROPIC_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN")),
+    "zai": EirOverlay(extra_env_vars=("GLM_API_KEY", "ZAI_API_KEY", "Z_AI_API_KEY"), base_url_env_var="GLM_BASE_URL"),
+    "kimi-for-coding": EirOverlay(base_url_env_var="KIMI_BASE_URL"),
+    "stepfun": EirOverlay(extra_env_vars=("STEPFUN_API_KEY",),
                              base_url_override="https://api.stepfun.ai/step_plan/v1",
                              base_url_env_var="STEPFUN_BASE_URL"),
-    "minimax": HermesOverlay(transport="anthropic_messages", base_url_env_var="MINIMAX_BASE_URL"),
-    "minimax-oauth": HermesOverlay(transport="anthropic_messages", auth_type="oauth_external",
+    "minimax": EirOverlay(transport="anthropic_messages", base_url_env_var="MINIMAX_BASE_URL"),
+    "minimax-oauth": EirOverlay(transport="anthropic_messages", auth_type="oauth_external",
                                    base_url_override="https://api.minimax.io/anthropic"),
-    "minimax-cn": HermesOverlay(transport="anthropic_messages", base_url_env_var="MINIMAX_CN_BASE_URL"),
-    "deepseek": HermesOverlay(base_url_env_var="DEEPSEEK_BASE_URL"),
-    "alibaba": HermesOverlay(base_url_env_var="DASHSCOPE_BASE_URL"),
-    "alibaba-coding-plan": HermesOverlay(base_url_env_var="ALIBABA_CODING_PLAN_BASE_URL"),
-    "vercel": HermesOverlay(is_aggregator=True),
-    "opencode": HermesOverlay(is_aggregator=True, base_url_env_var="OPENCODE_ZEN_BASE_URL"),
-    "opencode-go": HermesOverlay(is_aggregator=True, base_url_env_var="OPENCODE_GO_BASE_URL"),
-    "kilo": HermesOverlay(is_aggregator=True, base_url_env_var="KILOCODE_BASE_URL"),
-    "huggingface": HermesOverlay(is_aggregator=True, base_url_env_var="HF_BASE_URL"),
-    "novita": HermesOverlay(is_aggregator=True, base_url_env_var="NOVITA_BASE_URL"),
-    "xai": HermesOverlay(transport="codex_responses", base_url_override="https://api.x.ai/v1", base_url_env_var="XAI_BASE_URL"),
-    "nvidia": HermesOverlay(base_url_override="https://integrate.api.nvidia.com/v1", base_url_env_var="NVIDIA_BASE_URL"),
-    "xiaomi": HermesOverlay(base_url_env_var="XIAOMI_BASE_URL"),
-    "tencent-tokenhub": HermesOverlay(base_url_env_var="TOKENHUB_BASE_URL"),
-    "tencent-tokenplan": HermesOverlay(transport="anthropic_messages",
+    "minimax-cn": EirOverlay(transport="anthropic_messages", base_url_env_var="MINIMAX_CN_BASE_URL"),
+    "deepseek": EirOverlay(base_url_env_var="DEEPSEEK_BASE_URL"),
+    "alibaba": EirOverlay(base_url_env_var="DASHSCOPE_BASE_URL"),
+    "alibaba-coding-plan": EirOverlay(base_url_env_var="ALIBABA_CODING_PLAN_BASE_URL"),
+    "vercel": EirOverlay(is_aggregator=True),
+    "opencode": EirOverlay(is_aggregator=True, base_url_env_var="OPENCODE_ZEN_BASE_URL"),
+    "opencode-go": EirOverlay(is_aggregator=True, base_url_env_var="OPENCODE_GO_BASE_URL"),
+    "kilo": EirOverlay(is_aggregator=True, base_url_env_var="KILOCODE_BASE_URL"),
+    "huggingface": EirOverlay(is_aggregator=True, base_url_env_var="HF_BASE_URL"),
+    "novita": EirOverlay(is_aggregator=True, base_url_env_var="NOVITA_BASE_URL"),
+    "xai": EirOverlay(transport="codex_responses", base_url_override="https://api.x.ai/v1", base_url_env_var="XAI_BASE_URL"),
+    "nvidia": EirOverlay(base_url_override="https://integrate.api.nvidia.com/v1", base_url_env_var="NVIDIA_BASE_URL"),
+    "xiaomi": EirOverlay(base_url_env_var="XIAOMI_BASE_URL"),
+    "tencent-tokenhub": EirOverlay(base_url_env_var="TOKENHUB_BASE_URL"),
+    "tencent-tokenplan": EirOverlay(transport="anthropic_messages",
                                        base_url_override="https://api.lkeap.cloud.tencent.com/plan/anthropic",
                                        base_url_env_var="TOKENPLAN_BASE_URL"),
-    "arcee": HermesOverlay(base_url_override="https://api.arcee.ai/api/v1", base_url_env_var="ARCEE_BASE_URL"),
+    "arcee": EirOverlay(base_url_override="https://api.arcee.ai/api/v1", base_url_env_var="ARCEE_BASE_URL"),
     # models.dev lists CommandCode under CMD_API_KEY; the plugin profile and docs use COMMANDCODE_API_KEY.
-    "commandcode": HermesOverlay(extra_env_vars=("COMMANDCODE_API_KEY",),
+    "commandcode": EirOverlay(extra_env_vars=("COMMANDCODE_API_KEY",),
                                  base_url_override="https://api.commandcode.ai/provider/v1",
                                  base_url_env_var="COMMANDCODE_BASE_URL"),
-    "gmi": HermesOverlay(extra_env_vars=("GMI_API_KEY",), base_url_override="https://api.gmi-serving.com/v1",
+    "gmi": EirOverlay(extra_env_vars=("GMI_API_KEY",), base_url_override="https://api.gmi-serving.com/v1",
                          base_url_env_var="GMI_BASE_URL"),
-    "fireworks": HermesOverlay(extra_env_vars=("FIREWORKS_API_KEY",),
+    "fireworks": EirOverlay(extra_env_vars=("FIREWORKS_API_KEY",),
                                base_url_override="https://api.fireworks.ai/inference/v1"),
-    "actual": HermesOverlay(transport="chat_completions", extra_env_vars=("ACTUAL_API_KEY",),
+    "actual": EirOverlay(transport="chat_completions", extra_env_vars=("ACTUAL_API_KEY",),
                             base_url_override="https://api.actual.inc/v1", base_url_env_var="ACTUAL_BASE_URL"),
-    "upstage": HermesOverlay(extra_env_vars=("UPSTAGE_API_KEY",), base_url_override="https://api.upstage.ai/v1",
+    "upstage": EirOverlay(extra_env_vars=("UPSTAGE_API_KEY",), base_url_override="https://api.upstage.ai/v1",
                              base_url_env_var="UPSTAGE_BASE_URL"),
-    "nebius-token-factory": HermesOverlay(extra_env_vars=("NEBIUS_API_KEY", "NEBIUS_TOKEN_FACTORY_API_KEY"),
+    "nebius-token-factory": EirOverlay(extra_env_vars=("NEBIUS_API_KEY", "NEBIUS_TOKEN_FACTORY_API_KEY"),
                                           base_url_override="https://api.tokenfactory.nebius.com/v1",
                                           base_url_env_var="NEBIUS_BASE_URL"),
-    "ollama-cloud": HermesOverlay(base_url_override="https://ollama.com/v1", base_url_env_var="OLLAMA_BASE_URL"),
+    "ollama-cloud": EirOverlay(base_url_override="https://ollama.com/v1", base_url_env_var="OLLAMA_BASE_URL"),
     # Azure Foundry serves OpenAI- and Anthropic-style endpoints; transport comes from model.api_mode.
-    "azure-foundry": HermesOverlay(base_url_env_var="AZURE_FOUNDRY_BASE_URL"),
-    "bedrock": HermesOverlay(transport="bedrock_converse", auth_type="aws_sdk"),
+    "azure-foundry": EirOverlay(base_url_env_var="AZURE_FOUNDRY_BASE_URL"),
+    "bedrock": EirOverlay(transport="bedrock_converse", auth_type="aws_sdk"),
     # Vertex is OAuth2 (service-account JSON / ADC), resolved by agent/vertex_adapter.py. Without an
     # overlay get_provider("vertex") is None and auxiliary_client._preserve_provider_with_base_url
     # would treat a Vertex MoA slot as an unknown custom endpoint, losing the identity
     # _refresh_provider_credentials() needs to re-mint an expired token on 401.
-    "vertex": HermesOverlay(auth_type="vertex"),
+    "vertex": EirOverlay(auth_type="vertex"),
 }
 
 
@@ -108,7 +108,7 @@ class ProviderDef:
     is_aggregator: bool = False
     auth_type: str = "api_key"
     doc: str = ""
-    source: str = ""                      # "models.dev", "hermes", "user-config"
+    source: str = ""                      # "models.dev", "eir", "user-config"
 
 
 # -- Aliases: human-friendly / legacy names grouped by canonical (models.dev where possible) id;
@@ -133,7 +133,7 @@ _ALIAS_GROUPS: dict[str, tuple[str, ...]] = {
     "nebius-token-factory": ("nebius", "nebius-tokenfactory", "nebius-tf", "token-factory", "tokenfactory"),
     "lmstudio": ("lmstudio", "lm-studio", "lm_studio"),
     # Local OpenAI-compatible servers route through the generic "custom" provider,
-    # matching hermes_cli.auth and hermes_cli.models so every layer agrees. Issue #62213.
+    # matching eir_cli.auth and eir_cli.models so every layer agrees. Issue #62213.
     "custom": ("ollama", "local", "vllm", "llamacpp", "llama.cpp", "llama-cpp"),
 }
 ALIASES: dict[str, str] = {alias: canon for canon, aliases in _ALIAS_GROUPS.items() for alias in aliases}
@@ -180,11 +180,11 @@ def _profile_overlay_key(prof) -> str:
     return prof.models_dev_id or prof.name
 
 
-def hermes_overlays() -> dict[str, HermesOverlay]:
-    """``HERMES_OVERLAYS`` plus the overlays registered profiles declare (``provider_overlay``)."""
-    merged = dict(HERMES_OVERLAYS)
+def eir_overlays() -> dict[str, EirOverlay]:
+    """``EIR_OVERLAYS`` plus the overlays registered profiles declare (``provider_overlay``)."""
+    merged = dict(EIR_OVERLAYS)
     for prof in _overlay_profiles():
-        merged.setdefault(_profile_overlay_key(prof), HermesOverlay(**prof.provider_overlay))
+        merged.setdefault(_profile_overlay_key(prof), EirOverlay(**prof.provider_overlay))
     return merged
 
 
@@ -195,16 +195,16 @@ def _is_static_canonical(key: str) -> bool:
     """Whether *key* is a built-in canonical id (static tables + the auth registry's built-in rows).
 
     Those never take a profile overlay's name, so ``normalize_provider`` answers them without
-    the per-home profile scan. Asked mid-``hermes_cli.auth`` import (plugin discovery), before its
+    the per-home profile scan. Asked mid-``eir_cli.auth`` import (plugin discovery), before its
     built-in set exists, only the local tables answer and nothing is cached.
     """
     global _STATIC_CANONICAL_IDS
     if not _STATIC_CANONICAL_IDS:
         try:
-            from hermes_cli.auth import BUILTIN_PROVIDER_IDS
+            from eir_cli.auth import BUILTIN_PROVIDER_IDS
         except ImportError:
-            return key in HERMES_OVERLAYS or key in _ALIAS_GROUPS
-        _STATIC_CANONICAL_IDS = BUILTIN_PROVIDER_IDS | frozenset(_ALIAS_GROUPS) | frozenset(HERMES_OVERLAYS)
+            return key in EIR_OVERLAYS or key in _ALIAS_GROUPS
+        _STATIC_CANONICAL_IDS = BUILTIN_PROVIDER_IDS | frozenset(_ALIAS_GROUPS) | frozenset(EIR_OVERLAYS)
     return key in _STATIC_CANONICAL_IDS
 
 
@@ -220,16 +220,16 @@ def normalize_provider(name: str, overlay_profiles: Optional[list] = None) -> st
     return _profile_overlay_key(prof) if prof is not None else key
 
 
-def _get_overlay(canonical: str) -> tuple[Optional[HermesOverlay], str]:
+def _get_overlay(canonical: str) -> tuple[Optional[EirOverlay], str]:
     """``(overlay, label)`` for a canonical id: the static table, else a profile's ``provider_overlay``,
     labelled with the profile's ``display_name`` also when keyed by its models.dev id: without a
     models.dev catalog (offline, blocked) that label is the one picker rows and headings show."""
-    if canonical in HERMES_OVERLAYS:
-        return HERMES_OVERLAYS[canonical], _LABEL_OVERRIDES.get(canonical, canonical)
+    if canonical in EIR_OVERLAYS:
+        return EIR_OVERLAYS[canonical], _LABEL_OVERRIDES.get(canonical, canonical)
     prof = _overlay_profile(canonical)
     if prof is None or _profile_overlay_key(prof) != canonical:
         return None, canonical
-    return HermesOverlay(**prof.provider_overlay), _LABEL_OVERRIDES.get(canonical, prof.display_name or canonical)
+    return EirOverlay(**prof.provider_overlay), _LABEL_OVERRIDES.get(canonical, prof.display_name or canonical)
 
 
 def is_actual_route(provider: str = "", base_url: str = "") -> bool:
@@ -250,7 +250,7 @@ def _models_dev_info(canonical: str, allow_network: bool = True):
         return None
 
 
-def _overlay_pdef(canonical, ov: HermesOverlay, name, env_vars, base_url, doc, source) -> ProviderDef:
+def _overlay_pdef(canonical, ov: EirOverlay, name, env_vars, base_url, doc, source) -> ProviderDef:
     return ProviderDef(id=canonical, name=name, transport=ov.transport, api_key_env_vars=env_vars, base_url=base_url,
                        base_url_env_var=ov.base_url_env_var, is_aggregator=ov.is_aggregator, auth_type=ov.auth_type, doc=doc,
                        source=source)
@@ -262,7 +262,7 @@ def _plugin_alias_owner(canonical: str) -> str:
     A plugin alias that is also a models.dev provider id (``meta`` -> ``meta-ai``, ``azure`` ->
     ``azure-foundry``) otherwise resolved to the bare models.dev entry whenever the catalog
     loaded and to the plugin when it did not, so ``--provider meta`` persisted a different
-    provider depending on the network. ``hermes_cli.auth.resolve_provider`` already answers the
+    provider depending on the network. ``eir_cli.auth.resolve_provider`` already answers the
     plugin id. Built-in ids and overlay profiles keep what ``normalize_provider`` gave them.
     The owner comes from the registry's own lookup, so the bound home's plugin claiming the alias
     wins over a bundled one, exactly as ``get_provider_profile`` would pick it."""
@@ -280,16 +280,16 @@ def _plugin_alias_owner(canonical: str) -> str:
 
 
 def get_provider(name: str, *, allow_network: bool = True) -> Optional[ProviderDef]:
-    """Look up a built-in provider by id or alias: models.dev catalog merged with the Hermes overlay;
-    Hermes-only overlay (nous, openai-codex, …); plugin provider profiles with a concrete endpoint."""
+    """Look up a built-in provider by id or alias: models.dev catalog merged with the Eir overlay;
+    Eir-only overlay (nous, openai-codex, …); plugin provider profiles with a concrete endpoint."""
     canonical = _plugin_alias_owner(normalize_provider(name))
-    from hermes_cli.left_core_migration import provider_left_core
+    from eir_cli.left_core_migration import provider_left_core
     if provider_left_core(canonical):  # its plugin is not loaded: models.dev must not stand in for it
         return None
     mdev_info = _models_dev_info(canonical, allow_network)
     overlay, overlay_label = _get_overlay(canonical)
     if mdev_info is not None:
-        ov = overlay or HermesOverlay()
+        ov = overlay or EirOverlay()
         env_vars = list(mdev_info.env)
         for ev in ov.extra_env_vars:
             if ev not in env_vars:
@@ -298,9 +298,9 @@ def get_provider(name: str, *, allow_network: bool = True) -> Optional[ProviderD
                              mdev_info.doc, "models.dev")
     if overlay is not None:
         return _overlay_pdef(canonical, overlay, overlay_label, overlay.extra_env_vars,
-                             overlay.base_url_override, "", "hermes")
+                             overlay.base_url_override, "", "eir")
     # Plugin-registered profiles (plugins/model-providers/<name>/) absent from models.dev and
-    # HERMES_OVERLAYS would otherwise be "Unknown provider" in /model, --provider and model-switch
+    # EIR_OVERLAYS would otherwise be "Unknown provider" in /model, --provider and model-switch
     # even though the picker lists them. Only profiles with a literal or env-configured endpoint
     # resolve at this rung: placeholder profiles like ``custom`` (aliases ollama/local/vllm) ship
     # an empty base_url and are completed by config.yaml custom_providers — resolving them would
@@ -452,7 +452,7 @@ def _nous_anthropic_wire() -> str:
     """``nous.anthropic_wire``: ``"chat"`` (default), ``"native"``, or ``"auto"`` (chat, then per-session
     promotion decided from the first response; see ``agent/nous_wire.py``). Anything else reads as ``chat``."""
     try:
-        from hermes_cli.config import load_config_readonly
+        from eir_cli.config import load_config_readonly
         value = str(((load_config_readonly().get("nous") or {}).get("anthropic_wire")) or "chat").strip().lower()
     except Exception:
         return "chat"
@@ -573,13 +573,13 @@ def resolve_custom_provider(name: str, custom_providers: Optional[list[dict[str,
 
 
 def _lossy_alias_registry_pdef(raw: str, canonical: str) -> Optional[ProviderDef]:
-    """Exact Hermes registry ids win over LOSSY alias collapsing (kimi-coding-cn must stay distinct
+    """Exact Eir registry ids win over LOSSY alias collapsing (kimi-coding-cn must stay distinct
     from kimi-coding instead of collapsing through the shared models.dev alias "kimi-for-coding").
     A collapse is lossy only when MULTIPLE registry providers normalize to the same canonical name;
-    single-entry rewrites (a Hermes id -> its models.dev id) are correct routing and keep resolving
+    single-entry rewrites (a Eir id -> its models.dev id) are correct routing and keep resolving
     through the built-in chain so overlay transports apply."""
     try:
-        from hermes_cli.auth import PROVIDER_REGISTRY as _AUTH_PROVIDER_REGISTRY
+        from eir_cli.auth import PROVIDER_REGISTRY as _AUTH_PROVIDER_REGISTRY
         _pcfg = _AUTH_PROVIDER_REGISTRY.get(raw)
         if _pcfg is None:
             return None
@@ -591,24 +591,24 @@ def _lossy_alias_registry_pdef(raw: str, canonical: str) -> Optional[ProviderDef
         if len(_rows) > 1:
             return ProviderDef(id=_pcfg.id, name=_pcfg.name, transport="openai_chat",
                                api_key_env_vars=tuple(_pcfg.api_key_env_vars or ()), base_url=_pcfg.inference_base_url or "",
-                               source="hermes-auth-registry")
+                               source="eir-auth-registry")
     except Exception:
         pass
     return None
 
 
 # The local llama.cpp runtime's provider id + aliases: ONE definition, shared by the resolver rung
-# below and the picker's Local row (``hermes_cli/inventory.py``) — the two drifting apart is what
+# below and the picker's Local row (``eir_cli/inventory.py``) — the two drifting apart is what
 # made the row's own id unresolvable.
 LLAMACPP_PROVIDER_ID = "llamacpp"
 LLAMACPP_ALIASES: tuple[str, ...] = (LLAMACPP_PROVIDER_ID, "llama.cpp", "llama-cpp")
 
 
 def _has_staged_local_models() -> bool:
-    """True when GGUFs are staged under the Hermes home's ``models/`` — the model the picker's Local
+    """True when GGUFs are staged under the Eir home's ``models/`` — the model the picker's Local
     row offers, which the runtime seam serves by booting/attaching a server on selection."""
     try:
-        from hermes_cli.local_runtime.bootstrap import staged_model_ids
+        from eir_cli.local_runtime.bootstrap import staged_model_ids
         return bool(staged_model_ids())
     except Exception:
         return False
@@ -622,8 +622,8 @@ def _llamacpp_pdef() -> Optional[ProviderDef]:
     made that row offer a provider the resolver rejected ("Unknown provider 'llamacpp'"). Without
     this rung model-switch rejected the very provider the Local Models 'Use' flow writes to config."""
     try:
-        from hermes_cli.config import load_config_readonly
-        from hermes_cli.local_runtime.endpoint import resolve_llamacpp_endpoint
+        from eir_cli.config import load_config_readonly
+        from eir_cli.local_runtime.endpoint import resolve_llamacpp_endpoint
         endpoint = resolve_llamacpp_endpoint(config=load_config_readonly(), wait_for_boot_s=0)
     except Exception:
         endpoint = None
@@ -678,7 +678,7 @@ def resolve_provider_full(name: str, user_providers: Optional[dict[str, Any]] = 
         pass
     # Plugin profiles whose endpoint is minted at runtime (empty base_url, e.g. a token exchange
     # that also returns the host) are still real providers: /model --provider, the model picker
-    # and `hermes model` must not reject them as unknown. Last rung, so every user-configured
+    # and `eir model` must not reject them as unknown. Last rung, so every user-configured
     # entry above wins; the bare ``custom`` placeholder is excluded because model-switch completes
     # it from the current endpoint (see get_provider).
     pdef = _plugin_profile_pdef(canonical)

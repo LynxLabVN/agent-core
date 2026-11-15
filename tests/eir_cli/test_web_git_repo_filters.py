@@ -15,8 +15,8 @@ from pathlib import Path
 
 import pytest
 
-from hermes_cli import web_git
-from hermes_cli._subprocess_compat import FILTER_DISCOVERY_FAILED
+from eir_cli import web_git
+from eir_cli._subprocess_compat import FILTER_DISCOVERY_FAILED
 
 pytestmark = pytest.mark.skipif(shutil.which("git") is None, reason="git required")
 

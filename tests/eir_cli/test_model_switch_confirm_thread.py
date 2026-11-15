@@ -17,7 +17,7 @@ synchronous.
 import threading
 from types import SimpleNamespace
 
-from hermes_cli.model_switch import ModelSwitchResult
+from eir_cli.model_switch import ModelSwitchResult
 
 
 class _FakeAgent:
@@ -36,7 +36,7 @@ class _StubCLI:
     def _stage_and_swap_model(self, result, old_model):
         # Staging + in-place swap lives in a helper; run the real one on this stub.
         import cli as _cli_mod
-        return _cli_mod.HermesCLI._stage_and_swap_model(self, result, old_model)
+        return _cli_mod.EirCLI._stage_and_swap_model(self, result, old_model)
 
     model = "old/model"
     provider = "openrouter"
@@ -60,7 +60,7 @@ class _StubCLI:
     ):
         import cli as cli_mod
 
-        return cli_mod.HermesCLI._confirm_and_apply_cli_model_switch(
+        return cli_mod.EirCLI._confirm_and_apply_cli_model_switch(
             self, result, persist_global, one_turn, custom_provs
         )
 
@@ -82,7 +82,7 @@ def _patch_deps(monkeypatch, printed):
 
     monkeypatch.setattr(cli_mod, "_cprint", lambda s, *a, **k: printed.append(str(s)))
     monkeypatch.setattr(
-        "hermes_cli.inventory.load_picker_context",
+        "eir_cli.inventory.load_picker_context",
         lambda: SimpleNamespace(
             user_providers=None,
             custom_providers=None,
@@ -92,10 +92,10 @@ def _patch_deps(monkeypatch, printed):
         ),
     )
     monkeypatch.setattr(
-        "hermes_cli.model_switch.switch_model", lambda **_: _make_result()
+        "eir_cli.model_switch.switch_model", lambda **_: _make_result()
     )
     monkeypatch.setattr(
-        "hermes_cli.model_switch.resolve_display_context_length", lambda *a, **k: None
+        "eir_cli.model_switch.resolve_display_context_length", lambda *a, **k: None
     )
     return cli_mod
 
@@ -126,7 +126,7 @@ def test_confirm_runs_off_main_thread_when_tui_present(monkeypatch):
     monkeypatch.setattr(stub, "_confirm_expensive_model_switch", _confirm.__get__(stub))
 
     before = set(threading.enumerate())
-    cli_mod.HermesCLI._handle_model_switch(
+    cli_mod.EirCLI._handle_model_switch(
         stub, "/model claude-sonnet-4.6 --provider anthropic"
     )
 
@@ -164,7 +164,7 @@ def test_confirm_stays_synchronous_without_app(monkeypatch):
 
     monkeypatch.setattr(stub, "_confirm_expensive_model_switch", _confirm.__get__(stub))
 
-    cli_mod.HermesCLI._handle_model_switch(
+    cli_mod.EirCLI._handle_model_switch(
         stub, "/model claude-sonnet-4.6 --provider anthropic"
     )
 

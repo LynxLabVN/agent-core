@@ -1,9 +1,9 @@
 """Tests for git self-heal: atomic worktree-add failure cleanup + pack maintenance.
 
-Regression for the Aug 2026 `hermes -w` timeout incident: 39 accumulated packs
+Regression for the Aug 2026 `eir -w` timeout incident: 39 accumulated packs
 slowed object lookups until `git worktree add` blew its 30s timeout, and the
 timed-out add left a partially-materialized worktree plus a LOCKED admin entry
-(lock pid = the live hermes process), poisoning every retry.
+(lock pid = the live eir process), poisoning every retry.
 
 Two behaviors:
 1. `_cleanup_failed_worktree_add` — removes the partial dir, the admin entry
@@ -42,10 +42,10 @@ class TestCleanupFailedWorktreeAdd:
         """Reproduce git's post-timeout wreckage: partial dir + LOCKED admin
         entry + branch. Built from a real add then re-locking + damaging it,
         which yields the same on-disk shape as a killed `worktree add`."""
-        wt = repo / ".worktrees" / "hermes-dead00"
-        _git(repo, "worktree", "add", str(wt), "-b", "hermes/hermes-dead00")
-        # Live-pid lock, exactly what `hermes -w` writes before the checkout.
-        _git(repo, "worktree", "lock", str(wt), "--reason", "hermes pid=999999")
+        wt = repo / ".worktrees" / "eir-dead00"
+        _git(repo, "worktree", "add", str(wt), "-b", "eir/eir-dead00")
+        # Live-pid lock, exactly what `eir -w` writes before the checkout.
+        _git(repo, "worktree", "lock", str(wt), "--reason", "eir pid=999999")
         # Partial materialization: gut the checkout but keep the dir + .git file.
         for child in wt.iterdir():
             if child.name != ".git":
@@ -53,37 +53,37 @@ class TestCleanupFailedWorktreeAdd:
         return wt
 
     def test_sweeps_dir_admin_entry_and_branch(self, repo):
-        from hermes_cli.worktree_ops import _cleanup_failed_worktree_add
+        from eir_cli.worktree_ops import _cleanup_failed_worktree_add
 
         wt = self._simulate_timed_out_add(repo)
-        admin = repo / ".git" / "worktrees" / "hermes-dead00"
+        admin = repo / ".git" / "worktrees" / "eir-dead00"
         assert admin.exists() and (admin / "locked").exists()
 
-        _cleanup_failed_worktree_add(str(repo), wt, "hermes/hermes-dead00")
+        _cleanup_failed_worktree_add(str(repo), wt, "eir/eir-dead00")
 
         assert not wt.exists(), "partial worktree dir must be removed"
         assert not admin.exists(), "LOCKED admin entry must be removed"
-        branches = _git(repo, "branch", "--list", "hermes/hermes-dead00").stdout
+        branches = _git(repo, "branch", "--list", "eir/eir-dead00").stdout
         assert branches.strip() == "", "orphaned branch must be deleted"
 
     def test_retry_succeeds_after_cleanup(self, repo):
         """The whole point: the same worktree name is creatable again."""
-        from hermes_cli.worktree_ops import _cleanup_failed_worktree_add
+        from eir_cli.worktree_ops import _cleanup_failed_worktree_add
 
         wt = self._simulate_timed_out_add(repo)
-        _cleanup_failed_worktree_add(str(repo), wt, "hermes/hermes-dead00")
+        _cleanup_failed_worktree_add(str(repo), wt, "eir/eir-dead00")
 
         result = _git(
-            repo, "worktree", "add", str(wt), "-b", "hermes/hermes-dead00", check=False
+            repo, "worktree", "add", str(wt), "-b", "eir/eir-dead00", check=False
         )
         assert result.returncode == 0, f"retry failed: {result.stderr}"
 
     def test_noop_when_nothing_exists(self, repo):
         """Fail-soft on an error path where git never created anything."""
-        from hermes_cli.worktree_ops import _cleanup_failed_worktree_add
+        from eir_cli.worktree_ops import _cleanup_failed_worktree_add
 
         _cleanup_failed_worktree_add(
-            str(repo), repo / ".worktrees" / "never-existed", "hermes/never-existed"
+            str(repo), repo / ".worktrees" / "never-existed", "eir/never-existed"
         )  # must not raise
 
 
@@ -111,7 +111,7 @@ class TestMaintainPackHealth:
 
     def test_repacks_at_threshold(self, repo, monkeypatch):
         import cli
-        from hermes_cli import worktree_ops
+        from eir_cli import worktree_ops
 
         made = self._make_packs(repo, 12)
         # Behavior contract, not a snapshot: the geometric repack leaves a size progression
@@ -129,7 +129,7 @@ class TestMaintainPackHealth:
 
     def test_noop_below_threshold(self, repo, monkeypatch):
         import cli
-        from hermes_cli import worktree_ops
+        from eir_cli import worktree_ops
 
         made = self._make_packs(repo, 2)
         monkeypatch.setattr(worktree_ops, "_PACK_SPRAWL_THRESHOLD", 50)
@@ -151,7 +151,7 @@ class TestMaintainPackHealth:
         import os
         import time
 
-        from hermes_cli import worktree_ops
+        from eir_cli import worktree_ops
 
         src = tmp_path / "src"
         src.mkdir()
@@ -185,17 +185,17 @@ class TestMaintainPackHealth:
         worktree_ops._maintain_pack_health(str(linked))
 
         assert (info / "commit-graphs" / "commit-graph-chain").stat().st_mtime > time.time() - 300
-        assert (clone / ".git" / "hermes-commit-graph.fresh").is_file()
+        assert (clone / ".git" / "eir-commit-graph.fresh").is_file()
         assert sorted((clone / ".git" / "objects" / "pack").glob("*.pack")) == packs, "the write lazy-fetched"
         _git(clone, "commit-graph", "verify")
 
 
 class TestRepackStampede:
-    """Regression for the Sep 2026 shared-clone incident: every ``hermes -w`` launch started its
+    """Regression for the Sep 2026 shared-clone incident: every ``eir -w`` launch started its
     own full repack, and a timed-out repack left ``pack-objects`` running for days."""
 
     def test_one_repack_per_clone_per_interval(self, repo, monkeypatch):
-        from hermes_cli import worktree_ops
+        from eir_cli import worktree_ops
 
         monkeypatch.setattr(worktree_ops, "_PACK_SPRAWL_THRESHOLD", 0)
         runs: list = []
@@ -215,7 +215,7 @@ class TestRepackStampede:
         import os
         import time
 
-        from hermes_cli import worktree_ops
+        from eir_cli import worktree_ops
 
         # A stand-in ``git`` that forks a long-lived grandchild, the way repack forks pack-objects.
         shim_dir = tmp_path / "bin"

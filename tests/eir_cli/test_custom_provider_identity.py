@@ -8,7 +8,7 @@ tests/tui_gateway/test_custom_provider_session_persistence.py for the
 end-to-end persist/resume round-trip.
 """
 
-import hermes_cli.runtime_provider as rp
+import eir_cli.runtime_provider as rp
 
 
 def test_matches_legacy_custom_providers_list(monkeypatch):
@@ -125,7 +125,7 @@ def test_named_lookup_does_not_read_an_unmatched_providers_secret(monkeypatch):
     """Provider identity scans must not touch credentials belonging to preceding entries."""
     from agent.secret_scope import is_multiplex_active, set_multiplex_active
 
-    monkeypatch.delenv("HERMES_CUSTOM_ALPHA_API_KEY", raising=False)
+    monkeypatch.delenv("EIR_CUSTOM_ALPHA_API_KEY", raising=False)
     monkeypatch.setattr(
         rp,
         "load_config",
@@ -133,7 +133,7 @@ def test_named_lookup_does_not_read_an_unmatched_providers_secret(monkeypatch):
             "providers": {
                 "alpha": {
                     "api": "https://alpha.invalid/v1",
-                    "key_env": "HERMES_CUSTOM_ALPHA_API_KEY",
+                    "key_env": "EIR_CUSTOM_ALPHA_API_KEY",
                 },
                 "beta": {
                     "api": "https://beta.invalid/v1",

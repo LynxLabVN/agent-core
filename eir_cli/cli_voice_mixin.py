@@ -1,6 +1,6 @@
 """Voice mode (recording, STT, TTS, full-duplex barge-in) and wake-word listener handlers for the interactive CLI
 
-Mixin split out of ``cli.py``; bound onto ``HermesCLI`` via the MRO. cli.py-internal
+Mixin split out of ``cli.py``; bound onto ``EirCLI`` via the MRO. cli.py-internal
 symbols are imported LAZILY inside each method (``from cli import ...``) — the mixin
 never imports ``cli`` at module load time (import cycle).
 """
@@ -15,7 +15,7 @@ import threading
 import time
 
 from agent.i18n import t
-from hermes_constants import is_termux as _is_termux_environment
+from eir_constants import is_termux as _is_termux_environment
 from typing import Optional
 
 
@@ -27,7 +27,7 @@ def _config_section(name: str) -> dict:
     ``.get()``. Config load failures also yield {}.
     """
     try:
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
         section = load_config().get(name)
         return section if isinstance(section, dict) else {}
     except Exception:
@@ -324,7 +324,7 @@ class CLIVoiceMixin:
             self._voice_last_tts_text = tts_text
             # MP3 for CLI playback (afplay doesn't handle OGG well); the TTS tool may
             # auto-convert MP3->OGG but the original MP3 remains.
-            out_dir = os.path.join(tempfile.gettempdir(), "hermes_voice")
+            out_dir = os.path.join(tempfile.gettempdir(), "eir_voice")
             os.makedirs(out_dir, exist_ok=True)
             mp3_path = os.path.join(out_dir, f"tts_{time.strftime('%Y%m%d_%H%M%S')}.mp3")
 
@@ -365,7 +365,7 @@ class CLIVoiceMixin:
             return  # one listener owns the mic for this turn
         fd_active.set()
         try:
-            from hermes_cli.config import load_config
+            from eir_cli.config import load_config
             voice_cfg = load_config().get("voice") or {}
             if not (isinstance(voice_cfg, dict) and voice_cfg.get("barge_in", True)):
                 return
@@ -447,7 +447,7 @@ class CLIVoiceMixin:
                     self._disable_voice_mode()
                     return
                 # Fail-closed echo guard: playback-phase capture has no echo cancellation, so
-                # a close match for what Hermes just spoke is speaker bleed, not a user turn.
+                # a close match for what Eir just spoke is speaker bleed, not a user turn.
                 if getattr(self, "_voice_barge_phase", None) == "playback":
                     from tools.voice_mode_transcript import is_tts_echo
                     if is_tts_echo(transcript, getattr(self, "_voice_last_tts_text", "")):

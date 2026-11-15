@@ -20,7 +20,7 @@ from pathlib import Path
 
 import pytest
 
-from hermes_cli import backup
+from eir_cli import backup
 
 
 def _home(path: Path) -> Path:
@@ -37,7 +37,7 @@ def _child(home: Path, output: Path) -> tuple[subprocess.Popen[str], Path]:
         import sys
         from pathlib import Path
         from argparse import Namespace
-        from hermes_cli import backup
+        from eir_cli import backup
 
         def pause_copy(src, dst):
             dst.write_bytes(b'\\0' * 4096)
@@ -48,7 +48,7 @@ def _child(home: Path, output: Path) -> tuple[subprocess.Popen[str], Path]:
         backup._safe_copy_db = pause_copy
         backup._run_backup_locked(Namespace(output=sys.argv[2]), Path(sys.argv[1]))
     """
-    env = {**os.environ, "HERMES_HOME": str(home)}
+    env = {**os.environ, "EIR_HOME": str(home)}
     proc: subprocess.Popen[str] = subprocess.Popen(
         [sys.executable, "-c", textwrap.dedent(script), str(home), str(output)],
         stdin=subprocess.PIPE,
@@ -106,7 +106,7 @@ def test_killed_backup_recovers_and_preserves_live_peer(
     try:
         assert active_snapshot.read_bytes() == b"\0" * 4096
         # Reclaim from a different process/home while the original is active.
-        from hermes_cli.backup_staging import reclaim_backup_staging
+        from eir_cli.backup_staging import reclaim_backup_staging
 
         reclaim_backup_staging(home)
         assert active_snapshot.read_bytes() == b"\0" * 4096
@@ -122,11 +122,11 @@ def test_killed_backup_recovers_and_preserves_live_peer(
         assert backup._write_full_zip_backup(output, home) == output
     else:
         assert backup._run_backup_locked(Namespace(output=str(output)), home)
-    assert not any(p.name.startswith(".hermes-backup-stage-") for p in home.iterdir())
+    assert not any(p.name.startswith(".eir-backup-stage-") for p in home.iterdir())
     with zipfile.ZipFile(output) as archive:
         assert archive.testzip() is None
         assert "state.db" in archive.namelist()
-        assert not any(".hermes-backup-stage-" in n for n in archive.namelist())
+        assert not any(".eir-backup-stage-" in n for n in archive.namelist())
     for name, content in user_files.items():
         assert (home / name).read_bytes() == content
 
@@ -146,7 +146,7 @@ def test_termination_unwinds_staging_without_publishing(tmp_path, signum):
         assert child.returncode == 128 + signum
         assert output.read_bytes() == b"previous backup"
         assert not any(
-            p.name.startswith(".hermes-backup-stage-") for p in home.iterdir()
+            p.name.startswith(".eir-backup-stage-") for p in home.iterdir()
         )
     finally:
         _kill(child)
@@ -163,7 +163,7 @@ def test_failed_snapshot_cleans_staging_but_keeps_failure(tmp_path, monkeypatch)
     monkeypatch.setattr(backup, "_safe_copy_db", fail)
     monkeypatch.setattr(backup, "_collect_external_entries", lambda: ([], []))
     assert not backup._run_backup_locked(Namespace(output=str(output)), home)
-    assert not any(p.name.startswith(".hermes-backup-stage-") for p in home.iterdir())
+    assert not any(p.name.startswith(".eir-backup-stage-") for p in home.iterdir())
     with zipfile.ZipFile(output) as archive:
         assert "state.db" not in archive.namelist()
         assert archive.read("config.yaml") == b"model: {}\n"
@@ -204,9 +204,9 @@ def test_stage_stays_on_output_filesystem_and_snapshot_preserves_wal(
 
 
 def test_recovery_leaves_unknown_directories_and_unexpected_user_files(tmp_path):
-    from hermes_cli.backup_staging import reclaim_backup_staging, staged_backup_file
+    from eir_cli.backup_staging import reclaim_backup_staging, staged_backup_file
 
-    lookalike = tmp_path / (".hermes-backup-stage-" + "0" * 32)
+    lookalike = tmp_path / (".eir-backup-stage-" + "0" * 32)
     lookalike.mkdir()
     (lookalike / "snapshot.db").write_bytes(b"user file")
     # A user's extra file in even a genuine owned directory prevents all deletion.
@@ -227,7 +227,7 @@ def test_recovery_leaves_unknown_directories_and_unexpected_user_files(tmp_path)
 
 @pytest.mark.platforms("posix")
 def test_recovery_does_not_follow_staging_or_payload_symlinks(tmp_path):
-    from hermes_cli.backup_staging import reclaim_backup_staging, staged_backup_file
+    from eir_cli.backup_staging import reclaim_backup_staging, staged_backup_file
 
     outside = tmp_path / "outside"
     outside.mkdir()
@@ -235,7 +235,7 @@ def test_recovery_does_not_follow_staging_or_payload_symlinks(tmp_path):
     secret.write_bytes(b"keep me")
     output_dir = tmp_path / "output"
     output_dir.mkdir()
-    linked_dir = output_dir / (".hermes-backup-stage-" + "1" * 32)
+    linked_dir = output_dir / (".eir-backup-stage-" + "1" * 32)
     linked_dir.symlink_to(outside, target_is_directory=True)
     with staged_backup_file(output_dir, "snapshot.db") as staged:
         staged.symlink_to(secret)
@@ -246,7 +246,7 @@ def test_recovery_does_not_follow_staging_or_payload_symlinks(tmp_path):
 
 
 def test_nested_signal_guard_unwinds_and_restores_default():
-    from hermes_cli.termination_guard import unwind_on_termination
+    from eir_cli.termination_guard import unwind_on_termination
 
     previous = signal.getsignal(signal.SIGTERM)
     signal.signal(signal.SIGTERM, signal.SIG_DFL)
@@ -263,7 +263,7 @@ def test_nested_signal_guard_unwinds_and_restores_default():
 
 
 def test_signal_guard_preserves_embedding_handlers_and_worker_threads():
-    from hermes_cli.termination_guard import unwind_on_termination
+    from eir_cli.termination_guard import unwind_on_termination
 
     previous = signal.getsignal(signal.SIGTERM)
 
@@ -298,7 +298,7 @@ def test_signal_guard_preserves_embedding_handlers_and_worker_threads():
 def test_backup_completes_when_output_filesystem_refuses_locks(
     tmp_path, monkeypatch, caplog, automatic
 ):
-    from hermes_cli import backup_staging
+    from eir_cli import backup_staging
 
     home = _home(tmp_path / "home")
     output_dir = tmp_path / "output"
@@ -310,7 +310,7 @@ def test_backup_completes_when_output_filesystem_refuses_locks(
 
     monkeypatch.setattr(backup_staging, "_lock", refuse_lock)
     monkeypatch.setattr(backup, "_collect_external_entries", lambda: ([], []))
-    monkeypatch.setattr(backup, "get_default_hermes_root", lambda: home)
+    monkeypatch.setattr(backup, "get_default_eir_root", lambda: home)
     if automatic:
         assert backup._write_full_zip_backup(output, home) == output
     else:
@@ -329,7 +329,7 @@ def test_backup_completes_when_output_filesystem_refuses_locks(
 
 @pytest.mark.platforms("windows", "posix")
 def test_unlocked_stage_is_preserved_after_lock_support_returns(tmp_path, monkeypatch):
-    from hermes_cli import backup_staging
+    from eir_cli import backup_staging
 
     real_lock = backup_staging._lock
 
@@ -354,7 +354,7 @@ def test_retry_elsewhere_reclaims_default_backup_stages_but_preserves_live_ones(
     home = _home(tmp_path / "home")
     backup_dir = home / "backups"
     backup_dir.mkdir()
-    lookalike = backup_dir / (".hermes-backup-stage-" + "0" * 32)
+    lookalike = backup_dir / (".eir-backup-stage-" + "0" * 32)
     lookalike.mkdir()
     user_file = lookalike / "snapshot.db"
     user_file.write_bytes(b"user data")
@@ -375,7 +375,7 @@ def test_retry_elsewhere_reclaims_default_backup_stages_but_preserves_live_ones(
         _kill(child)
     run()
     assert not snapshot.parent.exists()
-    assert set(backup_dir.glob(".hermes-backup-stage-*")) == {lookalike}
+    assert set(backup_dir.glob(".eir-backup-stage-*")) == {lookalike}
     assert user_file.read_bytes() == b"user data"
     with zipfile.ZipFile(output) as archive:
         assert archive.testzip() is None
@@ -438,7 +438,7 @@ def test_legacy_zip_partial_is_reported_and_preserved(tmp_path, monkeypatch, cap
 
 @pytest.mark.platforms("windows", "posix")
 def test_lease_open_failure_removes_the_new_empty_stage(tmp_path, monkeypatch):
-    from hermes_cli import backup_staging
+    from eir_cli import backup_staging
 
     output_dir = tmp_path / "output"
     output_dir.mkdir()
@@ -460,7 +460,7 @@ def test_lease_open_failure_removes_the_new_empty_stage(tmp_path, monkeypatch):
 def test_termination_immediately_after_mkdir_removes_the_empty_stage(
     tmp_path, monkeypatch
 ):
-    from hermes_cli import backup_staging
+    from eir_cli import backup_staging
 
     output_dir = tmp_path / "output"
     output_dir.mkdir()
@@ -468,7 +468,7 @@ def test_termination_immediately_after_mkdir_removes_the_empty_stage(
 
     def terminate_after_mkdir(path, *args, **kwargs):
         real_mkdir(path, *args, **kwargs)
-        if path.name.startswith(".hermes-backup-stage-"):
+        if path.name.startswith(".eir-backup-stage-"):
             signal.raise_signal(signal.SIGTERM)
 
     previous = signal.getsignal(signal.SIGTERM)
@@ -485,10 +485,10 @@ def test_termination_immediately_after_mkdir_removes_the_empty_stage(
 
 @pytest.mark.platforms("windows", "posix")
 def test_failed_stage_creation_preserves_the_existing_path(tmp_path, monkeypatch):
-    from hermes_cli import backup_staging
+    from eir_cli import backup_staging
 
     token = "0" * 32
-    existing = tmp_path / (".hermes-backup-stage-" + token)
+    existing = tmp_path / (".eir-backup-stage-" + token)
     existing.mkdir()
     user_file = existing / "notes.txt"
     user_file.write_bytes(b"keep me")

@@ -1,17 +1,17 @@
-"""Tests for --ignore-user-config and --ignore-rules flags on `hermes chat`.
+"""Tests for --ignore-user-config and --ignore-rules flags on `eir chat`.
 
 Ported from openai/codex#18646 (`feat: add --ignore-user-config and --ignore-rules`).
 Codex's flags fully isolate a run from user-level config and exec-policy .rules
-files. In Hermes the equivalent isolation is:
+files. In Eir the equivalent isolation is:
 
-* ``--ignore-user-config`` → skip ``~/.hermes/config.yaml`` in ``load_cli_config()``
+* ``--ignore-user-config`` → skip ``~/.eir/config.yaml`` in ``load_cli_config()``
   (credentials in ``.env`` are still loaded).
 * ``--ignore-rules`` → skip AGENTS.md / SOUL.md / .cursorrules auto-injection
   and persistent memory (maps to ``AIAgent(skip_context_files=True,
   skip_memory=True)``).
 
 Both flags are wired via env vars so they work cleanly across the
-argparse → cmd_chat → cli.main() → HermesCLI → AIAgent call chain.
+argparse → cmd_chat → cli.main() → EirCLI → AIAgent call chain.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ import pytest
 
 
 def _default(*keys: str):
-    from hermes_cli.config import DEFAULT_CONFIG, cfg_get
+    from eir_cli.config import DEFAULT_CONFIG, cfg_get
     return cfg_get(DEFAULT_CONFIG, *keys)
 
 @pytest.fixture(autouse=True)
@@ -35,16 +35,16 @@ def _clean_env(monkeypatch):
     those writes aren't tracked by monkeypatch and won't be undone by it.
     We add explicit cleanup on yield to prevent cross-test pollution.
     """
-    for var in ("HERMES_IGNORE_USER_CONFIG", "HERMES_IGNORE_RULES"):
+    for var in ("EIR_IGNORE_USER_CONFIG", "EIR_IGNORE_RULES"):
         monkeypatch.delenv(var, raising=False)
     yield
-    for var in ("HERMES_IGNORE_USER_CONFIG", "HERMES_IGNORE_RULES"):
+    for var in ("EIR_IGNORE_USER_CONFIG", "EIR_IGNORE_RULES"):
         os.environ.pop(var, None)
 
 class TestIgnoreUserConfigEnvGate:
-    """``load_cli_config()`` must honour ``HERMES_IGNORE_USER_CONFIG=1``.
+    """``load_cli_config()`` must honour ``EIR_IGNORE_USER_CONFIG=1``.
 
-    When the env var is set, user config at ``<hermes_home>/config.yaml`` is
+    When the env var is set, user config at ``<eir_home>/config.yaml`` is
     skipped even if present — the function returns only the built-in defaults.
     """
 
@@ -61,9 +61,9 @@ class TestIgnoreUserConfigEnvGate:
         (tmp_path / "config.yaml").write_text(config_yaml)
 
     def _reload_cli(self, monkeypatch, tmp_path):
-        """Point cli._hermes_home at tmp_path and return a fresh load_cli_config."""
+        """Point cli._eir_home at tmp_path and return a fresh load_cli_config."""
         import cli
-        monkeypatch.setattr(cli, "_hermes_home", tmp_path)
+        monkeypatch.setattr(cli, "_eir_home", tmp_path)
         return cli.load_cli_config
 
     def test_user_config_loaded_when_flag_unset(self, tmp_path, monkeypatch):
@@ -77,13 +77,13 @@ class TestIgnoreUserConfigEnvGate:
         assert cfg["agent"]["system_prompt"] == "from user config"
 
     def test_user_config_skipped_when_flag_set(self, tmp_path, monkeypatch):
-        """With HERMES_IGNORE_USER_CONFIG=1, user config.yaml is ignored.
+        """With EIR_IGNORE_USER_CONFIG=1, user config.yaml is ignored.
 
         The built-in default ``model.default`` is empty string (no user override),
         and the user's ``agent.system_prompt`` is not seen.
         """
         self._write_user_config(tmp_path, "test-vendor/ignore-user-config-sentinel")
-        monkeypatch.setenv("HERMES_IGNORE_USER_CONFIG", "1")
+        monkeypatch.setenv("EIR_IGNORE_USER_CONFIG", "1")
 
         load_cli_config = self._reload_cli(monkeypatch, tmp_path)
         cfg = load_cli_config()
@@ -99,7 +99,7 @@ class TestIgnoreUserConfigEnvGate:
     def test_flag_ignored_when_set_to_other_value(self, tmp_path, monkeypatch):
         """Only the literal value "1" activates the bypass, matching the yolo pattern."""
         self._write_user_config(tmp_path, "test-vendor/ignore-user-config-sentinel")
-        monkeypatch.setenv("HERMES_IGNORE_USER_CONFIG", "true")  # not "1"
+        monkeypatch.setenv("EIR_IGNORE_USER_CONFIG", "true")  # not "1"
 
         load_cli_config = self._reload_cli(monkeypatch, tmp_path)
         cfg = load_cli_config()
@@ -116,13 +116,13 @@ class TestIgnoreUserConfigEnvGate:
         root.mkdir()
         if flag:
             self._write_user_config(home, "test-vendor/user-sentinel")
-            monkeypatch.setenv("HERMES_IGNORE_USER_CONFIG", "1")
-        package = root / "hermes_cli"
+            monkeypatch.setenv("EIR_IGNORE_USER_CONFIG", "1")
+        package = root / "eir_cli"
         package.mkdir()
         for where in (root, package):  # the install root, and beside the loader where the fallback looked
             (where / "cli-config.yaml").write_text("model:\n  default: test-vendor/project-sentinel\n")
-        monkeypatch.setattr("hermes_cli.config.get_project_root", lambda: root)
-        monkeypatch.setattr("hermes_cli.cli_config_load.__file__", str(package / "cli_config_load.py"))
+        monkeypatch.setattr("eir_cli.config.get_project_root", lambda: root)
+        monkeypatch.setattr("eir_cli.cli_config_load.__file__", str(package / "cli_config_load.py"))
 
         cfg = self._reload_cli(monkeypatch, home)()
 
@@ -133,7 +133,7 @@ class TestIgnoreUserConfigDelegationDefault:
     delegation reader must give the same cap as ``DEFAULT_CONFIG``."""
 
     def test_builtin_delegation_default_matches_the_delegate_tool_default(self):
-        """The CLI's built-in default (``hermes_cli/cli_config_load.py``, re-exported by ``cli``) is the
+        """The CLI's built-in default (``eir_cli/cli_config_load.py``, re-exported by ``cli``) is the
         value a `--ignore-user-config` run actually uses."""
         import cli
         from tools.delegate_tool import DEFAULT_MAX_ITERATIONS
@@ -156,13 +156,13 @@ class TestIgnoreUserConfigDelegationDefault:
             "delegate_tool_config._load_config()['max_iterations']]))"
         )
         for ignored in (False, True):
-            env = {"HOME": str(tmp_path), "USERPROFILE": str(tmp_path), "HERMES_HOME": str(tmp_path),
+            env = {"HOME": str(tmp_path), "USERPROFILE": str(tmp_path), "EIR_HOME": str(tmp_path),
                    "PATH": os.environ["PATH"], "PYTHONPATH": str(root), "PYTHONDONTWRITEBYTECODE": "1"}
             for name in ("SYSTEMROOT", "WINDIR", "COMSPEC"):
                 if name in os.environ:
                     env[name] = os.environ[name]
             if ignored:
-                env["HERMES_IGNORE_USER_CONFIG"] = "1"
+                env["EIR_IGNORE_USER_CONFIG"] = "1"
             result = subprocess.run([sys.executable, "-B", "-c", script], cwd=root, env=env,
                                     capture_output=True, text=True, check=True, timeout=60)
             expected = _default("delegation", "max_iterations") if ignored else 7
@@ -187,16 +187,16 @@ class TestSharedDefaults:
     """The classic CLI reads shared defaults without changing ignore-config policy."""
 
     def _home(self, tmp_path, monkeypatch, text=""):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("EIR_HOME", str(tmp_path))
         (tmp_path / "config.yaml").write_text(text)
         import cli
-        monkeypatch.setattr(cli, "_hermes_home", tmp_path)
+        monkeypatch.setattr(cli, "_eir_home", tmp_path)
         return tmp_path
 
     def test_classic_cli_defaults_are_the_shared_defaults(self, tmp_path, monkeypatch):
-        """An empty config.yaml gives ``hermes chat`` the turn cap and subagent cap that load_config
+        """An empty config.yaml gives ``eir chat`` the turn cap and subagent cap that load_config
         (gateway, TUI, dashboard) gives: unlimited and 250."""
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
 
         self._home(tmp_path, monkeypatch)
         import cli
@@ -207,7 +207,7 @@ class TestSharedDefaults:
             _default("delegation", "max_iterations"))
 
     def test_a_shell_terminal_timeout_survives_a_file_terminal_section(self, tmp_path, monkeypatch):
-        """``hermes chat`` mirrors the file's terminal section to env; a key the file does not set
+        """``eir chat`` mirrors the file's terminal section to env; a key the file does not set
         must not export a built-in default over the user's TERMINAL_TIMEOUT."""
         self._home(tmp_path, monkeypatch, "terminal:\n  backend: local\n")
         monkeypatch.setenv("TERMINAL_TIMEOUT", "600")
@@ -220,14 +220,14 @@ class TestSharedDefaults:
 @pytest.mark.parametrize("limit,label", [(19, "19"), (None, "unlimited")])
 def test_classic_config_renders_the_resolved_budget(capsys, limit, label):
     from datetime import datetime
-    from cli import HermesCLI, _t
-    from hermes_cli.config import resolve_turn_limit
+    from cli import EirCLI, _t
+    from eir_cli.config import resolve_turn_limit
     resolved = resolve_turn_limit(limit)
-    stand_in = HermesCLI.__new__(HermesCLI)
+    stand_in = EirCLI.__new__(EirCLI)
     stand_in.api_key, stand_in.agent, stand_in.model, stand_in.base_url = None, None, "test/model", "local"
     stand_in.max_turns, stand_in.enabled_toolsets, stand_in.verbose = resolved, [], False
     stand_in.session_start = datetime(2026, 1, 1)
-    HermesCLI.show_config(stand_in)
+    EirCLI.show_config(stand_in)
     output = capsys.readouterr().out
     turn_label = _t("cli.config.label_max_turns")
     row = next(line.strip() for line in output.splitlines() if line.strip().startswith(turn_label + " "))

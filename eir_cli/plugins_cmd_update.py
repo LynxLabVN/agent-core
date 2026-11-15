@@ -1,7 +1,7 @@
-"""``hermes plugins update`` plus the provenance verbs around it: ``adopt``, ``trust-update-url`` and the
+"""``eir plugins update`` plus the provenance verbs around it: ``adopt``, ``trust-update-url`` and the
 read-only ``check-updates``; the dashboard update path shares the same pull/re-clone core.
 
-Sibling of :mod:`hermes_cli.plugins_cmd` (the facade re-exports the names other modules use and is
+Sibling of :mod:`eir_cli.plugins_cmd` (the facade re-exports the names other modules use and is
 imported late here, never at module level).
 """
 
@@ -16,7 +16,7 @@ from typing import Any
 
 def _pc():
     """The facade, read at call time: tests patch ``plugins_cmd.<name>`` and sibling calls must see it."""
-    from hermes_cli import plugins_cmd
+    from eir_cli import plugins_cmd
     return plugins_cmd
 
 
@@ -28,14 +28,14 @@ def _pull_plugin_update(target: Path, pinned_msg, not_git_msg, before_pull=None,
     *pinned_msg(install_record)* / *not_git_msg()* build the caller-specific error text. Both paths
     scan the candidate tree the same way: *force* or a truthy *scan_decision_cb* accepts a caution
     verdict, nothing accepts a dangerous one. *surface_gate(manifest, tree)* may refuse the candidate
-    before publication (unattended updates: :func:`~hermes_cli.plugins_auto_update.unattended_gate`)."""
+    before publication (unattended updates: :func:`~eir_cli.plugins_auto_update.unattended_gate`)."""
     metadata = _pc()._read_install_metadata()
     install_record = metadata.get(target.name, {})
     if install_record.get("pinned") is True:
         raise _pc().PluginOperationError(pinned_msg(install_record))
     # A URL install whose name/repo later landed on the kill list must not keep pulling or
     # re-cloning new code, including subdirectory installs that carry no local .git directory.
-    from hermes_cli import plugins_cmd_catalog as catalog
+    from eir_cli import plugins_cmd_catalog as catalog
     catalog.refuse_if_installed_removed(target.name, target)
     if not (target / ".git").exists():
         source = install_record.get("source")
@@ -48,7 +48,7 @@ def _pull_plugin_update(target: Path, pinned_msg, not_git_msg, before_pull=None,
                                       allow_removed=install_record.get("allow_removed") is True)
     if before_pull is not None:
         before_pull()
-    from hermes_cli.plugins_transaction import update_plugin
+    from eir_cli.plugins_transaction import update_plugin
 
     return update_plugin(target, interactive=interactive, force=force, scan_decision_cb=scan_decision_cb,
                          **({"surface_gate": surface_gate} if surface_gate else {}))
@@ -64,7 +64,7 @@ def _reclone_plugin_update(target: Path, source: str, previous_revision: object,
     decision (*force* / *scan_decision_cb*), the same as the git-pull path. *allow_removed* is the
     install record's saved ``--allow-removed`` exemption; the core re-records it on publication.
     """
-    from hermes_cli.plugins_cmd_catalog import _carry_user_files
+    from eir_cli.plugins_cmd_catalog import _carry_user_files
 
     def _before_swap(manifest, tree):
         if surface_gate is not None:
@@ -90,9 +90,9 @@ def update_one(name: str, target: Path, console, *, interactive: bool = True, fo
                unattended: bool = False) -> bool:
     """:func:`_update_one_locked` under the plugin's one-updater lock (a terminal update, the gateway's
     auto-apply and a Desktop click never pull the same plugin at once; the loser changes nothing).
-    *unattended* (the auto-apply tick) applies :func:`~hermes_cli.plugins_auto_update.unattended_gate`
+    *unattended* (the auto-apply tick) applies :func:`~eir_cli.plugins_auto_update.unattended_gate`
     inside the lock: a hold recorded during the check, or a Git update that widens the plugin, refuses."""
-    from hermes_cli.plugins_auto_update import plugin_update_lock, unattended_gate
+    from eir_cli.plugins_auto_update import plugin_update_lock, unattended_gate
     with plugin_update_lock(target):
         gate = unattended_gate(name, target) if unattended else None
         return _update_one_locked(name, target, console, interactive=interactive, force=force, surface_gate=gate)
@@ -104,13 +104,13 @@ def _update_one_locked(name: str, target: Path, console, *, interactive: bool = 
 
     Every update is scanned. A caution verdict on a git update asks ``Update anyway? [y/N]`` when
     *interactive*; *force* (``--force``) accepts it without asking. A dangerous verdict always blocks.
-    Refusals raise :class:`~hermes_cli.plugins_cmd_catalog.RepinConsentRequired` or
+    Refusals raise :class:`~eir_cli.plugins_cmd_catalog.RepinConsentRequired` or
     ``PluginOperationError`` with nothing changed; :func:`cmd_update` turns them into exit 1 and
-    ``hermes plugins update`` with no name records them per plugin and moves on.
+    ``eir plugins update`` with no name records them per plugin and moves on.
     """
     from rich.markup import escape
-    from hermes_cli import plugins_cmd_catalog as catalog
-    from hermes_cli.plugins_cmd_install import interactive_scan_decision
+    from eir_cli import plugins_cmd_catalog as catalog
+    from eir_cli.plugins_cmd_install import interactive_scan_decision
     sidecar = catalog.catalog_install_record(target)
     if sidecar:  # catalog installs re-pin to the reviewed SHA — never `git pull`
         return catalog.cmd_update_catalog(name, target, sidecar, console, interactive=interactive)
@@ -118,7 +118,7 @@ def _update_one_locked(name: str, target: Path, console, *, interactive: bool = 
         target,
         lambda rec: (
             f"Plugin '{name}' is pinned to {rec.get('revision')}. To move it, run "
-            f"`hermes plugins install {escape(str(rec.get('source', '<source>')))} --force "
+            f"`eir plugins install {escape(str(rec.get('source', '<source>')))} --force "
             "--ref <40-character commit SHA>`."),
         lambda: f"Plugin '{name}' was not installed from git (no .git directory). Cannot update.",
         before_pull=lambda: console.print(f"[dim]Updating {name}...[/dim]"),
@@ -137,12 +137,12 @@ def _update_one_locked(name: str, target: Path, console, *, interactive: bool = 
     plugin_id = updated_manifest.get("name") or target.name
     declared_caps = _pc()._declared_capabilities_from_manifest(updated_manifest, plugin_id)
     if declared_caps:
-        from hermes_cli.plugin_capabilities import declared_set_changed, pending_capabilities
+        from eir_cli.plugin_capabilities import declared_set_changed, pending_capabilities
         if pending_capabilities(plugin_id, declared_caps) or declared_set_changed(plugin_id, declared_caps):
             if interactive:
                 _pc()._run_capability_consent(console, plugin_id, declared_caps, context="update")
             else:
-                console.print(f"[yellow]Plugin {plugin_id} has new capabilities; review them with `hermes plugins capabilities {plugin_id}`.[/yellow]")
+                console.print(f"[yellow]Plugin {plugin_id} has new capabilities; review them with `eir plugins capabilities {plugin_id}`.[/yellow]")
 
     out = output.strip()
     if "Already up to date" in out:
@@ -154,14 +154,14 @@ def _update_one_locked(name: str, target: Path, console, *, interactive: bool = 
 
 
 def cmd_update(name: str, *, interactive: bool = True, force: bool = False) -> None:
-    """``hermes plugins update <name> [--force]``: :func:`update_one`, exit 1 on a refusal."""
-    from hermes_cli.plugins_cmd_catalog import RepinConsentRequired
+    """``eir plugins update <name> [--force]``: :func:`update_one`, exit 1 on a refusal."""
+    from eir_cli.plugins_cmd_catalog import RepinConsentRequired
     console = _pc()._console()
     target = _pc()._require_installed_plugin(name, _pc()._plugins_dir(), console)
     try:
         if update_one(name, target, console, interactive=interactive, force=force):
             # Like install/enable: load it in the running gateway and say what is live (#153300).
-            from hermes_cli.plugins_activation import report_activation
+            from eir_cli.plugins_activation import report_activation
             report_activation(console, target.name)
     except RepinConsentRequired as exc:
         _pc()._fail(console, f"[yellow]Update of {name} not applied:[/yellow] {exc}")
@@ -192,7 +192,7 @@ def cmd_adopt(name: str) -> None:
     plugins_dir = _pc()._plugins_dir()
     target = _pc()._require_installed_plugin(name, plugins_dir, console)
 
-    from hermes_cli.plugins_provenance import ProvenanceClass, plugins_provenance
+    from eir_cli.plugins_provenance import ProvenanceClass, plugins_provenance
 
     prov = next((p for p in plugins_provenance(plugins_dir) if p.name == target.name), None)
     if prov is None:
@@ -250,7 +250,7 @@ def cmd_trust_update_url(name: str) -> None:
     plugins_dir = _pc()._plugins_dir()
     target = _pc()._require_installed_plugin(name, plugins_dir, console)
 
-    from hermes_cli.plugins_provenance import read_sidecar_rows
+    from eir_cli.plugins_provenance import read_sidecar_rows
 
     rows = read_sidecar_rows(plugins_dir)
     row = rows.get(target.name)
@@ -271,7 +271,7 @@ def cmd_trust_update_url(name: str) -> None:
         )
         return
     if claimed is not None:
-        from hermes_cli.plugins_updates import https_update_url
+        from eir_cli.plugins_updates import https_update_url
         try:
             claimed = https_update_url(claimed)
         except ValueError as exc:
@@ -297,9 +297,9 @@ def cmd_check_updates(args: Any | None = None) -> None:
     console = Console()
     plugins_dir = _pc()._plugins_dir()
 
-    from hermes_cli.plugins_updates import held_for_newer_hermes, run_checks
+    from eir_cli.plugins_updates import held_for_newer_eir, run_checks
 
-    from hermes_cli.plugins_cadence import record_check_results, snapshot_installs
+    from eir_cli.plugins_cadence import record_check_results, snapshot_installs
 
     checked_installs = snapshot_installs(plugins_dir)
     results = run_checks(plugins_dir)
@@ -318,8 +318,8 @@ def cmd_check_updates(args: Any | None = None) -> None:
     for r in results:
         if r.needs_fixing:
             status = f"[red]needs fixing[/red]\n[dim]{r.needs_fixing}[/dim]"
-        elif r.update_available is True and (held := held_for_newer_hermes(r)):
-            status = f"[yellow]update available after updating Hermes[/yellow]\n[dim]{held}[/dim]"
+        elif r.update_available is True and (held := held_for_newer_eir(r)):
+            status = f"[yellow]update available after updating Eir[/yellow]\n[dim]{held}[/dim]"
         elif r.update_available is True:
             status = "[green]update available[/green]"
         elif r.update_available is False:
@@ -332,22 +332,22 @@ def cmd_check_updates(args: Any | None = None) -> None:
     console.print()
     console.print(table)
     console.print()
-    console.print("[dim]Check-only. Apply with: hermes plugins update <name>, or "
-                  "hermes plugins update to update them all[/dim]")
+    console.print("[dim]Check-only. Apply with: eir plugins update <name>, or "
+                  "eir plugins update to update them all[/dim]")
 
 
 def dashboard_update_user_plugin(name: str, *, accept_capabilities: bool = False, force: bool = False,
                                  unattended: bool = False) -> dict[str, Any]:
     """The one non-interactive update for the dashboard and Desktop: ``git pull`` inside
-    ``~/.hermes/plugins/<name>``; catalog installs re-pin instead. Nothing changes on a refusal:
+    ``~/.eir/plugins/<name>``; catalog installs re-pin instead. Nothing changes on a refusal:
     a re-pin that widens the plugin returns ``{"ok": False, "consent_required": True, "delta": {...}}``
     (retry with *accept_capabilities*), and a git update the security scan blocks returns
     ``{"ok": False, "scan_blocked": True, "scan_verdict", "scan_findings"}`` (retry a caution verdict
     with *force* after the user saw the findings; a dangerous verdict never updates). *unattended*
-    (Update all) applies :func:`~hermes_cli.plugins_auto_update.unattended_gate` inside the lock: a hold
+    (Update all) applies :func:`~eir_cli.plugins_auto_update.unattended_gate` inside the lock: a hold
     recorded after the check returns ``{"ok": False, "held": True}``, a widening Git update
     ``consent_required``."""
-    from hermes_cli.plugins_auto_update import HeldWithRef, plugin_update_lock, unattended_gate
+    from eir_cli.plugins_auto_update import HeldWithRef, plugin_update_lock, unattended_gate
     target = _pc()._user_installed_plugin_dir(name)
     if target is None:
         return {"ok": False, "error": f"Plugin '{name}' was not found under {_pc()._plugins_dir()}."}
@@ -365,9 +365,9 @@ def dashboard_update_user_plugin(name: str, *, accept_capabilities: bool = False
 
 def _dashboard_update_locked(name: str, target: Path, *, accept_capabilities: bool, force: bool,
                              surface_gate=None) -> dict[str, Any]:
-    from hermes_cli import plugins_cmd_catalog as catalog
-    from hermes_cli.plugins_activation import activate_plugin_now
-    from hermes_cli.plugins_cmd_install import scan_blocked_result
+    from eir_cli import plugins_cmd_catalog as catalog
+    from eir_cli.plugins_activation import activate_plugin_now
+    from eir_cli.plugins_cmd_install import scan_blocked_result
     sidecar = catalog.catalog_install_record(target)
     try:
         if sidecar:
@@ -383,7 +383,7 @@ def _dashboard_update_locked(name: str, target: Path, *, accept_capabilities: bo
             target,
             lambda rec: (
                 f"Plugin '{name}' is pinned to {rec.get('revision')}; "
-                f"run `hermes plugins install {rec.get('source', '<source>')} --force "
+                f"run `eir plugins install {rec.get('source', '<source>')} --force "
                 "--ref <40-character commit SHA>` to move it."),
             lambda: f"Plugin '{name}' is not a git checkout; cannot pull updates.",
             force=force, surface_gate=surface_gate)

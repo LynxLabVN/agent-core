@@ -6,10 +6,10 @@ import inspect
 
 import pytest
 
-from hermes_cli import plugins_loader
-from hermes_cli.plugins import PluginContext, PluginManager, PluginManifest
-from hermes_cli.plugins_registrars import _SCOPED_PROVIDER_REGISTRARS, make_scoped_provider_registrar
-from hermes_constants import get_hermes_home
+from eir_cli import plugins_loader
+from eir_cli.plugins import PluginContext, PluginManager, PluginManifest
+from eir_cli.plugins_registrars import _SCOPED_PROVIDER_REGISTRARS, make_scoped_provider_registrar
+from eir_constants import get_eir_home
 
 
 def _provider_for(base_ref: str, name: str):
@@ -47,7 +47,7 @@ def test_admission_is_judged_under_the_managers_home(row, tmp_path, monkeypatch)
     module, attr = options["admit"].split(":")
     homes = []
     monkeypatch.setattr(
-        importlib.import_module(module), attr, lambda manifest: homes.append(get_hermes_home()) or "refused"
+        importlib.import_module(module), attr, lambda manifest: homes.append(get_eir_home()) or "refused"
     )
     owner_home = tmp_path / "owner-home"
     owner_home.mkdir()
@@ -55,7 +55,7 @@ def test_admission_is_judged_under_the_managers_home(row, tmp_path, monkeypatch)
     ctx = PluginContext(PluginManifest(name="probe", source="user"), manager)
 
     assert getattr(ctx, method)(_provider_for(base_ref, "probeadmit" + kind.replace("_", ""))) is None
-    assert homes == [manager.home_path] and manager.home_path != get_hermes_home()
+    assert homes == [manager.home_path] and manager.home_path != get_eir_home()
 
 
 def test_explicit_registrars_keep_the_row_docstring_and_parameter():

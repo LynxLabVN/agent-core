@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from hermes_state import SessionDB, _secure_state_db_files
+from eir_state import SessionDB, _secure_state_db_files
 
 pytestmark = pytest.mark.platforms("posix")  # POSIX symlinks and permission bits
 
@@ -122,7 +122,7 @@ class TestSecureStateDbSymlinkFailClosed:
         """The shared registry (gateway, CLI) resolves the path before SessionDB
         sees it, so it must judge the link first: a dangling one never gets a
         store created behind it."""
-        import hermes_state_registry
+        import eir_state_registry
 
         target = tmp_path / "unmounted" / "state.db"
         target.parent.mkdir()
@@ -130,13 +130,13 @@ class TestSecureStateDbSymlinkFailClosed:
         link.symlink_to(target)
 
         with pytest.raises(OSError) as exc_info:
-            hermes_state_registry.acquire(link)
+            eir_state_registry.acquire(link)
 
         assert exc_info.value.errno == errno.ELOOP
         assert not target.exists()
 
     def test_registry_opens_through_operator_store_link(self, tmp_path):
-        import hermes_state_registry
+        import eir_state_registry
 
         store = tmp_path / "dataset" / "state.db"
         store.parent.mkdir()
@@ -144,11 +144,11 @@ class TestSecureStateDbSymlinkFailClosed:
         link = tmp_path / "state.db"
         link.symlink_to(store)
 
-        db = hermes_state_registry.acquire(link)
+        db = eir_state_registry.acquire(link)
         try:
             assert Path(db.db_path) == store.resolve()
         finally:
-            hermes_state_registry.release_or_close(db)
+            eir_state_registry.release_or_close(db)
 
     def test_session_db_opens_through_operator_store_link(self, tmp_path):
         """A store the operator moved to other storage and linked back

@@ -1,6 +1,6 @@
 """The plugin docs' Python code blocks import only names on the published plugin API.
 
-``hermes_cli/data/plugin_api.json`` is the list ``hermes plugins validate`` enforces; a docs example
+``eir_cli/data/plugin_api.json`` is the list ``eir plugins validate`` enforces; a docs example
 that imports anything else teaches plugin authors an import validate warns on. Blocks that still need
 a seam are named in ``plugin_docs_import_seams.json``, which may only shrink.
 """
@@ -15,9 +15,9 @@ from pathlib import Path
 
 from markdown_it import MarkdownIt
 
-from hermes_cli.plugin_validate_private_imports import (
+from eir_cli.plugin_validate_private_imports import (
     _core_module_exists,
-    _hermes_packages,
+    _eir_packages,
     _imported,
     _private_target,
     _type_checking_nodes,
@@ -59,7 +59,7 @@ def _parse(block: str) -> ast.AST | None:
 
 
 def scan(markdown: str) -> tuple[set[str], list[int]]:
-    """Dotted Hermes targets the markdown's Python blocks import that the plugin API does not list, and
+    """Dotted Eir targets the markdown's Python blocks import that the plugin API does not list, and
     the opening line of every Python block that mentions ``import`` but does not parse even after
     placeholder repair (so it cannot be checked). A ``plugins.`` module core does not ship is the example
     plugin's own package; any other module core does not ship is a stale core import, reported with
@@ -76,7 +76,7 @@ def scan(markdown: str) -> tuple[set[str], list[int]]:
         skipped = _type_checking_nodes(tree)
         for node in ast.walk(tree):
             for module, name in [] if id(node) in skipped else _imported(node):
-                target = _private_target(module, name, _hermes_packages(), set())
+                target = _private_target(module, name, _eir_packages(), set())
                 if target and _core_module_exists(module):
                     found.add(target)
                 elif target and not module.startswith("plugins."):
@@ -221,6 +221,6 @@ def test_plugin_docs_import_only_the_published_plugin_api():
         "these plugin-docs Python blocks import something but do not parse, so their imports cannot be "
         f"checked; make the block valid Python (placeholders like `...` are fine): {unparsable}")
     assert not found - seams, (
-        "plugin docs import Hermes names outside hermes_cli/data/plugin_api.json; rewrite the example "
+        "plugin docs import Eir names outside eir_cli/data/plugin_api.json; rewrite the example "
         f"onto ctx.* or a listed name: {sorted(found - seams)}")
     assert not seams - found, f"no longer in the docs, delete from {_SEAMS.name}: {sorted(seams - found)}"

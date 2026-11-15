@@ -4,7 +4,7 @@
 ``agent.browser_page_backend:BrowserPageBackend`` are what ``browser-vault-plugin.md`` tells a plugin to
 subclass or return: ``ctx.register_login_backend`` / ``ctx.register_browser_page_backend`` accept only
 instances of the base classes, and the core login-backend wrapper accepts only ``VaultItemMeta`` items.
-A plugin built the way the guide shows passes ``hermes plugins validate`` without a private-import
+A plugin built the way the guide shows passes ``eir plugins validate`` without a private-import
 warning, registers through the real ``PluginContext``, and is driven by the vault.
 """
 
@@ -15,8 +15,8 @@ from pathlib import Path
 
 import pytest
 
-import hermes_yaml as yaml
-from hermes_cli.plugin_validate import validate_plugin_dir
+import eir_yaml as yaml
+from eir_cli.plugin_validate import validate_plugin_dir
 
 _GUIDE = Path(__file__).resolve().parents[2] / "website/docs/developer-guide/browser-vault-plugin.md"
 
@@ -55,13 +55,13 @@ def test_browser_vault_guide_examples_validate_clean(tmp_path):
 
 
 def _bundled_context(tmp_path, monkeypatch, name: str):
-    """A bundled plugin's real ``PluginContext`` for the active profile (``HERMES_HOME``)."""
-    from hermes_cli.plugins import PluginContext, PluginManager
-    from hermes_cli.plugins_manifest import PluginManifest
+    """A bundled plugin's real ``PluginContext`` for the active profile (``EIR_HOME``)."""
+    from eir_cli.plugins import PluginContext, PluginManager
+    from eir_cli.plugins_manifest import PluginManifest
 
     home = tmp_path / "home"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     return PluginContext(PluginManifest(name=name, source="bundled"), PluginManager(scope_key=str(home)))
 
 

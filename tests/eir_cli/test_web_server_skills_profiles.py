@@ -5,15 +5,15 @@ file (future CLI/gateway runs) — it never retargets the running dashboard
 process. Before the ``profile`` parameter existed, toggling a skill after
 "activating" a profile silently wrote into the dashboard's own config.
 These tests pin the new behavior: reads and writes land in the REQUESTED
-profile's HERMES_HOME, and the dashboard's own profile stays untouched.
+profile's EIR_HOME, and the dashboard's own profile stays untouched.
 """
 import threading
 from types import SimpleNamespace
 
 import pytest
-import hermes_yaml as yaml
-import hermes_cli.web_server_gateway as _web_server_gateway
-import hermes_cli.web_server_profiles as _web_server_profiles
+import eir_yaml as yaml
+import eir_cli.web_server_gateway as _web_server_gateway
+import eir_cli.web_server_profiles as _web_server_profiles
 
 
 def _write_skill(skills_dir, name, description="test skill"):
@@ -26,12 +26,12 @@ def _write_skill(skills_dir, name, description="test skill"):
 
 
 @pytest.fixture
-def isolated_profiles(tmp_path, monkeypatch, _isolate_hermes_home):
+def isolated_profiles(tmp_path, monkeypatch, _isolate_eir_home):
     """Isolated default home + one named profile, each with its own skills."""
-    from hermes_constants import get_hermes_home
-    from hermes_cli import profiles
+    from eir_constants import get_eir_home
+    from eir_cli import profiles
 
-    default_home = get_hermes_home()
+    default_home = get_eir_home()
     profiles_root = default_home / "profiles"
     worker_home = profiles_root / "worker_alpha"
     for home in (default_home, worker_home):
@@ -41,7 +41,7 @@ def isolated_profiles(tmp_path, monkeypatch, _isolate_hermes_home):
     _write_skill(default_home / "skills", "dashboard-skill")
     _write_skill(worker_home / "skills", "worker-skill")
 
-    monkeypatch.setattr(profiles, "_get_default_hermes_home", lambda: default_home)
+    monkeypatch.setattr(profiles, "_get_default_eir_home", lambda: default_home)
     monkeypatch.setattr(profiles, "_get_profiles_root", lambda: profiles_root)
     return {"default": default_home, "worker_alpha": worker_home}
 
@@ -53,11 +53,11 @@ def client(monkeypatch, isolated_profiles):
     except ImportError:
         pytest.skip("fastapi/starlette not installed")
 
-    import hermes_state
-    from hermes_constants import get_hermes_home
-    from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
+    import eir_state
+    from eir_constants import get_eir_home
+    from eir_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
 
-    monkeypatch.setattr(hermes_state, "DEFAULT_DB_PATH", get_hermes_home() / "state.db")
+    monkeypatch.setattr(eir_state, "DEFAULT_DB_PATH", get_eir_home() / "state.db")
     c = TestClient(app)
     c.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
     return c
@@ -141,9 +141,9 @@ class TestProfileScopedSkills:
                           json={"name": "shown-name", "locked": True})
         assert resp.status_code == 200, resp.text
         assert resp.json() == {"ok": True, "name": "shown-name", "locked": True}
-        monkeypatch.setenv("HERMES_HOME", str(isolated_profiles["worker_alpha"]))
+        monkeypatch.setenv("EIR_HOME", str(isolated_profiles["worker_alpha"]))
         assert skill_usage.is_locked("dir-name")
-        monkeypatch.setenv("HERMES_HOME", str(isolated_profiles["default"]))
+        monkeypatch.setenv("EIR_HOME", str(isolated_profiles["default"]))
         assert not skill_usage.is_locked("dir-name")
 
         rows = client.get("/api/skills", params={"profile": "worker_alpha"}).json()
@@ -152,7 +152,7 @@ class TestProfileScopedSkills:
         resp = client.put("/api/skills/lock", params={"profile": "worker_alpha"},
                           json={"name": "shown-name", "locked": False})
         assert resp.status_code == 200
-        monkeypatch.setenv("HERMES_HOME", str(isolated_profiles["worker_alpha"]))
+        monkeypatch.setenv("EIR_HOME", str(isolated_profiles["worker_alpha"]))
         assert not skill_usage.is_locked("dir-name")
 
     def test_lock_unknown_skill_404_and_corrupt_sidecar_lists_unlocked(
@@ -177,8 +177,8 @@ class TestProfileScopedHubActions:
         self, client, isolated_profiles, monkeypatch
     ):
         """Preview scans must stage and inspect under their requested profile too."""
-        from hermes_constants import get_hermes_home
-        from hermes_cli.web_routers import skills as skills_router
+        from eir_constants import get_eir_home
+        from eir_cli.web_routers import skills as skills_router
         from tools.skills_hub_models import SkillBundle
 
         seen_homes = []
@@ -196,11 +196,11 @@ class TestProfileScopedHubActions:
             skills_lock_free.append(got)
 
         def _quarantine(_bundle):
-            seen_homes.append(get_hermes_home())
+            seen_homes.append(get_eir_home())
             probe = threading.Thread(target=_probe_skills_lock)
             probe.start()
             probe.join(5)
-            path = get_hermes_home() / "skills" / ".hub" / "quarantine" / "scan-demo"
+            path = get_eir_home() / "skills" / ".hub" / "quarantine" / "scan-demo"
             path.mkdir(parents=True)
             return path
 
@@ -224,10 +224,10 @@ class TestProfileScopedHubActions:
     def test_hub_install_spawns_with_profile_flag(
         self, client, isolated_profiles, monkeypatch
     ):
-        """Hub installs must go through a fresh ``hermes -p <profile>``
+        """Hub installs must go through a fresh ``eir -p <profile>``
         subprocess — the in-process scope can't reach skills_hub's
         import-time SKILLS_DIR binding."""
-        from hermes_cli import web_server
+        from eir_cli import web_server
 
         calls = []
 
@@ -238,7 +238,7 @@ class TestProfileScopedHubActions:
             calls.append((list(subcommand), name))
             return _FakeProc()
 
-        monkeypatch.setattr(_web_server_gateway, "_spawn_hermes_action", _fake_spawn)
+        monkeypatch.setattr(_web_server_gateway, "_spawn_eir_action", _fake_spawn)
         resp = client.post(
             "/api/skills/hub/install",
             json={"identifier": "official/demo", "profile": "worker_alpha"},
@@ -263,7 +263,7 @@ class TestProfileScopedHubActions:
         self, client, isolated_profiles, monkeypatch
     ):
         """``default`` is a real named profile, not an alias for "the dashboard's own".
-        A pooled ``hermes -p worker_alpha serve`` dashboard answering a hub action with
+        A pooled ``eir -p worker_alpha serve`` dashboard answering a hub action with
         ``profile=default`` must still emit ``-p default``: without it the child's env
         carries this process's home verbatim and the install lands on worker_alpha."""
         calls = []
@@ -276,8 +276,8 @@ class TestProfileScopedHubActions:
             return _FakeProc()
 
         # Ambient home of a dashboard serving under the named profile.
-        monkeypatch.setenv("HERMES_HOME", str(isolated_profiles["worker_alpha"]))
-        monkeypatch.setattr(_web_server_gateway, "_spawn_hermes_action", _fake_spawn)
+        monkeypatch.setenv("EIR_HOME", str(isolated_profiles["worker_alpha"]))
+        monkeypatch.setattr(_web_server_gateway, "_spawn_eir_action", _fake_spawn)
         resp = client.post(
             "/api/skills/hub/install",
             json={"identifier": "official/demo", "profile": "default"},
@@ -289,4 +289,4 @@ class TestProfileScopedHubActions:
         # The spawn-path env pin must land the child on the default home, not the
         # ambient one it would inherit from a selector-less argv.
         env = _web_server_gateway._profile_action_environment(calls[0])
-        assert env["HERMES_HOME"] == str(isolated_profiles["default"])
+        assert env["EIR_HOME"] == str(isolated_profiles["default"])

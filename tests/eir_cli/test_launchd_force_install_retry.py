@@ -4,10 +4,10 @@ from types import SimpleNamespace
 
 import pytest
 
-import hermes_cli.gateway as gateway_cli
+import eir_cli.gateway as gateway_cli
 
 
-LABEL = "ai.hermes.gateway"
+LABEL = "ai.eir.gateway"
 DOMAIN = "gui/501"
 
 

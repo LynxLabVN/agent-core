@@ -1,4 +1,4 @@
-"""Plugin catalog contracts (hermes_cli/plugin_catalog.py): the in-tree seed is valid, bad entries are
+"""Plugin catalog contracts (eir_cli/plugin_catalog.py): the in-tree seed is valid, bad entries are
 skipped not raised, kill-list matching is name-or-repo, and the live catalog degrades to in-tree."""
 
 from __future__ import annotations
@@ -8,9 +8,9 @@ import os
 
 import pytest
 
-import hermes_yaml as yaml
+import eir_yaml as yaml
 
-from hermes_cli import plugin_catalog as pc
+from eir_cli import plugin_catalog as pc
 
 SHA = "38fe0fb53eff98d477f807432e965429e665ca33"
 
@@ -164,7 +164,7 @@ def _fresh_cache(tmp_path, monkeypatch, doc: dict):
 
 
 def test_newer_in_tree_pin_outranks_a_fresh_live_cache(tmp_path, monkeypatch):
-    """Right after `hermes update` bumps an in-tree pin, a live cache fetched BEFORE the bump must not
+    """Right after `eir update` bumps an in-tree pin, a live cache fetched BEFORE the bump must not
     re-install the old sha: for the same entry the newer catalog wins (checkout catalog commit time vs
     the doc's generated_at). Live-only entries survive; an older checkout still defers to the doc."""
     old, new = SHA, "a" * 40
@@ -220,7 +220,7 @@ def _serve(monkeypatch, doc: dict):
 def test_a_catalog_doc_past_two_mib_is_still_accepted(tmp_path, monkeypatch):
     """The published doc crossed 2 MiB on 2026-11-09 (1,268 entries). A 2 MiB cap made every client drop
     the live doc and install its in-tree pin instead, so catalog bumps merged after the client's own copy
-    never reached `hermes plugins install <name>`. A doc of today's size and shape must be taken and cached."""
+    never reached `eir plugins install <name>`. A doc of today's size and shape must be taken and cached."""
     cache = _fresh_cache(tmp_path, monkeypatch, {"entries": [], "removed": []})
     cache.unlink()
     entries = [_entry(f"plugin-{i}", description="x" * 1600, version="1.0.0") for i in range(1400)]
@@ -258,7 +258,7 @@ def test_curated_fields_the_published_doc_lacks_come_from_the_checkout(tmp_path,
 
 def test_in_tree_catalog_time_does_not_lazy_fetch_on_treeless_clones(tmp_path, monkeypatch):
     """``in_tree_catalog_time`` dates the checkout with a pathspec'd ``git log``; the pathspec makes git
-    open every commit's tree. On a treeless (``tree:0``) partial clone — the layout ``hermes update``
+    open every commit's tree. On a treeless (``tree:0``) partial clone — the layout ``eir update``
     produces — none of those trees exist locally, so an unrestricted probe lazy-fetches each one against
     the remote: measured 40-80 s per inventory request, past the desktop's 30s RPC limit (#125683).
     The probe must scope ``GIT_NO_LAZY_FETCH`` to itself so missing objects fail fast into the
@@ -302,7 +302,7 @@ def test_in_tree_catalog_time_does_not_lazy_fetch_on_treeless_clones(tmp_path, m
 
 def test_treeless_checkout_still_outranks_a_doc_fetched_before_the_bump(tmp_path, monkeypatch):
     """On the treeless layout the history probe fails fast, and ``None`` would feed the frozen-copy
-    rule that lets the live doc win — re-pinning the old sha on exactly the checkouts ``hermes
+    rule that lets the live doc win — re-pinning the old sha on exactly the checkouts ``eir
     update`` just bumped. The checked-out files' mtime must stand in for the unreadable commit time
     (fresh checkout ⇒ in-tree pin wins; catalog files older than the doc ⇒ live pin wins), with no
     tree lazy-fetch anywhere (#125716 review)."""
@@ -360,7 +360,7 @@ def _redirecting_to(target: str, doc: dict):
     import httpx
 
     def handler(request):
-        if request.url.host == "hermes-agent.nousresearch.com":
+        if request.url.host == "eir-agent.nousresearch.com":
             return httpx.Response(301, headers={"location": target})
         return httpx.Response(200, json=doc)
     return handler

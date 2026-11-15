@@ -27,9 +27,9 @@ def discard_unpublished_vault_key(ref: Optional[dict]) -> None:
 
 
 def prepare_imported_tree(staged: Path) -> None:
-    """Make an extracted ``hermes profile import`` tree safe to publish; runs on the staging tree."""
-    from hermes_cli.config_backend import drop_other_access
-    from hermes_cli.home_data_layout import PM_RUNTIME_ROOT_DIRS
+    """Make an extracted ``eir profile import`` tree safe to publish; runs on the staging tree."""
+    from eir_cli.config_backend import drop_other_access
+    from eir_cli.home_data_layout import PM_RUNTIME_ROOT_DIRS
     # Remove foreign runtime state before publishing, including file-shaped roots.
     # A failed removal must abort import rather than install a stale PM selection.
     for child in staged.iterdir():
@@ -39,7 +39,7 @@ def prepare_imported_tree(staged: Path) -> None:
             else:
                 child.unlink()
     # Extraction applied each archive member's mode: drop world access on config.yaml and make
-    # .env owner-only, as a clone and `hermes import` do (#59726).
+    # .env owner-only, as a clone and `eir import` do (#59726).
     drop_other_access(staged / "config.yaml")
     env = staged / ".env"
     if env.is_file() and not env.is_symlink():
@@ -49,7 +49,7 @@ def prepare_imported_tree(staged: Path) -> None:
 def finish_profile_layout(profile_dir: Path, *, no_skills: bool, clone_all: bool,
                            description: Optional[str], soul: Optional[str] = None) -> None:
     """Seed files a fresh profile owns from day one; runs on the staging tree before publish."""
-    from hermes_cli.profiles import (
+    from eir_cli.profiles import (
         _seed_file_if_missing, _PLACEHOLDER_ENV, NO_BUNDLED_SKILLS_MARKER,
         _migrate_profile_config_if_outdated, write_profile_meta,
     )
@@ -57,26 +57,26 @@ def finish_profile_layout(profile_dir: Path, *, no_skills: bool, clone_all: bool
         (profile_dir / "SOUL.md").write_text(soul, encoding="utf-8")
 
     # Seed an empty .env so the profile owns a credentials file from day one. Without it,
-    # profile-scoped env writes (dashboard Channels/Keys pages, `hermes -p <name> auth add`)
+    # profile-scoped env writes (dashboard Channels/Keys pages, `eir -p <name> auth add`)
     # had no file until first write and the profile silently inherited shell API keys —
     # read by users as "the new profile reads the root .env". Skipped when a clone copied one.
     _seed_file_if_missing(profile_dir / ".env", _PLACEHOLDER_ENV, 0o600)
     # A clone's copy2/copytree carries the source config.yaml's mode, world bits included.
-    from hermes_cli.config_backend import drop_other_access
+    from eir_cli.config_backend import drop_other_access
     drop_other_access(profile_dir / "config.yaml")
 
     # Default SOUL.md to customize immediately (skipped when a clone already provided one).
     with contextlib.suppress(Exception):  # best-effort — don't fail profile creation over this
-        from hermes_cli.default_soul import DEFAULT_SOUL_MD
+        from eir_cli.default_soul import DEFAULT_SOUL_MD
         _seed_file_if_missing(profile_dir / "SOUL.md", DEFAULT_SOUL_MD)
 
-    # Opt-out marker read by seed_profile_skills() and `hermes update`'s all-profile sync
+    # Opt-out marker read by seed_profile_skills() and `eir update`'s all-profile sync
     # (the feature still works via the empty skills/ dir if this fails).
     if no_skills:
         _seed_file_if_missing(
             profile_dir / NO_BUNDLED_SKILLS_MARKER,
-            "This profile opted out of bundled-skill seeding (`hermes profile create --no-skills`).\n"
-            "Delete this file to re-enable sync on the next `hermes update`.\n",
+            "This profile opted out of bundled-skill seeding (`eir profile create --no-skills`).\n"
+            "Delete this file to re-enable sync on the next `eir update`.\n",
         )
 
     # Migrate config-only clones now so desktop/status don't warn that a just-created
@@ -87,5 +87,5 @@ def finish_profile_layout(profile_dir: Path, *, no_skills: bool, clone_all: bool
 
     # Description last, so a partial-create failure doesn't strand a description file.
     if description and description.strip():
-        with contextlib.suppress(Exception):  # non-fatal — `hermes profile describe` works later
+        with contextlib.suppress(Exception):  # non-fatal — `eir profile describe` works later
             write_profile_meta(profile_dir, description=description.strip(), description_auto=False)

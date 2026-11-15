@@ -19,10 +19,10 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from hermes_cli import gateway_connections as store
-from hermes_cli import gateway_connections_oauth as oauth
-from hermes_cli import gateway_connections_reach as reach
-from hermes_cli import web_server
+from eir_cli import gateway_connections as store
+from eir_cli import gateway_connections_oauth as oauth
+from eir_cli import gateway_connections_reach as reach
+from eir_cli import web_server
 
 REMOTE = "https://remote.example:8443/hermes"
 
@@ -49,7 +49,7 @@ class FakeRemote:
                 "provider": "basic", "user_id": "u1"}
 
     def handle(self, request: httpx.Request) -> httpx.Response:
-        path = request.url.path.removeprefix("/hermes")
+        path = request.url.path.removeprefix("/eir")
         body = json.loads(request.content or b"{}")
         self.calls.append((path, {**dict(request.headers), **body}))
         if path == "/api/status":
@@ -73,7 +73,7 @@ class FakeRemote:
 def remote(monkeypatch, tmp_path):
     root = tmp_path / "root"
     root.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(root))
+    monkeypatch.setenv("EIR_HOME", str(root))
     fake = FakeRemote()
     monkeypatch.setattr(oauth, "_client", lambda: httpx.Client(transport=httpx.MockTransport(fake.handle)))
     monkeypatch.setattr(oauth, "_flights", {})
@@ -159,7 +159,7 @@ def test_an_expiring_access_token_is_rotated_and_a_rejected_refresh_drops_the_si
 def test_token_mode_sends_the_session_token_header_and_the_entry_headers(remote):
     cid = _save(token="secret-token", headers={"CF-Access-Client-Secret": "cf-secret"})
     assert reach.resolve_target(cid) == (
-        REMOTE, {"CF-Access-Client-Secret": "cf-secret", "X-Hermes-Session-Token": "secret-token"})
+        REMOTE, {"CF-Access-Client-Secret": "cf-secret", "X-Eir-Session-Token": "secret-token"})
     assert reach.mint_ws_ticket(cid) is None
     with pytest.raises(store.ConnectionStoreError):
         reach.resolve_target("local")

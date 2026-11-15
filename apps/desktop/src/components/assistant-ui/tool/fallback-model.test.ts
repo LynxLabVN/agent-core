@@ -220,16 +220,16 @@ describe('buildToolView web-search query', () => {
   it('keeps the query separate from structured search results', () => {
     const view = buildToolView(
       part({
-        args: { query: 'Hermes Agent Desktop tool calls' },
-        result: { web: [{ snippet: 'Desktop docs', title: 'Hermes docs', url: 'https://example.com/docs' }] },
+        args: { query: 'Eir Agent Desktop tool calls' },
+        result: { web: [{ snippet: 'Desktop docs', title: 'Eir docs', url: 'https://example.com/docs' }] },
         toolName: 'web_search'
       }),
       ''
     )
 
-    expect(view.searchQuery).toBe('Hermes Agent Desktop tool calls')
+    expect(view.searchQuery).toBe('Eir Agent Desktop tool calls')
     expect(view.searchHits).toEqual([
-      { snippet: 'Desktop docs', title: 'Hermes docs', url: 'https://example.com/docs' }
+      { snippet: 'Desktop docs', title: 'Eir docs', url: 'https://example.com/docs' }
     ])
   })
 })
@@ -246,7 +246,7 @@ describe('buildToolView browser_navigate title', () => {
     )
 
     expect(view.status).toBe('error')
-    expect(view.title).toContain('hermes-agent.nousresearch.com/docs')
+    expect(view.title).toContain('eir-agent.nousresearch.com/docs')
   })
 
   it('shows opened title on success', () => {
@@ -260,7 +260,7 @@ describe('buildToolView browser_navigate title', () => {
     )
 
     expect(view.status).toBe('success')
-    expect(view.title).toContain('hermes-agent.nousresearch.com/docs')
+    expect(view.title).toContain('eir-agent.nousresearch.com/docs')
   })
 })
 
@@ -463,7 +463,7 @@ describe('buildToolView title actions', () => {
     // prepends ("Running grep …") otherwise renders as "Running Running grep …".
     const view = buildToolView(
       part({
-        args: { context: 'Running grep -rn -i "bedrock" ~/.hermes/' },
+        args: { context: 'Running grep -rn -i "bedrock" ~/.eir/' },
         result: undefined,
         toolName: 'terminal'
       }),
@@ -471,11 +471,11 @@ describe('buildToolView title actions', () => {
     )
 
     expect(view.title.startsWith('Running Running')).toBe(false)
-    expect(view.title).toBe('Running grep -rn -i "bedrock" ~/.hermes/')
+    expect(view.title).toBe('Running grep -rn -i "bedrock" ~/.eir/')
     expect(view.titleAction).toEqual({
       prefix: '',
       text: 'Running',
-      suffix: ' grep -rn -i "bedrock" ~/.hermes/'
+      suffix: ' grep -rn -i "bedrock" ~/.eir/'
     })
   })
 

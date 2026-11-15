@@ -1,10 +1,10 @@
 """Setup-completion summary (tool availability + "Setup Complete!" banner). setup.py names are
-resolved through the module object so test patches on ``hermes_cli.setup.<name>`` take effect."""
+resolved through the module object so test patches on ``eir_cli.setup.<name>`` take effect."""
 
 import logging
 from tools import tool_backend_helpers
 
-logger = logging.getLogger("hermes_cli.setup")
+logger = logging.getLogger("eir_cli.setup")
 
 # provider -> (label, env vars: any one set means available; empty = always).
 # Local engines are (label, module, hint) and must be importable.
@@ -13,21 +13,21 @@ _TTS_SUMMARY_ROWS = {
     "openai": ("OpenAI", ("VOICE_TOOLS_OPENAI_KEY", "OPENAI_API_KEY")),
     "minimax": ("MiniMax", ("MINIMAX_API_KEY",)), "mistral": ("Mistral Voxtral", ("MISTRAL_API_KEY",)),
     "gemini": ("Google Gemini", ("GEMINI_API_KEY", "GOOGLE_API_KEY")),
-    "neutts": ("NeuTTS", "neutts", "run 'hermes setup tts'"),
-    "kittentts": ("KittenTTS", "kittentts", "run 'hermes setup tts'")}
+    "neutts": ("NeuTTS", "neutts", "run 'eir setup tts'"),
+    "kittentts": ("KittenTTS", "kittentts", "run 'eir setup tts'")}
 _TTS_SUMMARY_DEFAULT = ("Edge TTS", ())
 _STT_SUMMARY_ROWS = {
     "openai": ("OpenAI", ("VOICE_TOOLS_OPENAI_KEY", "OPENAI_API_KEY")), "groq": ("Groq Whisper", ("GROQ_API_KEY",)),
     "elevenlabs": ("ElevenLabs Scribe", ("ELEVENLABS_API_KEY",)), "xai": ("xAI", ()),
     "deepinfra": ("DeepInfra", ("DEEPINFRA_API_KEY",))}
-_STT_SUMMARY_DEFAULT = ("Local Whisper", "faster_whisper", "run 'hermes tools' → Speech-to-Text")
+_STT_SUMMARY_DEFAULT = ("Local Whisper", "faster_whisper", "run 'eir tools' → Speech-to-Text")
 
 # Browser "missing" hint keyed by the configured provider; anything else gets the generic hint.
 _BROWSER_MISSING_HINTS = {
     "Browserbase": "BROWSERBASE_API_KEY/BROWSERBASE_PROJECT_ID",
     "Browser Use": "BROWSER_USE_API_KEY",
-    "Local browser": "Chromium: run 'hermes pm install chromium'"}
-_BROWSER_MISSING_DEFAULT = "Chromium (run 'hermes pm install chromium'), or configure Browser Use or Browserbase"
+    "Local browser": "Chromium: run 'eir pm install chromium'"}
+_BROWSER_MISSING_DEFAULT = "Chromium (run 'eir pm install chromium'), or configure Browser Use or Browserbase"
 _WEB_MISSING = ("EXA_API_KEY, PARALLEL_API_KEY, FIRECRAWL_API_KEY/FIRECRAWL_API_URL, TAVILY_API_KEY, "
                 "PERPLEXITY_API_KEY, KEENABLE_API_KEY, or SEARXNG_URL")
 
@@ -37,15 +37,15 @@ _DONE_BANNER = (
     "└─────────────────────────────────────────────────────────┘")
 # (command, description) rows; the description carries its own alignment padding.
 _EDIT_WIZARD_ROWS = (
-    ("hermes setup", "          Re-run the full wizard"), ("hermes setup model", "    Change model/provider"),
-    ("hermes setup terminal", " Change terminal backend"), ("hermes setup gateway", "  Configure messaging"),
-    ("hermes setup tools", "    Configure tool providers"))
+    ("eir setup", "          Re-run the full wizard"), ("eir setup model", "    Change model/provider"),
+    ("eir setup terminal", " Change terminal backend"), ("eir setup gateway", "  Configure messaging"),
+    ("eir setup tools", "    Configure tool providers"))
 _EDIT_CONFIG_ROWS = (
-    ("hermes config", "         View current settings"), ("hermes config edit", "    Open config in your editor"),
-    ("hermes config set <key> <value>", ""))
+    ("eir config", "         View current settings"), ("eir config edit", "    Open config in your editor"),
+    ("eir config set <key> <value>", ""))
 _READY_ROWS = (
-    ("hermes", "              Start chatting"), ("hermes gateway", "      Start messaging gateway"),
-    ("hermes doctor", "       Check for issues"))
+    ("eir", "              Start chatting"), ("eir gateway", "      Start messaging gateway"),
+    ("eir doctor", "       Check for issues"))
 
 
 def _voice_provider_status(kind: str, provider: str, rows: dict, default: tuple) -> tuple:
@@ -67,7 +67,7 @@ def _first_available_plugin_provider(registry: str, skip: str | None = None):
     available (fail-soft: any error means none), skipping ``skip``."""
     try:
         import importlib
-        from hermes_cli.plugins import _ensure_plugins_discovered
+        from eir_cli.plugins import _ensure_plugins_discovered
         _ensure_plugins_discovered()
         for provider in importlib.import_module(f"agent.{registry}").list_providers():
             if provider.name == skip:
@@ -92,7 +92,7 @@ def _vision_row(config, feats):
         ok = bool(get_available_vision_backends())
     except Exception:
         ok = False
-    return ("Vision (image analysis)", ok, None if ok else "run 'hermes setup' to configure")
+    return ("Vision (image analysis)", ok, None if ok else "run 'eir setup' to configure")
 
 
 def _managed_or_provider_row(feature, name: str, managed_label: str, missing_hint: str):
@@ -129,7 +129,7 @@ def _image_gen_row(config, feats):
 
 
 def _video_gen_row(config, feats):
-    # Opt-in via `hermes tools` → Video Generation. Only show the row when a plugin reports
+    # Opt-in via `eir tools` → Video Generation. Only show the row when a plugin reports
     # available so we don't badger users who don't care about video gen with a "missing" line.
     if feats.video_gen.managed_by_nous:
         return ("Video Generation (FAL via Nous subscription)", True, None)
@@ -159,7 +159,7 @@ def _modal_row(config, feats):
     if _setup.cfg_get(config, "terminal", "backend") == "modal":
         if feats.modal.direct_override:
             return ("Modal Execution (direct Modal)", True, None)
-        return ("Modal Execution", False, "run 'hermes setup terminal'")
+        return ("Modal Execution", False, "run 'eir setup terminal'")
     if tool_backend_helpers.managed_nous_tools_enabled() and feats.nous_auth_present:
         return ("Modal Execution (optional via Nous subscription)", True, None)
     return None
@@ -192,21 +192,21 @@ def _print_section_header(title):
     print(_setup.color(title, _setup.Colors.CYAN, _setup.Colors.BOLD), end="\n\n")
 
 
-def _print_setup_summary(config: dict, hermes_home):
+def _print_setup_summary(config: dict, eir_home):
     """Print the setup completion summary."""
-    from hermes_constants import display_hermes_home as _dhh
-    from hermes_cli import nous_subscription
+    from eir_constants import display_eir_home as _dhh
+    from eir_cli import nous_subscription
     # Provider readiness — the one thing setup must produce. A user who cancelled the API-key
     # prompt mid-wizard used to exit "successfully" with NO working model; say so loudly.
     try:
-        from hermes_cli.auth import resolve_provider
+        from eir_cli.auth import resolve_provider
         resolve_provider()
     except Exception:
         print()
-        _setup.print_warning("No inference provider is configured — Hermes cannot chat yet.")
+        _setup.print_warning("No inference provider is configured — Eir cannot chat yet.")
         _setup._info("  Finish this one step with either of:",
-              "    hermes model            (pick any provider/model)",
-              "    hermes setup --portal   (Nous Portal OAuth, no API key)")
+              "    eir model            (pick any provider/model)",
+              "    eir setup --portal   (Nous Portal OAuth, no API key)")
 
     print()
     _setup.print_header("Tool Availability Summary")
@@ -226,7 +226,7 @@ def _print_setup_summary(config: dict, hermes_home):
     print()
 
     if available_count < len(tool_status):
-        _setup.print_warning("Some tools are disabled. Run 'hermes setup tools' to configure them,")
+        _setup.print_warning("Some tools are disabled. Run 'eir setup tools' to configure them,")
         _setup.print_warning(f"or edit {_dhh()}/.env directly to add the missing API keys.")
         print()
 
@@ -236,7 +236,7 @@ def _print_setup_summary(config: dict, hermes_home):
     print()
     print(_setup.color(f"📁 All your files are in {_dhh()}/:", _setup.Colors.CYAN, _setup.Colors.BOLD), end="\n\n")
     for label, value in (("Settings:", f"  {_setup.get_config_path()}"), ("API Keys:", f"  {_setup.get_env_path()}"),
-                         ("Data:", f"      {hermes_home}/cron/, sessions/, logs/")):
+                         ("Data:", f"      {eir_home}/cron/, sessions/, logs/")):
         print(f"   {_setup.color(label, _setup.Colors.YELLOW)}{value}")
     print()
 
@@ -254,4 +254,4 @@ def _print_setup_summary(config: dict, hermes_home):
     print()
 
 
-import hermes_cli.setup as _setup
+import eir_cli.setup as _setup

@@ -1,6 +1,6 @@
 """Set-time stale-route guard for provider switches.
 
-``hermes config set <block>.provider X`` must not carry the previous provider's route: the
+``eir config set <block>.provider X`` must not carry the previous provider's route: the
 runtime honours ``base_url``/``api_mode`` for whatever provider the block now names — and in an
 ``auxiliary.<task>`` block ``base_url`` even overrides ``provider`` (``config_defaults._aux``)
 — so the new provider's credential would be posted to the old provider's endpoint (#113719,
@@ -10,8 +10,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from hermes_cli.colors import Colors, color
-from hermes_cli.route_identity import normalize_route_base_url
+from eir_cli.colors import Colors, color
+from eir_cli.route_identity import normalize_route_base_url
 from utils import same_base_url_origin
 
 _AUX_KEY_FIELDS = ("api_key", "key_env", "api_key_env")
@@ -32,7 +32,7 @@ def clear_aux_credentials_on_route_change(entry: dict, provider: Any, base_url: 
     # (#130410), so a path change on the same origin is the same endpoint's key.
     if old == new or (new[0] == "custom" and new[1] and old[1] and same_base_url_origin(old[1], new[1])):
         return False
-    from hermes_cli.config import clear_model_endpoint_credentials
+    from eir_cli.config import clear_model_endpoint_credentials
     clear_model_endpoint_credentials(entry)
     return True
 
@@ -63,7 +63,7 @@ def drop_carried_route_state(old: Any, new: Any, config: dict) -> None:
     # Same URL identity as _route_of, or a re-spelt old URL escapes the carried check with its key.
     carried_url = bool(base_url) and normalize_route_base_url(base_url) == old_route[1]
     if carried_url and _route_of(new.get("provider"), "")[0] != old_route[0]:
-        from hermes_cli.route_identity import provider_owns_route
+        from eir_cli.route_identity import provider_owns_route
         if provider_owns_route(new.get("provider"), base_url, config) is not True:
             new.pop("base_url")
             carried_url = False
@@ -72,7 +72,7 @@ def drop_carried_route_state(old: Any, new: Any, config: dict) -> None:
     if _route_of(new.get("provider"), "")[0] == "custom" and same_base_url_origin(old_route[1], base_url):
         return  # bare custom's key binds to its URL's origin (#130410), as clear_aux_credentials_on_route_change
     fields = _CARRIED_CREDENTIAL_FIELDS[2:] if old_route == ("", "") else _CARRIED_CREDENTIAL_FIELDS
-    from hermes_cli.config import _expand_env_vars
+    from eir_cli.config import _expand_env_vars
     for key in fields:
         # GET hands the form a ``${VAR}`` key expanded (aux keys are stored that way), so the old
         # key comes back as its expansion, not as the reference.
@@ -95,7 +95,7 @@ def stale_route_notice(user_config: dict, dotted_key: str, value: Any) -> str:
     same escape-aware way ``_set_nested`` walks the key and mutated in place, so pops land in the
     caller's config dict. A route that IS the new provider's endpoint is kept; one of unknown
     ownership is kept but warned about."""
-    from hermes_cli.config import _locate_nested, _split_key_path
+    from eir_cli.config import _locate_nested, _split_key_path
 
     parts = _split_key_path(dotted_key.strip())
     block: Any = None
@@ -113,7 +113,7 @@ def stale_route_notice(user_config: dict, dotted_key: str, value: Any) -> str:
     old_provider = raw_old or "the previous provider"
     if raw_old.lower() == str(value).strip().lower():
         return ""
-    from hermes_cli.route_identity import drop_stale_model_route
+    from eir_cli.route_identity import drop_stale_model_route
     popped, unverified = drop_stale_model_route(block, value, user_config)
     prefix = ".".join(parts[:-1])
     dropped_keys: list[str] = []
@@ -138,5 +138,5 @@ def stale_route_notice(user_config: dict, dotted_key: str, value: Any) -> str:
         return color(
             f"⚠ {prefix}.base_url ({_safe(block.get('base_url'))}) was set under {old_provider} and "
             f"still applies to {value} — requests go there. If it is not {value}'s endpoint: "
-            f"`hermes config unset {prefix}.base_url` (and {prefix}.api_mode).", Colors.YELLOW)
+            f"`eir config unset {prefix}.base_url` (and {prefix}.api_mode).", Colors.YELLOW)
     return ""

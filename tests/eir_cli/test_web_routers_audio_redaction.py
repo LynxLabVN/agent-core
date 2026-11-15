@@ -13,7 +13,7 @@ from urllib.parse import urlencode
 import pytest
 from starlette.testclient import TestClient
 
-from hermes_cli import web_server
+from eir_cli import web_server
 
 # Built at runtime so no credential-shaped literal sits in the tree.
 _KEY = "sk-proj-" + "A1b2C3d4E5f6G7h8I9j0K1l2M3n4"
@@ -23,7 +23,7 @@ _AUDIO = {"data_url": "data:audio/webm;base64," + base64.b64encode(b"\x00fake").
 
 
 @pytest.fixture
-def client(_isolate_hermes_home):
+def client(_isolate_eir_home):
     c = TestClient(web_server.app)
     c.headers[web_server._SESSION_HEADER_NAME] = web_server._SESSION_TOKEN
     return c

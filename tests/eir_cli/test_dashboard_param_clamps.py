@@ -19,14 +19,14 @@ from fastapi.testclient import TestClient
 
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-    monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", "clamp-test-token")
-    from hermes_cli import web_server
-    import hermes_state
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_DASHBOARD_SESSION_TOKEN", "clamp-test-token")
+    from eir_cli import web_server
+    import eir_state
 
-    monkeypatch.setattr(hermes_state, "DEFAULT_DB_PATH", tmp_path / "state.db")
+    monkeypatch.setattr(eir_state, "DEFAULT_DB_PATH", tmp_path / "state.db")
     # The owner initializes storage, not GET requests or an unrelated lifespan.
-    with closing(hermes_state.SessionDB()) as db:
+    with closing(eir_state.SessionDB()) as db:
         db.create_session("clamp-session", source="cli")
 
     with closing(TestClient(web_server.app, raise_server_exceptions=False)) as c:

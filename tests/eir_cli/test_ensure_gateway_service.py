@@ -1,11 +1,11 @@
 """Service setup failure reporting; consent integration lives in test_gateway_service_choice."""
 
-import hermes_cli.gateway as gateway_mod
-from hermes_cli.gateway_setup_service import ensure_gateway_service
+import eir_cli.gateway as gateway_mod
+from eir_cli.gateway_setup_service import ensure_gateway_service
 
 
 def _patch_host(monkeypatch, *, container=False, systemd=True, macos=False, windows=False):
-    monkeypatch.setattr("hermes_constants.is_container", lambda: container)
+    monkeypatch.setattr("eir_constants.is_container", lambda: container)
     monkeypatch.setattr(gateway_mod, "supports_systemd_services", lambda: systemd)
     monkeypatch.setattr(gateway_mod, "is_macos", lambda: macos)
     monkeypatch.setattr(gateway_mod, "is_windows", lambda: windows)
@@ -26,7 +26,7 @@ class TestEnsureGatewayService:
         _patch_host(monkeypatch, systemd=False)
         assert ensure_gateway_service(install=True) is False
         out = capsys.readouterr().out
-        assert "hermes gateway" in out
+        assert "eir gateway" in out
 
     def test_already_running_short_circuits(self, monkeypatch):
         _patch_host(monkeypatch)
@@ -80,7 +80,7 @@ class TestEnsureGatewayService:
 
         assert ensure_gateway_service(install=True) is False
         out = capsys.readouterr().out
-        assert "hermes gateway install" in out
+        assert "eir gateway install" in out
 
     def test_never_raises_on_sys_exit(self, monkeypatch, capsys):
         """Install paths that sys.exit() must not abort setup/import."""
@@ -96,7 +96,7 @@ class TestEnsureGatewayService:
 
         assert ensure_gateway_service(install=True) is False
         out = capsys.readouterr().out
-        assert "hermes gateway install" in out
+        assert "eir gateway install" in out
 
     def test_user_systemd_unreachable_reports_remediation(self, monkeypatch, capsys):
         _patch_host(monkeypatch)

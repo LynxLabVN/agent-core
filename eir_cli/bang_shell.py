@@ -33,7 +33,7 @@ def parse_bang_command(text: str) -> str:
     """The shell command inside a bang submission (``""`` when bare).
 
     ``!  ls -la`` -> ``ls -la``; ``!!`` -> ``!`` — a literal second bang belongs to the user's shell
-    (history expansion), not to Hermes.
+    (history expansion), not to Eir.
     """
     return text.strip()[1:].strip() if is_bang_command(text) else ""
 
@@ -51,8 +51,8 @@ def bang_shell_enabled() -> bool:
         def env_var_enabled(name, default=""):  # type: ignore[misc]
             return str(os.getenv(name, default)).strip().lower() in {"1", "true", "yes", "on"}
 
-    return not (env_var_enabled("HERMES_GATEWAY_SESSION") or env_var_enabled("HERMES_CRON_SESSION")
-                or (os.getenv("HERMES_SESSION_PLATFORM") or "").strip())
+    return not (env_var_enabled("EIR_GATEWAY_SESSION") or env_var_enabled("EIR_CRON_SESSION")
+                or (os.getenv("EIR_SESSION_PLATFORM") or "").strip())
 
 
 def resolve_bang_cwd(session_key: Optional[str] = None) -> Optional[str]:
@@ -87,7 +87,7 @@ def check_bang_approval(command: str) -> dict:
 
 
 def _bang_env() -> dict:
-    """Environment for a bang command with Hermes-managed secrets filtered.
+    """Environment for a bang command with Eir-managed secrets filtered.
 
     The CLI process holds every provider API key; a user-typed command may still run a third-party
     script, so reuse the sanitizer ``quick_commands`` and the local terminal backend use. If that
@@ -107,7 +107,7 @@ def run_bang_command(command: str, *, cwd: Optional[str] = None, timeout: int = 
     if run_cwd and not os.path.isdir(run_cwd):
         run_cwd = None
     try:
-        from hermes_cli._subprocess_compat import windows_hide_flags
+        from eir_cli._subprocess_compat import windows_hide_flags
         creationflags = windows_hide_flags()
     except Exception:
         creationflags = 0
@@ -130,7 +130,7 @@ def run_bang_command(command: str, *, cwd: Optional[str] = None, timeout: int = 
         emit(f"!: command timed out after {timeout}s")
         return 124
     except KeyboardInterrupt:
-        # Ctrl+C interrupts the command, not the Hermes session.
+        # Ctrl+C interrupts the command, not the Eir session.
         proc.kill()
         emit("!: interrupted")
         return 130

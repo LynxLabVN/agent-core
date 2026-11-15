@@ -112,12 +112,12 @@ def _dots_to_hyphens(model_name: str) -> str:
 
 
 def _normalize_provider_alias(provider_name: str) -> str:
-    """Resolve provider aliases to Hermes' canonical ids."""
+    """Resolve provider aliases to Eir' canonical ids."""
     raw = (provider_name or "").strip().lower()
     if not raw:
         return raw
     try:
-        from hermes_cli.models import normalize_provider
+        from eir_cli.models import normalize_provider
 
         return normalize_provider(raw)
     except Exception:
@@ -127,7 +127,7 @@ def _normalize_provider_alias(provider_name: str) -> str:
 def _strip_matching_provider_prefix(model_name: str, target_provider: str) -> str:
     """Strip ``provider/`` or ``provider:`` only when the prefix matches the target provider, so
     arbitrary slash-bearing ids aren't mangled while ``zai/glm-5.1`` is repaired for ``zai``. The colon
-    form is Hermes's own ``provider:model`` switch syntax (``-m openai-codex:gpt-5.6-sol``); left intact
+    form is Eir's own ``provider:model`` switch syntax (``-m openai-codex:gpt-5.6-sol``); left intact
     it reaches the wire and the Codex backend rejects it with HTTP 400 (#64787). Only the FIRST separator
     counts, so an Ollama-style ``qwen3:8b`` tag is never split on a later colon. ``custom`` is a bucket,
     not a vendor: an alias resolving to it (``ollama``) may be a real LiteLLM-style routing prefix, so
@@ -175,7 +175,7 @@ def _repair_prefix_from_catalogue(model_name: str, provider: str) -> str:
     if "/" in model_name:
         return model_name
     try:
-        from hermes_cli.models import _PROVIDER_MODELS
+        from eir_cli.models import _PROVIDER_MODELS
     except Exception:
         return model_name
     # Compare against the catalogue's own suffix, tag included: a bare ``…:free`` id must resolve to
@@ -213,7 +213,7 @@ def normalize_model_for_provider(model_input: str, target_provider: str) -> str:
 
     # OpenCode Zen / Go are flat-namespace resellers: /v1/models returns bare IDs and inference 401s
     # vendor-prefixed names, so strip ANY leading ``vendor/`` (commonly copied from aggregator slugs).
-    from hermes_cli.models import opencode_provider_family
+    from eir_cli.models import opencode_provider_family
 
     _oc_family = opencode_provider_family(provider)
     if _oc_family is not None:

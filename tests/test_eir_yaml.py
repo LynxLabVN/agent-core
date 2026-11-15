@@ -1,11 +1,11 @@
-"""Contracts for Hermes' shared YAML reader and writer."""
+"""Contracts for Eir' shared YAML reader and writer."""
 
 import io
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-import hermes_yaml as yaml
+import eir_yaml as yaml
 from utils import fast_safe_load
 
 

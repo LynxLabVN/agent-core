@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# hermes-update-rehearsal.sh — for an EXISTING Hermes install.
+# eir-update-rehearsal.sh — for an EXISTING Eir install.
 #
 # Two steps:
-#   pre   take a `hermes backup` of your data, clone HERMES_HOME and the desktop
+#   pre   take a `eir backup` of your data, clone EIR_HOME and the desktop
 #         app's Electron userData into the backup dir, then point the install's
-#         update source at a fork so `hermes update` pulls that fork's main.
+#         update source at a fork so `eir update` pulls that fork's main.
 #         Prints what to do next.
 #   post  swap the clones back in, so both trees are exactly as they were.
 #
@@ -13,28 +13,28 @@
 #
 # On APFS (macOS) and btrfs/xfs the clone is copy-on-write: no file data is
 # copied. Elsewhere it is a plain copy. post swaps by rename, so it is instant
-# when the backup dir is on the same disk. HERMES_HOME/cache is left as it is.
+# when the backup dir is on the same disk. EIR_HOME/cache is left as it is.
 #
-#   ./hermes-update-rehearsal.sh pre  --source <git-url>
-#   # ... run `hermes update`, use Hermes, test whatever you need ...
-#   ./hermes-update-rehearsal.sh post
+#   ./eir-update-rehearsal.sh pre  --source <git-url>
+#   # ... run `eir update`, use Eir, test whatever you need ...
+#   ./eir-update-rehearsal.sh post
 #
 # Options:
 #   --source URL   repo to pull the update from; updates follow its main
 #                  (default: the rehearsal fork)
-#   --backup-root DIR   where the backup lives (default ~/hermes-update-rehearsal)
+#   --backup-root DIR   where the backup lives (default ~/eir-update-rehearsal)
 #   --yes          post: skip the confirmation
 #
-# Requires: git. `pre` and `hermes update` need network access to --source.
+# Requires: git. `pre` and `eir update` need network access to --source.
 
 set -euo pipefail
 
 OFFICIAL_HTTPS="https://github.com/NousResearch/hermes-agent.git"
-OFFICIAL_SSH="git@github.com:NousResearch/hermes-agent.git"
+OFFICIAL_SSH="git@github.com:NousResearch/eir-agent.git"
 DEFAULT_SOURCE="https://github.com/ethernet8023/hermes-agent.git"
 
 SUBCMD=""
-BACKUP_ROOT="${HOME}/hermes-update-rehearsal"
+BACKUP_ROOT="${HOME}/eir-update-rehearsal"
 SOURCE="$DEFAULT_SOURCE"
 ASSUME_YES=0
 
@@ -47,7 +47,7 @@ step() { printf '\n=== %s ===\n' "$*"; }
 usage() {
   if [ -n "$SELF" ] && [ -r "$SELF" ]; then sed -n '2,28p' "$SELF"; exit 0; fi
   cat <<'EOF'
-hermes-update-rehearsal.sh -- run against an EXISTING Hermes install.
+eir-update-rehearsal.sh -- run against an EXISTING Eir install.
 
   pre     back up your data, clone both trees, point the update source at a fork
   post    swap the clones back in, exactly as they were
@@ -56,7 +56,7 @@ hermes-update-rehearsal.sh -- run against an EXISTING Hermes install.
 Options:
   --source URL        repo to pull the update from; updates follow its main
                       (default: the rehearsal fork)
-  --backup-root DIR   where the backup lives (default ~/hermes-update-rehearsal)
+  --backup-root DIR   where the backup lives (default ~/eir-update-rehearsal)
   --yes               post: skip the confirmation
 
 `pre` reports what it did and prints the next commands. It never judges your
@@ -103,20 +103,20 @@ native_path() {
 }
 
 resolve_paths() {
-  local suffix="${HERMES_DATA_DIR_SUFFIX:-}"
-  if [ -n "${HERMES_HOME:-}" ]; then
-    HERMES_HOME="$(cd "$HERMES_HOME" 2>/dev/null && pwd || printf '%s' "$HERMES_HOME")"
+  local suffix="${EIR_DATA_DIR_SUFFIX:-}"
+  if [ -n "${EIR_HOME:-}" ]; then
+    EIR_HOME="$(cd "$EIR_HOME" 2>/dev/null && pwd || printf '%s' "$EIR_HOME")"
   else
-    HERMES_HOME="$HOME/.hermes${suffix}"
+    EIR_HOME="$HOME/.eir${suffix}"
   fi
-  INSTALL_DIR="$HERMES_HOME/hermes-agent"
-  if [ -n "${HERMES_DESKTOP_USER_DATA_DIR:-}" ]; then
-    USERDATA_DIR="$HERMES_DESKTOP_USER_DATA_DIR"; USERDATA_SOURCE="env"
+  INSTALL_DIR="$EIR_HOME/eir-agent"
+  if [ -n "${EIR_DESKTOP_USER_DATA_DIR:-}" ]; then
+    USERDATA_DIR="$EIR_DESKTOP_USER_DATA_DIR"; USERDATA_SOURCE="env"
   else
-    USERDATA_DIR="$HOME/Library/Application Support/Hermes${suffix}"; USERDATA_SOURCE="default"
+    USERDATA_DIR="$HOME/Library/Application Support/Eir${suffix}"; USERDATA_SOURCE="default"
   fi
   BACKUP_ROOT="$(native_path "$BACKUP_ROOT")"
-  HERMES_HOME="$(native_path "$HERMES_HOME")"
+  EIR_HOME="$(native_path "$EIR_HOME")"
   INSTALL_DIR="$(native_path "$INSTALL_DIR")"
   USERDATA_DIR="$(native_path "$USERDATA_DIR")"
 }
@@ -131,16 +131,16 @@ latest_backup_root() {
 
 load_snapshot() {
   SNAP="$(latest_backup_root)" || die "no backup found under $BACKUP_ROOT — run 'pre' first"
-  local recorded_path="$SNAP/hermes-home.txt"
-  [ -f "$recorded_path" ] || die "$SNAP is not a rehearsal backup (no hermes-home.txt)"
-  [ -d "$SNAP/home" ] || die "$SNAP has no clone of HERMES_HOME (made by an older version of this script, or already restored)"
+  local recorded_path="$SNAP/eir-home.txt"
+  [ -f "$recorded_path" ] || die "$SNAP is not a rehearsal backup (no eir-home.txt)"
+  [ -d "$SNAP/home" ] || die "$SNAP has no clone of EIR_HOME (made by an older version of this script, or already restored)"
   # Plain text, not JSON: this string is compared byte-for-byte to decide whether
   # the backup belongs to the home post is about to restore.
   local recorded current
   recorded="$(tr -d '\r' < "$recorded_path")"
-  current="$(printf '%s' "$HERMES_HOME" | tr '\\' '/')"
+  current="$(printf '%s' "$EIR_HOME" | tr '\\' '/')"
   [ "$(printf '%s' "$recorded" | tr '\\' '/')" = "$current" ] \
-    || die "that backup belongs to HERMES_HOME=$recorded, not $HERMES_HOME; pass --backup-root to pick the right one"
+    || die "that backup belongs to EIR_HOME=$recorded, not $EIR_HOME; pass --backup-root to pick the right one"
 }
 
 # ---------------------------------------------------------------------------
@@ -222,11 +222,11 @@ swap_tree() {
   rmdir "$clone"
 }
 
-# The install's own hermes: pre-branch installs keep it in the venv.
-resolve_hermes_exe() {
+# The install's own eir: pre-branch installs keep it in the venv.
+resolve_eir_exe() {
   local c
-  for c in "$INSTALL_DIR/venv/bin/hermes" "$INSTALL_DIR/.hermes/bin/hermes" \
-           "$INSTALL_DIR/venv/Scripts/hermes.exe" "$HERMES_HOME/bin/hermes"; do
+  for c in "$INSTALL_DIR/venv/bin/eir" "$INSTALL_DIR/.eir/bin/eir" \
+           "$INSTALL_DIR/venv/Scripts/eir.exe" "$EIR_HOME/bin/eir"; do
     [ -x "$c" ] && { printf '%s' "$c"; return 0; }
   done
   return 1
@@ -239,25 +239,25 @@ resolve_hermes_exe() {
 cmd_pre() {
   resolve_paths
   step "your install"
-  say "HERMES_HOME   $HERMES_HOME"
+  say "EIR_HOME   $EIR_HOME"
   say "install       $INSTALL_DIR"
   say "desktop data  $USERDATA_DIR ($USERDATA_SOURCE)"
   say "backup to     $BACKUP_ROOT"
-  [ -d "$HERMES_HOME" ] || die "no HERMES_HOME at $HERMES_HOME"
+  [ -d "$EIR_HOME" ] || die "no EIR_HOME at $EIR_HOME"
   [ -d "$INSTALL_DIR/.git" ] || die "no git checkout at $INSTALL_DIR — this tool covers source installs"
-  local hermes_exe
-  hermes_exe="$(resolve_hermes_exe)" || die "no hermes executable found in $INSTALL_DIR (venv/bin, .hermes/bin) or $HERMES_HOME/bin"
+  local eir_exe
+  eir_exe="$(resolve_eir_exe)" || die "no eir executable found in $INSTALL_DIR (venv/bin, .eir/bin) or $EIR_HOME/bin"
 
   step "before we start (nothing here is a pass/fail, just read it)"
   if command -v pgrep >/dev/null 2>&1; then
     local procs
-    procs="$(pgrep -fl hermes 2>/dev/null | grep -v 'hermes-update-rehearsal' || true)"
+    procs="$(pgrep -fl eir 2>/dev/null | grep -v 'eir-update-rehearsal' || true)"
     if [ -n "$procs" ]; then
-      warn "Hermes looks like it is running — close the desktop app and the gateway"
-      warn "before you run 'hermes update', or the dependency sync may fail:"
+      warn "Eir looks like it is running — close the desktop app and the gateway"
+      warn "before you run 'eir update', or the dependency sync may fail:"
       printf '    %s\n' "$procs"
     else
-      ok "no Hermes processes running"
+      ok "no Eir processes running"
     fi
   fi
   local n
@@ -276,23 +276,23 @@ cmd_pre() {
   [ ! -e "$SNAP" ] || die "backup dir already exists: $SNAP"
   mkdir -p "$SNAP"
 
-  step "backing up your data (hermes backup)"
+  step "backing up your data (eir backup)"
   # Config, keys, sessions, memories, skills, with SQLite copied consistently:
   # a second, independent copy of what matters most. post never deletes it.
   local started code=0 out
   started="$SECONDS"
-  out="$(HERMES_HOME="$HERMES_HOME" "$hermes_exe" backup -o "$SNAP/hermes-backup.zip" 2>&1)" || code=$?
-  if [ "$code" = 1 ] && [ -f "$SNAP/hermes-backup.zip" ]; then
+  out="$(EIR_HOME="$EIR_HOME" "$eir_exe" backup -o "$SNAP/eir-backup.zip" 2>&1)" || code=$?
+  if [ "$code" = 1 ] && [ -f "$SNAP/eir-backup.zip" ]; then
     printf '    %s\n' "$out"
-    warn "hermes backup finished INCOMPLETE ($((SECONDS - started))s): the files listed above are not in $SNAP/hermes-backup.zip"
-  elif [ "$code" != 0 ] || [ ! -f "$SNAP/hermes-backup.zip" ]; then
+    warn "eir backup finished INCOMPLETE ($((SECONDS - started))s): the files listed above are not in $SNAP/eir-backup.zip"
+  elif [ "$code" != 0 ] || [ ! -f "$SNAP/eir-backup.zip" ]; then
     printf '    %s\n' "$out"
-    die "hermes backup failed (exit $code) — nothing else was done"
+    die "eir backup failed (exit $code) — nothing else was done"
   else
-    ok "hermes-backup.zip ($(du -h "$SNAP/hermes-backup.zip" | cut -f1), $((SECONDS - started))s)"
+    ok "eir-backup.zip ($(du -h "$SNAP/eir-backup.zip" | cut -f1), $((SECONDS - started))s)"
   fi
 
-  step "cloning HERMES_HOME and the desktop app's data"
+  step "cloning EIR_HOME and the desktop app's data"
   detect_clone_mode
   case "$CLONE_MODE" in
     clonefile|reflink) ok "copy-on-write clones ($CLONE_MODE): no file data is copied" ;;
@@ -302,8 +302,8 @@ cmd_pre() {
   # Everything but cache/: checkout, venv, PM store and node_modules come too,
   # so post is a true rollback rather than a re-download. SQLite sidecars travel
   # WITH their db on purpose (a raw copy of db+wal+shm is consistent).
-  clone_tree "$HERMES_HOME" "$SNAP/home" cache || die "cloning HERMES_HOME failed"
-  ok "HERMES_HOME -> $SNAP/home ($((SECONDS - started))s, cache/ left out)"
+  clone_tree "$EIR_HOME" "$SNAP/home" cache || die "cloning EIR_HOME failed"
+  ok "EIR_HOME -> $SNAP/home ($((SECONDS - started))s, cache/ left out)"
   local userdata_existed=false
   if [ -d "$USERDATA_DIR" ]; then
     userdata_existed=true
@@ -314,12 +314,12 @@ cmd_pre() {
   fi
 
   step "recording what this backup is"
-  printf '%s\n' "$HERMES_HOME" > "$SNAP/hermes-home.txt"
+  printf '%s\n' "$EIR_HOME" > "$SNAP/eir-home.txt"
   cat > "$SNAP/manifest.json" <<EOF
 {
   "schema": 4,
   "created": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "hermes_home": "$HERMES_HOME",
+  "eir_home": "$EIR_HOME",
   "install_dir": "$INSTALL_DIR",
   "userdata_dir": "$USERDATA_DIR",
   "userdata_dir_source": "$USERDATA_SOURCE",
@@ -328,11 +328,11 @@ cmd_pre() {
   "rehearsal_source": "$SOURCE"
 }
 EOF
-  ok "manifest.json (backup of $HERMES_HOME)"
+  ok "manifest.json (backup of $EIR_HOME)"
 
   step "pointing your install at $SOURCE"
   # insteadOf is a TRANSPORT rewrite. Your checkout's origin keeps the official
-  # URL, which matters: `hermes update` resolves its channel from the archive
+  # URL, which matters: `eir update` resolves its channel from the archive
   # and validates it against `git config --get remote.origin.url`. Repointing
   # origin at a fork would make the update fail before any git work.
   # Straight at the fork: the updater follows main, so the fork's main is what
@@ -347,10 +347,10 @@ EOF
     git -C "$INSTALL_DIR" config --local --add "url.$SOURCE.insteadOf" "$url" \
       || die "could not write the URL redirect into $INSTALL_DIR/.git/config"
   done
-  touch "$HERMES_HOME/.skip_upstream_prompt"
+  touch "$EIR_HOME/.skip_upstream_prompt"
   printf '%s\n' "$target_sha" > "$SNAP/target-sha"
   ok "official repo URL now resolves to $SOURCE"
-  ok "created $HERMES_HOME/.skip_upstream_prompt (stops the 'add upstream remote?' prompt)"
+  ok "created $EIR_HOME/.skip_upstream_prompt (stops the 'add upstream remote?' prompt)"
 
   step "ready"
   say "your install is unchanged so far. nothing has been updated yet."
@@ -366,7 +366,7 @@ EOF
 cmd_status() {
   resolve_paths
   step "your install"
-  say "HERMES_HOME   $HERMES_HOME"
+  say "EIR_HOME   $EIR_HOME"
   say "install       $INSTALL_DIR"
   say "desktop data  $USERDATA_DIR ($USERDATA_SOURCE)"
   say "backup root   $BACKUP_ROOT"
@@ -383,8 +383,8 @@ cmd_status() {
     say "prepared      no"
   fi
   say "clone         $([ -d "$SNAP/home" ] && echo "present ($(sed -n 's/.*"clone_mode": "\(.*\)",/\1/p' "$SNAP/manifest.json" 2>/dev/null | head -1))" || echo 'none (restored already?)')"
-  say "data backup   $([ -f "$SNAP/hermes-backup.zip" ] && echo hermes-backup.zip || echo none)"
-  say "marker        $([ -f "$HERMES_HOME/.skip_upstream_prompt" ] && echo present || echo absent)"
+  say "data backup   $([ -f "$SNAP/eir-backup.zip" ] && echo eir-backup.zip || echo none)"
+  say "marker        $([ -f "$EIR_HOME/.skip_upstream_prompt" ] && echo present || echo absent)"
   local n=0
   while IFS= read -r _; do n=$((n + 1)); done \
     < <( { git config --global --get-regexp '^url\.' 2>/dev/null || true; git -C "$INSTALL_DIR" config --local --get-regexp '^url\.' 2>/dev/null || true; } )
@@ -421,23 +421,23 @@ cmd_post() {
   local userdata_existed
   userdata_existed="$(sed -n 's/.*"userdata_existed": \([a-z]*\).*/\1/p' "$SNAP/manifest.json" | head -1)"
   step "this will restore:"
-  say "  $HERMES_HOME  (everything except cache/, including the checkout)"
+  say "  $EIR_HOME  (everything except cache/, including the checkout)"
   say "  $USERDATA_DIR"
   say "  to how they were at $SNAP"
   confirm "Put everything back from $SNAP?"
 
   step "stopping this home's gateway"
-  local hermes_exe
-  hermes_exe="$(resolve_hermes_exe)" || die "no Hermes launcher for $INSTALL_DIR; stop this home's gateway before restoring"
-  HERMES_HOME="$HERMES_HOME" "$hermes_exe" gateway stop \
+  local eir_exe
+  eir_exe="$(resolve_eir_exe)" || die "no Eir launcher for $INSTALL_DIR; stop this home's gateway before restoring"
+  EIR_HOME="$EIR_HOME" "$eir_exe" gateway stop \
     || die "could not stop this home's gateway; restore has not started"
   ok "stopped this home's gateway (close the desktop app before restoring its data)"
 
   local aside="$SNAP/replaced"
   [ ! -e "$aside" ] || die "$aside already exists (an interrupted post?) — nothing was changed; move it away and run post again"
 
-  step "restoring your HERMES_HOME"
-  swap_tree "$HERMES_HOME" "$SNAP/home" "$aside/home" cache \
+  step "restoring your EIR_HOME"
+  swap_tree "$EIR_HOME" "$SNAP/home" "$aside/home" cache \
     || die "restore stopped part-way: the post-update files are in $aside/home, the rest of the clone in $SNAP/home"
   ok "restored (cache/ left as it was)"
 
@@ -456,15 +456,15 @@ cmd_post() {
   fi
 
   step "cleaning up"
-  # Only the whole trees the update left behind. hermes-backup.zip stays.
+  # Only the whole trees the update left behind. eir-backup.zip stays.
   rm -rf "$aside"
   ok "deleted the post-update trees ($aside)"
 
   step "done"
-  say "Your HERMES_HOME and the desktop app's data are back exactly as they were."
-  say "Open the desktop app once and run 'hermes doctor' to confirm."
+  say "Your EIR_HOME and the desktop app's data are back exactly as they were."
+  say "Open the desktop app once and run 'eir doctor' to confirm."
   say "Nothing was judged or changed by this script; the backup at $SNAP"
-  say "(including hermes-backup.zip) is yours to keep or delete."
+  say "(including eir-backup.zip) is yours to keep or delete."
 }
 
 case "$SUBCMD" in

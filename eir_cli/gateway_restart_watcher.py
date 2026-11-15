@@ -1,8 +1,8 @@
-"""Source of the detached gateway-restart watcher (``hermes_cli.gateway._spawn_gateway_restart_watcher``).
+"""Source of the detached gateway-restart watcher (``eir_cli.gateway._spawn_gateway_restart_watcher``).
 
 The watcher runs as ``python -c <source> <old_pid> <respawn argv…>`` on whatever interpreter the
 updater runs on (the bare store Python after the package-manager handoff), so the source imports
-only stdlib-safe Hermes modules. It respawns the gateway once the old one is gone: on POSIX it
+only stdlib-safe Eir modules. It respawns the gateway once the old one is gone: on POSIX it
 waits as long as that takes (a busy gateway's work is never killed on a timer), judging "gone" by
 the old process's ``(pid, start time)`` so a reused PID never holds it.
 """
@@ -13,7 +13,7 @@ import json
 import textwrap
 
 # Module level: the watcher is built after the update moved the checkout (post-swap imports test).
-from hermes_cli._subprocess_compat import process_start_time_stdlib
+from eir_cli._subprocess_compat import process_start_time_stdlib
 
 _SOURCE = textwrap.dedent(
     """
@@ -25,11 +25,11 @@ _SOURCE = textwrap.dedent(
         # Stdlib-only imports: after the package-manager handoff this is the bare store Python;
         # name the checkout explicitly.
         sys.path.insert(0, {project_root_literal})
-        from hermes_cli._subprocess_compat import (
+        from eir_cli._subprocess_compat import (
             _WINDOWS_GATEWAY_BREAKAWAY_ENV, pid_exists_stdlib, process_start_time_stdlib,
             windows_detach_flags, windows_detach_flags_without_breakaway,
         )
-        from hermes_cli.gateway_launchd_runtime import start_gateway_job
+        from eir_cli.gateway_launchd_runtime import start_gateway_job
 
         pid = int(sys.argv[1])
         cmd = sys.argv[2:]
@@ -52,9 +52,9 @@ _SOURCE = textwrap.dedent(
         _stdio_target = subprocess.DEVNULL
         _stdio_fh = None
         try:
-            from hermes_constants import get_hermes_home
+            from eir_constants import get_eir_home
             from pathlib import Path
-            _log_dir = Path(get_hermes_home()) / "logs"
+            _log_dir = Path(get_eir_home()) / "logs"
             _log_dir.mkdir(parents=True, exist_ok=True)
             _stdio_fh = open(_log_dir / "gateway-stdio.log", "ab", buffering=0)
             _stdio_target = _stdio_fh
@@ -64,7 +64,7 @@ _SOURCE = textwrap.dedent(
         # Detach the respawn: POSIX setsid; Windows needs CREATE_BREAKAWAY_FROM_JOB, since the watcher may sit in a job
         # object (Electron/Tauri parent) whose teardown would otherwise kill it (_subprocess_compat.windows_detach_flags).
         _popen_kwargs = {{"stdout": _stdio_target, "stderr": _stdio_target}}
-        # Stable cwd + env overlay (VIRTUAL_ENV/PYTHONPATH/HERMES_HOME) the windowless interpreter needs; empty on POSIX.
+        # Stable cwd + env overlay (VIRTUAL_ENV/PYTHONPATH/EIR_HOME) the windowless interpreter needs; empty on POSIX.
         if _respawn_cwd:
             _popen_kwargs["cwd"] = _respawn_cwd
         _base_env = {{**os.environ, **_respawn_env_overlay}}

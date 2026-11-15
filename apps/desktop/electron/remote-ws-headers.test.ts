@@ -38,10 +38,10 @@ function expectRequestHeaders(
 ) {
   const callback = vi.fn()
 
-  applyRemoteRequestHeaders({ url, requestHeaders: { Origin: 'app://hermes' } }, callback, store.headersFor, new Map())
+  applyRemoteRequestHeaders({ url, requestHeaders: { Origin: 'app://eir' } }, callback, store.headersFor, new Map())
 
   expect(callback).toHaveBeenCalledOnce()
-  expect(callback).toHaveBeenCalledWith(expected ? { requestHeaders: { Origin: 'app://hermes', ...expected } } : {})
+  expect(callback).toHaveBeenCalledWith(expected ? { requestHeaders: { Origin: 'app://eir', ...expected } } : {})
 }
 
 function expectNoHeadersForNearbyUrls(store: ReturnType<typeof createRemoteWsHeaderStore>, exactUrl: string) {
@@ -212,11 +212,11 @@ describe('OAuth login and registry extra headers', () => {
 
     const initial = vi.fn()
     listeners[0](
-      { id: 1, url: 'https://gateway.example/hermes/login', requestHeaders: { Origin: 'app://hermes' } },
+      { id: 1, url: 'https://gateway.example/hermes/login', requestHeaders: { Origin: 'app://eir' } },
       initial
     )
     expect(initial).toHaveBeenCalledWith({
-      requestHeaders: { Origin: 'app://hermes', ...scopedHeaders }
+      requestHeaders: { Origin: 'app://eir', ...scopedHeaders }
     })
 
     const sameScope = vi.fn()
@@ -224,12 +224,12 @@ describe('OAuth login and registry extra headers', () => {
       {
         id: 1,
         url: 'https://gateway.example/hermes/ready',
-        requestHeaders: { Origin: 'app://hermes', Cookie: 'session=live', ...scopedHeaders }
+        requestHeaders: { Origin: 'app://eir', Cookie: 'session=live', ...scopedHeaders }
       },
       sameScope
     )
     expect(sameScope).toHaveBeenCalledWith({
-      requestHeaders: { Origin: 'app://hermes', Cookie: 'session=live', ...scopedHeaders }
+      requestHeaders: { Origin: 'app://eir', Cookie: 'session=live', ...scopedHeaders }
     })
 
     for (const [id, redirectUrl] of [
@@ -244,7 +244,7 @@ describe('OAuth login and registry extra headers', () => {
           id,
           url: redirectUrl,
           requestHeaders: {
-            Origin: 'app://hermes',
+            Origin: 'app://eir',
             Cookie: 'idp-session=live',
             'x-api-key': scopedHeaders['X-Api-Key'],
             'cf-access-client-id': scopedHeaders['CF-Access-Client-Id'],
@@ -254,7 +254,7 @@ describe('OAuth login and registry extra headers', () => {
         redirected
       )
       expect(redirected).toHaveBeenCalledWith({
-        requestHeaders: { Origin: 'app://hermes', Cookie: 'idp-session=live' }
+        requestHeaders: { Origin: 'app://eir', Cookie: 'idp-session=live' }
       })
     }
 

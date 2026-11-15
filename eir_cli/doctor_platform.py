@@ -1,5 +1,5 @@
-"""Host-platform checks for hermes doctor: interpreter, SQLite, certificates, macOS TCC, gateway supervision, command install.
-Split out of ``hermes_cli/doctor.py``, which re-exports every name so ``hermes_cli.doctor.<name>`` keeps resolving (and monkeypatching)."""
+"""Host-platform checks for eir doctor: interpreter, SQLite, certificates, macOS TCC, gateway supervision, command install.
+Split out of ``eir_cli/doctor.py``, which re-exports every name so ``eir_cli.doctor.<name>`` keeps resolving (and monkeypatching)."""
 
 from __future__ import annotations
 
@@ -9,27 +9,27 @@ import ssl
 import subprocess
 import sys
 from pathlib import Path
-from hermes_cli.colors import Colors, color
-from hermes_cli.config import is_nix_install_method, recommended_update_command_for_method
-from hermes_cli.doctor_report import (
+from eir_cli.colors import Colors, color
+from eir_cli.config import is_nix_install_method, recommended_update_command_for_method
+from eir_cli.doctor_report import (
     Finding, _fail_and_issue, _section, check_bool, check_fail, check_info, check_ok, check_warn, doctor_check,
     warn_on_error,
 )
-from hermes_constants import is_termux as _is_termux
-from hermes_cli._startup_fast import project_root_str
+from eir_constants import is_termux as _is_termux
+from eir_cli._startup_fast import project_root_str
 
 
 def _python_repair_hint() -> str:
-    from hermes_cli.config import detect_install_method
-    from hermes_cli.doctor import PROJECT_ROOT
+    from eir_cli.config import detect_install_method
+    from eir_cli.doctor import PROJECT_ROOT
 
     method = detect_install_method(PROJECT_ROOT)
     if is_nix_install_method(method):
         return recommended_update_command_for_method(method)
     if method in ("docker", "apt"):
         command = recommended_update_command_for_method(method)
-        return f"Run `{command}`" + (", then recreate the Hermes container" if method == "docker" else "")
-    return "Run `hermes pm repair`, then restart Hermes"
+        return f"Run `{command}`" + (", then recreate the Eir container" if method == "docker" else "")
+    return "Run `eir pm repair`, then restart Eir"
 
 
 def _system_package_install_cmd(pkg: str) -> str:
@@ -38,21 +38,21 @@ def _system_package_install_cmd(pkg: str) -> str:
 
 def _sqlite_upgrade_hint(install_method: str | None = None) -> str:
     """Return an actionable SQLite upgrade hint for this install layout."""
-    from hermes_cli.doctor import PROJECT_ROOT
-    from hermes_cli.config import detect_install_method
+    from eir_cli.doctor import PROJECT_ROOT
+    from eir_cli.config import detect_install_method
     method = install_method or detect_install_method(PROJECT_ROOT)
     cmd = recommended_update_command_for_method(method)
     action = cmd if is_nix_install_method(method) else {  # nix: prose guidance, not a shell command
-        "docker": f"run `{cmd}`, then recreate all Hermes containers", "apt": f"run `{cmd}`"}.get(method, "run `hermes update`")
+        "docker": f"run `{cmd}`, then recreate all Eir containers", "apt": f"run `{cmd}`"}.get(method, "run `eir update`")
     return f"({action}; fixed versions: 3.51.3+ / 3.50.7 / 3.44.6 — see https://sqlite.org/wal.html#walresetbug)"
 
 
-def _hermes_database_paths(hermes_home: Path) -> list[tuple[str, Path]]:
-    """(display name, path) pairs for Hermes-managed SQLite databases: backup.py's per-profile store list + per-board kanban.db."""
-    from hermes_cli.backup import _QUICK_STATE_FILES
-    entries = [(name, hermes_home / name) for name in _QUICK_STATE_FILES if name.endswith(".db")]
-    for board_db in sorted((hermes_home / "kanban" / "boards").glob("*/kanban.db")):
-        entries.append((str(board_db.relative_to(hermes_home)), board_db))
+def _eir_database_paths(eir_home: Path) -> list[tuple[str, Path]]:
+    """(display name, path) pairs for Eir-managed SQLite databases: backup.py's per-profile store list + per-board kanban.db."""
+    from eir_cli.backup import _QUICK_STATE_FILES
+    entries = [(name, eir_home / name) for name in _QUICK_STATE_FILES if name.endswith(".db")]
+    for board_db in sorted((eir_home / "kanban" / "boards").glob("*/kanban.db")):
+        entries.append((str(board_db.relative_to(eir_home)), board_db))
     return entries
 
 
@@ -77,10 +77,10 @@ def _read_journal_mode(db_path: Path) -> tuple[str | None, str | None]:
 
     Opening through SQLite — even read-only — creates -wal/-shm sidecars, which a diagnostic must not do.
     ``read_header_bytes_preopen`` rather than a bare ``open()``: closing *any* descriptor cancels this
-    process's POSIX advisory locks (see ``hermes_cli.sqlite_safe_read``), and the dashboard console runs
+    process's POSIX advisory locks (see ``eir_cli.sqlite_safe_read``), and the dashboard console runs
     ``run_doctor`` in-process with live ``SessionDB`` connections — the helper refuses then (unreadable).
     """
-    from hermes_cli.sqlite_safe_read import has_live_connection, read_header_bytes_preopen
+    from eir_cli.sqlite_safe_read import has_live_connection, read_header_bytes_preopen
     header = read_header_bytes_preopen(db_path, length=20)
     if header is None:
         return None, "database is open in this process" if has_live_connection(db_path) else _unreadable_reason(db_path)
@@ -93,7 +93,7 @@ def _read_journal_mode(db_path: Path) -> tuple[str | None, str | None]:
 
 
 def _format_db_size(db_path: Path) -> str:
-    from hermes_cli.sizefmt import format_bytes as _format_size
+    from eir_cli.sizefmt import format_bytes as _format_size
     try:
         return _format_size(db_path.stat().st_size)
     except OSError:
@@ -104,7 +104,7 @@ def _report_database_holders(name: str, db_path: Path) -> None:
     """Name the processes holding ``db_path`` (or a WAL sidecar) so the operator knows what to stop before the
     offline journal-mode conversion; a partial or unavailable scan is reported as "cannot prove quiet", never as
     an all-clear (the scan is the same fail-closed authority repair/VACUUM/checkpoint admission uses)."""
-    from hermes_state_holders import describe_holder_pid, foreign_state_db_holders
+    from eir_state_holders import describe_holder_pid, foreign_state_db_holders
     unknown: list[str] = []
     by_pid: dict[int, set[str]] = {}
     for pid, target in foreign_state_db_holders(db_path):
@@ -121,20 +121,20 @@ def _report_database_holders(name: str, db_path: Path) -> None:
         check_info(f"{name}: no other process holds it right now — the offline conversion can run")
 
 
-def _report_database_journal_modes(hermes_home: Path | None = None, version_info: tuple[int, ...] | None = None) -> None:
+def _report_database_journal_modes(eir_home: Path | None = None, version_info: tuple[int, ...] | None = None) -> None:
     """List each database's journal mode; warn on WAL under a vulnerable SQLite, and on a configured
     ``database.journal_mode: delete`` that never took effect."""
-    from hermes_cli.doctor import HERMES_HOME
-    from hermes_state_wal import (
+    from eir_cli.doctor import EIR_HOME
+    from eir_state_wal import (
         _path_on_cross_vm_fs, _path_on_network_fs, _wal_reset_repair_hint, is_sqlite_wal_reset_vulnerable,
         resolve_journal_mode,
     )
     vulnerable = is_sqlite_wal_reset_vulnerable(version_info)
     configured = resolve_journal_mode()
     try:
-        databases = _hermes_database_paths(hermes_home if hermes_home is not None else HERMES_HOME)
+        databases = _eir_database_paths(eir_home if eir_home is not None else EIR_HOME)
     except Exception as exc:
-        check_warn(f"Could not list Hermes databases: {exc}")
+        check_warn(f"Could not list Eir databases: {exc}")
         return
     exposed = []
     for name, path in databases:
@@ -153,8 +153,8 @@ def _report_database_journal_modes(hermes_home: Path | None = None, version_info
             check_warn(f"{name} is in WAL mode ({size}) despite database.journal_mode=delete",
                        "(the setting never applied: an existing WAL database is never live-downgraded"
                        + ("; also exposed to the WAL-reset bug" if vulnerable else "")
-                       + ". Stop every Hermes process for this profile, then run "
-                       f"`hermes sessions set-journal-mode delete{'' if name == 'state.db' else f' --db {path}'}`)")
+                       + ". Stop every Eir process for this profile, then run "
+                       f"`eir sessions set-journal-mode delete{'' if name == 'state.db' else f' --db {path}'}`)")
             _report_database_holders(name, path)
         elif error is not None:
             if vulnerable:
@@ -168,15 +168,15 @@ def _report_database_journal_modes(hermes_home: Path | None = None, version_info
             if vulnerable:
                 exposed.append(name)
             check_warn(f"{name} is in WAL mode on a cross-VM filesystem (virtiofs/9p, {size})",
-                       "(WAL can silently corrupt across the VM boundary; stop every Hermes process and run "
-                       f"`hermes sessions set-journal-mode delete{'' if name == 'state.db' else f' --db {path}'}`, then "
+                       "(WAL can silently corrupt across the VM boundary; stop every Eir process and run "
+                       f"`eir sessions set-journal-mode delete{'' if name == 'state.db' else f' --db {path}'}`, then "
                        "set `database.journal_mode: delete` — or move the database onto a native/named volume)")
         elif mode == "wal" and _path_on_network_fs(str(path)):
             # #110848 remainder: an existing WAL file on a network mount keeps WAL (never live-downgraded); its
             # -shm locks are network round trips, and concurrent writers are one step from silent corruption.
             check_warn(f"{name} is in WAL mode on a network filesystem (nfs/cifs/smb/sshfs, {size})",
-                       "(WAL shared-memory locking is slow and unsafe across network filesystems; stop every Hermes "
-                       f"process and run `hermes sessions set-journal-mode delete{'' if name == 'state.db' else f' --db {path}'}`, "
+                       "(WAL shared-memory locking is slow and unsafe across network filesystems; stop every Eir "
+                       f"process and run `eir sessions set-journal-mode delete{'' if name == 'state.db' else f' --db {path}'}`, "
                        "then set `database.journal_mode: delete` — or move the database onto local disk)")
         elif mode == "wal" and vulnerable:
             exposed.append(name)
@@ -193,7 +193,7 @@ def _check_s6_supervision(issues: list[str]) -> None:
     """Under our s6 /init, report static services and the ONE host gateway slot; no-op elsewhere.
     Counterpart to :func:`_check_gateway_service_linger` (systemd-on-host)."""
     try:
-        from hermes_cli.service_manager import (
+        from eir_cli.service_manager import (
             S6_STATIC_SCANDIR, S6ServiceManager, detect_service_manager, s6_service_up)
     except Exception:
         return
@@ -201,7 +201,7 @@ def _check_s6_supervision(issues: list[str]) -> None:
         return
     _section("s6 Supervision")
     mgr = S6ServiceManager()
-    for static in ("main-hermes", "dashboard"):  # s6-rc symlinks in the root scandir, not the gateway one
+    for static in ("main-eir", "dashboard"):  # s6-rc symlinks in the root scandir, not the gateway one
         up = s6_service_up(S6_STATIC_SCANDIR / static)
         (check_ok if up else check_info)(f"{static}: up" if up else f"{static}: down (expected if not enabled via env)")
     _report_host_gateway_slot(mgr, issues)
@@ -216,10 +216,10 @@ def _report_host_gateway_slot(mgr, issues: list[str]) -> None:
     topology = host_gateway_topology()
     if topology is None:
         if not slots:
-            return check_info("No gateway registered yet — run `hermes gateway install`")
+            return check_info("No gateway registered yet — run `eir gateway install`")
         up = [p for p in slots if mgr.is_running(f"gateway-{p}")]
         issues.append("No host gateway owns the gateway role — start the ONE host multiplexer: "
-                      "hermes --profile default gateway start")
+                      "eir --profile default gateway start")
         return check_warn(f"No host gateway owns the gateway role ({len(up)}/{len(slots)} supervision "
                           f"slots up: {', '.join(slots)})", "(nothing is serving these profiles)")
     check_ok(f"Host gateway: {topology.describe()}")
@@ -228,7 +228,7 @@ def _report_host_gateway_slot(mgr, issues: list[str]) -> None:
         check_warn(f"LEGACY per-profile gateway slots still supervised: {', '.join(legacy_up)}",
                    "(multiplex-only: the host gateway already serves every profile from one process)")
         issues.append("Fold the legacy per-profile gateways into the host gateway: "
-                      "hermes --profile default gateway migrate --multiplex")
+                      "eir --profile default gateway migrate --multiplex")
 
 
 def check_certificates(should_fix: bool = False, issues: list | None = None) -> None:
@@ -269,10 +269,10 @@ def _check_gateway_service_linger(issues: list[str]) -> None:
     the check for every profile that does not own a service of its own.
     """
     try:
-        from hermes_cli.gateway import (
+        from eir_cli.gateway import (
             _SERVICE_BASE, get_systemd_linger_status, get_systemd_unit_path, is_linux,
             user_systemd_unit_dir)
-        from hermes_cli.service_manager import detect_service_manager
+        from eir_cli.service_manager import detect_service_manager
     except Exception as e:
         return check_warn("Gateway service linger", f"(could not import gateway helpers: {e})")
     if not is_linux() or detect_service_manager() == "s6":
@@ -292,11 +292,11 @@ def _check_gateway_service_linger(issues: list[str]) -> None:
 
 _TCC_CDHASH_DETAIL = (
     "the desktop bundle's designated requirement is cdhash-pinned (pre-#73681 build) — rebuilds invalidate "
-    "all permission grants. Run `hermes update` to get the stable identifier-pinned signing identity, "
+    "all permission grants. Run `eir update` to get the stable identifier-pinned signing identity, "
     "then re-grant permissions once.")
 _TCC_STABLE_DETAIL = {
     True: "(certificate-anchored DR; grants survive rebuilds)",
-    False: "(identifier-pinned DR; grants survive rebuilds — for the strongest anchor, see `hermes desktop --setup-tcc-identity`)",
+    False: "(identifier-pinned DR; grants survive rebuilds — for the strongest anchor, see `eir desktop --setup-tcc-identity`)",
 }
 
 
@@ -321,18 +321,18 @@ def check_macos_tcc_grants() -> None:
     # --setup-tcc-identity or notarized build (certificate-anchored) is the strongest anchor.
     check_ok("macOS TCC signing identity is stable", _TCC_STABLE_DETAIL["certificate" in dr.lower()])
     check_info("If macOS still re-prompts for permissions (toggle shows ON): the stored grant is stale — run "
-               "`tccutil reset ScreenCapture com.nousresearch.hermes` (repeat per affected service), toggle it ON in "
-               "System Settings, then fully quit & relaunch Hermes once.")
+               "`tccutil reset ScreenCapture com.nousresearch.eir` (repeat per affected service), toggle it ON in "
+               "System Settings, then fully quit & relaunch Eir once.")
 
 
 def _desktop_app_bundle() -> Path | None:
-    """Locate the locally-built desktop bundle (``apps/desktop/release/mac-<arch>/Hermes.app``), newest first.
+    """Locate the locally-built desktop bundle (``apps/desktop/release/mac-<arch>/Eir.app``), newest first.
 
-    The only layout whose ad-hoc re-signed bundle can invalidate TCC grants. ``/Applications/Hermes.app`` is
-    deliberately not probed: it is the separately-signed, certificate-anchored Hermes-Setup launcher.
+    The only layout whose ad-hoc re-signed bundle can invalidate TCC grants. ``/Applications/Eir.app`` is
+    deliberately not probed: it is the separately-signed, certificate-anchored Eir-Setup launcher.
     """
     release_dir = Path(project_root_str()) / "apps" / "desktop" / "release"
-    candidates = [p for p in release_dir.glob("mac*/Hermes.app") if p.is_dir()]
+    candidates = [p for p in release_dir.glob("mac*/Eir.app") if p.is_dir()]
     return max(candidates, key=lambda p: p.stat().st_mtime) if candidates else None
 
 
@@ -353,7 +353,7 @@ def check_macos_tcc_anchor(should_fix: bool = False) -> None:
     See #95596.
     """
     with warn_on_error("macOS TCC anchor check failed"):
-        from hermes_cli import macos_tcc_anchor as tcc
+        from eir_cli import macos_tcc_anchor as tcc
         status, detail = tcc.tcc_anchor_state()
         if status == "skip":
             return
@@ -382,12 +382,12 @@ def check_macos_full_disk_access() -> None:
     try:
         os.listdir(Path.home() / "Library" / "Application Support" / "com.apple.TCC")
     except PermissionError:
-        check_info("One switch silences all macOS folder prompts: grant your terminal app Full Disk Access and Hermes "
+        check_info("One switch silences all macOS folder prompts: grant your terminal app Full Disk Access and Eir "
                    "will never trip per-folder dialogs (Desktop/Downloads/Documents/...) again. Open: System Settings → "
                    "Privacy & Security → Full Disk Access — or run:\n"
                    "      open \"x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles\"\n"
-                   "    then enable your terminal (and Hermes.app if you use Desktop), and restart them once. "
-                   "With Hermes' stable signing identities the grant survives every update.")
+                   "    then enable your terminal (and Eir.app if you use Desktop), and restart them once. "
+                   "With Eir' stable signing identities the grant survives every update.")
     except OSError:
         pass  # missing dir / other error: indeterminate, stay silent
     else:
@@ -397,7 +397,7 @@ def check_macos_full_disk_access() -> None:
 @doctor_check("Security advisory check failed: {e}")
 def _check_security_advisories(should_fix: bool, f: Finding) -> None:
     """Compromised-package advisories, funnelled into manual issues; a bug here must never block the rest of doctor."""
-    from hermes_cli.security_advisories import detect_compromised, filter_unacked, full_remediation_text, get_acked_ids
+    from eir_cli.security_advisories import detect_compromised, filter_unacked, full_remediation_text, get_acked_ids
     all_hits = detect_compromised()
     fresh_hits = filter_unacked(all_hits)
     if not fresh_hits:
@@ -406,7 +406,7 @@ def _check_security_advisories(should_fix: bool, f: Finding) -> None:
         # Fail row + remediation text indented under it as one section; also into the summary action list.
         _fail_and_issue(f"{hit.advisory.title}", f"({hit.package}=={hit.installed_version})",
                         f"Resolve security advisory {hit.advisory.id}: uninstall {hit.package}=={hit.installed_version} "
-                        f"and rotate credentials, then run `hermes doctor --ack {hit.advisory.id}`.", f.manual_issues)
+                        f"and rotate credentials, then run `eir doctor --ack {hit.advisory.id}`.", f.manual_issues)
         for line in full_remediation_text(hit):
             print(f"    {color(line, Colors.YELLOW)}" if line else "")
     acked_ids = get_acked_ids()  # acked-but-still-installed stays visible
@@ -449,9 +449,9 @@ def _check_python_environment(should_fix: bool, f: Finding) -> None:
     # python-build-standalone can keep a vulnerable SQLite across upgrades).
     with warn_on_error("SQLite version probe failed: {e}", ""):
         import sqlite3
-        from hermes_state_wal import is_sqlite_wal_reset_vulnerable, sqlite_source_id
+        from eir_state_wal import is_sqlite_wal_reset_vulnerable, sqlite_source_id
         src = sqlite_source_id()
-        # Warn-only: Hermes already refuses WAL on fresh DBs and runtime repair is best-effort.
+        # Warn-only: Eir already refuses WAL on fresh DBs and runtime repair is best-effort.
         check_bool(not is_sqlite_wal_reset_vulnerable(), f"SQLite {sqlite3.sqlite_version}",
                    (f"SQLite {sqlite3.sqlite_version} (WAL-reset bug)", _sqlite_upgrade_hint()))
         if src:
@@ -514,7 +514,7 @@ def _check_windows_gateway_autostart(should_fix: bool, f: Finding) -> None:
     Startup-folder entry side by side launch it twice (#80569)."""
     if sys.platform != "win32":
         return
-    from hermes_cli import gateway_windows
+    from eir_cli import gateway_windows
     redundant = gateway_windows.redundant_autostart_entries()
     if not redundant:
         return
@@ -522,7 +522,7 @@ def _check_windows_gateway_autostart(should_fix: bool, f: Finding) -> None:
     if not should_fix:
         for path in redundant:
             check_warn("Redundant gateway login item", f"({path})")
-        f.issues.append("Remove duplicate Windows gateway autostart entries: hermes doctor --fix")
+        f.issues.append("Remove duplicate Windows gateway autostart entries: eir doctor --fix")
         return
     done, warnings = gateway_windows.reconcile_autostart_launchers()
     for message in done:
@@ -540,18 +540,18 @@ def _check_web_dashboard_import(should_fix: bool, f: Finding) -> None:
     """Import the dashboard web surface in a subprocess so an import-time crash lands in the report.
 
     When starlette is updated past the fastapi pinned beside it (the CVE starlette pin ships in
-    several extras on its own), ``hermes dashboard`` dies constructing ``FastAPI(...)`` with a
+    several extras on its own), ``eir dashboard`` dies constructing ``FastAPI(...)`` with a
     TypeError — not an ImportError — so the module's own lazy-install fallback never fires and the
     process exits before a single log line. Importing in a subprocess keeps a dead web surface
     from taking the doctor down with it; lazy installs stay off so the probe never mutates the
     environment it is diagnosing.
     """
-    from hermes_cli.doctor import PROJECT_ROOT
+    from eir_cli.doctor import PROJECT_ROOT
 
-    env = dict(os.environ, HERMES_DISABLE_LAZY_INSTALLS="1")
+    env = dict(os.environ, EIR_DISABLE_LAZY_INSTALLS="1")
     try:
         proc = subprocess.run(
-            [sys.executable, "-c", "import hermes_cli.web_server"],
+            [sys.executable, "-c", "import eir_cli.web_server"],
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -565,7 +565,7 @@ def _check_web_dashboard_import(should_fix: bool, f: Finding) -> None:
         _fail_and_issue(
             "Dashboard web surface",
             "(import probe timed out)",
-            "Repair the dashboard dependencies: `hermes pm repair`, then restart Hermes",
+            "Repair the dashboard dependencies: `eir pm repair`, then restart Eir",
             f.issues,
         )
         return
@@ -582,7 +582,7 @@ def _check_web_dashboard_import(should_fix: bool, f: Finding) -> None:
     _fail_and_issue(
         "Dashboard web surface",
         detail,
-        "Repair the dashboard dependencies: `hermes pm repair`, then restart Hermes",
+        "Repair the dashboard dependencies: `eir pm repair`, then restart Eir",
         f.issues,
     )
 
@@ -597,22 +597,22 @@ def _check_gateway_supervision(should_fix: bool, f: Finding) -> None:
 @doctor_check()
 def _check_command_installation(should_fix: bool, f: Finding) -> None:
     """Check the install-owned launch contract without replacing custom commands."""
-    from hermes_cli.doctor import PROJECT_ROOT
+    from eir_cli.doctor import PROJECT_ROOT
     if sys.platform == "win32":
         return
     _section("Command Installation")
-    from hermes_cli.config import detect_install_method
+    from eir_cli.config import detect_install_method
 
     method = detect_install_method(PROJECT_ROOT)
     if is_nix_install_method(method) or method in ("docker", "apt"):
-        command = shutil.which("hermes")
+        command = shutil.which("eir")
         if command:
-            check_ok(f"Hermes command managed by {method} ({command})")
+            check_ok(f"Eir command managed by {method} ({command})")
         else:
-            check_warn(f"Hermes command not on PATH ({method}-managed)")
+            check_warn(f"Eir command not on PATH ({method}-managed)")
             f.manual_issues.append(_python_repair_hint())
         return
-    from hermes_cli._launchers import resolve_store_python
+    from eir_cli._launchers import resolve_store_python
     from pm.environments import base_venv, selected_venv
 
     try:
@@ -621,47 +621,47 @@ def _check_command_installation(should_fix: bool, f: Finding) -> None:
         check_fail("Cannot resolve selected dependencies", str(exc))
         return f.manual_issues.append(_python_repair_hint())
     pm_launcher = selected != base_venv(PROJECT_ROOT) or resolve_store_python(PROJECT_ROOT) is not None
-    venv_bin = PROJECT_ROOT / "hermes" if pm_launcher else selected / "bin" / "hermes"
+    venv_bin = PROJECT_ROOT / "eir" if pm_launcher else selected / "bin" / "eir"
     if not venv_bin.is_file():
-        check_warn("Hermes entry point not found", f"({venv_bin})")
-        return f.manual_issues.append("Repair or reinstall the Hermes launcher through the installation owner")
-    check_ok(f"Hermes entry point exists ({venv_bin})")
+        check_warn("Eir entry point not found", f"({venv_bin})")
+        return f.manual_issues.append("Repair or reinstall the Eir launcher through the installation owner")
+    check_ok(f"Eir entry point exists ({venv_bin})")
     # Expected command link directory (mirrors install.sh logic).
     prefix = os.environ.get("PREFIX", "")
     termux = prefix and (os.environ.get("TERMUX_VERSION") or "com.termux/files/usr" in prefix)
     link_dir, display = (Path(prefix) / "bin", "$PREFIX/bin") if termux else (Path.home() / ".local" / "bin", "~/.local/bin")
-    link = link_dir / "hermes"
+    link = link_dir / "eir"
     if link.is_symlink():
         target, expected = link.resolve(), venv_bin.resolve()
         if target == expected:
-            return check_ok(f"{display}/hermes → correct target")
-        check_warn(f"{display}/hermes points to wrong target", f"(→ {target}, expected → {expected})")
-        owned_targets = {(PROJECT_ROOT / name / "bin" / "hermes").resolve() for name in ("venv", ".venv")}
+            return check_ok(f"{display}/eir → correct target")
+        check_warn(f"{display}/eir points to wrong target", f"(→ {target}, expected → {expected})")
+        owned_targets = {(PROJECT_ROOT / name / "bin" / "eir").resolve() for name in ("venv", ".venv")}
         if target not in owned_targets:
-            return f.manual_issues.append(f"Review {display}/hermes manually; its target is user-managed and was not changed")
+            return f.manual_issues.append(f"Review {display}/eir manually; its target is user-managed and was not changed")
         if not should_fix:
-            return f.issues.append(f"Broken symlink at {display}/hermes — run 'hermes doctor --fix'")
+            return f.issues.append(f"Broken symlink at {display}/eir — run 'eir doctor --fix'")
         verb = "Fixed"
     elif link.exists():  # regular file (wrapper script), not a symlink
-        return check_ok(f"{display}/hermes exists (non-symlink)")
+        return check_ok(f"{display}/eir exists (non-symlink)")
     else:
-        check_fail(f"{display}/hermes not found", "(hermes command may not work outside the venv)")
+        check_fail(f"{display}/eir not found", "(eir command may not work outside the venv)")
         if not should_fix:
-            return f.issues.append(f"Missing {display}/hermes symlink — run 'hermes doctor --fix'")
+            return f.issues.append(f"Missing {display}/eir symlink — run 'eir doctor --fix'")
         link_dir.mkdir(parents=True, exist_ok=True)
         verb = "Created"
     if pm_launcher:
-        from hermes_cli._launchers import stage_launcher
+        from eir_cli._launchers import stage_launcher
 
-        if stage_launcher("hermes", PROJECT_ROOT, link_dir) is None:
-            check_fail("Could not publish Hermes launcher")
-            return f.manual_issues.append("Repair the PM store interpreter through the installation owner, then rerun 'hermes doctor --fix'")
-        check_ok(f"{verb} PM launcher: {display}/hermes")
+        if stage_launcher("eir", PROJECT_ROOT, link_dir) is None:
+            check_fail("Could not publish Eir launcher")
+            return f.manual_issues.append("Repair the PM store interpreter through the installation owner, then rerun 'eir doctor --fix'")
+        check_ok(f"{verb} PM launcher: {display}/eir")
     else:
         if link.is_symlink():
             link.unlink()
         link.symlink_to(venv_bin)
-        check_ok(f"{verb} symlink: {display}/hermes → {venv_bin}")
+        check_ok(f"{verb} symlink: {display}/eir → {venv_bin}")
     f.fixed += 1
     if verb == "Created" and str(link_dir) not in os.environ.get("PATH", "").split(os.pathsep):
         check_warn(f"{display} is not on your PATH", "(add it to your shell config: export PATH=\"$HOME/.local/bin:$PATH\")")

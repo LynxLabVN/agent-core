@@ -3,10 +3,10 @@
 import queue
 import time as _time
 
-from hermes_cli.banner import cprint, _DIM, _RST
-from hermes_cli.config import save_env_value_secure
-from hermes_cli.secret_prompt import masked_secret_prompt
-from hermes_constants import display_hermes_home
+from eir_cli.banner import cprint, _DIM, _RST
+from eir_cli.config import save_env_value_secure
+from eir_cli.secret_prompt import masked_secret_prompt
+from eir_constants import display_eir_home
 
 
 def _invalidate(cli) -> None:
@@ -43,7 +43,7 @@ def _secret_result(var_name: str, value: str) -> dict:
     except ValueError as exc:  # a locked or denylisted key: the skill setup only logs it, so say why here
         cprint(f"\n  ✗ {exc}")
         raise
-    cprint(f"\n{_DIM}  ✓ Stored secret in {display_hermes_home()}/.env as {var_name}{_RST}")
+    cprint(f"\n{_DIM}  ✓ Stored secret in {display_eir_home()}/.env as {var_name}{_RST}")
     return {
         **stored,
         "skipped": False,
@@ -54,7 +54,7 @@ def prompt_for_secret(cli, var_name: str, prompt: str, metadata=None) -> dict:
     """Prompt for a secret value through the TUI (e.g. API keys for skills).
 
     Returns a dict with keys: success, stored_as, validated, skipped, message. The secret is stored
-    in ~/.hermes/.env and never exposed to the model.
+    in ~/.eir/.env and never exposed to the model.
     """
     if not getattr(cli, "_app", None):
         if not hasattr(cli, "_secret_state"):

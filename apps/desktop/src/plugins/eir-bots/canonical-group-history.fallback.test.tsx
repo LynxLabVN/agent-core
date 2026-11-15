@@ -5,7 +5,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 // An SDK without MessageTextContent (older shells) still exports Streamdown, which renders links,
 // images and fences with none of previewOnly's limits.
 const streamdown = vi.hoisted(() => vi.fn(({ children }: { children: ReactNode }) => <div data-testid="streamdown">{children}</div>))
-vi.mock('@hermes/plugin-sdk', async () => ({ ...await (await import('./group-test-utils')).pluginSdkMock({}), Button: () => null, MessageTextContent: undefined, Streamdown: streamdown, useI18n: () => ({ locale: 'en', t: {} }) }))
+vi.mock('@eir/plugin-sdk', async () => ({ ...await (await import('./group-test-utils')).pluginSdkMock({}), Button: () => null, MessageTextContent: undefined, Streamdown: streamdown, useI18n: () => ({ locale: 'en', t: {} }) }))
 vi.mock('./canonical-group-labels', async () => {
   const { CANONICAL_GROUP_LOCALES } = await import('./canonical-group-locales')
 

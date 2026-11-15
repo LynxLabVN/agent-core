@@ -10,8 +10,8 @@ import logging
 
 import pytest
 
-import hermes_state_readpool
-from hermes_state import SessionDB
+import eir_state_readpool
+from eir_state import SessionDB
 
 
 @pytest.fixture()
@@ -30,9 +30,9 @@ def _exhaust(monkeypatch, db):
 def test_pool_exhaustion_warns_once_per_window_with_a_count(db, monkeypatch, caplog):
     _exhaust(monkeypatch, db)
     clock = [1000.0]
-    monkeypatch.setattr(hermes_state_readpool.time, "monotonic", lambda: clock[0], raising=False)
-    getattr(hermes_state_readpool, "_pool_exhaustion_warned_at", {}).clear()
-    with caplog.at_level(logging.WARNING, logger="hermes_state"):
+    monkeypatch.setattr(eir_state_readpool.time, "monotonic", lambda: clock[0], raising=False)
+    getattr(eir_state_readpool, "_pool_exhaustion_warned_at", {}).clear()
+    with caplog.at_level(logging.WARNING, logger="eir_state"):
         for _ in range(5):
             assert db._get_read_conn() is None
             assert db.get_session("s") is not None  # still served, from the locked writer
@@ -48,12 +48,12 @@ def test_pool_exhaustion_warns_once_per_window_with_a_count(db, monkeypatch, cap
 
 
 def test_pool_exhaustion_count_is_per_database(tmp_path, monkeypatch, caplog):
-    getattr(hermes_state_readpool, "_pool_exhaustion_warned_at", {}).clear()
+    getattr(eir_state_readpool, "_pool_exhaustion_warned_at", {}).clear()
     a, b = SessionDB(tmp_path / "a" / "state.db"), SessionDB(tmp_path / "b" / "state.db")
     try:
         for handle in (a, b):
             _exhaust(monkeypatch, handle)
-        with caplog.at_level(logging.WARNING, logger="hermes_state"):
+        with caplog.at_level(logging.WARNING, logger="eir_state"):
             a._get_read_conn()
             b._get_read_conn()
             a._get_read_conn()

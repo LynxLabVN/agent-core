@@ -1,13 +1,13 @@
-import { resolveGatewayWsUrl } from '@hermes/shared'
+import { resolveGatewayWsUrl } from '@eir/shared'
 
-import type { HermesConnection } from '@/global'
+import type { EirConnection } from '@/global'
 
 export function resolveDesktopGatewayWsUrl(
-  desktop: Window['hermesDesktop'],
-  connection: HermesConnection
+  desktop: Window['eirDesktop'],
+  connection: EirConnection
 ): Promise<string> {
   // Only a registry-scoped descriptor may use the *For bridge (see
-  // HermesConnection.registryScoped); an absent bridge fails closed rather
+  // EirConnection.registryScoped); an absent bridge fails closed rather
   // than minting the peer's URL against the local pool.
   const { connectionId, profile, registryScoped } = connection
 

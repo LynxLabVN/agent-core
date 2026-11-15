@@ -49,9 +49,9 @@ def _float_env(name: str, default: float) -> float:
 
 
 def _exit_watchdog_timeout() -> float:
-    """``HERMES_EXIT_WATCHDOG_S`` as a float (default 30; ``0`` disables)."""
+    """``EIR_EXIT_WATCHDOG_S`` as a float (default 30; ``0`` disables)."""
     from cli import _float_env
-    return _float_env("HERMES_EXIT_WATCHDOG_S", 30.0)
+    return _float_env("EIR_EXIT_WATCHDOG_S", 30.0)
 
 
 def _arm_exit_watchdog(timeout_s: float | None = None, *, from_signal: bool = False) -> None:
@@ -59,7 +59,7 @@ def _arm_exit_watchdog(timeout_s: float | None = None, *, from_signal: bool = Fa
 
     Backstop for a cleanup step wedged on network I/O and for interpreter teardown
     blocked joining non-daemon threads (ThreadPoolExecutor's atexit join). The daemon
-    timer survives ``Py_FinalizeEx``'s joins. ``HERMES_EXIT_WATCHDOG_S=0`` disables.
+    timer survives ``Py_FinalizeEx``'s joins. ``EIR_EXIT_WATCHDOG_S=0`` disables.
 
     1. 2. Interpreter teardown blocked joining non-daemon threads — stdlib ``ThreadPoolExecutor`` workers
     are joined unconditionally by ``concurrent.futures``' atexit hook even after ``shutdown(wait=False)``,
@@ -159,13 +159,13 @@ _CLEANUP_STEPS = (
 def _gateway_owns_session_end(agent) -> bool:
     """A gateway-backed session ends in the gateway: the viewer's ``end_session`` (``session.detach
     {end_reason}``) makes the owner run finalize and the memory commit (gateway/session_viewer_close)."""
-    from hermes_cli.gateway_agent import GatewayAgent
+    from eir_cli.gateway_agent import GatewayAgent
     return isinstance(agent, GatewayAgent)
 
 
 def _is_gateway_viewer(cli) -> bool:
     """The CLI is a viewer of a gateway-owned session store (its ``end_session`` is a detach)."""
-    from hermes_cli.gateway_session_store import GatewaySessionStore
+    from eir_cli.gateway_session_store import GatewaySessionStore
     return isinstance(getattr(cli, "_session_db", None), GatewaySessionStore)
 
 
@@ -187,7 +187,7 @@ def _should_emit_cleanup_session_finalize(session_id: str | None) -> bool:
 def _notify_session_finalize(*, session_id: str | None, platform: str = "cli", reason: str = "shutdown") -> list[str]:
     """Fire on_session_finalize; return the plugin messages meant for the user (never raises)."""
     with suppress(Exception):
-        from hermes_cli.lifecycle import finalize_session, session_end_messages
+        from eir_cli.lifecycle import finalize_session, session_end_messages
         return session_end_messages(finalize_session(session_id=session_id, platform=platform, reason=reason))
     return []
 
@@ -201,7 +201,7 @@ def _oneshot_agent_and_session(cli):
 def _invoke_interrupted_session_end(agent, session_id, reason: str, **extra) -> None:
     """Best-effort ``on_session_end`` hook for a turn cut short (never raises)."""
     with suppress(Exception):
-        from hermes_cli.lifecycle import invoke_hook as _invoke_hook
+        from eir_cli.lifecycle import invoke_hook as _invoke_hook
         _invoke_hook(
             "on_session_end", session_id=session_id, completed=False, interrupted=True,
             model=getattr(agent, "model", None), platform=getattr(agent, "platform", None) or "cli",

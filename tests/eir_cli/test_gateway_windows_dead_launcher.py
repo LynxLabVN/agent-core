@@ -12,17 +12,17 @@ from types import SimpleNamespace
 
 import pytest
 
-import hermes_constants
-from hermes_cli import gateway, gateway_windows
-from hermes_cli import gateway_runtime_service as service
-from hermes_cli.gateway_runtime_service_identity import _vbs_identity, launcher_text
+import eir_constants
+from eir_cli import gateway, gateway_windows
+from eir_cli import gateway_runtime_service as service
+from eir_cli.gateway_runtime_service_identity import _vbs_identity, launcher_text
 
 # Host-independent: run on every lane, including native Windows, where the launchers actually live.
 pytestmark = pytest.mark.platforms("any")
 
 
 def _payload(root, version):
-    python = root / f"NousResearchInc.HermesAgent_{version}_x64__pub" / "agent-payload" / "python" / "python.exe"
+    python = root / f"NousResearchInc.EirAgent_{version}_x64__pub" / "agent-payload" / "python" / "python.exe"
     python.parent.mkdir(parents=True)
     python.write_bytes(b"")
     return python
@@ -34,12 +34,12 @@ def store_update(request, tmp_path, monkeypatch):
 
     Both naming branches: the platform-default home owns the bare task name (a Store user's usual
     home), any other root a hashed suffix."""
-    home = hermes_constants._get_platform_default_hermes_home() if request.param == "default" else tmp_path / "custom-home"
+    home = eir_constants._get_platform_default_eir_home() if request.param == "default" else tmp_path / "custom-home"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     old, new = _payload(tmp_path / "WindowsApps", "2026.7363.3271.0"), _payload(tmp_path / "WindowsApps", "2026.7411.3516.0")
     suffix = service.service_suffix(home)
-    name = f"Hermes_Gateway{'_' + suffix if suffix else ''}"  # what install names the task for this home
+    name = f"Eir_Gateway{'_' + suffix if suffix else ''}"  # what install names the task for this home
     cmd = home / "gateway-service" / f"{name}.cmd"
     cmd.parent.mkdir()
     monkeypatch.setattr(gateway, "get_python_path", lambda: str(old))
@@ -119,7 +119,7 @@ def test_a_named_profile_client_renders_the_root_launcher_for_the_root(store_upd
     installed = gateway_windows._render_launchers(gateway_windows._launcher_settings(store_update.home), store_update.cmd)
     profile = store_update.home / "profiles" / "work"
     profile.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(profile))
+    monkeypatch.setenv("EIR_HOME", str(profile))
 
     assert gateway_windows.refresh_dead_launcher(store_update.home, store_update.name)
 
@@ -128,13 +128,13 @@ def test_a_named_profile_client_renders_the_root_launcher_for_the_root(store_upd
 
 def test_the_repair_keeps_the_installed_home_spelling(store_update, monkeypatch):
     """Ensure passes the canonical (resolved) home, but install wrote the configured spelling, which may
-    be a link to the real directory (as ``%LOCALAPPDATA%\\hermes`` can be): the repair keeps that spelling."""
-    link = store_update.home.parent / "hermes-link"
+    be a link to the real directory (as ``%LOCALAPPDATA%\\eir`` can be): the repair keeps that spelling."""
+    link = store_update.home.parent / "eir-link"
     try:
         link.symlink_to(store_update.home, target_is_directory=True)
     except OSError:
         pytest.skip("filesystem does not allow symlinks")
-    monkeypatch.setenv("HERMES_HOME", str(link))
+    monkeypatch.setenv("EIR_HOME", str(link))
     cmd = link / "gateway-service" / store_update.cmd.name
     monkeypatch.setattr(gateway, "get_python_path", lambda: str(store_update.old))
     gateway_windows._write_launcher_scripts(gateway_windows._render_launchers(gateway_windows._launcher_settings(link), cmd))

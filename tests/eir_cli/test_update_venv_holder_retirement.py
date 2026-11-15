@@ -8,7 +8,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from hermes_cli import main, update_cmd, update_cmd_windows
+from eir_cli import main, update_cmd, update_cmd_windows
 from tests.compat.old_updater_support import fresh_child as fresh_child, no_external_work as no_external_work  # noqa: PLC0414 -- the self-alias is load-bearing: it suppresses F811 for the pytest fixture parameter shadowing this import
 
 
@@ -16,13 +16,13 @@ from tests.compat.old_updater_support import fresh_child as fresh_child, no_exte
 @pytest.mark.parametrize(
     "module,name,args,kwargs",
     [
-        (main, "_filter_non_gateway_concurrent_instances", ([(123, "hermes.exe")],), {}),
-        (main, "_detect_concurrent_hermes_instances", (Path("Scripts"),), {"exclude_pid": 123}),
-        (main, "_leftover_pausable_gateway_pids", ([(123, "python.exe", "hermes serve")],), {}),
-        (main, "_ledger_manual_serve_holders", ([(123, "python.exe", "hermes serve")],), {}),
-        (main, "_ledger_reapable_backend_pids", ([(123, "python.exe", "hermes serve")],), {}),
-        (main, "_orphaned_desktop_backend_pids", ([(123, "python.exe", "hermes serve")],), {}),
-        (main, "_handoff_reapable_backend_pids", ([(123, "python.exe", "hermes serve")],), {}),
+        (main, "_filter_non_gateway_concurrent_instances", ([(123, "eir.exe")],), {}),
+        (main, "_detect_concurrent_eir_instances", (Path("Scripts"),), {"exclude_pid": 123}),
+        (main, "_leftover_pausable_gateway_pids", ([(123, "python.exe", "eir serve")],), {}),
+        (main, "_ledger_manual_serve_holders", ([(123, "python.exe", "eir serve")],), {}),
+        (main, "_ledger_reapable_backend_pids", ([(123, "python.exe", "eir serve")],), {}),
+        (main, "_orphaned_desktop_backend_pids", ([(123, "python.exe", "eir serve")],), {}),
+        (main, "_handoff_reapable_backend_pids", ([(123, "python.exe", "eir serve")],), {}),
         (main, "_stop_process_trees", ([123, (456, 789)],), {}),
     ],
 )
@@ -31,8 +31,8 @@ def test_historical_holder_hooks_hand_off_without_inspecting_or_killing(
 ):
     """A historical main's holder gates hand the update to the fresh child and exit with its
     status; the old parent never classifies, inspects or kills processes itself."""
-    from hermes_cli import gateway
-    from hermes_cli import process_identity
+    from eir_cli import gateway
+    from eir_cli import process_identity
     import psutil
 
     forbidden = Mock(side_effect=AssertionError("retired holder gate performed work"))
@@ -62,7 +62,7 @@ def test_relaunch_stopped_serves_is_separate_work_not_an_update(monkeypatch, fre
 @pytest.mark.parametrize("gateway_mode", [False, True])
 def test_gateway_ancestor_refusal_never_kills_unknown_ancestry(monkeypatch, gateway_mode):
     """The live guard only refuses a tree-kill when a nominated gateway is positively an ancestor."""
-    from hermes_cli import gateway
+    from eir_cli import gateway
     import psutil
 
     forbidden = Mock(side_effect=AssertionError("refusal probe performed work"))
@@ -75,7 +75,7 @@ def test_gateway_ancestor_refusal_never_kills_unknown_ancestry(monkeypatch, gate
 
 
 def test_command_reaches_checkout_preparation_without_holder_gates(monkeypatch, tmp_path):
-    from hermes_cli import update_inventory
+    from eir_cli import update_inventory
 
     class ReachedCheckout(BaseException):
         pass
@@ -94,7 +94,7 @@ def test_command_reaches_checkout_preparation_without_holder_gates(monkeypatch, 
 
     # Recreate the former call-site names as tripwires, not host-OS fakes.
     # The scan remains live for lifecycle ownership, but must not gate updates.
-    monkeypatch.setattr(main, "_detect_concurrent_hermes_instances", forbidden, raising=False)
+    monkeypatch.setattr(main, "_detect_concurrent_eir_instances", forbidden, raising=False)
     monkeypatch.setattr(update_cmd_windows, "_detect_venv_python_processes", forbidden)
     monkeypatch.setattr(update_cmd, "_refuse_gateway_ancestor_tree_kill", forbidden)
     monkeypatch.setattr(main, "_is_windows", forbidden)

@@ -140,7 +140,7 @@ def validate_config_seed(plugin_id: str, seed: Any) -> dict[str, Any]:
 
 def parse_pack(text: str, *, source: str = "<pack>") -> PluginPack:
     """Parse and validate a pack YAML document."""
-    import hermes_yaml as yaml
+    import eir_yaml as yaml
     try:
         raw = yaml.safe_load(text)
     except yaml.YAMLError as exc:
@@ -249,7 +249,7 @@ def resolve_pack_plugins(pack: PluginPack) -> list[ResolvedPackPlugin]:
             continue
         try:
             if catalog_entries is None:
-                from hermes_cli.plugin_catalog import load_catalog_live
+                from eir_cli.plugin_catalog import load_catalog_live
                 catalog_entries = load_catalog_live()
         except Exception as exc:  # catalog load must not crash pack handling
             resolved.append(ResolvedPackPlugin(
@@ -296,7 +296,7 @@ def render_pack_review(console, pack: PluginPack, resolved: list[ResolvedPackPlu
     if pack.skills:
         console.print(
             "[yellow]Pack lists skills (NOT auto-installed yet):[/yellow] " + ", ".join(pack.skills))
-        console.print("[dim]Install them manually, e.g. `hermes skills install <id>`.[/dim]")
+        console.print("[dim]Install them manually, e.g. `eir skills install <id>`.[/dim]")
     console.print(
         "\n[dim]Installing a pack runs third-party code × "
         f"{len(resolved)} plugins. Each plugin's declared capabilities still "
@@ -317,7 +317,7 @@ class PackInstallResult:
 
 def _seed_plugin_config(plugin_id: str, seed: dict[str, Any], console) -> None:
     """Seed plugins.entries.<plugin_id> keys that are not already set (user values always win)."""
-    from hermes_cli.config import load_config, save_config
+    from eir_cli.config import load_config, save_config
     seed = validate_config_seed(plugin_id, seed)
     config = load_config()
     entry = config.setdefault("plugins", {}).setdefault("entries", {}).setdefault(plugin_id, {})
@@ -351,7 +351,7 @@ def install_pack_plugins(
     consent flow as a single install (a pack never bulk-grants). Successful installs are enabled
     (the user consented via the review screen) and their config seed applied.
     """
-    from hermes_cli.plugins_cmd import (
+    from eir_cli.plugins_cmd import (
         PluginOperationError,
         _declared_capabilities_from_manifest,
         _install_plugin_core,
@@ -359,9 +359,9 @@ def install_pack_plugins(
         _run_capability_consent,
         _set_plugin_enabled,
     )
-    from hermes_cli.plugins_admission import AdmissionRefused
-    from hermes_cli.plugins_cmd_catalog import raise_if_removed
-    from hermes_cli.plugins_cmd_install import recorded_install
+    from eir_cli.plugins_admission import AdmissionRefused
+    from eir_cli.plugins_cmd_catalog import raise_if_removed
+    from eir_cli.plugins_cmd_install import recorded_install
     results: list[PackInstallResult] = []
 
     def _fail(display: str, error: str) -> None:
@@ -442,7 +442,7 @@ def _sanitized_entry_config(plugin_id: str) -> dict[str, Any]:
     """Exportable plugins.entries.<id> keys: YAML scalars/containers only, reserved and
     secret-shaped keys stripped at every depth."""
     try:
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
 
         config = load_config() or {}
     except Exception:
@@ -453,11 +453,11 @@ def _sanitized_entry_config(plugin_id: str) -> dict[str, Any]:
     return _strip_forbidden_keys(entry)
 
 
-def export_pack(*, enabled_only: bool = False, pack_name: str = "my-hermes-pack") -> tuple[str, list[str]]:
+def export_pack(*, enabled_only: bool = False, pack_name: str = "my-eir-pack") -> tuple[str, list[str]]:
     """Build pack YAML from the current install; returns ``(yaml_text, warnings)``. Plugins with
     unknown Git provenance (no install metadata) become warnings + YAML comments, never entries."""
-    import hermes_yaml as yaml
-    from hermes_cli.plugins_cmd import _get_enabled_set, _plugins_dir, _read_install_metadata
+    import eir_yaml as yaml
+    from eir_cli.plugins_cmd import _get_enabled_set, _plugins_dir, _read_install_metadata
     metadata = _read_install_metadata()
     enabled = _get_enabled_set()
     installed = sorted(d.name for d in _plugins_dir().iterdir() if d.is_dir() and not d.name.startswith("."))
@@ -487,7 +487,7 @@ def export_pack(*, enabled_only: bool = False, pack_name: str = "my-hermes-pack"
 
     doc: dict[str, Any] = {
         "name": pack_name,
-        "description": "Exported by `hermes plugins pack export`.",
+        "description": "Exported by `eir plugins pack export`.",
         "version": "1.0.0",
         "plugins": entries,
     }
@@ -504,7 +504,7 @@ def export_pack(*, enabled_only: bool = False, pack_name: str = "my-hermes-pack"
 
 def _load_and_review(console, source: str):
     """Load *source* (exit 1 on PackError), resolve it, print the review screen."""
-    from hermes_cli.plugins_cmd import _fail
+    from eir_cli.plugins_cmd import _fail
     try:
         pack = load_pack(source)
     except PackError as exc:
@@ -515,8 +515,8 @@ def _load_and_review(console, source: str):
 
 
 def cmd_pack_show(source: str) -> None:
-    """``hermes plugins pack show <path-or-url>`` — dry-run review."""
-    from hermes_cli.plugins_cmd import _console
+    """``eir plugins pack show <path-or-url>`` — dry-run review."""
+    from eir_cli.plugins_cmd import _console
     console = _console()
     _pack, resolved = _load_and_review(console, source)
     unresolved = [rp for rp in resolved if rp.identifier is None]
@@ -524,13 +524,13 @@ def cmd_pack_show(source: str) -> None:
         console.print(
             f"\n[yellow]{len(unresolved)} entr{'y' if len(unresolved) == 1 else 'ies'} "
             "could not be resolved — install would skip them and exit non-zero.[/yellow]")
-    console.print("\n[dim]Dry run only. Install with `hermes plugins pack install ...`.[/dim]")
+    console.print("\n[dim]Dry run only. Install with `eir plugins pack install ...`.[/dim]")
 
 
 def cmd_pack_install(source: str, *, force: bool = False) -> None:
-    """``hermes plugins pack install <path-or-url>``: mandatory review screen -> one pack-level
+    """``eir plugins pack install <path-or-url>``: mandatory review screen -> one pack-level
     consent -> pinned fan-out installs -> per-plugin capability consent. Exit 1 if any failed."""
-    from hermes_cli.plugins_cmd import _ask_yes, _console, _fail, _is_tty
+    from eir_cli.plugins_cmd import _ask_yes, _console, _fail, _is_tty
     console = _console()
     pack, resolved = _load_and_review(console, source)
 
@@ -550,13 +550,13 @@ def cmd_pack_install(source: str, *, force: bool = False) -> None:
         console.print(f"  [red]✗[/red] {r.display}: {r.error}")
     if ok:
         console.print("[dim]Restart the gateway for the plugins to take effect:[/dim]")
-        console.print("[dim]  hermes gateway restart[/dim]")
+        console.print("[dim]  eir gateway restart[/dim]")
     if failed:
         sys.exit(1)
 
 
-def cmd_pack_export(*, enabled_only: bool = False, name: str = "my-hermes-pack") -> None:
-    """``hermes plugins pack export [--enabled-only]`` — pack YAML on stdout."""
+def cmd_pack_export(*, enabled_only: bool = False, name: str = "my-eir-pack") -> None:
+    """``eir plugins pack export [--enabled-only]`` — pack YAML on stdout."""
     from rich.console import Console
     console = Console(stderr=True)
     try:
@@ -570,11 +570,11 @@ def cmd_pack_export(*, enabled_only: bool = False, name: str = "my-hermes-pack")
 
 
 def pack_command(args) -> None:
-    """Dispatch ``hermes plugins pack <action>``."""
+    """Dispatch ``eir plugins pack <action>``."""
     handler = _PACK_ACTIONS.get(getattr(args, "pack_action", None))
     if handler is None:
-        from hermes_cli.plugins_cmd import _console, _fail
-        _fail(_console(), "[red]Error:[/red] Usage: hermes plugins pack {install|export|show}")
+        from eir_cli.plugins_cmd import _console, _fail
+        _fail(_console(), "[red]Error:[/red] Usage: eir plugins pack {install|export|show}")
     handler(args)
 
 
@@ -582,6 +582,6 @@ _PACK_ACTIONS = {
     "install": lambda args: cmd_pack_install(args.source, force=getattr(args, "force", False)),
     "export": lambda args: cmd_pack_export(
         enabled_only=getattr(args, "enabled_only", False),
-        name=getattr(args, "name", None) or "my-hermes-pack"),
+        name=getattr(args, "name", None) or "my-eir-pack"),
     "show": lambda args: cmd_pack_show(args.source),
 }

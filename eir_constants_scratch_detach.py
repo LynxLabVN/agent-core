@@ -2,7 +2,7 @@
 
 A pass can take seconds to minutes (the idle scan of a large tree, the ``rmtree`` of a multi-GB
 entry). Inline, it held every process start; on a daemon thread it died with every short-lived
-``hermes`` command, the hourly stamp already spent. A detached child outlives the command that
+``eir`` command, the hourly stamp already spent. A detached child outlives the command that
 launched it, so each due pass runs to the end, with the same rules as an inline one.
 """
 from __future__ import annotations
@@ -13,15 +13,15 @@ import subprocess
 import sys
 from pathlib import Path
 
-import hermes_constants_scratch as rules
+import eir_constants_scratch as rules
 
 logger = logging.getLogger(__name__)
 
 # ``-I``: neither the launcher's cwd (a project ``utils/`` would shadow ours) nor PYTHON* env vars
 # decide what the child imports; it gets the launcher's own ``sys.path`` (repo root, PM/venv
-# site-packages), not ``hermes_bootstrap``, whose boot hook would schedule another prune.
+# site-packages), not ``eir_bootstrap``, whose boot hook would schedule another prune.
 _CHILD = ("import sys; sys.path[:] = sys.argv[3:]; "
-          "import hermes_constants_scratch_detach as d; d.run(*sys.argv[1:3])")
+          "import eir_constants_scratch_detach as d; d.run(*sys.argv[1:3])")
 
 
 def spawn_prune(scratch: Path) -> None:
@@ -37,7 +37,7 @@ def spawn_prune(scratch: Path) -> None:
     if sys.pycache_prefix:  # a sealed payload must never get __pycache__ writes
         argv += ["-X", f"pycache_prefix={sys.pycache_prefix}"]
     argv += ["-c", _CHILD, os.fspath(scratch), _encode_lineage(rules.lineage_with_start_times()), *sys.path]
-    from hermes_cli._subprocess_compat import windows_detach_flags_without_breakaway, windows_detach_popen_kwargs
+    from eir_cli._subprocess_compat import windows_detach_flags_without_breakaway, windows_detach_popen_kwargs
 
     stdio = {"stdin": subprocess.DEVNULL, "stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
     try:
@@ -61,7 +61,7 @@ def run(scratch: str, lineage: str) -> None:
     """Child entry: one prune of *scratch*, sparing the launcher's ancestry. Any failure is one
     line in ``scratch-prune.log``; nothing is raised (no one reads this process's stderr)."""
     try:
-        from hermes_constants import prune_scratch_dir
+        from eir_constants import prune_scratch_dir
 
         rules._launcher_lineage = None if lineage == "-" else frozenset(
             (int(pid), float(started)) for pid, started in (item.split(":") for item in lineage.split(",")))

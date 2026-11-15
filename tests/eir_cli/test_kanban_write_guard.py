@@ -1,21 +1,21 @@
-"""#69283: kanban write guard prevents tests from writing to real ~/.hermes."""
+"""#69283: kanban write guard prevents tests from writing to real ~/.eir."""
 
 from __future__ import annotations
 
 import pytest
 
-from hermes_cli import kanban_db
-from hermes_cli import kanban_db_connect as kbc
+from eir_cli import kanban_db
+from eir_cli import kanban_db_connect as kbc
 
 # These probe the kanban guard against the real root on purpose.
 pytestmark = pytest.mark.allow_real_home_io
 
 
 def test_connect_succeeds_under_test_home(tmp_path, monkeypatch):
-    """When HERMES_HOME is a temp dir, kanban connect succeeds normally."""
-    home = tmp_path / "hermes_home"
+    """When EIR_HOME is a temp dir, kanban connect succeeds normally."""
+    home = tmp_path / "eir_home"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     conn = kbc.connect()
     try:
         assert str(kanban_db.kanban_db_path()).startswith(str(home))

@@ -1,14 +1,14 @@
-"""Remote ``hermes serve`` lifecycle over an SSH ControlMaster (Linux/macOS remotes).
+"""Remote ``eir serve`` lifecycle over an SSH ControlMaster (Linux/macOS remotes).
 
-Server-side port of ``apps/desktop/electron/remote-lifecycle.ts``: locate the remote Hermes, gate
+Server-side port of ``apps/desktop/electron/remote-lifecycle.ts``: locate the remote Eir, gate
 the platform, refuse while a remote install update is in progress, reuse a provably-owned
 ``serve --isolated`` through its lockfile + an authenticated ownership proof, otherwise spawn a
 fresh detached one under the update-marker mutex and scrape its READY port, and reap a stale
 backend only when its argv proves it is ours.
 
-The remote paths below (``~/.hermes/desktop-ssh/...``) are REMOTE path strings: the remote
-``serve`` validates ``--ssh-session-token-file`` against ``$HOME/.hermes/desktop-ssh`` on its own
-host (``hermes_cli/main_dashboard.py::_read_ssh_session_token_file``).
+The remote paths below (``~/.eir/desktop-ssh/...``) are REMOTE path strings: the remote
+``serve`` validates ``--ssh-session-token-file`` against ``$HOME/.eir/desktop-ssh`` on its own
+host (``eir_cli/main_dashboard.py::_read_ssh_session_token_file``).
 """
 
 from __future__ import annotations
@@ -22,15 +22,15 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Callable
 
-from hermes_cli.gateway_connections_ssh_programs import REMOTE_MARKER_GATE_PY
-from hermes_cli.gateway_connections_ssh_transport import SshConnection, SshReachError, with_remote_timeout
+from eir_cli.gateway_connections_ssh_programs import REMOTE_MARKER_GATE_PY
+from eir_cli.gateway_connections_ssh_transport import SshConnection, SshReachError, with_remote_timeout
 
 LOCKFILE_SCHEMA_VERSION = 2
 # Bumped when the client<->serve reuse contract changes so an old serve is never reattached.
 PROTOCOL_VERSION = 1
 # The remote log is `>> log 2>&1`: merged output, not line-accurate (backend-ready.ts).
-READY_RE = re.compile(r"(?<!\w)HERMES_(?:BACKEND|DASHBOARD)_READY port=(\d+)")
-REMOTE_LOCK_DIR = "~/.hermes/desktop-ssh"
+READY_RE = re.compile(r"(?<!\w)EIR_(?:BACKEND|DASHBOARD)_READY port=(\d+)")
+REMOTE_LOCK_DIR = "~/.eir/desktop-ssh"
 SUPPORTED_REMOTE_OS = ("Linux", "Darwin")
 # A busy remote's cold boot can take 60-150s before READY; a warm start announces in <1s.
 DEFAULT_READY_TIMEOUT_S = 120.0
@@ -131,7 +131,7 @@ def expand_remote_path(path: str) -> str:
 def assert_safe_remote_home(home: str) -> str:
     value = str(home or "").strip()
     if not re.fullmatch(r"(/|~/)[A-Za-z0-9._/+-]+", value) or ".." in value:
-        raise _err("unknown", "Unsafe remote Hermes home.")
+        raise _err("unknown", "Unsafe remote Eir home.")
     return value.rstrip("/")
 
 
@@ -157,36 +157,36 @@ def probe_remote_platform(ssh: SshConnection) -> tuple[str, str]:
     return os_name, arch
 
 
-def probe_remote_hermes_home(ssh: SshConnection) -> str:
+def probe_remote_eir_home(ssh: SshConnection) -> str:
     try:
-        out = ssh.exec('echo "${HERMES_HOME:-$HOME/.hermes}"').strip().split("\n")[-1]
+        out = ssh.exec('echo "${EIR_HOME:-$HOME/.eir}"').strip().split("\n")[-1]
     except SshReachError as exc:
-        raise _err("transient-transport-error", "Could not resolve the remote Hermes home.") from exc
-    return out or "~/.hermes"
+        raise _err("transient-transport-error", "Could not resolve the remote Eir home.") from exc
+    return out or "~/.eir"
 
 
-def assert_remote_install_update_clear(ssh: SshConnection, hermes_home: str, hermes_path: str = "") -> None:
+def assert_remote_install_update_clear(ssh: SshConnection, eir_home: str, eir_path: str = "") -> None:
     """Refuse reuse/spawn while the remote install is being mutated (fail closed on any doubt).
 
     The gate travels on stdin (``python3 -``), not argv: over a mux socket a large argv can leave
     no buffer room for ssh's SCM_RIGHTS descriptor pass (EMSGSIZE on macOS's 8 KB buffers)."""
-    marker = expand_remote_path(f"{remote_install_root(hermes_home)}/.hermes-update-in-progress")
-    hermes = f" '' {expand_remote_path(hermes_path)}" if hermes_path else ""
+    marker = expand_remote_path(f"{remote_install_root(eir_home)}/.eir-update-in-progress")
+    eir = f" '' {expand_remote_path(eir_path)}" if eir_path else ""
     try:
-        lines = ssh.exec(f"python3 - {marker}{hermes}", stdin_data=REMOTE_MARKER_GATE_PY).strip().splitlines()
+        lines = ssh.exec(f"python3 - {marker}{eir}", stdin_data=REMOTE_MARKER_GATE_PY).strip().splitlines()
     except SshReachError as exc:
         raise _err("update-in-progress",
-                   "Could not prove that the remote Hermes install is clear for SSH startup.") from exc
+                   "Could not prove that the remote Eir install is clear for SSH startup.") from exc
     observation = lines[-1] if lines else ""
     if observation == "CLEAR":
         return
     live = re.fullmatch(r"LIVE:([1-9][0-9]*)", observation)
     if live:
-        message = f"Remote Hermes update process {live.group(1)} is still running; SSH startup is paused."
+        message = f"Remote Eir update process {live.group(1)} is still running; SSH startup is paused."
     elif observation == "HELD":
-        message = "A process the remote Hermes update started still holds the install; SSH startup is paused."
+        message = "A process the remote Eir update started still holds the install; SSH startup is paused."
     else:
-        message = "The remote Hermes update marker is unreadable, malformed, or locked; refusing SSH startup."
+        message = "The remote Eir update marker is unreadable, malformed, or locked; refusing SSH startup."
     raise _err("update-in-progress", message)
 
 
@@ -198,45 +198,45 @@ def _is_executable(ssh: SshConnection, candidate: str) -> bool:
         return False
 
 
-def locate_hermes(ssh: SshConnection, remote_hermes_path: str) -> str:
+def locate_eir(ssh: SshConnection, remote_eir_path: str) -> str:
     """An explicit path is honored strictly; a blank one auto-detects (login shell, then installs)."""
-    if remote_hermes_path:
-        if _is_executable(ssh, remote_hermes_path):
-            return remote_hermes_path
-        raise _err("hermes-not-found",
-                   f'The Hermes path set for this connection is not an executable on the remote host: '
-                   f'"{remote_hermes_path}". It must be the full path to the remote `hermes` binary, or blank '
+    if remote_eir_path:
+        if _is_executable(ssh, remote_eir_path):
+            return remote_eir_path
+        raise _err("eir-not-found",
+                   f'The Eir path set for this connection is not an executable on the remote host: '
+                   f'"{remote_eir_path}". It must be the full path to the remote `eir` binary, or blank '
                    "to auto-detect.")
     candidates: list[str] = []
     try:
-        found = ssh.exec(f"bash -lc {shq('command -v hermes')}").strip()
+        found = ssh.exec(f"bash -lc {shq('command -v eir')}").strip()
         if found:
             candidates.append(found.split("\n")[-1].strip())
     except SshReachError:
         pass
     # The installer's command locations (scripts/install.sh): per-user, root/FHS, legacy venv.
-    candidates += ["~/.local/bin/hermes", "/usr/local/bin/hermes", "~/.hermes/hermes-agent/venv/bin/hermes"]
+    candidates += ["~/.local/bin/eir", "/usr/local/bin/eir", "~/.eir/eir-agent/venv/bin/eir"]
     for candidate in candidates:
         if candidate and _is_executable(ssh, candidate):
             return candidate
-    raise _err("hermes-not-found",
-               "Hermes is not installed on the remote host (no `hermes` executable found). Install it there, "
-               "or set the Hermes path explicitly on the connection.")
+    raise _err("eir-not-found",
+               "Eir is not installed on the remote host (no `eir` executable found). Install it there, "
+               "or set the Eir path explicitly on the connection.")
 
 
-def probe_hermes_version(ssh: SshConnection, hermes_path: str) -> str:
+def probe_eir_version(ssh: SshConnection, eir_path: str) -> str:
     try:
-        out = ssh.exec(with_remote_timeout(f"{expand_remote_path(hermes_path)} --version 2>&1")).strip()
+        out = ssh.exec(with_remote_timeout(f"{expand_remote_path(eir_path)} --version 2>&1")).strip()
     except SshReachError:
         return ""
     return out.split("\n")[0].strip()
 
 
-def remote_supports_ssh_ownership(ssh: SshConnection, hermes_path: str) -> bool:
+def remote_supports_ssh_ownership(ssh: SshConnection, eir_path: str) -> bool:
     # The `$( (` space is load-bearing: `$((` would parse as arithmetic expansion.
-    hermes = expand_remote_path(hermes_path)
+    eir = expand_remote_path(eir_path)
     out = ssh.exec(
-        f'help="$( {with_remote_timeout(f"{hermes} serve --help 2>&1")} )"; '
+        f'help="$( {with_remote_timeout(f"{eir} serve --help 2>&1")} )"; '
         "printf '%s' \"$help\" | grep -q ssh-session-token-file && "
         "printf '%s' \"$help\" | grep -q ssh-owner-nonce && echo YES || echo NO")
     return out.strip().endswith("YES")
@@ -257,7 +257,7 @@ class LockfileSkew:
     reason: str
 
 
-_LOCK_STR_FIELDS = ("profile", "hermesPath", "hermesHome", "logPath", "startedAt")
+_LOCK_STR_FIELDS = ("profile", "eirPath", "eirHome", "logPath", "startedAt")
 
 
 def _valid_int(value: object, lo: int, hi: int) -> bool:
@@ -387,11 +387,11 @@ def remote_process_creation_time(ssh: SshConnection, pid: int) -> str:
 
 _OWNED_PY = r"""import os,shlex,subprocess,sys
 pid={pid}
-expected=os.path.expanduser({hermes_path})
-hermes_home=os.path.expanduser({hermes_home}) if {hermes_home} else ""
+expected=os.path.expanduser({eir_path})
+eir_home=os.path.expanduser({eir_home}) if {eir_home} else ""
 expected_entries={{expected}}
-if hermes_home:
- expected_entries.add(os.path.join(hermes_home,"hermes-agent","venv","bin","hermes"))
+if eir_home:
+ expected_entries.add(os.path.join(eir_home,"eir-agent","venv","bin","eir"))
 expected_token=os.path.expanduser({token_path})
 expected_profile={profile}
 nonce={nonce}
@@ -405,7 +405,7 @@ except OSError:
   # pid already gone — a dead process is FOREIGN, not a transport error
   print("FOREIGN");sys.exit(0)
  # ps joins argv with spaces and no quoting (macOS has no /proc), so a quote or space in the
- # Hermes path breaks shlex: cut the known entry path out before splitting the rest.
+ # Eir path breaks shlex: cut the known entry path out before splitting the rest.
  head,rest=None,line
  for e in sorted(expected_entries,key=len,reverse=True):
   at=0 if line.startswith(e+" ") else line.find(" "+e+" ")+1
@@ -446,12 +446,12 @@ def pid_is_our_serve(ssh: SshConnection, lock: dict, ownership_id: str) -> bool:
 
     A profile literally named ``serve`` puts its value before the subcommand, so the ``serve``
     index/count skip the ``--profile`` value token."""
-    pid, nonce, hermes_path = lock.get("pid"), str(lock.get("spawnNonce") or ""), lock.get("hermesPath") or ""
-    if not pid or not re.fullmatch(r"[0-9a-f]{16}", nonce) or not hermes_path:
+    pid, nonce, eir_path = lock.get("pid"), str(lock.get("spawnNonce") or ""), lock.get("eirPath") or ""
+    if not pid or not re.fullmatch(r"[0-9a-f]{16}", nonce) or not eir_path:
         return False
     # Values enter the Python source as Python literals; shell quoting wraps only the whole script.
     script = _OWNED_PY.format(
-        pid=int(pid), hermes_path=repr(str(hermes_path)), hermes_home=repr(str(lock.get("hermesHome") or "")),
+        pid=int(pid), eir_path=repr(str(eir_path)), eir_home=repr(str(lock.get("eirHome") or "")),
         token_path=repr(spawn_token_path(ownership_id, nonce)), profile=repr(str(lock.get("profile") or "")),
         nonce=repr(nonce))
     return exec_probe_verdict(ssh, f"python3 -c {shq(script)}", ("OWNED", "FOREIGN"),
@@ -505,41 +505,41 @@ def disconnect_remote(ssh: SshConnection, ownership_id: str) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def with_remote_update_mutex(command: str, marker_word: str, hermes_word: str) -> str:
+def with_remote_update_mutex(command: str, marker_word: str, eir_word: str) -> str:
     """Run ``command`` holding the updaters' marker lock (REMOTE_MARKER_GATE_PY). ``marker_word``
-    and ``hermes_word`` are expand_remote_path() output, embedded raw so $HOME expands remotely."""
-    return f"python3 -c {shq(REMOTE_MARKER_GATE_PY)} {marker_word} {shq(command)} {hermes_word}"
+    and ``eir_word`` are expand_remote_path() output, embedded raw so $HOME expands remotely."""
+    return f"python3 -c {shq(REMOTE_MARKER_GATE_PY)} {marker_word} {shq(command)} {eir_word}"
 
 
 @dataclass(frozen=True)
 class SpawnPlan:
-    hermes_path: str
+    eir_path: str
     profile: str
     spawn_nonce: str
     token_file_path: str
     log_path: str
-    hermes_home: str
+    eir_home: str
     ownership_id: str
     lock_metadata: dict = field(default_factory=dict)
 
 
 def _spawn_payload_prefix(plan: SpawnPlan) -> tuple[str, str, str]:
-    hermes = expand_remote_path(plan.hermes_path)
+    eir = expand_remote_path(plan.eir_path)
     pinned = backend_profile_arg(plan.profile)
     profile_args = f"--profile {shq(pinned)} " if pinned else ""
     log_path = expand_remote_path(plan.log_path)
     sub = (f"serve --isolated --host 127.0.0.1 --port 0 --ssh-session-token-file "
            f"{expand_remote_path(plan.token_file_path)} --ssh-owner-nonce {validate_spawn_nonce(plan.spawn_nonce)}")
     # A value the remote login shell exports is cleared first; gateway connections never hand a
-    # dev renderer origin on (Desktop's HERMES_DESKTOP_DEV_SERVER is always empty here).
-    dash = (f"ulimit -n {REMOTE_NOFILE_SOFT_LIMIT} 2>/dev/null || true; unset HERMES_DESKTOP_DEV_SERVER; "
-            f"exec env HERMES_DESKTOP=1 {hermes} {profile_args}{sub}")
+    # dev renderer origin on (Desktop's EIR_DESKTOP_DEV_SERVER is always empty here).
+    dash = (f"ulimit -n {REMOTE_NOFILE_SOFT_LIMIT} 2>/dev/null || true; unset EIR_DESKTOP_DEV_SERVER; "
+            f"exec env EIR_DESKTOP=1 {eir} {profile_args}{sub}")
     detached_shell = f'eval "exec $1>&-"; {dash} </dev/null >> {log_path} 2>&1 & echo $!'
     # setsid (Linux) starts a new session; macOS has no setsid, so nohup. The inner shell
-    # backgrounds Hermes and reports ITS pid, which is what the lock publishes.
+    # backgrounds Eir and reports ITS pid, which is what the lock publishes.
     detached_spawn = (f'child=$("$(command -v setsid || echo nohup)" sh -c {shq(detached_shell)} '
-                      'hermes-update-child "$1")')
-    return hermes, log_path, detached_spawn
+                      'eir-update-child "$1")')
+    return eir, log_path, detached_spawn
 
 
 def build_spawn_command(plan: SpawnPlan) -> str:
@@ -548,8 +548,8 @@ def build_spawn_command(plan: SpawnPlan) -> str:
     spawns beside this one. A marker present after the spawn came from a writer that skipped the
     lock, so the child is reaped (exit 75). The reservation is an atomic mkdir reclaimed only when
     its owning remote shell is dead. Plain sh (dash): no ``${var//pat/rep}``."""
-    hermes, log_path, detached_spawn = _spawn_payload_prefix(plan)
-    marker = expand_remote_path(f"{remote_install_root(plan.hermes_home or '~/.hermes')}/.hermes-update-in-progress")
+    eir, log_path, detached_spawn = _spawn_payload_prefix(plan)
+    marker = expand_remote_path(f"{remote_install_root(plan.eir_home or '~/.eir')}/.eir-update-in-progress")
     marker_absent = f"[ ! -e {marker} ]"
     reap = 'kill "$child" 2>/dev/null || true; wait "$child" 2>/dev/null || true;'
     reservation = expand_remote_path(connect_reservation_path(plan.ownership_id))
@@ -583,7 +583,7 @@ def build_spawn_command(plan: SpawnPlan) -> str:
         f"printf '%s' \"$lock_json\" > \"$temporary_lock\" && mv -f \"$temporary_lock\" \"$lock\" || {{ {reap} exit 76; }}; "
         'echo "$child"'
     )
-    return with_remote_update_mutex(payload, marker, hermes)
+    return with_remote_update_mutex(payload, marker, eir)
 
 
 _TOKEN_UPLOAD_PY = """import os,sys,stat
@@ -632,18 +632,18 @@ class Spawned:
     token_file_path: str = ""
 
 
-def spawn_remote_serve(ssh: SshConnection, *, hermes_path: str, profile: str, token: str, ownership_id: str,
-                       hermes_home: str, assert_install_clear: Callable[[], None]) -> Spawned:
-    if not remote_supports_ssh_ownership(ssh, hermes_path):
-        raise _err("update-required", "The remote Hermes install does not support --ssh-session-token-file and "
-                                      "--ssh-owner-nonce. Update Hermes on the remote host.")
+def spawn_remote_serve(ssh: SshConnection, *, eir_path: str, profile: str, token: str, ownership_id: str,
+                       eir_home: str, assert_install_clear: Callable[[], None]) -> Spawned:
+    if not remote_supports_ssh_ownership(ssh, eir_path):
+        raise _err("update-required", "The remote Eir install does not support --ssh-session-token-file and "
+                                      "--ssh-owner-nonce. Update Eir on the remote host.")
     nonce = secrets.token_hex(8)
     plan = SpawnPlan(
-        hermes_path=hermes_path, profile=profile, spawn_nonce=nonce, ownership_id=ownership_id,
+        eir_path=eir_path, profile=profile, spawn_nonce=nonce, ownership_id=ownership_id,
         token_file_path=spawn_token_path(ownership_id, nonce), log_path=spawn_log_path(ownership_id, nonce),
-        hermes_home=hermes_home,
+        eir_home=eir_home,
         lock_metadata={"ownershipId": ownership_id, "spawnNonce": nonce, "port": 0, "profile": profile,
-                       "hermesPath": hermes_path, "hermesHome": hermes_home,
+                       "eirPath": eir_path, "eirHome": eir_home,
                        "logPath": spawn_log_path(ownership_id, nonce), "tokenFingerprint": fingerprint_token(token),
                        "protocolVersion": PROTOCOL_VERSION, "devServer": "", "startedAt": _now_iso()})
     try:
@@ -660,7 +660,7 @@ def spawn_remote_serve(ssh: SshConnection, *, hermes_path: str, profile: str, to
         return Spawned(existing=True)
     if not lines or not lines[-1].isdigit() or int(lines[-1]) <= 0:
         _remove_remote(ssh, plan.token_file_path)
-        raise _err("spawn-failed", "Failed to launch the remote Hermes serve (no pid returned).")
+        raise _err("spawn-failed", "Failed to launch the remote Eir serve (no pid returned).")
     return Spawned(False, int(lines[-1]), nonce, plan.log_path, plan.token_file_path)
 
 
@@ -675,7 +675,7 @@ def remote_profile_missing_error(output: str) -> SshReachError | None:
         return None
     create = (match.group(2) or "").strip()
     hint = f" or create it with: {create}" if create else "."
-    return _err("spawn-failed", f"The remote Hermes profile '{match.group(1)}' does not exist. "
+    return _err("spawn-failed", f"The remote Eir profile '{match.group(1)}' does not exist. "
                                 f"Select an existing remote profile{hint}")
 
 
@@ -690,12 +690,12 @@ def scrape_ready_port(ssh: SshConnection, log_path: str, *, timeout_s: float = D
             tail = ""
         if is_alive is not None and not is_alive():
             raise remote_profile_missing_error(tail) or _err(
-                "spawn-failed", "Remote Hermes serve exited before announcing its port.")
+                "spawn-failed", "Remote Eir serve exited before announcing its port.")
         match = READY_RE.search(tail)
         if match:
             return int(match.group(1))
         time.sleep(READY_POLL_INTERVAL_S)
-    raise _err("ready-timeout", f"Timed out waiting for the remote Hermes serve to announce its port ({timeout_s:.0f}s).")
+    raise _err("ready-timeout", f"Timed out waiting for the remote Eir serve to announce its port ({timeout_s:.0f}s).")
 
 
 # ---------------------------------------------------------------------------
@@ -709,10 +709,10 @@ def classify_ssh_reuse_proof(proof: Any, spawn_nonce: str) -> str:
     return "authenticated-ok" if ok else "authenticated-stale"
 
 
-def lock_serves_connect(lock: dict, *, profile: str, reuse_token: str, hermes_path: str, hermes_home: str) -> bool:
+def lock_serves_connect(lock: dict, *, profile: str, reuse_token: str, eir_path: str, eir_home: str) -> bool:
     return (lock["port"] > 0 and lock["profile"] == profile and bool(reuse_token)
             and lock["tokenFingerprint"] == fingerprint_token(reuse_token)
-            and lock["hermesPath"] == hermes_path and lock["hermesHome"] == hermes_home
+            and lock["eirPath"] == eir_path and lock["eirHome"] == eir_home
             and (lock.get("devServer") or "") == "")
 
 
@@ -731,7 +731,7 @@ class ConnectDeps:
     wait_for_health: Callable[[str], None]
     probe_reuse_proof: Callable[[str, str, str], str]
     profile: str = ""
-    remote_hermes_path: str = ""
+    remote_eir_path: str = ""
     reuse_token: str = ""
     ready_timeout_s: float = DEFAULT_READY_TIMEOUT_S
 
@@ -744,9 +744,9 @@ class Connected:
     remote_port: int
     pid: int
     reused: bool
-    hermes_version: str
-    hermes_path: str
-    hermes_home: str
+    eir_version: str
+    eir_path: str
+    eir_home: str
     spawn_nonce: str
     platform: tuple[str, str]
 
@@ -778,16 +778,16 @@ def wait_for_remote_spawn_completion(ssh: SshConnection, ownership_id: str, time
 @dataclass(frozen=True)
 class _Remote:
     platform: tuple[str, str]
-    hermes_home: str
-    hermes_path: str
-    hermes_version: str
+    eir_home: str
+    eir_path: str
+    eir_version: str
     profile: str
 
 
 def _skew_error(ownership_id: str, skew: LockfileSkew) -> SshReachError:
     path = lockfile_path(ownership_id)
     return _err("remote-lockfile-skew",
-                f"The remote ownership record {path} does not match this Hermes build ({skew.reason}). It was "
+                f"The remote ownership record {path} does not match this Eir build ({skew.reason}). It was "
                 "probably written by a different build sharing this remote, or the file is corrupt. Refusing to "
                 "reap or overwrite it. If nothing else uses this remote, delete that file there and reconnect.")
 
@@ -798,9 +798,9 @@ def _try_reuse(deps: ConnectDeps, remote: _Remote, lock: dict) -> Connected | No
     pid_alive = remote_pid_alive(ssh, lock["pid"])
     owned = pid_alive and pid_is_our_serve(ssh, lock, oid)
     reusable = owned and lock_serves_connect(lock, profile=remote.profile, reuse_token=deps.reuse_token,
-                                             hermes_path=remote.hermes_path, hermes_home=remote.hermes_home)
+                                             eir_path=remote.eir_path, eir_home=remote.eir_home)
     if not reusable:
-        assert_remote_install_update_clear(ssh, remote.hermes_home, remote.hermes_path)
+        assert_remote_install_update_clear(ssh, remote.eir_home, remote.eir_path)
         cleanup_stale(ssh, oid, lock, pid_alive)
         return None
     if not lock.get("creationTime"):
@@ -808,7 +808,7 @@ def _try_reuse(deps: ConnectDeps, remote: _Remote, lock: dict) -> Connected | No
         if creation:
             lock = {**lock, "creationTime": creation}
             write_lockfile(ssh, oid, lock)
-    assert_remote_install_update_clear(ssh, remote.hermes_home, remote.hermes_path)
+    assert_remote_install_update_clear(ssh, remote.eir_home, remote.eir_path)
     local_port = open_forward(ssh, deps.pick_local_port, lock["port"])
     base_url = f"http://127.0.0.1:{local_port}"
     try:
@@ -818,26 +818,26 @@ def _try_reuse(deps: ConnectDeps, remote: _Remote, lock: dict) -> Connected | No
         raise _err("transient-transport-error", "Could not verify the existing SSH backend.") from exc
     if verdict != "authenticated-ok":
         ssh.cancel_forward(local_port, lock["port"])
-        assert_remote_install_update_clear(ssh, remote.hermes_home, remote.hermes_path)
+        assert_remote_install_update_clear(ssh, remote.eir_home, remote.eir_path)
         cleanup_stale(ssh, oid, lock)
         return None
     if not remote_pid_alive(ssh, lock["pid"]):
         ssh.cancel_forward(local_port, lock["port"])
-        raise _err("spawn-failed", "The reused remote Hermes serve exited while it was being verified.")
+        raise _err("spawn-failed", "The reused remote Eir serve exited while it was being verified.")
     return Connected(base_url, deps.reuse_token, local_port, lock["port"], lock["pid"], True,
-                     remote.hermes_version, remote.hermes_path, remote.hermes_home, lock["spawnNonce"],
+                     remote.eir_version, remote.eir_path, remote.eir_home, lock["spawnNonce"],
                      remote.platform)
 
 
 def _spawn_fresh(deps: ConnectDeps, remote: _Remote) -> Connected | None:
     """Spawn, scrape READY, forward, prove ownership, publish the port. None = a concurrent owner."""
     ssh, oid = deps.ssh, deps.ownership_id
-    assert_remote_install_update_clear(ssh, remote.hermes_home, remote.hermes_path)
+    assert_remote_install_update_clear(ssh, remote.eir_home, remote.eir_path)
     token = mint_token()
     spawned = spawn_remote_serve(
-        ssh, hermes_path=remote.hermes_path, profile=remote.profile, token=token, ownership_id=oid,
-        hermes_home=remote.hermes_home,
-        assert_install_clear=lambda: assert_remote_install_update_clear(ssh, remote.hermes_home, remote.hermes_path))
+        ssh, eir_path=remote.eir_path, profile=remote.profile, token=token, ownership_id=oid,
+        eir_home=remote.eir_home,
+        assert_install_clear=lambda: assert_remote_install_update_clear(ssh, remote.eir_home, remote.eir_path))
     if spawned.existing:
         if not deps.reuse_token:
             raise _err("remote-ownership-contended",
@@ -846,7 +846,7 @@ def _spawn_fresh(deps: ConnectDeps, remote: _Remote) -> Connected | None:
         return None
     creation = remote_process_creation_time(ssh, spawned.pid)
     owned = {"ownershipId": oid, "spawnNonce": spawned.spawn_nonce, "pid": spawned.pid, "port": 0,
-             "profile": remote.profile, "hermesPath": remote.hermes_path, "hermesHome": remote.hermes_home,
+             "profile": remote.profile, "eirPath": remote.eir_path, "eirHome": remote.eir_home,
              "logPath": spawned.log_path, "tokenFingerprint": fingerprint_token(token),
              "protocolVersion": PROTOCOL_VERSION, "devServer": "", "startedAt": _now_iso(),
              **({"creationTime": creation} if creation else {})}
@@ -864,8 +864,8 @@ def _spawn_fresh(deps: ConnectDeps, remote: _Remote) -> Connected | None:
     except BaseException as exc:
         _rollback_spawn(ssh, oid, owned, spawned, local_port, remote_port, exc)
         raise
-    return Connected(base_url, token, local_port, remote_port, spawned.pid, False, remote.hermes_version,
-                     remote.hermes_path, remote.hermes_home, spawned.spawn_nonce, remote.platform)
+    return Connected(base_url, token, local_port, remote_port, spawned.pid, False, remote.eir_version,
+                     remote.eir_path, remote.eir_home, spawned.spawn_nonce, remote.platform)
 
 
 def _rollback_spawn(ssh: SshConnection, oid: str, owned: dict, spawned: Spawned, local_port: int,
@@ -888,10 +888,10 @@ def _rollback_spawn(ssh: SshConnection, oid: str, owned: dict, spawned: Spawned,
 def _probe_remote(deps: ConnectDeps) -> _Remote:
     ssh = deps.ssh
     platform = probe_remote_platform(ssh)
-    hermes_home = probe_remote_hermes_home(ssh)
-    assert_remote_install_update_clear(ssh, hermes_home)
-    hermes_path = locate_hermes(ssh, deps.remote_hermes_path)
-    return _Remote(platform, hermes_home, hermes_path, probe_hermes_version(ssh, hermes_path),
+    eir_home = probe_remote_eir_home(ssh)
+    assert_remote_install_update_clear(ssh, eir_home)
+    eir_path = locate_eir(ssh, deps.remote_eir_path)
+    return _Remote(platform, eir_home, eir_path, probe_eir_version(ssh, eir_path),
                    backend_profile_arg(deps.profile) or "")
 
 

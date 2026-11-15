@@ -4,7 +4,7 @@ sha: '2612639a1be8d93dfc9a3ab02d65609e0bff7749'
 version: "0.1.0"
 title: ShapeRotator — verified engineering design
 description: >-
-  Parametric mechanical CAD and linear-static FEA for Hermes, with a claims checker: stress,
+  Parametric mechanical CAD and linear-static FEA for Eir, with a claims checker: stress,
   deflection, safety factor or mass the agent quotes is checked against the analyses it actually ran,
   and a verification footer is appended to the reply. One toolset drives FreeCAD (headless,
   cross-platform) or Autodesk Inventor (Windows, COM); every feature reports a volume/topology delta;
@@ -19,7 +19,7 @@ description: >-
   Windows, can drive Autodesk Inventor over COM; cad_python runs Python inside the CAD app only after
   the user approves each call; reads files the user names; writes models, renders, FEA folders and exports
   in the session's job folder, and any write outside it (or a save over a file opened from elsewhere) goes
-  through a Hermes approval prompt naming the path; child processes (FreeCAD worker, MCP servers, headless
+  through a Eir approval prompt naming the path; child processes (FreeCAD worker, MCP servers, headless
   browser for the PDF report) get a minimal environment without provider keys; appends a verification footer to assistant
   replies that quote engineering figures; Inventor stress/modal analysis (no API exists) takes over the
   mouse and keyboard for about half a minute, only after the user approves each call; no network,
@@ -28,7 +28,7 @@ description: >-
 maintainer: RobertBarnettProjects
 tier: community
 category: tools
-requires_hermes: ">=0.22.7"
+requires_eir: ">=0.22.7"
 docs_url: https://github.com/RobertBarnettProjects/hermes-shaperotator#readme
 platforms: [windows, linux, macos]
 screenshots:

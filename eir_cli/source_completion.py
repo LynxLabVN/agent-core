@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 
 # The installers run this file directly under an isolated interpreter, which
-# leaves the checkout off sys.path. Same idiom as hermes_cli/_launchers.py.
+# leaves the checkout off sys.path. Same idiom as eir_cli/_launchers.py.
 if __name__ == "__main__":
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -49,25 +49,25 @@ def complete_source_checkout(
     recorded on the open update receipt and appended to ``followups`` as ``(step, reason)``.
     Returns True only when every step finished and the SQLite runtime is not unsafe.
     """
-    from hermes_cli.update_lock import UpdateLock, describe_holder
+    from eir_cli.update_lock import UpdateLock, describe_holder
 
     root = Path(root)
     # This tail is the last mutating step of an install or update, and its product
     # builds run for minutes. A gateway restarted while it runs (launchd KeepAlive,
-    # a service manager, a second `hermes` launch) reaches the same tail through
-    # venv_sync, and `hermes update` runs its own: two completions then build the
+    # a service manager, a second `eir` launch) reaches the same tail through
+    # venv_sync, and `eir update` runs its own: two completions then build the
     # same output directories concurrently and race on install-stamp.json (#123376).
     # Claim the shared update lock so stacked completions serialize. A tail whose
     # orchestrator already holds the lock (venv_sync's interrupted-update finish,
     # the updater's completion child) runs under its parent's claim, exactly as
-    # `hermes update` does under the desktop handoff pid. The CHECKOUT lock is acquired, not
+    # `eir update` does under the desktop handoff pid. The CHECKOUT lock is acquired, not
     # sampled (R2): a completion from another home must not build a checkout an update owns;
     # one inside the update's tree joins the lock it inherited.
     lock = UpdateLock(install_root=root)
     if not lock.acquire():
         raise RuntimeError(
             f"an update is still running ({describe_holder(lock.holder)}); "
-            "wait for it to exit, then relaunch Hermes"
+            "wait for it to exit, then relaunch Eir"
         )
     try:
         return _complete_locked(
@@ -95,12 +95,12 @@ def _complete_locked(
     after_dependencies=None,
 ) -> bool:
     """The completion body; callers hold the update lock already."""
-    from hermes_cli.source_build import build_update_products
-    from hermes_cli.update_cmd_maint import _run_post_update_maintenance
-    from hermes_cli.venv_sync import publish_launchers
+    from eir_cli.source_build import build_update_products
+    from eir_cli.update_cmd_maint import _run_post_update_maintenance
+    from eir_cli.venv_sync import publish_launchers
 
     try:
-        from hermes_cli._subprocess_compat import expose_pm_git
+        from eir_cli._subprocess_compat import expose_pm_git
 
         # The builds, the release-history refresh and the install stamp all run
         # git; a fresh Windows machine has only PM's.
@@ -115,7 +115,7 @@ def _complete_locked(
         try:
             run()
         except (Exception, SystemExit) as exc:  # health: allow BLE001 -- reported as an owed follow-up
-            from hermes_cli.update_receipt import record_followup
+            from eir_cli.update_receipt import record_followup
 
             reason = str(exc) or type(exc).__name__
             record_followup(name, reason)
@@ -137,7 +137,7 @@ def _complete_locked(
     )))
     tail_done = not owed
     if tail_done:
-        from hermes_cli.source_stamp import write_source_stamp
+        from eir_cli.source_stamp import write_source_stamp
 
         try:
             write_source_stamp(root)
@@ -173,8 +173,8 @@ def main(argv: list[str] | None = None) -> int:
                              "same launchers/products/maintenance with update wording.")
     args = parser.parse_args([argument for argument in argv if argument != _PREPARED])
     root = args.source.resolve()
-    if not (root / "hermes_cli/source_completion.py").is_file():
-        print(f"✗ {root} is not a Hermes source checkout", file=sys.stderr)
+    if not (root / "eir_cli/source_completion.py").is_file():
+        print(f"✗ {root} is not a Eir source checkout", file=sys.stderr)
         return 1
 
     if prepared:
@@ -185,7 +185,7 @@ def main(argv: list[str] | None = None) -> int:
         activate_dependencies(root)
         if args.finish_update:
             # A source update that never reached its own completion -- a
-            # pre-handoff release cannot flip during `hermes update`, so its
+            # pre-handoff release cannot flip during `eir update`, so its
             # update ends with the tree at HEAD and nothing built -- lands here
             # on the next ordinary startup. Same tail as an install, so the two
             # states cannot drift apart. Only owed TAIL work keeps it pending: an
@@ -211,7 +211,7 @@ def main(argv: list[str] | None = None) -> int:
     passthrough = (["--desktop"] if args.desktop else []) + \
                   (["--finish-update"] if args.finish_update else [])
     command = _bootstrap_command(root, passthrough)
-    from hermes_cli.update_lock import checkout_lock_fds
+    from eir_cli.update_lock import checkout_lock_fds
 
     # Called inside an update tree (venv_sync's interrupted-update finish), the prepared child
     # keeps the checkout lock this bootstrap inherited.

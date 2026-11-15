@@ -4,25 +4,25 @@ installer-owned install-metadata ``catalog`` record; the install endpoint has no
 from __future__ import annotations
 
 import pytest
-import hermes_yaml as yaml
+import eir_yaml as yaml
 
-from hermes_cli import plugin_catalog as pc_cat
+from eir_cli import plugin_catalog as pc_cat
 
 VALID_SHA = "38fe0fb53eff98d477f807432e965429e665ca33"
 OTHER_SHA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
 
 @pytest.fixture
-def client(monkeypatch, tmp_path, _isolate_hermes_home):
+def client(monkeypatch, tmp_path, _isolate_eir_home):
     try:
         from starlette.testclient import TestClient
     except ImportError:
         pytest.skip("fastapi/starlette not installed")
-    import hermes_state
-    from hermes_constants import get_hermes_home
-    from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
+    import eir_state
+    from eir_constants import get_eir_home
+    from eir_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
 
-    monkeypatch.setattr(hermes_state, "DEFAULT_DB_PATH", get_hermes_home() / "state.db")
+    monkeypatch.setattr(eir_state, "DEFAULT_DB_PATH", get_eir_home() / "state.db")
     catalog_dir = tmp_path / "catalog"
     catalog_dir.mkdir()
     (catalog_dir / "alpha-plugin.yaml").write_text(yaml.safe_dump({
@@ -41,10 +41,10 @@ def client(monkeypatch, tmp_path, _isolate_hermes_home):
 
 def _install(name: str, sidecar: dict | None):
     """A user-dir plugin; *sidecar* records catalog provenance the way the installer does — on the
-    installer-owned ``.install-metadata.json`` record (an in-tree ``.hermes-catalog.json`` is inert)."""
-    from hermes_constants import get_hermes_home
-    from hermes_cli.plugins_cmd import _read_install_metadata, _write_install_metadata
-    d = get_hermes_home() / "plugins" / name
+    installer-owned ``.install-metadata.json`` record (an in-tree ``.eir-catalog.json`` is inert)."""
+    from eir_constants import get_eir_home
+    from eir_cli.plugins_cmd import _read_install_metadata, _write_install_metadata
+    d = get_eir_home() / "plugins" / name
     d.mkdir(parents=True)
     (d / "plugin.yaml").write_text(yaml.safe_dump({"name": name, "version": "1.0", "description": "x"}))
     if sidecar:
@@ -56,7 +56,7 @@ def _install(name: str, sidecar: dict | None):
 
 def test_catalog_endpoint_merges_installed_state_from_sidecar(client):
     from starlette.testclient import TestClient
-    from hermes_cli.web_server import app
+    from eir_cli.web_server import app
     assert TestClient(app).get("/api/dashboard/plugins/catalog").status_code == 401
 
     # Manifest name differs from the catalog name (the common case): matched through the sidecar.
@@ -71,11 +71,11 @@ def test_catalog_endpoint_merges_installed_state_from_sidecar(client):
 
 
 def test_install_endpoint_refuses_removed_plugins_with_no_bypass(client, monkeypatch):
-    from hermes_cli import plugins_cmd
+    from eir_cli import plugins_cmd
     monkeypatch.setattr(plugins_cmd, "_install_plugin_core", lambda *a, **k: pytest.fail("kill-listed install ran"))
     for body in ({"identifier": "https://github.com/evil/bad-plugin.git"},
                  {"identifier": "", "catalog_name": "bad-plugin"}, {"identifier": "evil/bad-plugin"}):
         resp = client.post("/api/dashboard/agent-plugins/install", json=body)
         assert resp.status_code == 400, body
-        assert "removed" in resp.json()["detail"] or "not in the Hermes plugin catalog" in resp.json()["detail"]
+        assert "removed" in resp.json()["detail"] or "not in the Eir plugin catalog" in resp.json()["detail"]
     assert client.post("/api/dashboard/agent-plugins/install", json={"identifier": ""}).status_code == 400

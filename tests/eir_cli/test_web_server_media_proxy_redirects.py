@@ -4,7 +4,7 @@ import httpx
 import pytest
 from fastapi import HTTPException
 
-from hermes_cli.web_routers import files
+from eir_cli.web_routers import files
 
 _PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 8
 

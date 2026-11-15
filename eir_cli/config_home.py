@@ -1,8 +1,8 @@
-"""Directory initialization and storage diagnostics for the active Hermes home."""
+"""Directory initialization and storage diagnostics for the active Eir home."""
 
 import os
 from pathlib import Path
-from hermes_dir_acl import make_user_dir
+from eir_dir_acl import make_user_dir
 
 
 class HomeInitializationError(RuntimeError):
@@ -26,7 +26,7 @@ def _operator_owned_links(links: list[Path], home: Path) -> list[Path]:
 
 
 def _ensure_directory(path: Path, *, create: bool, secure: bool, home: Path) -> None:
-    from hermes_cli.config import _secure_dir
+    from eir_cli.config import _secure_dir
 
     detail = ""
     try:
@@ -45,16 +45,16 @@ def _ensure_directory(path: Path, *, create: bool, secure: bool, home: Path) -> 
             _secure_dir(path)
     except OSError as exc:
         raise HomeInitializationError(
-            f"Cannot initialize Hermes directory {path}: {exc}. "
+            f"Cannot initialize Eir directory {path}: {exc}. "
             + (f"Directory links: {detail}. " if detail else "")
             + "Check the directory/link target, mount availability and access permissions; "
             "restore the mount or repair the link before retrying. "
-            "Hermes has not replaced the link or created its missing target."
+            "Eir has not replaced the link or created its missing target."
         ) from exc
 
 
 def initialize_home(home: Path, subdirs: tuple[str, ...], ensured: set[str]) -> None:
-    from hermes_cli.config import _ensure_default_soul_md, is_managed
+    from eir_cli.config import _ensure_default_soul_md, is_managed
 
     managed = is_managed()
     old_umask = os.umask(0o007) if managed else None
@@ -69,7 +69,7 @@ def initialize_home(home: Path, subdirs: tuple[str, ...], ensured: set[str]) -> 
             _ensure_default_soul_md(home)
         except OSError as exc:
             raise HomeInitializationError(
-                f"Cannot initialize Hermes home {home}: {exc}. "
+                f"Cannot initialize Eir home {home}: {exc}. "
                 "Check storage availability and access permissions."
             ) from exc
     finally:
@@ -81,11 +81,11 @@ def initialize_home(home: Path, subdirs: tuple[str, ...], ensured: set[str]) -> 
 
 
 def config_load_issue(exc: Exception):
-    from hermes_cli.config_issues import ConfigIssue
+    from eir_cli.config_issues import ConfigIssue
 
     if isinstance(exc, (HomeInitializationError, OSError)):
         return ConfigIssue(
-            "error", f"Hermes storage is unavailable: {exc}",
+            "error", f"Eir storage is unavailable: {exc}",
             "Check the reported path, link target, mount and permissions; keep config.yaml unchanged.",
         )
-    return ConfigIssue("error", "Could not load config.yaml", "Run 'hermes setup' to create a valid config")
+    return ConfigIssue("error", "Could not load config.yaml", "Run 'eir setup' to create a valid config")

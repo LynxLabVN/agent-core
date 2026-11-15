@@ -1,6 +1,6 @@
 """MCP catalog — curated, Nous-approved MCP servers shipped with the repo.
 
-Entries are added only by merging a PR into hermes-agent; presence in ``optional-mcps/`` = Nous
+Entries are added only by merging a PR into eir-agent; presence in ``optional-mcps/`` = Nous
 approval (no community tier, no other trust signals). Manifests pin transport details.
 """
 
@@ -14,15 +14,15 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional
 
-import hermes_yaml as yaml
+import eir_yaml as yaml
 
-from hermes_constants import get_hermes_home, get_optional_mcps_dir
-from hermes_cli._subprocess_compat import noninteractive_git_env
-from hermes_cli.colors import Colors, color
-from hermes_cli.config import load_config, save_config, get_env_value, save_env_value
-from hermes_cli.cli_output import prompt as _prompt_input
+from eir_constants import get_eir_home, get_optional_mcps_dir
+from eir_cli._subprocess_compat import noninteractive_git_env
+from eir_cli.colors import Colors, color
+from eir_cli.config import load_config, save_config, get_env_value, save_env_value
+from eir_cli.cli_output import prompt as _prompt_input
 from utils import rmtree_readonly
-from hermes_cli._startup_fast import project_root_str
+from eir_cli._startup_fast import project_root_str
 
 _MANIFEST_VERSION = 1
 
@@ -64,7 +64,7 @@ class TransportSpec:
     url: Optional[str] = None
     version: Optional[str] = None  # informational, pinned
     # Static env for the stdio subprocess (telemetry opt-outs, mode flags). NOT for secrets — those
-    # go through auth.env so they are prompted for and land in ~/.hermes/.env.
+    # go through auth.env so they are prompted for and land in ~/.eir/.env.
     env: dict[str, str] = field(default_factory=dict)
 
 
@@ -203,7 +203,7 @@ def _parse_auth(path: Path, raw: Any, name: str, http: bool) -> AuthSpec:
         # _build_server_config emits an Authorization header referencing ${MCP_<NAME>_API_KEY}, but
         # install_entry only persists the env vars DECLARED in auth.env. Enforce the naming contract
         # here, or a manifest declaring e.g. N8N_API_KEY would send a literal-placeholder header (401).
-        from hermes_cli.mcp_config import _env_key_for_server
+        from eir_cli.mcp_config import _env_key_for_server
 
         _required_key = _env_key_for_server(name)
         if all(spec.name != _required_key for spec in env_list):
@@ -323,7 +323,7 @@ def _parse_manifest(path: Path) -> CatalogEntry:
     if mv != _MANIFEST_VERSION:
         raise CatalogError(
             f"{path}: manifest_version {mv!r} unsupported "
-            f"(this Hermes understands version {_MANIFEST_VERSION})"
+            f"(this Eir understands version {_MANIFEST_VERSION})"
         )
     name = data.get("name") or ""
     if not name or not re.match(r"^[A-Za-z0-9_-]+$", name):
@@ -355,7 +355,7 @@ def list_catalog() -> list[CatalogEntry]:
     """Return all valid catalog entries, sorted by name.
 
     Invalid manifests are skipped silently (CI catches them); future ``manifest_version`` ones are
-    skipped too but surfaced via :func:`catalog_diagnostics` so UIs can say "update Hermes".
+    skipped too but surfaced via :func:`catalog_diagnostics` so UIs can say "update Eir".
     """
     root = _catalog_root()
     if not root.exists():
@@ -377,7 +377,7 @@ def list_catalog() -> list[CatalogEntry]:
 
 def catalog_diagnostics() -> list[tuple]:
     """``(entry_name, kind, message)`` tuples from the most recent :func:`list_catalog` call;
-    ``kind`` is ``future_manifest`` (newer than this Hermes) or ``invalid`` (malformed)."""
+    ``kind`` is ``future_manifest`` (newer than this Eir) or ``invalid`` (malformed)."""
     return list(_CATALOG_DIAGNOSTICS)
 
 
@@ -389,7 +389,7 @@ def get_entry(name: str) -> Optional[CatalogEntry]:
 
 def installed_servers() -> dict[str, dict]:
     """Return current ``mcp_servers`` block from config.yaml."""
-    from hermes_cli.mcp_config import _get_mcp_servers
+    from eir_cli.mcp_config import _get_mcp_servers
 
     return _get_mcp_servers()
 
@@ -412,7 +412,7 @@ def is_enabled(name: str) -> bool:
 
 def remove_server(name: str) -> bool:
     """Drop ``mcp_servers.<name>`` from config.yaml (pruning an empty block). True if it existed."""
-    from hermes_cli.mcp_config import _remove_mcp_server
+    from eir_cli.mcp_config import _remove_mcp_server
 
     return _remove_mcp_server(name)
 
@@ -423,7 +423,7 @@ def _say(msg: str, colour: str = Colors.GREEN) -> None:
 
 def _install_root() -> Path:
     """Where git-bootstrapped MCPs are cloned. Per-user, profile-aware."""
-    root = get_hermes_home() / "mcp-installs"
+    root = get_eir_home() / "mcp-installs"
     root.mkdir(parents=True, exist_ok=True)
     return root
 
@@ -438,7 +438,7 @@ def _run_bootstrap(cwd: Path, commands: list[str]) -> None:
 
 
 def _do_git_install(entry: CatalogEntry) -> Path:
-    """Clone the entry's repo into ``~/.hermes/mcp-installs/<name>`` and run bootstrap. Returns the dir."""
+    """Clone the entry's repo into ``~/.eir/mcp-installs/<name>`` and run bootstrap. Returns the dir."""
     assert entry.install is not None and entry.install.type == "git"
     install = entry.install
     dest = _install_root() / entry.name
@@ -456,7 +456,7 @@ def _do_git_install(entry: CatalogEntry) -> Path:
     # upfront so the fast path doesn't always fail noisily before the full-clone fallback.
     is_sha_ref = bool(re.fullmatch(r"[0-9a-f]{7,40}", install.ref))
     # Never hang on a credential prompt: installs run from CLI/dashboard flows nobody can answer.
-    from hermes_cli.git_credentials import run_git_with_credential_fallback
+    from eir_cli.git_credentials import run_git_with_credential_fallback
 
     def _git(*args: str) -> int:
         result = run_git_with_credential_fallback(
@@ -493,7 +493,7 @@ def _expand_install_dir(value: str, install_dir: Optional[Path]) -> str:
 def _prompt_env_vars(specs: list[EnvVarSpec], preloaded: Optional[dict[str, str]] = None) -> dict[str, str]:
     """Prompt for each env spec.
 
-    Secrets persist to ~/.hermes/.env. Non-secrets are only collected and
+    Secrets persist to ~/.eir/.env. Non-secrets are only collected and
     returned — the caller inlines them into the server config (config.yaml),
     since .env is secrets-only. Values already supplied by the caller
     (``preloaded``, e.g. from a dashboard form) skip the prompt.
@@ -538,7 +538,7 @@ def _inline_non_secret_value(obj: Any, name: str, value: str) -> Any:
 
 
 def _build_server_config(entry: CatalogEntry, install_dir: Optional[Path]) -> dict:
-    """Translate a manifest into the ``mcp_servers.<name>`` block format used by hermes_cli/mcp_config.py."""
+    """Translate a manifest into the ``mcp_servers.<name>`` block format used by eir_cli/mcp_config.py."""
     cfg: dict = {}
     t = entry.transport
     if t.type == "stdio":
@@ -554,7 +554,7 @@ def _build_server_config(entry: CatalogEntry, install_dir: Optional[Path]) -> di
             if entry.auth.oauth:
                 cfg["oauth"] = dict(entry.auth.oauth)
         elif entry.auth.type == "api_key":
-            from hermes_cli.mcp_config import _bearer_auth_headers
+            from eir_cli.mcp_config import _bearer_auth_headers
 
             cfg["headers"] = _bearer_auth_headers(entry.name)
     return cfg
@@ -584,7 +584,7 @@ def _probe_tools(name: str) -> Optional[list[tuple]]:
     if not server_cfg:
         return None
     try:
-        from hermes_cli.mcp_config import _probe_single_server  # lazy: keep this module cheap
+        from eir_cli.mcp_config import _probe_single_server  # lazy: keep this module cheap
 
         tools = _probe_single_server(name, server_cfg)
         return list(tools) if tools is not None else []
@@ -622,11 +622,11 @@ def _apply_tool_selection(
 
     Probe-success: curses checklist; pre-check priority *prior_selection* (reinstall) > manifest
     ``tools.default_enabled`` > all; all-on clears any filter. Probe-fail: keep the prior filter,
-    else apply ``default_enabled``, else no filter; point the user at ``hermes mcp configure``.
+    else apply ``default_enabled``, else no filter; point the user at ``eir mcp configure``.
     """
     print()
     name = entry.name
-    configure_hint = f"`hermes mcp configure {name}`"
+    configure_hint = f"`eir mcp configure {name}`"
 
     # Exclude-mode manifests never probe: the curated exclude list (names or globs) is written as-is
     # and everything else stays enabled, including tools the server adds later. A prior include
@@ -696,7 +696,7 @@ def _apply_tool_selection(
     pre_indices = {i for i, n in enumerate(tool_names) if n in pre_set}
     _say(f"  Found {len(probed)} tool(s). Pre-checked: {len(pre_indices)}.")
 
-    from hermes_cli.curses_ui import curses_checklist
+    from eir_cli.curses_ui import curses_checklist
 
     labels = [f"{n}  —  {(d[:60] + '...') if len(d) > 60 else d}" for n, d in probed]
     chosen_indices = curses_checklist(
@@ -709,7 +709,7 @@ def _apply_tool_selection(
         return
     if len(chosen_indices) == len(probed):
         # Clear the filter: tools the server adds later are auto-enabled too. To pin the current set,
-        # re-run `hermes mcp configure <name>` and unselect a tool (switches to include-mode).
+        # re-run `eir mcp configure <name>` and unselect a tool (switches to include-mode).
         _write_tools_filter(name, "include", None)
         _say(
             f"  ✓ All {len(probed)} tools enabled (no filter — new tools "
@@ -749,7 +749,7 @@ def record_mcp_install(source: str, name: Optional[str], outcome: str, *, failur
                        error: Optional[BaseException] = None) -> None:
     """One shared-metrics extension install for an MCP server (catalog entry name, or None when custom).
     A failed one names its ``failure_class`` or passes the raised ``error`` (classified by its type)."""
-    from hermes_cli.observability.shared_metrics_events import record_extension_install
+    from eir_cli.observability.shared_metrics_events import record_extension_install
 
     record_extension_install(kind="mcp_server", source=source, name=name, outcome=outcome,
                              failure_class=failure_class, error=error)
@@ -801,11 +801,11 @@ def _install_entry(entry: CatalogEntry, *, enable: bool, preloaded_env: Optional
         _say("  Configure credentials:", Colors.CYAN)
         env_values = _prompt_env_vars(entry.auth.env, preloaded_env or {})
     if entry.auth.type == "oauth" and entry.auth.provider:
-        # Provider-mediated OAuth relies on the existing `hermes auth <provider>` flow; surface
+        # Provider-mediated OAuth relies on the existing `eir auth <provider>` flow; surface
         # guidance rather than auto-running it to keep install decoupled from provider-auth lifecycle.
         _say(
             f"  This MCP uses {entry.auth.provider} OAuth. Run "
-            f"`hermes auth {entry.auth.provider}` if you have not "
+            f"`eir auth {entry.auth.provider}` if you have not "
             "already authenticated.",
             Colors.YELLOW)
     elif entry.auth.type == "oauth":
@@ -827,7 +827,7 @@ def _install_entry(entry: CatalogEntry, *, enable: bool, preloaded_env: Optional
             server_cfg = _inline_non_secret_value(server_cfg, spec.name, env_values[spec.name])
     server_cfg["enabled"] = enable
 
-    from hermes_cli.mcp_config import _save_mcp_server
+    from eir_cli.mcp_config import _save_mcp_server
 
     if not _save_mcp_server(entry.name, server_cfg):
         raise CatalogError(f"catalog entry '{entry.name}' rejected: suspicious command/args configuration",
@@ -839,7 +839,7 @@ def _install_entry(entry: CatalogEntry, *, enable: bool, preloaded_env: Optional
     _say(
         f"  ✓ Installed '{entry.name}' "
         f"({'enabled' if enable else 'disabled'}). "
-        f"Start a new Hermes session to load its tools."
+        f"Start a new Eir session to load its tools."
     )
     if entry.post_install:
         print()

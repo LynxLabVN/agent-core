@@ -3,14 +3,14 @@
 Covers:
   - Two plugins communicate via emit/subscribe; emit returns listener count
   - Namespace is FORCED to the emitting plugin's own key
-  - Namespace spoofing (hermes:, foreign, already-colon'd) is rejected
+  - Namespace spoofing (eir:, foreign, already-colon'd) is rejected
   - Non-blocking bounded delivery for synchronous subscribers
   - Per-callback isolation and deep-copied payload ownership
   - Async subscribers resolved through the loop-safe host path
   - Owner unload / generation reset cancel zombie callbacks
   - Recursion cap: mutually-emitting plugins terminate + warn
   - Manifest emits/listens parsed as optional advisory fields
-  - `hermes plugins show` output includes emits/listens
+  - `eir plugins show` output includes emits/listens
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ import threading
 
 import pytest
 
-from hermes_cli.plugins import (
+from eir_cli.plugins import (
     _EVENT_EMIT_DEPTH_CAP,
     PluginContext,
     PluginManager,
@@ -124,7 +124,7 @@ def test_namespace_falls_back_to_name_when_key_empty():
 @pytest.mark.parametrize(
     "bad_event",
     [
-        "hermes:x",   # reserved core prefix
+        "eir:x",   # reserved core prefix
         "a:x",        # foreign namespace
         "b:x",        # even the plugin's own colon'd name — must pass bare only
         "other:evt",
@@ -138,7 +138,7 @@ def test_emit_rejects_namespaced_names(bad_event):
 
     fired = []
     # Subscribe to every plausible delivery target so we can prove no delivery.
-    for name in (bad_event, f"b:{bad_event}", "hermes:x", "a:x", "b:x"):
+    for name in (bad_event, f"b:{bad_event}", "eir:x", "a:x", "b:x"):
         ctx_b.subscribe(name, lambda **p: fired.append(name))
 
     with pytest.raises(ValueError):
@@ -216,7 +216,7 @@ def test_emit_returns_before_blocking_subscriber_finishes():
 
 
 def test_pending_budget_drops_new_event_without_blocking(monkeypatch, caplog):
-    from hermes_cli import plugins_dispatch
+    from eir_cli import plugins_dispatch
 
     monkeypatch.setattr(plugins_dispatch, "_EVENT_PENDING_CAP", 1)
     manager = _fresh_manager()
@@ -358,7 +358,7 @@ def test_recursion_cap_terminates(caplog):
 
 def test_manifest_parse_reads_emits_listens(tmp_path):
     """parse_manifest_file picks up optional emits/listens from plugin.yaml."""
-    import hermes_yaml as yaml
+    import eir_yaml as yaml
 
     plugin_dir = tmp_path / "myplug"
     plugin_dir.mkdir()
@@ -374,7 +374,7 @@ def test_manifest_parse_reads_emits_listens(tmp_path):
         encoding="utf-8",
     )
 
-    from hermes_cli.plugins import parse_manifest_file
+    from eir_cli.plugins import parse_manifest_file
 
     manifest = parse_manifest_file(manifest_file, plugin_dir, "user", "")
     assert manifest is not None
@@ -386,8 +386,8 @@ def test_manifest_parse_reads_emits_listens(tmp_path):
 
 
 def test_plugins_show_includes_emits_listens(tmp_path, monkeypatch, capsys):
-    import hermes_yaml as yaml
-    from hermes_cli import plugins_cmd
+    import eir_yaml as yaml
+    from eir_cli import plugins_cmd
 
     plugin_dir = tmp_path / "showplug"
     plugin_dir.mkdir()
@@ -420,7 +420,7 @@ def test_plugins_show_includes_emits_listens(tmp_path, monkeypatch, capsys):
 
 
 def test_plugins_show_not_found_exits(monkeypatch):
-    from hermes_cli import plugins_cmd
+    from eir_cli import plugins_cmd
 
     monkeypatch.setattr(plugins_cmd, "_discover_all_plugins", list)
     with pytest.raises(SystemExit) as exc:

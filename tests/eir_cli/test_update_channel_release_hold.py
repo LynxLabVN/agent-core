@@ -1,6 +1,6 @@
 """A channel whose release predates the gateway runtime holds the install where it is (#140729).
 
-The channel picked that release, the user did not ask to go back: ``hermes update`` reports that
+The channel picked that release, the user did not ask to go back: ``eir update`` reports that
 the build is newer than the release and holds there, exiting 0, instead of refusing the
 downgrade on every attempt. An explicit ``--branch`` to a pre-runtime commit is still refused.
 """
@@ -12,11 +12,11 @@ from types import SimpleNamespace
 
 import pytest
 
-import hermes_state_runtime as rt
-from hermes_cli import main, source_releases, update_cmd
-from hermes_cli.subcommands.update import build_update_parser
-from hermes_cli.update_channel import set_install_channel
-from hermes_state import SessionDB
+import eir_state_runtime as rt
+from eir_cli import main, source_releases, update_cmd
+from eir_cli.subcommands.update import build_update_parser
+from eir_cli.update_channel import set_install_channel
+from eir_state import SessionDB
 
 pytestmark = pytest.mark.real_release_channels
 
@@ -35,14 +35,14 @@ def source(tmp_path, monkeypatch):
     home, origin, checkout = (tmp_path / name for name in ("home", "origin", "checkout"))
     home.mkdir()
     origin.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.setenv("HERMES_INSTALL_ROOT", str(checkout))
-    monkeypatch.delenv("HERMES_MANAGED", raising=False)
+    monkeypatch.setenv("EIR_HOME", str(home))
+    monkeypatch.setenv("EIR_INSTALL_ROOT", str(checkout))
+    monkeypatch.delenv("EIR_MANAGED", raising=False)
     git(origin, "init", "-b", "main")
     git(origin, "config", "user.name", "Channel Fixture")
     git(origin, "config", "user.email", "fixture@example.invalid")
     git(origin, "config", "commit.gpgsign", "false")
-    (origin / "hermes_state_common.py").write_text(_PRE_RUNTIME)
+    (origin / "eir_state_common.py").write_text(_PRE_RUNTIME)
     git(origin, "add", ".")
     git(origin, "commit", "-m", "before the cutover")
     git(origin, "checkout", "-q", "-b", "release")
@@ -51,15 +51,15 @@ def source(tmp_path, monkeypatch):
     git(origin, "commit", "-m", "stable release cut beside main")
     release = git(origin, "rev-parse", "HEAD")
     git(origin, "checkout", "-q", "main")
-    (origin / "hermes_state_common.py").write_text(_RUNTIME)
+    (origin / "eir_state_common.py").write_text(_RUNTIME)
     git(origin, "commit", "-am", "gateway runtime")
     installed = git(origin, "rev-parse", "HEAD")
     git(tmp_path, "clone", "-q", str(origin), str(checkout))
     git(checkout, "fetch", "-q", "origin", "release")
     git(checkout, "checkout", "-q", "--detach", installed)
     monkeypatch.setattr(main, "PROJECT_ROOT", checkout)
-    monkeypatch.setattr("hermes_cli.config.get_project_root", lambda: checkout)
-    monkeypatch.setattr("hermes_cli.backup._sibling_profile_homes", lambda h: [])
+    monkeypatch.setattr("eir_cli.config.get_project_root", lambda: checkout)
+    monkeypatch.setattr("eir_cli.backup._sibling_profile_homes", lambda h: [])
     monkeypatch.setattr(update_cmd._commit, "preflight_refusal", lambda *a, **k: None)
     parser = argparse.ArgumentParser()
     build_update_parser(parser.add_subparsers(), cmd_update=main.cmd_update)
@@ -86,12 +86,12 @@ def _ledgered(home):
 
 
 def _channel_publishes(monkeypatch, source, name):
-    record = {"schema": 1, "name": name, "repository": "NousResearch/hermes-agent", "policy": "preview",
+    record = {"schema": 1, "name": name, "repository": "NousResearch/eir-agent", "policy": "preview",
               "state": "active", "identity": {}, "nextSequence": 2,
               "head": {"buildId": "build-fixture", "sequence": 1}}
     result = SimpleNamespace(requested=deepcopy(record), terminal=record, manifest={
         "schema": 1, "request": {"buildId": "build-fixture", "channel": name, "sequence": 1,
-        "repository": "NousResearch/hermes-agent", "commit": source.release, "sourceVersion": "1.2.3",
+        "repository": "NousResearch/eir-agent", "commit": source.release, "sourceVersion": "1.2.3",
         "version": "0.0.1", "identity": {}, "bundleEnv": {},
         "publicBase": "https://hermes-assets.nousresearch.com"}, "packages": []})
     monkeypatch.setattr(source_releases, "_resolve_channel", lambda n, repository: deepcopy(result),
@@ -111,7 +111,7 @@ def test_a_channel_release_older_than_the_runtime_holds_the_install_and_exits_cl
     assert git(source.root, "rev-parse", "HEAD") == source.installed
     assert "Refusing" not in out and "Downgrading is unsupported" not in out
     assert f"This build is newer than the {name} release {source.release[:12]}" in out
-    assert "hermes update --set-channel main" in out
+    assert "eir update --set-channel main" in out
     assert len(source.completed) == 1 and source.completed[0]["expected_sha"] == source.installed
     # A held install is not up to date with its channel: the closing line says it was held.
     assert source.completed[0]["completion_message"] == f"✓ Holding at this build until a newer {name} release ships."
@@ -163,7 +163,7 @@ def test_an_unconfigured_stable_install_on_a_main_commit_beside_the_release_is_h
         source, monkeypatch, capsys, argv):
     """#140729 as reported: no recorded channel, an official checkout's default (stable), a main
     commit past the cutover that neither contains nor is contained by the release."""
-    monkeypatch.setattr("hermes_cli.update_channel.default_channel", lambda *_a, **_k: "stable")
+    monkeypatch.setattr("eir_cli.update_channel.default_channel", lambda *_a, **_k: "stable")
     _stable_publishes(monkeypatch, source.release)
     _ledgered(source.home)
 

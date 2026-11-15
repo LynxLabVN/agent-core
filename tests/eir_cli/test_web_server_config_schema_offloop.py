@@ -22,13 +22,13 @@ import pytest
 
 class TestConfigSchemaOffLoop:
     @pytest.fixture(autouse=True)
-    def _home(self, _isolate_hermes_home):
+    def _home(self, _isolate_eir_home):
         pass
 
     def test_schema_build_runs_off_the_loop_and_keeps_it_responsive(self, monkeypatch):
         httpx = pytest.importorskip("httpx")
-        from hermes_cli import web_server
-        from hermes_cli.web_routers import config_env
+        from eir_cli import web_server
+        from eir_cli.web_routers import config_env
 
         observed = {}
 

@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import hermes_yaml as yaml
+import eir_yaml as yaml
 import pytest
 
-from hermes_cli.config import DEFAULT_CONFIG, atomic_config_write, read_user_config_raw
-from hermes_cli.profile_provision import inherit_launch_model
+from eir_cli.config import DEFAULT_CONFIG, atomic_config_write, read_user_config_raw
+from eir_cli.profile_provision import inherit_launch_model
 
 
 @pytest.mark.parametrize(
@@ -19,10 +19,10 @@ from hermes_cli.profile_provision import inherit_launch_model
 def test_inherit_launch_model_carries_a_custom_provider_gateway(
     monkeypatch, tmp_path, schema, provider
 ):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     home.mkdir()
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     monkeypatch.setenv("FAKE_GW_TOKEN", "gw-FAKE-111")
     endpoint = {
         "name": "my-gateway",
@@ -90,10 +90,10 @@ def test_inherit_launch_model_carries_a_custom_provider_gateway(
 
 @pytest.mark.parametrize("written", ["http://127.0.0.1:11434/v1", "${LAB_URL}"])
 def test_inherit_launch_model_pins_a_bare_custom_endpoint(monkeypatch, tmp_path, written):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     home.mkdir()
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     for var in ("CUSTOM_BASE_URL", "OPENAI_BASE_URL"):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setenv("LAB_URL", "http://127.0.0.1:11434/v1")
@@ -122,10 +122,10 @@ def test_inherit_launch_model_pins_a_bare_custom_endpoint(monkeypatch, tmp_path,
 def test_inherit_launch_model_preserves_explicit_profile_selection(
     monkeypatch, tmp_path
 ):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     home.mkdir()
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     atomic_config_write(
         home / "config.yaml", {"model": {"provider": "nous", "default": "launch-model"}}
     )

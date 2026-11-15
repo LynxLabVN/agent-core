@@ -1,7 +1,7 @@
 """Custom OpenAI-compatible endpoint wizards: the ad-hoc ``custom`` flow and the
 ``custom_providers`` / ``providers.<key>`` named-endpoint flow.
 
-Imports of hermes_cli.main / auth / config / models stay lazy (main.py import cycle;
+Imports of eir_cli.main / auth / config / models stay lazy (main.py import cycle;
 tests patch them at call time). Prompt strings and config write order are behavior.
 """
 
@@ -11,9 +11,9 @@ import contextlib
 import os
 import urllib.parse
 
-from hermes_cli.cli_output import line_input
-from hermes_cli.providers import custom_provider_slug
-from hermes_cli.model_setup_flows_common import (
+from eir_cli.cli_output import line_input
+from eir_cli.providers import custom_provider_slug
+from eir_cli.model_setup_flows_common import (
     _HTTP, _ask, _commit_model_config, _load_config_model_section,
     _prune_replaced_custom_model_config_credentials, _radiolist, _say)
 
@@ -41,7 +41,7 @@ def _report_context_length_detection(model_name: str, base_url: str, api_key: st
     """
     try:
         from agent.model_metadata import DEFAULT_FALLBACK_CONTEXT, get_model_context_length
-        from hermes_cli.banner import _format_context_length
+        from eir_cli.banner import _format_context_length
         detected = get_model_context_length(model_name, base_url=base_url, api_key=api_key or "")
     except Exception:  # a failing probe must never block the save
         return
@@ -55,7 +55,7 @@ def _report_context_length_detection(model_name: str, base_url: str, api_key: st
 def _probe_custom_endpoint(effective_key: str, effective_url: str) -> tuple[dict, str]:
     """Verify a custom endpoint via ``probe_api_models`` and report; returns
     ``(probe, effective_url)`` where the URL may be the working fallback base."""
-    from hermes_cli.models import probe_api_models
+    from eir_cli.models import probe_api_models
     probe = probe_api_models(effective_key, effective_url)
     if probe.get("used_fallback") and probe.get("resolved_base_url"):
         print(f"Warning: endpoint verification worked at {probe['resolved_base_url']}/models, "
@@ -64,7 +64,7 @@ def _probe_custom_endpoint(effective_key: str, effective_url: str) -> tuple[dict
     elif probe.get("models") is not None:
         print(f"Verified endpoint via {probe.get('probed_url')} ({len(probe.get('models') or [])} model(s) visible)")
     else:
-        print(f"Warning: could not verify this endpoint via {probe.get('probed_url')}. Hermes will still save it.")
+        print(f"Warning: could not verify this endpoint via {probe.get('probed_url')}. Eir will still save it.")
         suggested = probe.get("suggested_base_url")
         if suggested and suggested.endswith("/v1"):
             print(f"  If this server expects /v1 in the path, try base URL: {suggested}")
@@ -108,7 +108,7 @@ def _key_for_endpoint(api_key: str, current_key: str, current_url: str, effectiv
     old, new = (urllib.parse.urlparse(u) for u in (key_url, effective_url))
     new_origin = f"{new.scheme}://{new.netloc.rpartition('@')[2]}"
     print(f"  The saved key is for {old.scheme}://{old.netloc.rpartition('@')[2]}; it is not sent to {new_origin}.")
-    from hermes_cli.secret_prompt import masked_secret_prompt
+    from eir_cli.secret_prompt import masked_secret_prompt
     try:
         return masked_secret_prompt(f"API key for {new_origin} [blank = no key]: ").strip()
     except (KeyboardInterrupt, EOFError):
@@ -119,10 +119,10 @@ def _key_for_endpoint(api_key: str, current_key: str, current_url: str, effectiv
 def _model_flow_custom(config):
     """Custom endpoint: collect URL, API key, and model name; also saved to ``custom_providers`` so
     it appears in the provider menu on subsequent runs."""
-    from hermes_cli.main_provider_setup import _auto_provider_name, _prompt_custom_api_mode_selection, _save_custom_provider
-    from hermes_cli.auth import _save_model_choice, deactivate_provider
-    from hermes_cli.config import get_env_value
-    from hermes_cli.secret_prompt import masked_secret_prompt
+    from eir_cli.main_provider_setup import _auto_provider_name, _prompt_custom_api_mode_selection, _save_custom_provider
+    from eir_cli.auth import _save_model_choice, deactivate_provider
+    from eir_cli.config import get_env_value
+    from eir_cli.secret_prompt import masked_secret_prompt
     current_url = get_env_value("OPENAI_BASE_URL") or ""
     current_key = get_env_value("OPENAI_API_KEY") or ""
 
@@ -188,12 +188,12 @@ def _model_flow_custom(config):
 
     # The key goes to .env and config.yaml only references it, under a name unique to the endpoint
     # (#69449, #77471). Configs written by older releases keep the ${VAR} they already reference.
-    # An endpoint that already has a Hermes-written row keeps that row's variable, so a key
+    # An endpoint that already has a Eir-written row keeps that row's variable, so a key
     # rotation reaches every block reading it instead of forking a second copy.
     custom_key_env, shared_key_envs = "", []
     if effective_key:
-        from hermes_cli.config import read_raw_config
-        from hermes_cli.config_secret_refs import (
+        from eir_cli.config import read_raw_config
+        from eir_cli.config_secret_refs import (
             endpoint_api_key_env, known_endpoint_key_env, shared_endpoint_key_envs, store_secret,
         )
         custom_key_env = (known_endpoint_key_env(read_raw_config(), effective_url)
@@ -242,14 +242,14 @@ def _model_flow_custom(config):
             _caller_model = {"default": _caller_model} if _caller_model else {}
         _apply_endpoint(_caller_model)
         config["model"] = _caller_model
-        print("Endpoint saved. Use `/model` in chat or `hermes model` to set a model.")
+        print("Endpoint saved. Use `/model` in chat or `eir model` to set a model.")
 
     # Auto-save to custom_providers so it appears in the menu next time
     _save_custom_provider(effective_url, effective_key, model_name or "", context_length=context_length,
                           name=display_name, api_mode=api_mode, key_env=custom_key_env)
     if shared_key_envs:  # e.g. a providers.<name> row for this endpoint, still on a variable it shares
-        from hermes_cli.config import load_config, save_config
-        from hermes_cli.config_secret_refs import repoint_endpoint_key_env
+        from eir_cli.config import load_config, save_config
+        from eir_cli.config_secret_refs import repoint_endpoint_key_env
         cfg = load_config()
         for shared_key_env in shared_key_envs:
             repoint_endpoint_key_env(cfg, effective_url, shared_key_env, custom_key_env)
@@ -277,9 +277,9 @@ def _configured_model_ids(cfg_models) -> list[str]:
 def _discover_named_custom_models(provider_info: dict, api_key: str, configured_models: list, explicit_catalog: bool):
     """Live catalog probe for a named custom endpoint (native ``/api/tags`` for Ollama).
     Returns ``(models, native_catalog_empty)``; persists the live catalog as a side effect."""
-    from hermes_cli.config import normalize_extra_headers
-    from hermes_cli.models import fetch_api_models, _get_ollama_native_headers
-    from hermes_cli.models_local import (
+    from eir_cli.config import normalize_extra_headers
+    from eir_cli.models import fetch_api_models, _get_ollama_native_headers
+    from eir_cli.models_local import (
         fetch_ollama_local_models,
         _normalize_openai_base_url,
         should_use_ollama_native_catalog,
@@ -328,7 +328,7 @@ def _discover_named_custom_models(provider_info: dict, api_key: str, configured_
     # _save_discovered_models_to_config. A failed save is non-fatal.
     if live_models:
         with contextlib.suppress(Exception):
-            from hermes_cli.model_switch_providers import _entry_credentials, _save_discovered_models_to_config
+            from eir_cli.model_switch_providers import _entry_credentials, _save_discovered_models_to_config
             _save_discovered_models_to_config(
                 base_url, live_models, api_mode=api_mode, headers=extra_headers or None,
                 credential_identity=_entry_credentials(provider_info, "key_env", "api_key_env")[2])
@@ -366,11 +366,11 @@ def _model_flow_named_custom(config, provider_info):
     """Named custom provider from ``custom_providers`` / ``providers.<key>``: probes the model
     catalog (native ``/api/tags`` for endpoints conservatively identified as Ollama); a previously
     saved model is pre-selected and is the fallback when probing fails."""
-    from hermes_cli.main_provider_setup import _custom_provider_api_key_config_value, _custom_provider_base_url_config_value, _save_custom_provider
-    from hermes_cli.auth import _save_model_choice
-    from hermes_cli.config import load_config, save_config
-    from hermes_cli.route_identity import drop_credentials_of_other_route
-    from hermes_cli.model_switch import _entry_models_discovered, _models_config_is_allowlist
+    from eir_cli.main_provider_setup import _custom_provider_api_key_config_value, _custom_provider_base_url_config_value, _save_custom_provider
+    from eir_cli.auth import _save_model_choice
+    from eir_cli.config import load_config, save_config
+    from eir_cli.route_identity import drop_credentials_of_other_route
+    from eir_cli.model_switch import _entry_models_discovered, _models_config_is_allowlist
     name = provider_info["name"]
     base_url = provider_info["base_url"]
     api_mode = provider_info.get("api_mode", "")

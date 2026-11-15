@@ -1,4 +1,4 @@
-"""Tests for the Kanban DB layer (hermes_cli.kanban_db)."""
+"""Tests for the Kanban DB layer (eir_cli.kanban_db)."""
 
 from __future__ import annotations
 
@@ -13,19 +13,19 @@ from pathlib import Path
 
 import pytest
 
-import hermes_state_wal
-from hermes_cli import kanban_db as kb
-from hermes_cli import kanban_db_connect as kbc
-from hermes_cli import kanban_db_dispatch as kbd
-from hermes_cli import kanban_db_workspace as kbw
+import eir_state_wal
+from eir_cli import kanban_db as kb
+from eir_cli import kanban_db_connect as kbc
+from eir_cli import kanban_db_dispatch as kbd
+from eir_cli import kanban_db_workspace as kbw
 
 
 @pytest.fixture
 def kanban_home(tmp_path, monkeypatch):
-    """Isolated HERMES_HOME with an empty kanban DB."""
-    home = tmp_path / ".hermes"
+    """Isolated EIR_HOME with an empty kanban DB."""
+    home = tmp_path / ".eir"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     kb.init_db()
     return home
@@ -216,7 +216,7 @@ def test_stale_claim_reclaim_event_records_diagnostic_payload(
     (#23025: previous payload only had ``stale_lock`` which gives no
     timing context)."""
     import json
-    import hermes_cli.kanban_db as _kb
+    import eir_cli.kanban_db as _kb
 
     with kbc.connect() as conn:
         t = kb.create_task(conn, title="x", assignee="a")
@@ -278,7 +278,7 @@ def test_stale_claim_extend_live_worker_does_not_count_failure(
 ):
     """The live-worker extend path must NOT increment ``consecutive_failures``
     (#111306): extending a still-alive worker's claim is not a failure."""
-    import hermes_cli.kanban_db as _kb
+    import eir_cli.kanban_db as _kb
 
     with kbc.connect() as conn:
         t = kb.create_task(conn, title="live worker", assignee="a")
@@ -327,11 +327,11 @@ def test_rate_limit_exit_requeues_without_counting_failure(
     """A rate-limit sentinel exit releases the task to ``ready`` and leaves
     ``consecutive_failures`` untouched — the breaker must never trip on a
     transient throttle, even across many quota-wall hits."""
-    import hermes_cli.kanban_db as _kb
-    from hermes_cli import kanban_db_dispatch as _kbd
+    import eir_cli.kanban_db as _kb
+    from eir_cli import kanban_db_dispatch as _kbd
 
     monkeypatch.setattr(_kb, "_pid_alive", lambda _pid: False)
-    monkeypatch.setenv("HERMES_KANBAN_CRASH_GRACE_SECONDS", "0")
+    monkeypatch.setenv("EIR_KANBAN_CRASH_GRACE_SECONDS", "0")
 
     with kbc.connect() as conn:
         host = _kb._claimer_id().split(":", 1)[0]
@@ -390,11 +390,11 @@ def test_terminal_provider_exit_blocks_after_one_attempt_in_either_lane(kanban_h
     gone) parks the card ``blocked`` on the FIRST death — well below ``failure_limit`` and the
     per-task ``max_retries`` — with the provider error as the reason, sticky against
     ``recompute_ready``. Same booking for the implementation and the review lane (#114587)."""
-    import hermes_cli.kanban_db as _kb
-    from hermes_cli import kanban_db_dispatch as _kbd
+    import eir_cli.kanban_db as _kb
+    from eir_cli import kanban_db_dispatch as _kbd
 
     monkeypatch.setattr(_kb, "_pid_alive", lambda _pid: False)
-    monkeypatch.setenv("HERMES_KANBAN_CRASH_GRACE_SECONDS", "0")
+    monkeypatch.setenv("EIR_KANBAN_CRASH_GRACE_SECONDS", "0")
 
     with kbc.connect() as conn:
         host = _kb._claimer_id().split(":", 1)[0]
@@ -436,9 +436,9 @@ def test_respawn_guard_defers_rate_limited_within_cooldown(
     """Within the cooldown after a rate-limit requeue, the guard defers the
     respawn; after the cooldown it allows a probe — and crucially does NOT
     fall into ``blocker_auth`` (which would defer forever)."""
-    import hermes_cli.kanban_db as _kb
+    import eir_cli.kanban_db as _kb
 
-    monkeypatch.setenv("HERMES_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS", "300")
+    monkeypatch.setenv("EIR_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS", "300")
     now = 5_000_000
 
     with kbc.connect() as conn:
@@ -492,7 +492,7 @@ def test_respawn_guard_blocker_auth_curated_not_open_stem(
     ordinary English words like "author"/"authored"/"authoring"/"authoritative"
     in worker progress prose, parking a healthy ``ready`` card forever (#117009).
     The auth family must be a curated set of real auth-failure tokens."""
-    monkeypatch.setenv("HERMES_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS", "0")
+    monkeypatch.setenv("EIR_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS", "0")
 
     with kbc.connect() as conn:
         tid = kb.create_task(conn, title="prose", assignee="a")
@@ -565,10 +565,10 @@ def test_infrastructure_spawn_refusal_never_charges_the_card(
     monkeypatch.setattr(process_registry, "_is_supervised_gateway_process", lambda: True)
     monkeypatch.setenv("INVOCATION_ID", "managed-gateway")
     monkeypatch.setattr(process_registry, "_systemd_run_user_scope_available", lambda: False)
-    monkeypatch.setenv("HERMES_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS", "0")
+    monkeypatch.setenv("EIR_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS", "0")
 
     def spawn_via_real_boundary(task, workspace, board=None):
-        kbd._restart_safe_worker_argv(task, ["hermes", "chat"])  # raises: real probe verdict, real _degrade()
+        kbd._restart_safe_worker_argv(task, ["eir", "chat"])  # raises: real probe verdict, real _degrade()
         raise AssertionError("unreachable")
 
     with kbc.connect() as conn:
@@ -587,11 +587,11 @@ def test_infrastructure_spawn_refusal_never_charges_the_card(
         assert [r["outcome"] for r in runs] == ["spawn_failed"] * 3
         assert all(json.loads(r["metadata"])["infrastructure"] is True for r in runs)
 
-        monkeypatch.setenv("HERMES_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS", "300")
+        monkeypatch.setenv("EIR_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS", "300")
         assert kbd.check_respawn_guard(conn, tid) == "infrastructure_cooldown"
 
         # Control: an ordinary spawn failure on the same card still spends budget.
-        monkeypatch.setenv("HERMES_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS", "0")
+        monkeypatch.setenv("EIR_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS", "0")
 
         def spawn_broken(task, workspace, board=None):
             raise RuntimeError("profile launcher exploded")
@@ -945,13 +945,13 @@ def test_dir_child_completion_unblocks_deferred_scratch_parent(kanban_home, tmp_
 
 
 def test_is_managed_scratch_path_rejects_kanban_metadata_subtrees(kanban_home):
-    """Hermes' own DB/metadata/log subtrees under ``<kanban_home>/kanban`` are NOT managed.
+    """Eir' own DB/metadata/log subtrees under ``<kanban_home>/kanban`` are NOT managed.
 
     Regression guard for the Copilot finding on #28819: a scratch task whose
     ``workspace_path`` was mis-set to the kanban home, the logs dir, or a
     board's metadata dir (i.e. the board root itself, not its ``workspaces/``
     child) must be refused. Without this, the containment check would happily
-    ``shutil.rmtree`` Hermes' DB/metadata/logs on task completion.
+    ``shutil.rmtree`` Eir' DB/metadata/logs on task completion.
     """
     kanban_root = kanban_home / "kanban"
     kanban_root.mkdir(parents=True, exist_ok=True)
@@ -1034,37 +1034,37 @@ def test_symlinked_workspaces_root_does_not_widen_scratch_cleanup(kanban_home, t
 # Shared-board path resolution (issue #19348)
 #
 # The kanban board is a cross-profile coordination primitive: a worker
-# spawned with `hermes -p <profile>` must read/write the same kanban.db
+# spawned with `eir -p <profile>` must read/write the same kanban.db
 # as the dispatcher that claimed the task. These tests exercise the
 # path-resolution layer directly and would have caught the regression
-# where `kanban_db_path()` resolved to the active profile's HERMES_HOME.
+# where `kanban_db_path()` resolved to the active profile's EIR_HOME.
 # ---------------------------------------------------------------------------
 
 class TestSharedBoardPaths:
     """`kanban_home`/`kanban_db_path`/`workspaces_root`/`worker_log_path`
-    must anchor at the **shared root**, not the active profile's HERMES_HOME."""
+    must anchor at the **shared root**, not the active profile's EIR_HOME."""
 
-    def _set_home(self, monkeypatch, tmp_path, hermes_home):
+    def _set_home(self, monkeypatch, tmp_path, eir_home):
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
-        monkeypatch.delenv("HERMES_KANBAN_HOME", raising=False)
+        monkeypatch.setenv("EIR_HOME", str(eir_home))
+        monkeypatch.delenv("EIR_KANBAN_HOME", raising=False)
 
 
     def test_profile_worker_resolves_to_shared_root(
         self, tmp_path, monkeypatch
     ):
-        # Reproduces the bug: dispatcher uses ~/.hermes/kanban.db,
+        # Reproduces the bug: dispatcher uses ~/.eir/kanban.db,
         # worker spawned with -p <profile> previously resolved to
-        # ~/.hermes/profiles/<profile>/kanban.db. After the fix both
-        # converge on ~/.hermes/kanban.db.
-        default_home = tmp_path / ".hermes"
+        # ~/.eir/profiles/<profile>/kanban.db. After the fix both
+        # converge on ~/.eir/kanban.db.
+        default_home = tmp_path / ".eir"
         default_home.mkdir()
         profile_home = default_home / "profiles" / "nehemiahkanban"
         profile_home.mkdir(parents=True)
         self._set_home(monkeypatch, tmp_path, profile_home)
 
         # All four resolvers must anchor at the shared root, not the
-        # profile-local HERMES_HOME.
+        # profile-local EIR_HOME.
         assert kb.kanban_home() == default_home
         assert kb.kanban_db_path() == default_home / "kanban.db"
         assert kb.workspaces_root() == default_home / "kanban" / "workspaces"
@@ -1086,9 +1086,9 @@ class TestSharedBoardPaths:
         self, tmp_path, monkeypatch
     ):
         # Belt-and-suspenders: round-trip a task across the two
-        # HERMES_HOME perspectives via a real SQLite file. Without the
+        # EIR_HOME perspectives via a real SQLite file. Without the
         # fix the worker would open a different file and see no rows.
-        default_home = tmp_path / ".hermes"
+        default_home = tmp_path / ".eir"
         default_home.mkdir()
         profile_home = default_home / "profiles" / "nehemiahkanban"
         profile_home.mkdir(parents=True)
@@ -1099,8 +1099,8 @@ class TestSharedBoardPaths:
         with kbc.connect() as conn:
             task_id = kb.create_task(conn, title="cross-profile")
 
-        # Worker switches to the profile HERMES_HOME and reads.
-        monkeypatch.setenv("HERMES_HOME", str(profile_home))
+        # Worker switches to the profile EIR_HOME and reads.
+        monkeypatch.setenv("EIR_HOME", str(profile_home))
         with kbc.connect() as conn:
             task = kb.get_task(conn, task_id)
         assert task is not None
@@ -1113,11 +1113,11 @@ class TestSharedBoardPaths:
         self, tmp_path, monkeypatch
     ):
         # The dispatcher must pin board paths while stripping any unrelated
-        # HERMES_SESSION_* identity inherited from the long-lived gateway.
-        # The one exception is HERMES_SESSION_SOURCE, which the dispatcher
+        # EIR_SESSION_* identity inherited from the long-lived gateway.
+        # The one exception is EIR_SESSION_SOURCE, which the dispatcher
         # re-sets to its own `kanban` tag AFTER the strip — a value it owns,
         # never one inherited from whatever the gateway last routed.
-        default_home = tmp_path / ".hermes"
+        default_home = tmp_path / ".eir"
         default_home.mkdir()
         self._set_home(monkeypatch, tmp_path, default_home)
 
@@ -1160,14 +1160,14 @@ class TestSharedBoardPaths:
         kbd._default_spawn(task, str(tmp_path / "ws"))
 
         env = captured["env"]
-        assert env["HERMES_KANBAN_DB"] == str(default_home / "kanban.db")
-        assert env["HERMES_KANBAN_WORKSPACES_ROOT"] == str(
+        assert env["EIR_KANBAN_DB"] == str(default_home / "kanban.db")
+        assert env["EIR_KANBAN_WORKSPACES_ROOT"] == str(
             default_home / "kanban" / "workspaces"
         )
-        assert env["HERMES_KANBAN_TASK"] == "t_dispatch_env"
-        assert env["HERMES_KANBAN_BRANCH"] == "wt/t_dispatch_env"
+        assert env["EIR_KANBAN_TASK"] == "t_dispatch_env"
+        assert env["EIR_KANBAN_BRANCH"] == "wt/t_dispatch_env"
         for key in sc._VAR_MAP:
-            if key == "HERMES_SESSION_SOURCE":
+            if key == "EIR_SESSION_SOURCE":
                 # Re-set by the dispatcher, so what matters is that it carries
                 # the worker's own tag rather than the inherited routing value.
                 assert env[key] == "kanban"
@@ -1187,7 +1187,7 @@ class TestSharedBoardPaths:
 
 
 # ---------------------------------------------------------------------------
-# NFS / network-filesystem fallback (see hermes_state_wal.apply_wal_with_fallback)
+# NFS / network-filesystem fallback (see eir_state_wal.apply_wal_with_fallback)
 # ---------------------------------------------------------------------------
 
 def test_connect_falls_back_to_delete_on_locking_protocol(tmp_path, monkeypatch, caplog):
@@ -1196,7 +1196,7 @@ def test_connect_falls_back_to_delete_on_locking_protocol(tmp_path, monkeypatch,
     Without this fallback, the gateway's kanban dispatcher crashes every
     60s and the kanban migration (``consecutive_failures`` ADD COLUMN) is
     retried forever — which is what the real-world user report shows
-    (see hermes-agent issue #22032).
+    (see eir-agent issue #22032).
 
     NOTE: We do NOT use the ``kanban_home`` fixture here because that
     fixture pre-initializes the DB via ``kb.init_db()`` — putting the
@@ -1210,23 +1210,23 @@ def test_connect_falls_back_to_delete_on_locking_protocol(tmp_path, monkeypatch,
     import sqlite3 as _sqlite3
     from unittest.mock import patch as _patch
 
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
 
     # These tests exercise the WAL-attempt path; assume a fixed SQLite so the
     # WAL-reset vulnerability gate doesn't short-circuit before the pragma.
-    import hermes_state_wal as _hermes_state_wal
+    import eir_state_wal as _eir_state_wal
     monkeypatch.setattr(
-        _hermes_state_wal, "is_sqlite_wal_reset_vulnerable",
+        _eir_state_wal, "is_sqlite_wal_reset_vulnerable",
         lambda version_info=None: False,
     )
-    _hermes_state_wal._wal_fallback_warned_paths.clear()
+    _eir_state_wal._wal_fallback_warned_paths.clear()
 
     # Clear module cache so a fresh connect() is attempted
     kb._INITIALIZED_PATHS.clear()
-    hermes_state_wal._wal_fallback_warned_paths.clear()
+    eir_state_wal._wal_fallback_warned_paths.clear()
 
     real_connect = _sqlite3.connect
 
@@ -1245,8 +1245,8 @@ def test_connect_falls_back_to_delete_on_locking_protocol(tmp_path, monkeypatch,
             *args, factory=_WalBlockingConnection, **kwargs
         )
 
-    with _patch("hermes_cli.kanban_db.sqlite3.connect", side_effect=wal_blocking_connect):
-        with caplog.at_level("ERROR", logger="hermes_state"):
+    with _patch("eir_cli.kanban_db.sqlite3.connect", side_effect=wal_blocking_connect):
+        with caplog.at_level("ERROR", logger="eir_state"):
             conn = kbc.connect()
 
     # One fallback error, naming kanban.db
@@ -1271,16 +1271,16 @@ def test_connect_works_when_wal_is_silently_refused(tmp_path, monkeypatch, caplo
     import sqlite3 as _sqlite3
     from unittest.mock import patch as _patch
 
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
 
     kb._INITIALIZED_PATHS.clear()
-    hermes_state_wal._wal_fallback_warned_paths.clear()
+    eir_state_wal._wal_fallback_warned_paths.clear()
     # Assume a fixed SQLite so the WAL-reset gate doesn't short-circuit.
     monkeypatch.setattr(
-        hermes_state_wal, "is_sqlite_wal_reset_vulnerable",
+        eir_state_wal, "is_sqlite_wal_reset_vulnerable",
         lambda version_info=None: False,
     )
 
@@ -1299,10 +1299,10 @@ def test_connect_works_when_wal_is_silently_refused(tmp_path, monkeypatch, caplo
         )
 
     with _patch(
-        "hermes_cli.kanban_db.sqlite3.connect",
+        "eir_cli.kanban_db.sqlite3.connect",
         side_effect=wal_silent_noop_connect,
     ):
-        with caplog.at_level("ERROR", logger="hermes_state"):
+        with caplog.at_level("ERROR", logger="eir_state"):
             conn = kbc.connect()
 
     assert conn.execute("PRAGMA journal_mode").fetchone()[0].lower() == "delete"
@@ -1323,7 +1323,7 @@ def test_connect_works_when_wal_is_silently_refused(tmp_path, monkeypatch, caplo
 
 def test_sqlite_connect_closes_tracked_conn_on_setup_failure(tmp_path, monkeypatch):
     """A PRAGMA failure after connect must not abandon a tracked kanban fd."""
-    from hermes_cli import sqlite_safe_read
+    from eir_cli import sqlite_safe_read
 
     db_path = tmp_path / "kanban.db"
     real_connect = sqlite3.connect
@@ -1449,7 +1449,7 @@ def test_unlink_tasks_triggers_recompute_ready(kanban_home):
     complete_task and unblock_task.
 
     Before the fix, child stayed 'todo' indefinitely after unlink; only the
-    next dispatcher tick or a manual 'hermes kanban recompute' would promote it.
+    next dispatcher tick or a manual 'eir kanban recompute' would promote it.
     """
     with kbc.connect() as conn:
         # A is done.
@@ -1492,7 +1492,7 @@ def test_add_column_if_missing_is_idempotent_on_race(kanban_home):
     """
     import sqlite3
 
-    from hermes_cli.sqlite_util import add_column_if_missing as _add_column_if_missing
+    from eir_cli.sqlite_util import add_column_if_missing as _add_column_if_missing
 
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row
@@ -1562,55 +1562,55 @@ def test_connect_heals_reduced_tasks_schema_seeded_by_external_harness(kanban_ho
 
 
 # ---------------------------------------------------------------------------
-# Dispatcher spawn invocation — _resolve_hermes_argv()
+# Dispatcher spawn invocation — _resolve_eir_argv()
 #
-# Workers spawned by the dispatcher must use a `hermes` invocation that does
+# Workers spawned by the dispatcher must use a `eir` invocation that does
 # not depend on PATH being set up correctly. cron jobs, systemd User= services,
 # launchd jobs, and other detached processes routinely run with a stripped
-# $PATH that doesn't include the venv's bin/, so a bare `["hermes", ...]`
+# $PATH that doesn't include the venv's bin/, so a bare `["eir", ...]`
 # spawn fails with FileNotFoundError and the task gets stuck. The resolver
 # prefers the interpreter-bound module form (exactly this install; a PATH
 # shim could be attacker-planted or belong to another install, #111569) and
-# only falls back to the PATH shim when ``hermes_cli`` is not importable.
+# only falls back to the PATH shim when ``eir_cli`` is not importable.
 # ---------------------------------------------------------------------------
 
 
-def test_resolve_hermes_argv_prefers_module_form_over_path_shim(monkeypatch):
-    """A `hermes` on PATH must not shadow the running install (#111569):
-    the module argv wins whenever ``hermes_cli`` is importable; only an
-    explicit ``$HERMES_BIN`` overrides it."""
+def test_resolve_eir_argv_prefers_module_form_over_path_shim(monkeypatch):
+    """A `eir` on PATH must not shadow the running install (#111569):
+    the module argv wins whenever ``eir_cli`` is importable; only an
+    explicit ``$EIR_BIN`` overrides it."""
     import shutil
     import sys
-    from hermes_cli import kanban_db_dispatch as kbd
+    from eir_cli import kanban_db_dispatch as kbd
 
-    monkeypatch.delenv("HERMES_BIN", raising=False)
-    monkeypatch.setattr(shutil, "which", lambda name: "/tmp/planted/hermes")
-    monkeypatch.setattr(kbd, "_safe_which_no_cwd", lambda name: "/tmp/planted/hermes")
-    assert kbd._resolve_hermes_argv() == [sys.executable, "-m", "hermes_cli.main"]
+    monkeypatch.delenv("EIR_BIN", raising=False)
+    monkeypatch.setattr(shutil, "which", lambda name: "/tmp/planted/eir")
+    monkeypatch.setattr(kbd, "_safe_which_no_cwd", lambda name: "/tmp/planted/eir")
+    assert kbd._resolve_eir_argv() == [sys.executable, "-m", "eir_cli.main"]
 
-    monkeypatch.setenv("HERMES_BIN", "/opt/hermes/bin/hermes")
-    assert kbd._resolve_hermes_argv() == ["/opt/hermes/bin/hermes"]
+    monkeypatch.setenv("EIR_BIN", "/opt/eir/bin/eir")
+    assert kbd._resolve_eir_argv() == ["/opt/eir/bin/eir"]
 
 
 
-def test_resolve_hermes_argv_module_actually_runs():
+def test_resolve_eir_argv_module_actually_runs():
     """The fallback module name must be importable + runnable.
 
     A unit test that pins the literal string is necessary but not
-    sufficient — if `hermes_cli.main` ever loses `if __name__ == "__main__"`
-    handling or its argparse setup, `python -m hermes_cli.main --version`
+    sufficient — if `eir_cli.main` ever loses `if __name__ == "__main__"`
+    handling or its argparse setup, `python -m eir_cli.main --version`
     would fail and so would every dispatcher spawn that hits the fallback.
     Run it as a real subprocess to catch that regression.
     """
     import subprocess
-    from hermes_cli import kanban_db_dispatch as kbd
+    from eir_cli import kanban_db_dispatch as kbd
     import shutil
     from unittest import mock
 
     with mock.patch.dict(os.environ, {}, clear=False):
-        os.environ.pop("HERMES_BIN", None)
+        os.environ.pop("EIR_BIN", None)
         with mock.patch.object(shutil, "which", return_value=None):
-            argv = kbd._resolve_hermes_argv()
+            argv = kbd._resolve_eir_argv()
     offline = {**os.environ, "HTTPS_PROXY": "http://127.0.0.1:9", "https_proxy": "http://127.0.0.1:9", "NO_PROXY": "", "no_proxy": ""}
     r = subprocess.run(argv + ["--version"], capture_output=True, text=True, timeout=30, check=False, env=offline)
     assert r.returncode == 0, (
@@ -1622,28 +1622,28 @@ def test_resolve_hermes_argv_module_actually_runs():
 def test_default_spawn_pins_repo_root_on_module_worker_pythonpath(tmp_path, monkeypatch):
     """The dispatcher's worker must carry the import context of the install that spawned it.
 
-    The worker is always ``sys.executable -m hermes_cli.kanban_worker_client`` (it only submits
-    the claim to the profile owner), and the worker env scrub strips Hermes-owned PYTHONPATH
+    The worker is always ``sys.executable -m eir_cli.kanban_worker_client`` (it only submits
+    the claim to the profile owner), and the worker env scrub strips Eir-owned PYTHONPATH
     entries, so a bare module child died on import and the board auto-blocked (#122299,
     #122487, #122500). The spawned env must put the running install's root first on
-    PYTHONPATH. Main's carve-out for a resolved ``hermes`` shim path does not apply here: the
-    worker never runs the resolved CLI argv, so a ``$HERMES_BIN``/PATH shim can neither replace
+    PYTHONPATH. Main's carve-out for a resolved ``eir`` shim path does not apply here: the
+    worker never runs the resolved CLI argv, so a ``$EIR_BIN``/PATH shim can neither replace
     the module child nor drop the pin.
     """
     import os
     import sys
     from pathlib import Path
 
-    from hermes_cli import kanban_db_dispatch as kbd
+    from eir_cli import kanban_db_dispatch as kbd
 
     root = str(Path(kbd.__file__).resolve().parents[1])
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     home.mkdir()
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.delenv("HERMES_KANBAN_HOME", raising=False)
+    monkeypatch.setenv("EIR_HOME", str(home))
+    monkeypatch.delenv("EIR_KANBAN_HOME", raising=False)
     monkeypatch.delenv("PYTHONPATH", raising=False)
-    monkeypatch.delenv("HERMES_BIN", raising=False)
+    monkeypatch.delenv("EIR_BIN", raising=False)
 
     captured = {}
 
@@ -1662,10 +1662,10 @@ def test_default_spawn_pins_repo_root_on_module_worker_pythonpath(tmp_path, monk
         claim_expires=None, tenant=None, branch_name=None,
     )
 
-    for resolved in ([sys.executable, "-m", "hermes_cli.main"], ["/opt/hermes/bin/hermes"]):
-        monkeypatch.setattr(kbd, "_resolve_hermes_argv", lambda resolved=resolved: resolved)
+    for resolved in ([sys.executable, "-m", "eir_cli.main"], ["/opt/eir/bin/eir"]):
+        monkeypatch.setattr(kbd, "_resolve_eir_argv", lambda resolved=resolved: resolved)
         kbd._default_spawn(task, str(tmp_path / "ws"))
-        assert captured["cmd"][-3:] == [sys.executable, "-m", "hermes_cli.kanban_worker_client"]
+        assert captured["cmd"][-3:] == [sys.executable, "-m", "eir_cli.kanban_worker_client"]
         assert captured["env"]["PYTHONPATH"].split(os.pathsep)[0] == root
 
 
@@ -1976,8 +1976,8 @@ def test_write_txn_check_reads_correct_header_fields(tmp_path):
     way the file must never come back clean.
     """
     import struct
-    from hermes_cli.kanban_db_connect import connect
-    from hermes_cli.sqlite_safe_read import file_length_matches_header
+    from eir_cli.kanban_db_connect import connect
+    from eir_cli.sqlite_safe_read import file_length_matches_header
 
     db = tmp_path / "synthetic.db"
     conn = connect(db_path=db)

@@ -44,12 +44,12 @@ def _on_event_loop():
 
 def _caller(stack):
     """The innermost frame outside the store and this guard: the code that made the call."""
-    from hermes_cli._startup_fast import project_root_str
+    from eir_cli._startup_fast import project_root_str
     here = os.path.normcase(project_root_str())
     for frame in reversed(stack):
         name = os.path.basename(frame.filename)
         if os.path.normcase(os.path.realpath(os.path.dirname(frame.filename))) == here and (
-                name.startswith('hermes_state') or name == 'contextlib.py'):
+                name.startswith('eir_state') or name == 'contextlib.py'):
             continue
         if name == 'contextlib.py':
             continue
@@ -85,7 +85,7 @@ def install(mode):
     if mode not in _MODES:
         logger.warning('%s=%r is not one of %s; guard not installed', CONFIG_KEY, mode, '/'.join(_MODES))
         return _state['mode']
-    from hermes_state import SessionDB
+    from eir_state import SessionDB
     if not getattr(SessionDB, '_loop_guard_installed', False):
         read, write = SessionDB._read_ctx, SessionDB._execute_write
 
@@ -105,7 +105,7 @@ def install(mode):
 
 def uninstall():
     """Restore the unwrapped methods (tests)."""
-    from hermes_state import SessionDB
+    from eir_state import SessionDB
     if getattr(SessionDB, '_loop_guard_installed', False):
         SessionDB._read_ctx = SessionDB._read_ctx.__wrapped__
         SessionDB._execute_write = SessionDB._execute_write.__wrapped__

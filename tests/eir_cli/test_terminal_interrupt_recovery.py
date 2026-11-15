@@ -6,7 +6,7 @@ reply (``ESC[<row>;<col>R``) arrives on stdin after the input parser has torn
 down. The reply then leaks as literal text (``^[[19;1R``) and the VT100 parser
 can stall, accepting no further keystrokes — the terminal appears frozen.
 
-The recovery path lives in ``HermesCLI._recover_terminal_after_interrupt()``,
+The recovery path lives in ``EirCLI._recover_terminal_after_interrupt()``,
 which is invoked from ``process_loop``'s ``finally`` block only when
 ``self._last_turn_interrupted`` is set. It must:
   1. Drain stray escape bytes from the OS input buffer (``flush_stdin``).
@@ -19,15 +19,15 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from cli import HermesCLI
+from cli import EirCLI
 
 @pytest.fixture
 def bare_cli():
-    """A HermesCLI with no __init__ — we only exercise the recovery helper."""
-    return object.__new__(HermesCLI)
+    """A EirCLI with no __init__ — we only exercise the recovery helper."""
+    return object.__new__(EirCLI)
 
 class TestRecoverTerminalAfterInterrupt:
-    """Directly exercise HermesCLI._recover_terminal_after_interrupt()."""
+    """Directly exercise EirCLI._recover_terminal_after_interrupt()."""
 
     def test_redraw_still_runs_when_flush_fails(self, bare_cli):
         """A flush_stdin failure (no TTY, non-POSIX) must not skip the redraw.
@@ -37,7 +37,7 @@ class TestRecoverTerminalAfterInterrupt:
         """
         bare_cli._force_full_redraw = MagicMock()
         with patch(
-            "hermes_cli.curses_ui.flush_stdin", side_effect=OSError("no tty")
+            "eir_cli.curses_ui.flush_stdin", side_effect=OSError("no tty")
         ):
             bare_cli._recover_terminal_after_interrupt()  # must not raise
 
@@ -50,7 +50,7 @@ class TestRecoverTerminalAfterInterrupt:
             side_effect=lambda: events.append("redraw")
         )
         with patch(
-            "hermes_cli.curses_ui.flush_stdin",
+            "eir_cli.curses_ui.flush_stdin",
             side_effect=lambda: events.append("flush"),
         ):
             bare_cli._recover_terminal_after_interrupt()
@@ -63,6 +63,6 @@ class TestRecoverTerminalAfterInterrupt:
         Under pytest stdin is not a TTY, so this must return cleanly without
         touching termios.
         """
-        from hermes_cli.curses_ui import flush_stdin
+        from eir_cli.curses_ui import flush_stdin
 
         flush_stdin()  # must not raise in a non-TTY test environment

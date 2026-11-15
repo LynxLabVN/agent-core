@@ -1,4 +1,4 @@
-import { Text } from '@hermes/ink'
+import { Text } from '@eir/ink'
 import { useStore } from '@nanostores/react'
 import type { ReactNode } from 'react'
 

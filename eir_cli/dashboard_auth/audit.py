@@ -1,6 +1,6 @@
-"""Audit log for dashboard-auth events: ``$HERMES_HOME/logs/dashboard-auth.log``, one JSON object
+"""Audit log for dashboard-auth events: ``$EIR_HOME/logs/dashboard-auth.log``, one JSON object
 per line. Token-like fields are stripped before serialisation so refresh tokens / JWTs never
-reach disk. Minimal import surface (no ``hermes_constants`` at import time) so early-loading
+reach disk. Minimal import surface (no ``eir_constants`` at import time) so early-loading
 middleware can import it."""
 from __future__ import annotations
 
@@ -18,11 +18,11 @@ _write_lock = threading.Lock()
 _MAX_FIELD_LENGTH = 256
 _TRUNCATION_MARKER = "...[truncated]"
 
-# Size-based rotation matching hermes_logging's agent.log / errors.log convention
+# Size-based rotation matching eir_logging's agent.log / errors.log convention
 # (maxBytes=5MB, backupCount=3, stdlib RotatingFileHandler ``.1``/``.2``/``.3`` naming).
 # Implemented locally (check-and-rename, stdlib only) rather than importing
-# hermes_logging/_ManagedRotatingFileHandler: that would pull in hermes_constants
-# (and lazily hermes_cli.config) and break this module's import-light guarantee —
+# eir_logging/_ManagedRotatingFileHandler: that would pull in eir_constants
+# (and lazily eir_cli.config) and break this module's import-light guarantee —
 # it is imported by middleware that runs very early in startup.
 _MAX_BYTES = 5 * 1024 * 1024
 _BACKUP_COUNT = 3
@@ -59,8 +59,8 @@ class AuditEvent(enum.Enum):
 
 def _resolve_log_path() -> Path:
     """Lazy leaf import: honours profile overrides + the native-Windows ``%LOCALAPPDATA%`` fallback."""
-    from hermes_constants import get_hermes_home
-    return get_hermes_home() / "logs" / "dashboard-auth.log"
+    from eir_constants import get_eir_home
+    return get_eir_home() / "logs" / "dashboard-auth.log"
 
 
 def _bounded_value(value: Any) -> Any:

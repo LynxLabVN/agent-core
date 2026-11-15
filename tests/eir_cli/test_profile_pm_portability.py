@@ -12,12 +12,12 @@ def transfer_home(tmp_path, monkeypatch):
     home = tmp_path / "source-home"
     home.mkdir()
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
 
-    from hermes_cli import backup, gateway, profiles
+    from eir_cli import backup, gateway, profiles
 
     # Restoring data must not install host services or modify the test user's shell.
-    from hermes_cli import gateway_setup_service
+    from eir_cli import gateway_setup_service
     monkeypatch.setattr(gateway_setup_service, "ensure_gateway_service", lambda *args, **kwargs: False)
     monkeypatch.setattr(gateway, "_is_service_running", lambda: False)
     monkeypatch.setattr(profiles, "check_alias_collision", lambda name: "test has no aliases")
@@ -36,11 +36,11 @@ def _write_files(root, files):
 def test_transfers_preserve_user_files_without_porting_pm_state(
     transfer_home, tmp_path, monkeypatch, route
 ):
-    from hermes_cli.backup import run_backup, run_import
-    from hermes_cli.profile_distribution import (
+    from eir_cli.backup import run_backup, run_import
+    from eir_cli.profile_distribution import (
         DistributionManifest, install_distribution, write_manifest,
     )
-    from hermes_cli.profiles import export_profile, get_profile_dir, import_profile
+    from eir_cli.profiles import export_profile, get_profile_dir, import_profile
 
     portable = {
         "config.yaml": "model:\n  model: portable\n",
@@ -81,7 +81,7 @@ def test_transfers_preserve_user_files_without_porting_pm_state(
 
     target_home = tmp_path / "target-home"
     target_home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(target_home))
+    monkeypatch.setenv("EIR_HOME", str(target_home))
     if route == "backup":
         run_import(Namespace(zipfile=str(archive), force=True))
         restored = target_home
@@ -101,11 +101,11 @@ def test_transfers_preserve_user_files_without_porting_pm_state(
 def test_incoming_runtime_state_never_replaces_target_runtime(
     transfer_home, tmp_path, monkeypatch, route
 ):
-    from hermes_cli.backup import run_import
-    from hermes_cli.profile_distribution import (
+    from eir_cli.backup import run_import
+    from eir_cli.profile_distribution import (
         DistributionManifest, install_distribution, write_manifest,
     )
-    from hermes_cli.profiles import get_profile_dir, import_profile
+    from eir_cli.profiles import get_profile_dir, import_profile
 
     incoming = {
         "config.yaml": "model:\n  model: restored\n",
@@ -131,14 +131,14 @@ def test_incoming_runtime_state_never_replaces_target_runtime(
         archive = tmp_path / "legacy.zip"
         with zipfile.ZipFile(archive, "w") as writer:
             for rel, content in (incoming | machine).items():
-                writer.writestr(f".hermes/{rel}", content)
+                writer.writestr(f".eir/{rel}", content)
         run_import(Namespace(zipfile=str(archive), force=True))
     elif route.startswith("profile"):
         archive = tmp_path / "legacy.tar.gz"
         with tarfile.open(archive, "w:gz") as writer:
             writer.add(staged, arcname="legacy")
         if route == "profile-denied":
-            from hermes_cli import profiles
+            from eir_cli import profiles
 
             real_rmtree = profiles.shutil.rmtree
 
@@ -181,7 +181,7 @@ def test_incoming_runtime_state_never_replaces_target_runtime(
     elif route == "backup":
         # An in-home traversal must not bypass the runtime-root classification.
         with zipfile.ZipFile(archive, "w") as writer:
-            writer.writestr(".hermes/config.yaml", incoming["config.yaml"])
-            writer.writestr(".hermes/skills/../installs/key/facts.json", "foreign generation\n")
+            writer.writestr(".eir/config.yaml", incoming["config.yaml"])
+            writer.writestr(".eir/skills/../installs/key/facts.json", "foreign generation\n")
         run_import(Namespace(zipfile=str(archive), force=True))
         assert (target / "installs/key/facts.json").read_text(encoding="utf-8") == "target-owned runtime\n"

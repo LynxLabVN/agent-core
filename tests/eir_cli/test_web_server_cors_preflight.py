@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import pytest
 
-from hermes_cli import web_server
+from eir_cli import web_server
 
 pytest.importorskip("starlette.testclient")
 from starlette.testclient import TestClient
@@ -24,7 +24,7 @@ from starlette.testclient import TestClient
 @pytest.fixture
 def client(monkeypatch):
     # CORS grants only the backend's own loopback origin: the port it bound.
-    monkeypatch.delenv("HERMES_DESKTOP_DEV_SERVER", raising=False)
+    monkeypatch.delenv("EIR_DESKTOP_DEV_SERVER", raising=False)
     monkeypatch.setattr(web_server.app.state, "bound_host", "127.0.0.1", raising=False)
     monkeypatch.setattr(web_server.app.state, "bound_port", 8092, raising=False)
     return TestClient(web_server.app, base_url="http://127.0.0.1:8092")
@@ -40,7 +40,7 @@ def test_options_preflight_returns_cors_headers(client):
         headers={
             "Origin": "http://127.0.0.1:8092",
             "Access-Control-Request-Method": "GET",
-            "Access-Control-Request-Headers": "x-hermes-session-token",
+            "Access-Control-Request-Headers": "x-eir-session-token",
         },
     )
     assert resp.status_code == 200

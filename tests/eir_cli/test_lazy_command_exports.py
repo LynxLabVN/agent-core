@@ -1,9 +1,9 @@
-"""The frozen updater surface on hermes_cli.main stays lazy and resolvable.
+"""The frozen updater surface on eir_cli.main stays lazy and resolvable.
 
-``hermes_cli/update_cmd*.py`` (frozen: old installed versions call into it) reads
-helpers off ``hermes_cli.main`` via ``_m().<name>``. main.py resolves the ones that
+``eir_cli/update_cmd*.py`` (frozen: old installed versions call into it) reads
+helpers off ``eir_cli.main`` via ``_m().<name>``. main.py resolves the ones that
 live in the lazily-imported command modules through PEP 562 ``__getattr__`` so
-every ``hermes`` invocation (including ``hermes --version``) does not pay for
+every ``eir`` invocation (including ``eir --version``) does not pay for
 update_cmd's dependency chain (jwt, click, ...) when no subcommand runs.
 """
 
@@ -13,19 +13,19 @@ import textwrap
 
 import pytest
 
-import hermes_cli.main
+import eir_cli.main
 
 def test_importing_main_does_not_import_command_modules():
     code = textwrap.dedent(
         """
         import sys
-        import hermes_cli.main  # noqa: F401
+        import eir_cli.main  # noqa: F401
         loaded = [
             m
             for m in (
-                "hermes_cli.update_cmd",
-                "hermes_cli.sessions_cmd",
-                "hermes_cli.dashboard_procs",
+                "eir_cli.update_cmd",
+                "eir_cli.sessions_cmd",
+                "eir_cli.dashboard_procs",
             )
             if m in sys.modules
         ]
@@ -43,12 +43,12 @@ def test_importing_main_does_not_import_command_modules():
 
 @pytest.mark.real_concurrent_gate  # conftest autouse stub would shadow one frozen name
 def test_frozen_updater_surface_resolves_to_real_objects():
-    for module, names in hermes_cli.main._FROZEN_UPDATER_SURFACE.items():
+    for module, names in eir_cli.main._FROZEN_UPDATER_SURFACE.items():
         mod = sys.modules[module] if module in sys.modules else __import__(module, fromlist=["_"])
         for name in names:
-            got = getattr(hermes_cli.main, name)
+            got = getattr(eir_cli.main, name)
             # Identity, or the same function after another test importlib.reload()ed the module
-            # (the resolved value is cached on hermes_cli.main by design).
+            # (the resolved value is cached on eir_cli.main by design).
             assert got is getattr(mod, name) or (
                 getattr(got, "__module__", None) == module and getattr(got, "__name__", None) == name
             ), name

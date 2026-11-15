@@ -1,8 +1,8 @@
 """Status dashboard routes: health, /api/status, system stats, curator, learning graph,
 portal and diagnostics actions.
 
-Extracted from ``hermes_cli.web_server``; app state and helpers are late-bound through
-:mod:`hermes_cli.web_deps` (cycle-safe, monkeypatch-friendly).
+Extracted from ``eir_cli.web_server``; app state and helpers are late-bound through
+:mod:`eir_cli.web_deps` (cycle-safe, monkeypatch-friendly).
 """
 
 import concurrent.futures
@@ -14,8 +14,8 @@ import os
 import sys
 import time
 from fastapi import APIRouter
-from hermes_cli.web_deps import LateState, late
-from hermes_cli.web_server_gateway import _display_system_platform
+from eir_cli.web_deps import LateState, late
+from eir_cli.web_server_gateway import _display_system_platform
 from starlette.concurrency import run_in_threadpool
 from fastapi import HTTPException, Request
 from gateway.status import (
@@ -24,44 +24,44 @@ from gateway.status import (
     retained_gateway_state,
     runtime_status_heartbeat_age_s, runtime_status_is_stale)
 from gateway.status_served import local_liveness_pid
-from hermes_cli import __release_date__
-from hermes_cli.config import get_config_path, get_env_path
-from hermes_cli.isolated_scope import isolated_launch_profile, scope_to_launch_profile
-from hermes_cli.version_info import get_version_info
-from hermes_constants import get_process_hermes_home, profile_name_for_home
-from hermes_cli.web_models import CuratorPause, LearningNodeRef, LearningNodeEdit, DebugShareRequest
-from hermes_cli.web_routers._common import config_scoped_to_thread, destructive_profile, scoped_to_thread
-from hermes_cli.web_routers.status_public import redact_status_for_unverified
+from eir_cli import __release_date__
+from eir_cli.config import get_config_path, get_env_path
+from eir_cli.isolated_scope import isolated_launch_profile, scope_to_launch_profile
+from eir_cli.version_info import get_version_info
+from eir_constants import get_process_eir_home, profile_name_for_home
+from eir_cli.web_models import CuratorPause, LearningNodeRef, LearningNodeEdit, DebugShareRequest
+from eir_cli.web_routers._common import config_scoped_to_thread, destructive_profile, scoped_to_thread
+from eir_cli.web_routers.status_public import redact_status_for_unverified
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-_log = logging.getLogger("hermes_cli.web_server")
+_log = logging.getLogger("eir_cli.web_server")
 router = APIRouter()
 # Mounted separately by web_server so /api/logs keeps its original route-table position.
 logs_router = APIRouter()
 
 # Late-bound so a test's monkeypatch on the owning module wins at call time.
-_collect_profile_gateway_topology_cached = late("_collect_profile_gateway_topology_cached", "hermes_cli.web_server_gateway")
-_config_profile_scope = late("_config_profile_scope", "hermes_cli.web_server_profiles")
-_dashboard_local_update_managed_externally = late("_dashboard_local_update_managed_externally", "hermes_cli.web_server_files")
-_load_configured_gateway_platforms = late("_load_configured_gateway_platforms", "hermes_cli.web_server_gateway")
-_probe_gateway_health = late("_probe_gateway_health", "hermes_cli.web_server_gateway")
+_collect_profile_gateway_topology_cached = late("_collect_profile_gateway_topology_cached", "eir_cli.web_server_gateway")
+_config_profile_scope = late("_config_profile_scope", "eir_cli.web_server_profiles")
+_dashboard_local_update_managed_externally = late("_dashboard_local_update_managed_externally", "eir_cli.web_server_files")
+_load_configured_gateway_platforms = late("_load_configured_gateway_platforms", "eir_cli.web_server_gateway")
+_probe_gateway_health = late("_probe_gateway_health", "eir_cli.web_server_gateway")
 _require_token = late("_require_token")
-_resolve_profile_dir = late("_resolve_profile_dir", "hermes_cli.web_server_profiles")
-_resolve_restart_drain_timeout = late("_resolve_restart_drain_timeout", "hermes_cli.web_server_lifecycle")
-_spawn_hermes_action = late("_spawn_hermes_action", "hermes_cli.web_server_gateway")
+_resolve_profile_dir = late("_resolve_profile_dir", "eir_cli.web_server_profiles")
+_resolve_restart_drain_timeout = late("_resolve_restart_drain_timeout", "eir_cli.web_server_lifecycle")
+_spawn_eir_action = late("_spawn_eir_action", "eir_cli.web_server_gateway")
 _ssh_runtime_intact = late("_ssh_runtime_intact")
 app = LateState("app")  # the FastAPI instance (app.state.*)
-check_config_version = late("check_config_version", "hermes_cli.config")
-get_hermes_home = late("get_hermes_home", "hermes_cli.config")
-_profile_cli_args = late("_profile_cli_args", "hermes_cli.web_server_profiles")
+check_config_version = late("check_config_version", "eir_cli.config")
+get_eir_home = late("get_eir_home", "eir_cli.config")
+_profile_cli_args = late("_profile_cli_args", "eir_cli.web_server_profiles")
 get_install_id = late("get_install_id")
 get_running_pid_cached = late("get_running_pid_cached", "gateway.status")
 get_runtime_status_running_pid = late("get_runtime_status_running_pid", "gateway.status")
 served_profile_runtime = late("served_profile_runtime", "gateway.status_served")
-load_config = late("load_config", "hermes_cli.config")
+load_config = late("load_config", "eir_cli.config")
 read_runtime_status = late("read_runtime_status", "gateway.status")
-_open_session_db_for_profile = late("_open_session_db_for_profile", "hermes_cli.web_server_sessions")
+_open_session_db_for_profile = late("_open_session_db_for_profile", "eir_cli.web_server_sessions")
 
 
 _STATUS_ACTIVE_SESSIONS_TIMEOUT = 0.75
@@ -79,8 +79,8 @@ def _safe_call(mod, fn_name: str, default):
 
 def _count_status_active_sessions() -> int:
     """Best-effort status garnish. Opens read-only (via the shared stale-schema heal) so
-    /api/status never routinely writes to state.db while another Hermes process uses it."""
-    from hermes_state import _default_db_path
+    /api/status never routinely writes to state.db while another Eir process uses it."""
+    from eir_state import _default_db_path
     # The heal helper bootstraps a missing store; this garnish must not — on a fresh install
     # /api/status polls would otherwise create state.db before the user's first session.
     if not Path(_default_db_path()).exists():
@@ -110,7 +110,7 @@ async def _status_active_sessions() -> int:
 
 @router.get("/api/ssh/ownership")
 async def get_ssh_ownership(request: Request):
-    from hermes_cli.web_server import _SSH_OWNER_NONCE
+    from eir_cli.web_server import _SSH_OWNER_NONCE
     _require_token(request)
     if not _SSH_OWNER_NONCE:
         raise HTTPException(status_code=404, detail="SSH ownership is not active")
@@ -124,7 +124,7 @@ async def get_health():
 
     ``commit`` is the code this process BOOTED from (``get_version_info`` is cached at
     ``web_server`` import): Desktop refuses to attach to a backend whose commit differs from
-    its checkout, so a serve that outlived ``hermes update`` is never re-adopted.
+    its checkout, so a serve that outlived ``eir update`` is never re-adopted.
     """
     info = get_version_info()
     return {"ok": True, "version": info.base_version, "displayVersion": info.display_version,
@@ -134,24 +134,24 @@ async def get_health():
 
 @router.get("/api/host/identity")
 async def get_host_identity(request: Request):
-    """Prove to an attaching `hermes serve`/`dashboard` WHO owns this port.
+    """Prove to an attaching `eir serve`/`dashboard` WHO owns this port.
 
     The host rendezvous record names a (pid, port) owner, but a record cannot say whether that
     owner still holds the port: a graceful-shutdown window or an unrelated listener that
     inherited the port both look identical on disk. The attaching side dials this endpoint with
     the owner's 0600 token and attaches only when pid+role match. ``servesSpa`` is false for
-    headless ``serve``, so a `hermes dashboard` user is never routed to a backend with no UI.
+    headless ``serve``, so a `eir dashboard` user is never routed to a backend with no UI.
     """
     _require_token(request)
     # ``role`` is the host ROLE this process published (gateway/host_rendezvous.ROLE_SERVE, or
-    # ROLE_DESKTOP_SERVE for a Desktop-owned child), not the launch mode: `hermes serve` and
-    # `hermes dashboard` are one host role that differ in SPA.
+    # ROLE_DESKTOP_SERVE for a Desktop-owned child), not the launch mode: `eir serve` and
+    # `eir dashboard` are one host role that differ in SPA.
     return {"ok": True, "protocolVersion": 1, "pid": os.getpid(),
             "role": getattr(app.state, "host_role", None) or "serve",
             "servesSpa": bool(getattr(app.state, "serves_spa", False))}
 
 
-# The idle proof and retirement fence cover a standalone ``hermes serve`` child's ledgers only. On
+# The idle proof and retirement fence cover a standalone ``eir serve`` child's ledgers only. On
 # the gateway's listener the agent work lives on the runner, which retires through its own idle exit
 # (``gateway/run_idle_exit.py``); there this route never proves idle nor takes the fence.
 _GATEWAY_OWNS_LIFECYCLE = "gateway_owns_lifecycle"
@@ -164,7 +164,7 @@ def _mounted_on_gateway(request: Request) -> bool:
 @router.get("/api/health/idle")
 async def get_health_idle(request: Request):
     """Token-gated diagnostic snapshot; never a retirement permit. None means cannot prove idle."""
-    from hermes_cli.web_server_idle_proof import idle_proof
+    from eir_cli.web_server_idle_proof import idle_proof
     _require_token(request)
     if _mounted_on_gateway(request):
         return {"ok": True, "idle": False, "reason": _GATEWAY_OWNS_LIFECYCLE}
@@ -173,7 +173,7 @@ async def get_health_idle(request: Request):
 
 @router.post("/api/health/retirement")
 async def post_health_retirement(request: Request):
-    from hermes_cli.backend_retirement import retirement
+    from eir_cli.backend_retirement import retirement
 
     _require_token(request)
     if _mounted_on_gateway(request):
@@ -193,7 +193,7 @@ async def post_health_retirement(request: Request):
     return getattr(retirement, action)(token)
 
 
-# Profile segment mirrors hermes_cli.profiles._PROFILE_ID_RE. Platform segment mirrors the
+# Profile segment mirrors eir_cli.profiles._PROFILE_ID_RE. Platform segment mirrors the
 # Platform enum's normalized values: built-in members plus plugin directory names
 # (lowercased), which allow hyphens as well as underscores (e.g. ``reviewer:foo-bar``).
 _PROFILE_PLATFORM_STATUS_KEY_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}:[a-z0-9][a-z0-9_-]{0,63}$")
@@ -237,7 +237,7 @@ def _merge_profile_gateway_platforms(gateway_platforms: dict, profile_platforms:
     reads unless folded in under the validated ``<profile>:<platform>`` grammar. The active
     profile's own map is skipped (already present); existing keys are never overwritten."""
     try:
-        from hermes_cli.profiles import get_active_profile_name
+        from eir_cli.profiles import get_active_profile_name
         active = get_active_profile_name()
     except Exception:
         active = "default"
@@ -259,7 +259,7 @@ def _merge_profile_gateway_platforms(gateway_platforms: dict, profile_platforms:
 # endpoint and /api/messaging/platforms can never disagree about whether the gateway is up (they used to:
 # sidebar "running" while the Channels page rendered "The gateway is not running"). When ?profile=<name> was
 # given, scope PID and state reads to that profile's directory — gateway identity files (PID, lock, runtime
-# status) are written to the per-profile home, not the process-level HERMES_HOME (see issue #69143). Plain
+# status) are written to the per-profile home, not the process-level EIR_HOME (see issue #69143). Plain
 # /api/status keeps the exact zero-arg call so its behavior (and cache signature) is unchanged. The
 # module-level probe references are handed to the resolver so the long-standing
 # `monkeypatch.setattr(gateway.status, "get_running_pid_cached", ...)` seam used across the test-suite still
@@ -329,13 +329,13 @@ async def _resolve_gateway_status(profile_dir: Optional[Path], health_url) -> di
     runtime = local_runtime
     if runtime is None and remote_health_body and remote_health_body.get("gateway_state"):
         runtime = remote_health_body
-    # Unscoped, the profile is the process's own home (a pooled ``hermes --profile X serve``).
-    own_home = profile_dir or get_process_hermes_home()
+    # Unscoped, the profile is the process's own home (a pooled ``eir --profile X serve``).
+    own_home = profile_dir or get_process_eir_home()
     if liveness.runtime is not None:
         # Served by the multiplexer: its record is this profile's runtime, with the profile's own
         # adapters under ``<profile>:<platform>`` re-keyed to the standalone shape.
         # Fold on the profile NAME, never ``profile_dir.name``: ``?profile=default`` resolves the
-        # root itself, whose basename (``.hermes``) matched nothing and read as a named id (#123088).
+        # root itself, whose basename (``.eir``) matched nothing and read as a named id (#123088).
         served_name = profile_name_for_home(own_home)
         runtime = {**liveness.runtime,
                    "platforms": profile_platforms_from_multiplexer(liveness.runtime, served_name or "")}
@@ -371,7 +371,7 @@ async def _resolve_gateway_status(profile_dir: Optional[Path], health_url) -> di
         elif gateway_state in {"running", "degraded", "starting"} and runtime_status_is_stale(runtime):
             # Alive PID, but housekeeping stopped re-stamping the heartbeat: the loop or the
             # housekeeping thread wedged while the file still says 'running' (#113372). Same arm
-            # as ``hermes gateway status`` so the sidebar strip and the CLI agree.
+            # as ``eir gateway status`` so the sidebar strip and the CLI agree.
             gateway_heartbeat_stale_s = runtime_status_heartbeat_age_s(runtime)
         gateway_platforms = _project_gateway_platforms(
             runtime.get("platforms") or {}, configured, gateway_running, gateway_state)
@@ -410,10 +410,10 @@ def _auth_gate_status() -> dict[str, Any]:
     auth_flows: list[str] = []
     peer_access = 0
     try:
-        from hermes_cli.dashboard_auth import (
+        from eir_cli.dashboard_auth import (
             list_interactive_providers as _list_interactive_providers,
             list_providers as _list_providers)
-        from hermes_cli.dashboard_auth.peer_pass import peer_access_contract
+        from eir_cli.dashboard_auth.peer_pass import peer_access_contract
         auth_providers = [p.name for p in _list_providers()]
         peer_access = peer_access_contract()
         if auth_required:
@@ -433,7 +433,7 @@ def _nous_session_validity() -> str:
     fails, and this is the ONLY signal that surfaces it (local auth-store state, no token
     needed). Best-effort: never let auth classification break the probe."""
     try:
-        from hermes_cli.auth import get_nous_session_validity
+        from eir_cli.auth import get_nous_session_validity
         return get_nous_session_validity()
     except Exception:
         return "unknown"
@@ -443,7 +443,7 @@ async def _component_health(gateway: dict[str, Any]) -> dict[str, Any]:
     """Component-level health rollup: counts and status enums only (public payload — no
     messages, paths or other detail that could carry secrets). The storage probe reuses the
     gateway readiness state_db check (read-only, 1s-bounded) off-loop."""
-    from hermes_cli.web_server import DASHBOARD_HEALTH
+    from eir_cli.web_server import DASHBOARD_HEALTH
     gateway_running, gateway_state = gateway["gateway_running"], gateway["gateway_state"]
     gateway_platforms = gateway["gateway_platforms"]
     components: dict[str, Any] = {
@@ -453,7 +453,7 @@ async def _component_health(gateway: dict[str, Any]) -> dict[str, Any]:
         "dashboard": DASHBOARD_HEALTH.snapshot()}
     try:
         from gateway.readiness import _probe_state_db
-        storage_check = await run_in_threadpool(_probe_state_db, get_hermes_home())
+        storage_check = await run_in_threadpool(_probe_state_db, get_eir_home())
         components["storage"] = {"status": storage_check.get("status", "degraded")}
         # The one reason enum consumers key off; same latch as readiness and the session lists.
         if storage_check.get("detail") == "corrupt":
@@ -501,14 +501,14 @@ def _status_local_reads() -> dict[str, Any]:
     current_ver, latest_ver = check_config_version()
     return {"version": get_version_info().base_version, "config_version": current_ver,
             "latest_config_version": latest_ver,
-            "can_update_hermes": not _dashboard_local_update_managed_externally(),
+            "can_update_eir": not _dashboard_local_update_managed_externally(),
             "nous_session_valid": _nous_session_validity()}
 
 
 def _fts_rebuild_status() -> Optional[dict[str, Any]]:
     """Deferred FTS rebuild progress of this home's state.db (read-only open), or None."""
-    from hermes_state import SessionDB as _SDB
-    from hermes_constants import get_hermes_home as _ghh
+    from eir_state import SessionDB as _SDB
+    from eir_constants import get_eir_home as _ghh
     _db_path = _ghh() / "state.db"
     if not _db_path.exists():
         return None
@@ -522,7 +522,7 @@ def _fts_rebuild_status() -> Optional[dict[str, Any]]:
 #: What the gateway's Webapp answers a caller who has not signed in: liveness, version and the
 #: sign-in shape (the native-app login probe and uptime checks read nothing else). Profile names,
 #: the install id and host figures wait for sign-in, since a Webapp on a wildcard bind is reachable
-#: by everyone on the network. The standalone dashboard keeps its public body: Hermes Cloud reads
+#: by everyone on the network. The standalone dashboard keeps its public body: Eir Cloud reads
 #: the profile list there without a session (#60585).
 _WEBAPP_SIGNED_OUT_STATUS_KEYS = frozenset({
     "version", "release_date", "gateway_running", "gateway_state", "overall", "components",
@@ -533,11 +533,11 @@ async def _status_caller_verified(request: Request) -> bool:
     """True when the caller carries a credential the auth gate would accept on a gated route
     (session cookie/bearer, native principal, or the loopback session token). ``/api/status`` is
     public, so the gate never verified one. ``None`` is an in-process caller, not a network one."""
-    from hermes_cli.web_server import _require_token
+    from eir_cli.web_server import _require_token
     if request is None:
         return True
     if getattr(request.app.state, "auth_required", False) and getattr(request.state, "session", None) is None:
-        from hermes_cli.dashboard_auth.middleware import peek_session
+        from eir_cli.dashboard_auth.middleware import peek_session
         request.state.session = await run_in_threadpool(peek_session, request)
     try:
         _require_token(request)
@@ -548,7 +548,7 @@ async def _status_caller_verified(request: Request) -> bool:
 
 def _webapp_caller_signed_out(request: Request, verified: bool) -> bool:
     """True when this request reached the gateway's Webapp behind its sign-in gate unverified."""
-    from hermes_cli.web_server_surface import surface
+    from eir_cli.web_server_surface import surface
     return (not verified and surface(request.app.state) == "webapp"
             and bool(getattr(request.app.state, "auth_required", False)))
 
@@ -563,7 +563,7 @@ async def get_status(profile: Optional[str] = None,
     _profile_scope: this handler awaits the remote health probe, and _profile_scope swaps
     process-global skills-module attributes a concurrent request would cross-restore.
     """
-    from hermes_cli.web_server import _GATEWAY_HEALTH_URL
+    from eir_cli.web_server import _GATEWAY_HEALTH_URL
     verified = await _status_caller_verified(request)
     signed_out = _webapp_caller_signed_out(request, verified)
     status_scope = None
@@ -594,7 +594,7 @@ async def get_status(profile: Optional[str] = None,
         # count + liveness via gateway.status. Liveness keys off gateway_running, NEVER
         # gateway_updated_at — a stale heartbeat is reported separately, not treated as death.
         active_agents = parse_active_agents((gateway["runtime"] or {}).get("active_agents", 0))
-        # Off-loop: on a cold Windows install the first import of hermes_cli.gateway blocks
+        # Off-loop: on a cold Windows install the first import of eir_cli.gateway blocks
         # 15-30s (.pyc compilation + Defender), exceeding the desktop handshake's 15s timeout.
         restart_drain_timeout = await run_in_threadpool(_resolve_restart_drain_timeout)
         auth = _auth_gate_status()
@@ -602,7 +602,7 @@ async def get_status(profile: Optional[str] = None,
         status = {
             "version": local["version"], "release_date": __release_date__,
             "config_version": local["config_version"], "latest_config_version": local["latest_config_version"],
-            "can_update_hermes": local["can_update_hermes"],
+            "can_update_eir": local["can_update_eir"],
             "gateway_running": gateway_running, "gateway_state": gateway_state,
             "gateway_platforms": gateway["gateway_platforms"],
             "gateway_exit_reason": gateway["gateway_exit_reason"],
@@ -628,20 +628,20 @@ async def get_status(profile: Optional[str] = None,
             status["install_id"] = install_id
 
         # Advisory only. Expose no paths or process identities on this public probe.
-        from hermes_cli.shared_profile_warning import shared_profile_warning
+        from eir_cli.shared_profile_warning import shared_profile_warning
         status["shared_profile_warning"] = bool(await run_in_threadpool(shared_profile_warning))
 
         components = await _component_health(gateway)
         status["components"] = components
         status["overall"] = ("ok" if all(item.get("status") == "ok" for item in components.values())
                              else "degraded")
-        await _advisory_pressure(status, profile_dir if profile_dir else get_hermes_home())
+        await _advisory_pressure(status, profile_dir if profile_dir else get_eir_home())
 
-        # Profile NAMES and ``gateway_mode`` are low-sensitivity product surface (Hermes Cloud
+        # Profile NAMES and ``gateway_mode`` are low-sensitivity product surface (Eir Cloud
         # renders the profile list over a gated bind) so they survive the auth gate; the
         # per-gateway ``gateways[]`` carries host ports and stays gated below.
         # An operator's `-p <name> serve --isolated` lists only <name>: a listing choice, not a
-        # boundary (hermes_cli/isolated_scope.py).
+        # boundary (eir_cli/isolated_scope.py).
         status["profiles"] = scope_to_launch_profile(topology["profiles"])
         status["parked_profiles"] = scope_to_launch_profile(topology.get("parked_profiles", []))
         status["isolated_profile"] = isolated_launch_profile()
@@ -653,7 +653,7 @@ async def get_status(profile: Optional[str] = None,
         # reaches this endpoint — surface them only on a loopback / ``--insecure`` bind.
         if not auth["auth_required"]:
             status.update({
-                "hermes_home": str(get_hermes_home()), "config_path": str(get_config_path()),
+                "eir_home": str(get_eir_home()), "config_path": str(get_config_path()),
                 "env_path": str(get_env_path()), "gateway_pid": gateway["gateway_pid"],
                 "gateway_health_url": _GATEWAY_HEALTH_URL, "gateways": topology["gateways"]})
 
@@ -670,7 +670,7 @@ async def get_status(profile: Optional[str] = None,
 @router.get("/api/system/stats")
 def get_system_stats():  # sync: FastAPI runs it on a worker (psutil.cpu_percent blocks 100 ms)
     """Host + process system stats for the System page (stdlib identity; psutil CPU/memory/
-    disk/uptime when available). Non-sensitive: no env values, no paths beyond hermes home."""
+    disk/uptime when available). Non-sensitive: no env values, no paths beyond eir home."""
     import platform as _platform
 
     info: dict[str, Any] = {
@@ -680,10 +680,10 @@ def get_system_stats():  # sync: FastAPI runs it on a worker (psutil.cpu_percent
         "arch": _platform.machine(), "hostname": _platform.node(),
         "python_version": _platform.python_version(),
         "python_impl": _platform.python_implementation(),
-        "hermes_version": get_version_info().base_version, "cpu_count": os.cpu_count()}
+        "eir_version": get_version_info().base_version, "cpu_count": os.cpu_count()}
 
     def _disk():
-        du = psutil.disk_usage(str(get_hermes_home()))
+        du = psutil.disk_usage(str(get_eir_home()))
         info["disk"] = {"total": du.total, "used": du.used, "free": du.free, "percent": du.percent}
 
     def _cpu():
@@ -750,17 +750,17 @@ async def get_curator_status(profile: Optional[str] = None):
 @router.put("/api/curator/paused")
 async def set_curator_paused(body: CuratorPause, profile: Optional[str] = None):
     from agent import curator
-    # ``_state_file()`` is ``get_hermes_home()/skills/.curator_state`` resolved at call
+    # ``_state_file()`` is ``get_eir_home()/skills/.curator_state`` resolved at call
     # time, so the request's home override is what decides which profile pauses.
     await config_scoped_to_thread(profile, lambda: curator.set_paused(bool(body.paused)))
     return {"ok": True, "paused": bool(body.paused)}
 
 
 def _spawn_action(argv: list, name: str, prefix: str, profile: Optional[str] = None) -> dict:
-    """Spawn a background ``hermes -p <profile> <argv>`` action; a spawn failure is
+    """Spawn a background ``eir -p <profile> <argv>`` action; a spawn failure is
     ``500 "<prefix>: <exc>"``."""
     try:
-        proc = _spawn_hermes_action(_profile_cli_args(profile) + argv, name)
+        proc = _spawn_eir_action(_profile_cli_args(profile) + argv, name)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"{prefix}: {exc}")
     return {"ok": True, "pid": proc.pid, "name": name}
@@ -850,7 +850,7 @@ def _get_portal_status_sync():
     cfg = load_config() or {}
     auth: dict[str, Any] = {}
     try:
-        from hermes_cli.auth import get_nous_auth_status_local
+        from eir_cli.auth import get_nous_auth_status_local
         # Refresh-free snapshot so polling never performs an OAuth refresh.
         auth = get_nous_auth_status_local() or {}
     except Exception:
@@ -858,7 +858,7 @@ def _get_portal_status_sync():
 
     features = []
     try:
-        from hermes_cli.nous_subscription import get_nous_subscription_features
+        from eir_cli.nous_subscription import get_nous_subscription_features
         feats = get_nous_subscription_features(cfg)
         if feats is not None:
             features = [{"label": getattr(feat, "label", ""), "state": _feature_state(feat)}
@@ -900,12 +900,12 @@ async def run_config_migrate(profile: Optional[str] = None):
 async def run_debug_share_endpoint(body: DebugShareRequest | None = None,
                                    profile: Optional[str] = None):
     """Upload the allowlisted public debug summary (no log text; full logs only via
-    ``hermes debug share --nous``) and return the paste URL; refused (400) unless the body
+    ``eir debug share --nous``) and return the paste URL; refused (400) unless the body
     carries ``consent: true`` from a user confirmation. Synchronous,
     unlike the other diagnostics actions: the point is the shareable URLs, returned as a
     structured payload the dashboard renders as copyable links."""
-    from hermes_cli.debug import build_debug_share
-    from hermes_cli.debug_redaction import redact_debug_support_text
+    from eir_cli.debug import build_debug_share
+    from eir_cli.debug_redaction import redact_debug_support_text
     req = body or DebugShareRequest()
     if not req.consent:
         raise HTTPException(status_code=400,
@@ -933,17 +933,17 @@ async def get_logs(
     file: str = "agent", lines: int = 100, level: Optional[str] = None,
     component: Optional[str] = None, search: Optional[str] = None,
     profile: Optional[str] = None):
-    from hermes_cli.logs import _read_tail, LOG_FILES
+    from eir_cli.logs import _read_tail, LOG_FILES
     log_name = LOG_FILES.get(file)
     if not log_name:
         raise HTTPException(status_code=400, detail=f"Unknown log file: {file}")
     with _config_profile_scope(profile):
-        log_path = get_hermes_home() / "logs" / log_name
+        log_path = get_eir_home() / "logs" / log_name
     if not log_path.exists():
         return {"file": file, "lines": []}
 
     try:
-        from hermes_logging import COMPONENT_PREFIXES
+        from eir_logging import COMPONENT_PREFIXES
     except ImportError:
         COMPONENT_PREFIXES = {}
     # "ALL"/"all"/empty → no filter (None, not (): _matches_filters treats an empty tuple as

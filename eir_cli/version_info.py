@@ -1,4 +1,4 @@
-"""Canonical runtime identity for Hermes.
+"""Canonical runtime identity for Eir.
 
 Resolution order:
 1. Install stamp (``install-stamp.json``) — written at build time by
@@ -18,9 +18,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, cast
 
-from hermes_cli.steward import UPDATE_MECHANISMS
-from hermes_cli.update_channel import STABLE_TAG_RE
-from hermes_cli._startup_fast import project_root_str
+from eir_cli.steward import UPDATE_MECHANISMS
+from eir_cli.update_channel import STABLE_TAG_RE
+from eir_cli._startup_fast import project_root_str
 
 
 @dataclass(frozen=True)
@@ -78,9 +78,9 @@ def _resolve_repo_dir() -> Path | None:
         return repo_dir
     # The PROCESS home: this is the running code's identity and is cached
     # process-wide, so a profile's context-local override must not pick it.
-    from hermes_constants import get_process_hermes_home
+    from eir_constants import get_process_eir_home
 
-    candidate = get_process_hermes_home() / "hermes-agent"
+    candidate = get_process_eir_home() / "eir-agent"
     if (candidate / ".git").exists():
         return candidate
     return None
@@ -100,7 +100,7 @@ def _calver_release_version(repo_dir: Path) -> tuple[str, int] | None:
     Releases before semver tags existed are tagged ``vYYYY.M.D`` only; the
     version users actually run is in that tag's pyproject. Without this, a
     checkout past such a release would compare as "unknown" against plugins'
-    ``requires_hermes``.
+    ``requires_eir``.
     """
     described = _run_git(repo_dir, "describe", "--tags", "--long", "--match", "v2[0-9][0-9][0-9].*", "HEAD")
     if not described:
@@ -313,11 +313,11 @@ def get_version_info() -> VersionInfo:
     return info
 
 
-def hermes_user_agent(product: str = "hermes-cli") -> str:
+def eir_user_agent(product: str = "eir-cli") -> str:
     """``<product>/<base version>`` for an outbound request.
 
     Call it where the request is built, never at module level: a source checkout resolves the
-    release from git, so a module-level read made every Hermes start pay that walk whether or not
+    release from git, so a module-level read made every Eir start pay that walk whether or not
     it ever sent the request.
     """
     return f"{product}/{get_version_info().base_version}"

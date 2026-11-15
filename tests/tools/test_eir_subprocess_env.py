@@ -1,4 +1,4 @@
-"""Tests for hermes_subprocess_env() — the centralized credential-safe env
+"""Tests for eir_subprocess_env() — the centralized credential-safe env
 builder for the non-terminal subprocess spawn surface.
 
 Covers GHSA-m4m8-xjp4-5rmm / issue #29157: subprocesses spawned by the
@@ -7,15 +7,15 @@ full credential environment. Two tiers:
 
   * Tier 1 (_ALWAYS_STRIP_KEYS): gateway bot tokens, GitHub auth, infra
     secrets — stripped even when inherit_credentials=True.
-  * Tier 2 (_HERMES_PROVIDER_ENV_BLOCKLIST): LLM provider/tool keys — stripped
+  * Tier 2 (_EIR_PROVIDER_ENV_BLOCKLIST): LLM provider/tool keys — stripped
     unless the caller opts into inherit_credentials=True.
 """
 
 import os
 from unittest.mock import patch
 
-from tools.environments.local import hermes_subprocess_env
-from tools.environments.local_env_policy import _ALWAYS_STRIP_KEYS, _HERMES_PROVIDER_ENV_FORCE_PREFIX
+from tools.environments.local import eir_subprocess_env
+from tools.environments.local_env_policy import _ALWAYS_STRIP_KEYS, _EIR_PROVIDER_ENV_FORCE_PREFIX
 
 
 _TIER1_SAMPLE = {
@@ -23,7 +23,7 @@ _TIER1_SAMPLE = {
     "TELEGRAM_BOT_TOKEN": "bot-token",
     "SLACK_APP_TOKEN": "xapp-secret",
     "MODAL_TOKEN_SECRET": "modal-secret",
-    "HERMES_DASHBOARD_SESSION_TOKEN": "dash-secret",
+    "EIR_DASHBOARD_SESSION_TOKEN": "dash-secret",
 }
 
 _PROVIDER_SAMPLE = {
@@ -45,7 +45,7 @@ def _build(extra=None, *, inherit_credentials=False):
     if extra:
         env.update(extra)
     with patch.dict(os.environ, env, clear=True):
-        return hermes_subprocess_env(inherit_credentials=inherit_credentials)
+        return eir_subprocess_env(inherit_credentials=inherit_credentials)
 
 
 class TestStripByDefault:
@@ -70,7 +70,7 @@ class TestStripByDefault:
         }
         result = _build(buzz_sample)
         for var in buzz_sample:
-            assert var not in result, f"{var} leaked via hermes_subprocess_env"
+            assert var not in result, f"{var} leaked via eir_subprocess_env"
 
 
     def test_pythonutf8_set(self):
@@ -117,7 +117,7 @@ class TestTierInvariants:
     def test_left_core_secrets_stripped_without_their_plugin(self):
         """A feature that left core for a catalog plugin keeps its credentials out of children even
         when the plugin is not installed (no manifest declares them then)."""
-        from hermes_cli.left_core_migration import LEFT_CORE
+        from eir_cli.left_core_migration import LEFT_CORE
         names = {"HASS_TOKEN"} | {n for feature in LEFT_CORE for n in feature.secret_env}
         for inherit in (False, True):
             assert not names & set(_build({n: "secret" for n in names}, inherit_credentials=inherit))
@@ -133,8 +133,8 @@ class TestTierInvariants:
 
     def test_tier1_covers_dashboard_auth(self):
         # Credentialed CLIs (claude/codex) must not be able to mint dashboard sessions.
-        assert {"HERMES_DASHBOARD_BASIC_AUTH_PASSWORD", "HERMES_DASHBOARD_BASIC_AUTH_SECRET",
-                "HERMES_DASHBOARD_OIDC_CLIENT_SECRET", "HERMES_DASHBOARD_DRAIN_SECRET"} <= _ALWAYS_STRIP_KEYS
+        assert {"EIR_DASHBOARD_BASIC_AUTH_PASSWORD", "EIR_DASHBOARD_BASIC_AUTH_SECRET",
+                "EIR_DASHBOARD_OIDC_CLIENT_SECRET", "EIR_DASHBOARD_DRAIN_SECRET"} <= _ALWAYS_STRIP_KEYS
 
 
 class TestBrowserPassthroughPattern:
@@ -150,7 +150,7 @@ class TestBrowserPassthroughPattern:
             "TELEGRAM_BOT_TOKEN": "bot-should-go",
         }
         with patch.dict(os.environ, {**_SAFE_SAMPLE, **leaked}, clear=True):
-            env = hermes_subprocess_env(inherit_credentials=False)
+            env = eir_subprocess_env(inherit_credentials=False)
             for key in _HARNESS_PASSTHROUGH_KEYS:
                 if key in os.environ:
                     env[key] = os.environ[key]
@@ -171,23 +171,23 @@ class TestDelegatedChildMarker:
             os.environ,
             {
                 **_SAFE_SAMPLE,
-                "HERMES_KANBAN_TASK": "t_parent",
-                "HERMES_KANBAN_RUN_ID": "123",
-                "HERMES_KANBAN_DB": "/tmp/parent-kanban.db",
-                "HERMES_KANBAN_WORKSPACE": "/tmp/parent-workspace",
+                "EIR_KANBAN_TASK": "t_parent",
+                "EIR_KANBAN_RUN_ID": "123",
+                "EIR_KANBAN_DB": "/tmp/parent-kanban.db",
+                "EIR_KANBAN_WORKSPACE": "/tmp/parent-workspace",
             },
             clear=True,
         ):
             with delegated_child_context():
-                env = hermes_subprocess_env(inherit_credentials=True)
+                env = eir_subprocess_env(inherit_credentials=True)
 
-        assert env["HERMES_DELEGATED_CHILD_CONTEXT"]  # fenced board root (path), not a bare flag
+        assert env["EIR_DELEGATED_CHILD_CONTEXT"]  # fenced board root (path), not a bare flag
         # Worker identity is scrubbed; board location and workspace routing survive so the
         # fenced descendant can still read the board it belongs to.
-        assert "HERMES_KANBAN_TASK" not in env
-        assert "HERMES_KANBAN_RUN_ID" not in env
-        assert env["HERMES_KANBAN_DB"] == "/tmp/parent-kanban.db"
-        assert env["HERMES_KANBAN_WORKSPACE"] == "/tmp/parent-workspace"
+        assert "EIR_KANBAN_TASK" not in env
+        assert "EIR_KANBAN_RUN_ID" not in env
+        assert env["EIR_KANBAN_DB"] == "/tmp/parent-kanban.db"
+        assert env["EIR_KANBAN_WORKSPACE"] == "/tmp/parent-workspace"
         assert env["MY_APP_VAR"] == "keep-me"
 
 

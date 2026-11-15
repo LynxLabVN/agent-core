@@ -1,6 +1,6 @@
 """An OAuth login waits as long as ``oauth.timeout`` says, and a probe timeout names itself (#116278).
 
-``hermes mcp login`` (and the dashboard / Desktop re-auth twins) bounded the login probe at a fixed
+``eir mcp login`` (and the dashboard / Desktop re-auth twins) bounded the login probe at a fixed
 315 s floor, so ``oauth: {timeout: 3600}`` changed nothing; the expiry then surfaced as a bare
 ``asyncio.TimeoutError`` whose ``str()`` is empty — a blank ``✗ Authentication failed:`` line.
 """
@@ -15,8 +15,8 @@ import pytest
 def test_login_probe_window_follows_oauth_timeout(monkeypatch, tmp_path):
     """Production entry point ``_reauth_oauth_server``: with ``oauth.timeout: 3600`` the probe's
     connect bound is the callback window plus exchange headroom, not the old 315 s floor."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-    import hermes_cli.mcp_config as mc
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
+    import eir_cli.mcp_config as mc
 
     seen = {}
 
@@ -37,7 +37,7 @@ def test_login_probe_window_follows_oauth_timeout(monkeypatch, tmp_path):
 def test_probe_timeout_names_server_and_knobs(monkeypatch):
     """A probe that outlives its bound raises a TimeoutError whose message names the server and the
     governing settings — never the empty ``str(asyncio.TimeoutError())``."""
-    import hermes_cli.mcp_config as mc
+    import eir_cli.mcp_config as mc
 
     async def _hang(name, config):
         await asyncio.sleep(3600)
@@ -52,9 +52,9 @@ def test_probe_timeout_names_server_and_knobs(monkeypatch):
 
 def _record_add_probe(monkeypatch, tmp_path, *, oauth: bool):
     """Run ``cmd_mcp_add`` for an HTTP server with the probe replaced by a recorder; returns its bound."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     import argparse
-    import hermes_cli.mcp_config as mc
+    import eir_cli.mcp_config as mc
 
     def _fake_http_auth(name, url, auth_type, server_config):
         if oauth:
@@ -78,7 +78,7 @@ def _record_add_probe(monkeypatch, tmp_path, *, oauth: bool):
 
 
 def test_add_with_oauth_waits_like_login(monkeypatch, tmp_path):
-    """``hermes mcp add --auth oauth``: the first connect is the browser sign-in, so its probe gets the login
+    """``eir mcp add --auth oauth``: the first connect is the browser sign-in, so its probe gets the login
     window (oauth.timeout 300 s + 15 s), not the 30 s connect_timeout that closed the callback listener while
     the user was still on the consent page."""
     assert _record_add_probe(monkeypatch, tmp_path, oauth=True) == 315.0

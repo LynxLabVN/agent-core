@@ -12,11 +12,11 @@ from contextlib import contextmanager, nullcontext
 from fastapi import HTTPException
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
-from hermes_cli.config import DEFAULT_CONFIG, get_process_hermes_home
-from hermes_cli.web_server_gateway import _ACTION_LOG_FILES
+from eir_cli.config import DEFAULT_CONFIG, get_process_eir_home
+from eir_cli.web_server_gateway import _ACTION_LOG_FILES
 
 # Same logger the code used before extraction (record parity).
-_log = logging.getLogger("hermes_cli.web_server")
+_log = logging.getLogger("eir_cli.web_server")
 
 
 def _safe(callable_: Callable[[], Any], default: Any) -> Any:
@@ -33,15 +33,15 @@ def _is_current_profile(profile: Optional[str]) -> bool:
 
 
 @contextmanager
-def _hermes_home_scope(path) -> Any:
-    """Scope ``load_config``/``save_config`` (anything resolving ``get_hermes_home()`` at call
-    time) to ``path`` for the block via the context-local HERMES_HOME override."""
-    from hermes_constants import set_hermes_home_override, reset_hermes_home_override
-    token = set_hermes_home_override(str(path))
+def _eir_home_scope(path) -> Any:
+    """Scope ``load_config``/``save_config`` (anything resolving ``get_eir_home()`` at call
+    time) to ``path`` for the block via the context-local EIR_HOME override."""
+    from eir_constants import set_eir_home_override, reset_eir_home_override
+    token = set_eir_home_override(str(path))
     try:
         yield
     finally:
-        reset_hermes_home_override(token)
+        reset_eir_home_override(token)
 
 
 def serving_profile_name() -> str:
@@ -52,16 +52,16 @@ def serving_profile_name() -> str:
     switcher has resolved: a destructive route now 400s on an unnamed profile as soon as
     the host serves more than one, and "" would otherwise mean "whichever home this
     process launched with" anyway. Naming it is only safe if the name cannot resolve
-    ELSEWHERE, so a custom HERMES_HOME outside ``profiles/`` (``get_active_profile_name()``
+    ELSEWHERE, so a custom EIR_HOME outside ``profiles/`` (``get_active_profile_name()``
     answers ``"custom"``) returns "" and keeps the old unnamed behaviour rather than
     risking a wrong-profile write.
     """
-    from hermes_cli import profiles as profiles_mod
+    from eir_cli import profiles as profiles_mod
     try:
         name = (profiles_mod.get_active_profile_name() or "").strip()
         if not name or name == "custom":
             return ""
-        return name if profiles_mod.profile_matches_home(name, get_process_hermes_home()) else ""
+        return name if profiles_mod.profile_matches_home(name, get_process_eir_home()) else ""
     except Exception:
         return ""
 
@@ -74,7 +74,7 @@ def _is_other_profile(profile: Optional[str]) -> bool:
         target = _resolve_profile_dir(profile.strip())
     except HTTPException:
         return True
-    return target.resolve() != get_process_hermes_home().resolve()
+    return target.resolve() != get_process_eir_home().resolve()
 
 
 def _approval_mode_of(config: dict[str, Any]) -> str:
@@ -157,7 +157,7 @@ def _fallback_profile_entry(profiles_mod, name: str, home: Path, *, is_default: 
 
 def _fallback_profile_dicts(profiles_mod) -> list[dict[str, Any]]:
     profiles: list[dict[str, Any]] = []
-    default_home = profiles_mod._get_default_hermes_home()
+    default_home = profiles_mod._get_default_eir_home()
     if default_home.is_dir():
         profiles.append(_fallback_profile_entry(
             profiles_mod, "default", default_home, is_default=True,
@@ -186,7 +186,7 @@ def _fallback_profile_dicts(profiles_mod) -> list[dict[str, Any]]:
 
 def _resolve_profile_dir(name: str) -> Path:
     """Validate ``name`` and resolve to its directory or raise an HTTPException."""
-    from hermes_cli import profiles as profiles_mod
+    from eir_cli import profiles as profiles_mod
     try:
         profiles_mod.validate_profile_name(name)
     except ValueError as e:
@@ -208,39 +208,39 @@ _SKILLS_PROFILE_LOCK = threading.RLock()
 def _profile_scope(profile: Optional[str]):
     """Scope config + skill-directory resolution to ``profile`` for one request.
 
-    Two seams: (1) ``load_config``/``save_config`` resolve ``get_hermes_home()`` at call
+    Two seams: (1) ``load_config``/``save_config`` resolve ``get_eir_home()`` at call
     time, so the contextvar override reaches them; (2) ``tools.skills_tool`` /
     ``tools.skill_manager_tool`` bind ``SKILLS_DIR`` at import time, so both are retargeted
     under a lock and restored after. For the dashboard's own profile config resolution is
     untouched, but the skill-module globals are still retargeted to the *current*
-    ``get_hermes_home()`` so writes land in the live home even when the import-time binding
-    is stale (test isolation, late HERMES_HOME override). Yields the profile dir for a named
+    ``get_eir_home()`` so writes land in the live home even when the import-time binding
+    is stale (test isolation, late EIR_HOME override). Yields the profile dir for a named
     profile, None for the current one.
 
     ``tools.skills_sync`` (reset/diff/list-modified/opt-in/opt-out/ repair-official) needs NO retargeting:
     since #65828 its directory lookups resolve at call time through the same contextvar override set in step
     1.
     """
-    from hermes_constants import get_hermes_home
+    from eir_constants import get_eir_home
     from tools import skills_tool as _skills_tool
     from tools import skill_manager_tool as _skill_mgr
     with _config_profile_scope(profile) as scoped:
-        profile_dir = get_hermes_home() if scoped is None else scoped
+        profile_dir = get_eir_home() if scoped is None else scoped
         modules = (_skills_tool, _skill_mgr)
         with _SKILLS_PROFILE_LOCK:
-            saved = [(m.HERMES_HOME, m.SKILLS_DIR) for m in modules]
+            saved = [(m.EIR_HOME, m.SKILLS_DIR) for m in modules]
             for m in modules:
-                m.HERMES_HOME, m.SKILLS_DIR = profile_dir, profile_dir / "skills"
+                m.EIR_HOME, m.SKILLS_DIR = profile_dir, profile_dir / "skills"
             try:
                 yield scoped
             finally:
                 for m, (home, skills_dir) in zip(modules, saved):
-                    m.HERMES_HOME, m.SKILLS_DIR = home, skills_dir
+                    m.EIR_HOME, m.SKILLS_DIR = home, skills_dir
 
 
 @contextmanager
 def _config_profile_scope(profile: Optional[str]):
-    """Await-safe profile scope: the task-local HERMES_HOME contextvar PLUS the profile's secret
+    """Await-safe profile scope: the task-local EIR_HOME contextvar PLUS the profile's secret
     scope, never the process-global skills-module attributes ``_profile_scope`` swaps (holding
     those across an ``await`` lets a concurrent request restore THIS request's dir on its
     ``finally``). None/""/"current" = no override.
@@ -260,13 +260,13 @@ def _config_profile_scope(profile: Optional[str]):
     secret scope rather than the launch profile's.
     """
     from agent.secret_scope import build_profile_secret_scope, reset_secret_scope, set_secret_scope
-    from hermes_cli.env_loader import hydrate_profile_secret_sources
-    from hermes_constants import get_hermes_home, get_hermes_home_override
+    from eir_cli.env_loader import hydrate_profile_secret_sources
+    from eir_constants import get_eir_home, get_eir_home_override
     from tui_gateway.launch_profile_policy import activate_multi_profile_hosting, launch_secret_scope
 
-    process_home = get_process_hermes_home()
+    process_home = get_process_eir_home()
     if _is_current_profile(profile):
-        profile_dir = get_hermes_home() if get_hermes_home_override() else None
+        profile_dir = get_eir_home() if get_eir_home_override() else None
     else:
         profile_dir = _resolve_profile_dir(profile.strip())
     scoped = None if profile_dir is None or profile_dir.resolve() == process_home.resolve() else profile_dir
@@ -281,7 +281,7 @@ def _config_profile_scope(profile: Optional[str]):
         # concurrent first ``?profile=B`` request flips ``get_secret`` to fail closed mid-request,
         # and an unscoped launch request would then raise ``UnscopedSecretError`` on its next read.
         secrets = launch_secret_scope(process_home)
-    with (_hermes_home_scope(profile_dir) if profile_dir is not None else nullcontext()):
+    with (_eir_home_scope(profile_dir) if profile_dir is not None else nullcontext()):
         token = set_secret_scope(secrets, profile_home=str(profile_dir or process_home))
         try:
             yield scoped
@@ -312,7 +312,7 @@ def _plugin_terminal_backend_rows() -> list[dict[str, str]]:
     """Picker rows for plugin-registered terminal backends (fail-soft)."""
     rows: list[dict[str, str]] = []
     try:
-        from hermes_cli.plugins import discover_plugins
+        from eir_cli.plugins import discover_plugins
         discover_plugins()  # idempotent — plugin state may not be loaded yet
     except Exception:
         pass
@@ -404,21 +404,21 @@ def _aux_task_summary(aux_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def _profile_cli_args(profile: Optional[str]) -> list[str]:
     """``["-p", <name>]`` for a validated named profile, else ``[]``. Hub actions run in
-    a fresh ``hermes`` subprocess whose ``_apply_profile_override()`` reads ``-p`` from argv —
+    a fresh ``eir`` subprocess whose ``_apply_profile_override()`` reads ``-p`` from argv —
     the only mechanism that reaches import-time-bound globals like ``skills_hub.SKILLS_DIR``.
     ``default`` is a real named target, not an alias for the dashboard's own profile:
-    selector-less argv would make the child resolve the ambient ``HERMES_HOME`` (the launch
+    selector-less argv would make the child resolve the ambient ``EIR_HOME`` (the launch
     profile under a pooled ``-p X serve``), not the default home."""
     requested = (profile or "").strip()
     if not requested or requested.lower() == "current":
         return []
-    from hermes_cli import profiles as profiles_mod
+    from eir_cli import profiles as profiles_mod
     _resolve_profile_dir(requested)
     return ["-p", profiles_mod.normalize_profile_name(requested)]
 
 
 def _hub_action_name(verb: str, key: str, profile: Optional[str] = None) -> str:
-    """Unique per-skill hub action name (+ registered log file): ``_spawn_hermes_action``
+    """Unique per-skill hub action name (+ registered log file): ``_spawn_eir_action``
     tracks one process/log per name, so a shared "skills-install" would make concurrent
     row-level actions overwrite each other. Slug (readable) + hash (collision-proof)."""
     slug = re.sub(r"[^a-z0-9]+", "-", key.lower()).strip("-")[:48] or "skill"

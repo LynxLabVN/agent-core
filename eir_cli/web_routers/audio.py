@@ -1,6 +1,6 @@
 """Audio dashboard routes: transcription upload + live transcribe-stream, voice config, ElevenLabs voices, TTS speak/lease and the speak-stream WebSocket.
 
-Extracted from ``hermes_cli.web_server``; helpers/state that tests monkeypatch on
+Extracted from ``eir_cli.web_server``; helpers/state that tests monkeypatch on
 ``web_server`` stay there and are late-bound (cycle-safe).
 """
 
@@ -17,15 +17,15 @@ import os
 import urllib.parse
 import urllib.request
 from fastapi import APIRouter
-from hermes_cli.dashboard_auth.native_http import grant_home_scope
-from hermes_cli.web_routers._common import client_error, http_failure
-from hermes_cli.web_deps import late
-from hermes_cli.web_server_chat import _ws_auth_ok, _ws_request_is_allowed
-from hermes_cli.web_server_gateway import _read_dashboard_json_response, _split_text_for_speak_stream
-from hermes_cli.web_server_surface import policy
-from hermes_cli.web_session_sockets import SPEAK_STREAM_SOCKET, TRANSCRIBE_STREAM_SOCKET
+from eir_cli.dashboard_auth.native_http import grant_home_scope
+from eir_cli.web_routers._common import client_error, http_failure
+from eir_cli.web_deps import late
+from eir_cli.web_server_chat import _ws_auth_ok, _ws_request_is_allowed
+from eir_cli.web_server_gateway import _read_dashboard_json_response, _split_text_for_speak_stream
+from eir_cli.web_server_surface import policy
+from eir_cli.web_session_sockets import SPEAK_STREAM_SOCKET, TRANSCRIBE_STREAM_SOCKET
 from fastapi import HTTPException, Request, WebSocket, WebSocketDisconnect
-from hermes_cli.web_models import (
+from eir_cli.web_models import (
     AudioTranscriptionRequest,
     STTLeaseRequest,
     TTSSpeakRequest,
@@ -34,13 +34,13 @@ from hermes_cli.web_models import (
 )
 from typing import Any, Dict, Optional
 
-_log = logging.getLogger("hermes_cli.web_server")
+_log = logging.getLogger("eir_cli.web_server")
 router = APIRouter()
 
 # Late-bound so a test's monkeypatch on the owning module wins at call time.
-_config_profile_scope = late("_config_profile_scope", "hermes_cli.web_server_profiles")
+_config_profile_scope = late("_config_profile_scope", "eir_cli.web_server_profiles")
 _voice_list_error_logged_once = late("_voice_list_error_logged_once")
-load_env = late("load_env", "hermes_cli.config")
+load_env = late("load_env", "eir_cli.config")
 
 _AUDIO_MIME_EXTENSIONS: dict[str, str] = {
     "audio/aac": ".aac", "audio/flac": ".flac", "audio/m4a": ".m4a", "audio/mp3": ".mp3",
@@ -117,7 +117,7 @@ async def transcribe_audio_upload(
     try:
         with http_failure("Desktop voice transcription failed", 500, "Transcription failed"):
             with tempfile.NamedTemporaryFile(
-                prefix="hermes-desktop-voice-", suffix=_audio_extension_for_mime(mime_type),
+                prefix="eir-desktop-voice-", suffix=_audio_extension_for_mime(mime_type),
                 delete=False,
             ) as tmp:
                 tmp.write(audio_bytes)
@@ -196,7 +196,7 @@ async def create_voice_live_session(payload: VoiceLiveSessionRequest, profile: O
 
     The project API key stays on this host; the renderer only receives the session id and the
     SDP answer. Client delegation is fixed at creation: every ``session.delegation.created`` the
-    renderer receives becomes a Hermes turn on the session it belongs to.
+    renderer receives becomes a Eir turn on the session it belongs to.
     """
     from tools.voice_live import create_webrtc_session
     # Validate emptiness only: the vendor's SDP parser needs the offer byte-exact, including the
@@ -541,10 +541,10 @@ async def transcribe_stream_ws(ws: WebSocket) -> None:
     if not _ws_request_is_allowed(ws):
         await ws.close(code=4403)
         return
-    await ws.accept(subprotocol=getattr(ws, "_hermes_ws_subprotocol", None))
+    await ws.accept(subprotocol=getattr(ws, "_eir_ws_subprotocol", None))
 
     profile = (ws.query_params.get("profile") or "").strip() or None
-    grant = getattr(ws, "_hermes_native_grant", None)
+    grant = getattr(ws, "_eir_native_grant", None)
     loop = asyncio.get_running_loop()
     partials: asyncio.Queue = asyncio.Queue()
 
@@ -633,14 +633,14 @@ async def speak_stream_ws(ws: WebSocket) -> None:
     if not _ws_request_is_allowed(ws):
         await ws.close(code=4403)
         return
-    await ws.accept(subprotocol=getattr(ws, "_hermes_ws_subprotocol", None))
+    await ws.accept(subprotocol=getattr(ws, "_eir_ws_subprotocol", None))
 
     # Profile via query param, like /api/pty and /api/console: the provider
     # chain + API keys must resolve from the requesting profile's config, not
     # the dashboard's own — at resolve time AND in the synthesis thread. A
     # native grant's home owns the implicit selector (its explicit ones match it).
     profile = (ws.query_params.get("profile") or "").strip() or None
-    grant = getattr(ws, "_hermes_native_grant", None)
+    grant = getattr(ws, "_eir_native_grant", None)
 
     loop = asyncio.get_running_loop()
 

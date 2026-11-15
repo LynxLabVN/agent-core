@@ -1,10 +1,10 @@
 """Dispatcher subprocess: submit one claim to its profile owner; never run an agent."""
 # Spawned as a bare ``sys.executable -m``: in a PM install that interpreter carries no dependencies
-# until hermes_bootstrap selects the committed environment, so it must be the first import.
+# until eir_bootstrap selects the committed environment, so it must be the first import.
 try:
-    import hermes_bootstrap
+    import eir_bootstrap
 except ModuleNotFoundError as exc:
-    if exc.name != "hermes_bootstrap" and not "hermes_bootstrap".startswith(f"{exc.name}."):
+    if exc.name != "eir_bootstrap" and not "eir_bootstrap".startswith(f"{exc.name}."):
         raise
 
 import asyncio
@@ -15,7 +15,7 @@ import sys
 import time
 from typing import Optional
 
-# A worker that loses its owner (a dropped socket, a restart, `hermes update` draining it or a new
+# A worker that loses its owner (a dropped socket, a restart, `eir update` draining it or a new
 # owner still starting) waits for it instead of exiting: the condition is the host's, not the card's,
 # and a failed exit here spends the card's failure budget and lets the owner end the turn. Asking
 # again is safe: ``kanban.run`` is idempotent per attempt and ``prompt.receipt`` is a read.
@@ -30,7 +30,7 @@ def admission_answer_budget():
     """Seconds to wait for ``kanban.run``'s answer: the longest the owner's admission write can
     wait on the board lock (``write_txn`` retries ``BEGIN IMMEDIATE`` ``_BUSY_MAX_RETRIES`` times,
     each under the busy timeout) plus ``ADMISSION_ANSWER_MARGIN_S``."""
-    from hermes_cli import kanban_db_connect
+    from eir_cli import kanban_db_connect
     lock_wait = (kanban_db_connect._BUSY_MAX_RETRIES + 1) * kanban_db_connect._resolve_busy_timeout_ms() / 1000
     return lock_wait + ADMISSION_ANSWER_MARGIN_S
 
@@ -48,10 +48,10 @@ class _Claim:
 
 async def run(params, board_db):
     from agent.retry_utils import jittered_backoff
-    from hermes_cli.gateway_client import connect_gateway, GatewayClientError, outside_restart_wait
-    from hermes_cli.gateway_owner_restart import restartable
+    from eir_cli.gateway_client import connect_gateway, GatewayClientError, outside_restart_wait
+    from eir_cli.gateway_owner_restart import restartable
     from websockets.exceptions import WebSocketException
-    if os.environ.get('HERMES_TUI_GATEWAY_URL'):
+    if os.environ.get('EIR_TUI_GATEWAY_URL'):
         raise GatewayClientError('Kanban requires the assigned local profile owner')
     # A lost socket is not a lost attempt, and exiting here would let ``_watch_submitter`` end the
     # owner's in-flight turn, so the next connection resumes whatever the last one reached. The
@@ -64,7 +64,7 @@ async def run(params, board_db):
         try:
             # Never into a restart's after-turn wait: it cut this socket so the turn's submitter
             # waits for the NEXT owner, and a worker polling its receipt inside the wait keeps the
-            # turn it waits on alive, holding `hermes update` until restart_after_turn_timeout.
+            # turn it waits on alive, holding `eir update` until restart_after_turn_timeout.
             with outside_restart_wait():
                 async with connect_gateway() as client:
                     # kanban.run subscribes this socket to the card's session, but only receipts
@@ -126,7 +126,7 @@ async def _await_receipt(client, params, board_db, claim):
 
 
 def _exit_code(receipt, params, board_db):
-    from hermes_cli.gateway_client import GatewayClientError
+    from eir_cli.gateway_client import GatewayClientError
     if receipt['status'] == 'unknown':
         raise GatewayClientError('Kanban execution unknown; retained by owner')
     from gateway.session_kanban import worker_result
@@ -144,7 +144,7 @@ async def _receipt(client, claim):
 def main():
     # The dead-worker sweep books this process's exit from the trailer in its log (it never
     # reaps us), so every exit path writes it — the same contract as a quiet one-shot worker.
-    from hermes_cli.quiet_single_query import KANBAN_WORKER_EXIT_TRAILER
+    from eir_cli.quiet_single_query import KANBAN_WORKER_EXIT_TRAILER
     rc = 1
     try:
         rc = _submit()
@@ -155,15 +155,15 @@ def main():
 
 def _submit():
     try:
-        params = {'board': os.environ['HERMES_KANBAN_BOARD'], 'task_id': os.environ['HERMES_KANBAN_TASK'],
-            'run_id': int(os.environ['HERMES_KANBAN_RUN_ID']), 'claim_lock': os.environ['HERMES_KANBAN_CLAIM_LOCK']}
-        board_db = os.environ['HERMES_KANBAN_DB']
+        params = {'board': os.environ['EIR_KANBAN_BOARD'], 'task_id': os.environ['EIR_KANBAN_TASK'],
+            'run_id': int(os.environ['EIR_KANBAN_RUN_ID']), 'claim_lock': os.environ['EIR_KANBAN_CLAIM_LOCK']}
+        board_db = os.environ['EIR_KANBAN_DB']
         # Owner startup must never inherit this worker's task/tool/goal identity.
         for key in list(os.environ):
             # The busy timeout is a host tuning knob, not task identity: the answer budget reads it.
-            if key.startswith('HERMES_KANBAN_') and key not in ('HERMES_KANBAN_HOME', 'HERMES_KANBAN_BUSY_TIMEOUT_MS'):
+            if key.startswith('EIR_KANBAN_') and key not in ('EIR_KANBAN_HOME', 'EIR_KANBAN_BUSY_TIMEOUT_MS'):
                 os.environ.pop(key)
-        for key in ('HERMES_SESSION_SOURCE', 'HERMES_TENANT', 'TERMINAL_CWD'):
+        for key in ('EIR_SESSION_SOURCE', 'EIR_TENANT', 'TERMINAL_CWD'):
             os.environ.pop(key, None)
         return asyncio.run(run(params, board_db))
     except (KeyError, ValueError, OSError) as exc:

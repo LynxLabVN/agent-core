@@ -1,11 +1,11 @@
-"""``hermes plugins validate`` — admission checks for a plugin directory.
+"""``eir plugins validate`` — admission checks for a plugin directory.
 
 This is the command the plugin-catalog admission CI (and the
 ``.github/actions/plugin-validate`` composite action) runs against a
 candidate plugin. It performs static manifest checks plus a
 subprocess-isolated capability probe: the plugin is imported and its
 ``register(ctx)`` called against a minimal recording stub context in a
-scratch child process (with a throwaway ``HERMES_HOME``), so a crashing or
+scratch child process (with a throwaway ``EIR_HOME``), so a crashing or
 malicious plugin cannot take down the CLI, and the *actually registered*
 tools/hooks/middleware are compared against the manifest's declared
 ``provides_*`` lists.
@@ -24,19 +24,19 @@ from functools import cached_property
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from hermes_cli.plugin_validate_core_override import check_core_override
-from hermes_cli.plugin_validate_desktop import check_desktop_surface
-from hermes_cli.plugin_validate_private_imports import check_private_imports
-from hermes_cli.plugin_validate_locales import check_language_packs
-from hermes_cli.plugins_manifest import _CONFIG_SCHEMA_TYPES
-from hermes_cli._startup_fast import project_root_str
+from eir_cli.plugin_validate_core_override import check_core_override
+from eir_cli.plugin_validate_desktop import check_desktop_surface
+from eir_cli.plugin_validate_private_imports import check_private_imports
+from eir_cli.plugin_validate_locales import check_language_packs
+from eir_cli.plugins_manifest import _CONFIG_SCHEMA_TYPES
+from eir_cli._startup_fast import project_root_str
 
 _UPPER_SNAKE_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 # Admission accepts exactly the ``config_schema`` types the loader type-checks at load time (and the
 # Desktop settings renderer keys its field table on) — a private copy drifted and rejected ``secret``.
 _CONFIG_TYPES = frozenset(_CONFIG_SCHEMA_TYPES)
 _PROBE_TIMEOUT = 30
-_PROBE_SENTINEL = "HERMES_VALIDATE_JSON:"
+_PROBE_SENTINEL = "EIR_VALIDATE_JSON:"
 
 
 @dataclass
@@ -80,14 +80,14 @@ class ValidationReport:
 # ─── Static checks ───────────────────────────────────────────────────────────
 
 
-def _requires_hermes_spec_valid(spec: str) -> bool:
-    """Strictly validate a ``requires_hermes`` spec.
+def _requires_eir_spec_valid(spec: str) -> bool:
+    """Strictly validate a ``requires_eir`` spec.
 
-    Unlike :func:`hermes_cli.plugins_manifest.version_satisfies` (permissive at load
+    Unlike :func:`eir_cli.plugins_manifest.version_satisfies` (permissive at load
     time), validation REJECTS clauses whose version segment doesn't parse —
     a typo'd spec should fail admission, not silently gate nothing.
     """
-    from hermes_cli.plugins_manifest import _VERSION_COMPARATOR_RE, _version_tuple
+    from eir_cli.plugins_manifest import _VERSION_COMPARATOR_RE, _version_tuple
 
     for clause in spec.split(","):
         clause = clause.strip()
@@ -114,18 +114,18 @@ def _check_manifest_fields(report: ValidationReport, manifest: dict) -> None:
         report.add("manifest fields", True, "name, version, description present")
 
 
-def _check_requires_hermes(report: ValidationReport, manifest: dict) -> None:
-    spec = str(manifest.get("requires_hermes") or "").strip()
+def _check_requires_eir(report: ValidationReport, manifest: dict) -> None:
+    spec = str(manifest.get("requires_eir") or "").strip()
     if not spec:
-        report.add("requires_hermes", True, "not declared")
+        report.add("requires_eir", True, "not declared")
         return
-    if _requires_hermes_spec_valid(spec):
-        report.add("requires_hermes", True, f"spec {spec!r} parses")
+    if _requires_eir_spec_valid(spec):
+        report.add("requires_eir", True, f"spec {spec!r} parses")
     else:
         report.add(
-            "requires_hermes",
+            "requires_eir",
             False,
-            f"requires_hermes spec {spec!r} does not parse "
+            f"requires_eir spec {spec!r} does not parse "
             "(expected e.g. \">=0.19\" or \">=0.19, <1.0\")",
         )
 
@@ -188,9 +188,9 @@ def _check_requires_env(report: ValidationReport, manifest: dict) -> None:
 
 
 def _check_oauth(report: ValidationReport, manifest: dict, plugin_dir: Path) -> None:
-    """``oauth:`` clients (hermes_cli.plugin_oauth): shape, https and declared variables fail admission; a
+    """``oauth:`` clients (eir_cli.plugin_oauth): shape, https and declared variables fail admission; a
     host outside the IdP's domains and plugin code that names a token URL are reviewer warnings."""
-    from hermes_cli.plugin_oauth import oauth_admission_problems, oauth_admission_warnings
+    from eir_cli.plugin_oauth import oauth_admission_problems, oauth_admission_warnings
 
     if manifest.get("oauth") in (None, []):
         report.add("oauth", True, "not declared")
@@ -207,7 +207,7 @@ def _check_oauth(report: ValidationReport, manifest: dict, plugin_dir: Path) -> 
 # module using the same file-location mechanics PluginManager uses, calls
 # register() against a recording stub ctx, and prints a sentinel-prefixed
 # JSON line of what was actually registered. Deliberately imports NOTHING
-# from hermes so a hostile plugin only sees a bare interpreter — the exceptions are the
+# from eir so a hostile plugin only sees a bare interpreter — the exceptions are the
 # stdlib-only compat finder (old module names keep resolving) and `providers` for
 # `kind: model-provider`, whose contract IS calling providers.register_provider at import.
 _PROBE_SCRIPT = r"""
@@ -215,7 +215,7 @@ import importlib.util
 import json
 import sys
 
-from hermes_agent.compat import install
+from eir_agent.compat import install
 
 install()
 
@@ -236,7 +236,7 @@ recorded = {"tools": [], "hooks": [], "middleware": [], "commands": [], "provide
 class RecordingContext:
     plugin_config = {}
     profile_name = "default"
-    plugin_id = "hermes_validate_probe_plugin"
+    plugin_id = "eir_validate_probe_plugin"
 
     def register_tool(self, name, *args, **kwargs):
         recorded["tools"].append(str(name))
@@ -283,11 +283,11 @@ class RecordingContext:
 
 class _ProbeState:
     # Same shape as PluginState (real Path values, get() returns the default) over an empty store
-    # in the probe's scratch HERMES_HOME, which the parent deletes after the run.
+    # in the probe's scratch EIR_HOME, which the parent deletes after the run.
     def __init__(self):
         import os
         from pathlib import Path
-        self.data_dir = Path(os.environ["HERMES_HOME"]) / "plugin-data" / "probe"
+        self.data_dir = Path(os.environ["EIR_HOME"]) / "plugin-data" / "probe"
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.path = self.data_dir / "state.json"
         self.quota_bytes = 1024 * 1024
@@ -336,7 +336,7 @@ if provider_kind:
 
 try:
     spec = importlib.util.spec_from_file_location(
-        "hermes_validate_probe_plugin",
+        "eir_validate_probe_plugin",
         plugin_dir + "/__init__.py",
         submodule_search_locations=[plugin_dir],
     )
@@ -371,7 +371,7 @@ emit(recorded)
 
 
 def _probe_options(manifest: dict) -> dict:
-    from hermes_cli.plugins import PluginContext
+    from eir_cli.plugins import PluginContext
 
     public = [n for n in dir(PluginContext) if not n.startswith("_")]
     return {
@@ -395,9 +395,9 @@ def _run_capability_probe(
     is the ``{tools, hooks, middleware, commands, providers}`` dict on
     success, and *error* is a human-readable failure description otherwise.
     """
-    with tempfile.TemporaryDirectory(prefix="hermes-validate-") as scratch:
+    with tempfile.TemporaryDirectory(prefix="eir-validate-") as scratch:
         env = dict(probe[1] if probe else os.environ)
-        env["HERMES_HOME"] = scratch
+        env["EIR_HOME"] = scratch
         # The probe imports this tree's ``providers``; name the tree instead of relying on the cwd.
         repo_root = project_root_str()
         env["PYTHONPATH"] = os.pathsep.join(p for p in (repo_root, env.get("PYTHONPATH", "")) if p)
@@ -405,7 +405,7 @@ def _run_capability_probe(
         try:
             result = subprocess.run(
                 [
-                    # -P: ``-c`` would put the user's cwd ahead of Hermes and the plugin's imports.
+                    # -P: ``-c`` would put the user's cwd ahead of Eir and the plugin's imports.
                     python, "-P", *options,
                     "-c",
                     _PROBE_SCRIPT,
@@ -574,7 +574,7 @@ def validate_plugin_dir(
         )
         return report
 
-    import hermes_yaml as yaml
+    import eir_yaml as yaml
 
     try:
         manifest = yaml.safe_load(
@@ -589,7 +589,7 @@ def validate_plugin_dir(
     report.add("manifest", True, "plugin.yaml parses")
 
     _check_manifest_fields(report, manifest)
-    _check_requires_hermes(report, manifest)
+    _check_requires_eir(report, manifest)
     _check_config_spec(report, manifest)
     _check_requires_env(report, manifest)
     _check_oauth(report, manifest, plugin_dir)
@@ -603,7 +603,7 @@ def validate_plugin_dir(
     check_private_imports(report, plugin_dir)
     check_desktop_surface(report, plugin_dir)
     check_language_packs(report, manifest, plugin_dir)
-    from hermes_cli.plugin_isolation_audit import audit_plugin_dir
+    from eir_cli.plugin_isolation_audit import audit_plugin_dir
     report.isolation = audit_plugin_dir(plugin_dir, manifest).to_dict()
     return report
 
@@ -623,7 +623,7 @@ _LOADABLE_ENTRYPOINTS = ("__init__.py", "desktop/plugin.js", "plugin.json")
 
 
 def _check_loadable(report: ValidationReport, plugin_dir: Path, manifest: Optional[dict] = None) -> None:
-    """A plugin.yaml with nothing beside it that Hermes can load (no ``register()`` module, no
+    """A plugin.yaml with nothing beside it that Eir can load (no ``register()`` module, no
     desktop bundle, no portable manifest, no declared language pack) installs "successfully" and does
     nothing — a pip-layout repo whose code lives under ``src/`` behind an entry point is the usual shape."""
     present = [rel for rel in _LOADABLE_ENTRYPOINTS if (plugin_dir / rel).is_file()]
@@ -687,8 +687,8 @@ def _validate_portable_plugin(report: ValidationReport, plugin_dir: Path) -> Val
     diagnostics (schema shape, name, supported subset).
     """
     try:
-        from hermes_cli.agent_plugins import load_agent_plugin
-        from hermes_platform.resolver.availability import availability
+        from eir_cli.agent_plugins import load_agent_plugin
+        from eir_platform.resolver.availability import availability
 
         with tempfile.TemporaryDirectory() as data_root:
             package = load_agent_plugin(plugin_dir, Path(data_root))
@@ -710,12 +710,12 @@ def _validate_portable_plugin(report: ValidationReport, plugin_dir: Path) -> Val
         bool(name),
         "name present" if name else "plugin.json missing required 'name'",
     )
-    from hermes_cli.agent_plugins import manifest_config_schema
+    from eir_cli.agent_plugins import manifest_config_schema
     _check_config_spec(report, {"config_schema": manifest_config_schema(manifest)})
     for server_name, config in package.mcp_servers.items():
         if config.get("trust") == "untrusted":
             report.add(f"server trust: {server_name}", True,
-                       "untrusted (Hermes asks before every write-capable tool call)")
+                       "untrusted (Eir asks before every write-capable tool call)")
         if config.get("tool_costs"):
             limit = config.get("spend_limit") or 0
             report.add(f"server costs: {server_name}", True,
@@ -732,6 +732,6 @@ def _validate_portable_plugin(report: ValidationReport, plugin_dir: Path) -> Val
         report.add(f"server availability: {server_name}", True, detail)
     _check_security_scan(report, plugin_dir)
     check_desktop_surface(report, plugin_dir)
-    from hermes_cli.plugin_isolation_audit import audit_plugin_dir
+    from eir_cli.plugin_isolation_audit import audit_plugin_dir
     report.isolation = audit_plugin_dir(plugin_dir, manifest).to_dict()
     return report

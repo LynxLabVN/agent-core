@@ -1,4 +1,4 @@
-"""``hermes journey`` — what Hermes has learned, on a timeline."""
+"""``eir journey`` — what Eir has learned, on a timeline."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ def _build_payload() -> dict[str, Any]:
 def _primary_hex() -> str:
     """The active skin's primary color (mirrors the TUI theme primary)."""
     try:
-        from hermes_cli.skin_engine import get_active_skin
+        from eir_cli.skin_engine import get_active_skin
 
         skin = get_active_skin()
         return skin.get_color("ui_primary", "") or skin.get_color("banner_title", "#FFD700")
@@ -222,7 +222,7 @@ def _cmd_show(args: argparse.Namespace) -> int:
 
     if not payload.get("nodes"):
         console.print(
-            "[grey62]No learning yet — use Hermes a while and your learned skills and "
+            "[grey62]No learning yet — use Eir a while and your learned skills and "
             "memories will start mapping out here.[/grey62]"
         )
         return 0
@@ -374,7 +374,7 @@ def register_cli(parent: argparse.ArgumentParser) -> None:
 
 
 if __name__ == "__main__":
-    _p = argparse.ArgumentParser(prog="hermes journey")
+    _p = argparse.ArgumentParser(prog="eir journey")
     register_cli(_p)
     _a = _p.parse_args()
     sys.exit(_a.func(_a))

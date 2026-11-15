@@ -4,7 +4,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from hermes_cli import mem_trim
+from eir_cli import mem_trim
 
 
 @pytest.fixture(autouse=True)
@@ -17,23 +17,23 @@ def _reset_trim_state(monkeypatch):
 
 
 def test_config_kill_switch_overrides_force_from_config_file(monkeypatch, tmp_path):
-    from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+    from eir_constants import reset_eir_home_override, set_eir_home_override
 
-    hermes_home = tmp_path / "hermes"
-    hermes_home.mkdir()
-    (hermes_home / "config.yaml").write_text(
+    eir_home = tmp_path / "eir"
+    eir_home.mkdir()
+    (eir_home / "config.yaml").write_text(
         "context:\n  memory_trim:\n    enabled: false\n",
         encoding="utf-8",
     )
     trim = Mock(return_value=1)
     monkeypatch.setattr(mem_trim, "_malloc_trim", trim)
-    token = set_hermes_home_override(hermes_home)
+    token = set_eir_home_override(eir_home)
 
     try:
         assert mem_trim.trim_memory(force=True) is False
         trim.assert_not_called()
     finally:
-        reset_hermes_home_override(token)
+        reset_eir_home_override(token)
 
 
 
@@ -129,7 +129,7 @@ def test_config_cooldown_controls_rate_limit(monkeypatch):
     monkeypatch.setattr(mem_trim, "_last_trim_monotonic", 1.0)
     monkeypatch.setattr(mem_trim.time, "monotonic", lambda: 100.0)
     monkeypatch.setattr(
-        "hermes_cli.config.load_config_readonly",
+        "eir_cli.config.load_config_readonly",
         lambda: {
             "context": {
                 "memory_trim": {"enabled": True, "cooldown_seconds": 120.0}

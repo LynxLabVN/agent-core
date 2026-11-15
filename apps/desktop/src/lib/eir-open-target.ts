@@ -1,20 +1,20 @@
 /**
  * Shared resolver for in-app navigation targets that must stay compatible with
- * `hermes://` deep links and `host.navigate('/path?…')`.
+ * `eir://` deep links and `host.navigate('/path?…')`.
  *
  * Notification activation, deep-link delivery, and plugin `activate` payloads
  * all funnel through here so a toast click and an OS deep link land on the
  * same hash-router path.
  *
  * Supported deep-link shapes:
- *  - `hermes://index-network/intent/1` → `/index-network/intent/1` (plugin-scoped)
- *  - `hermes://open/my-page?item=x` → `/my-page?item=x` (generic open)
+ *  - `eir://index-network/intent/1` → `/index-network/intent/1` (plugin-scoped)
+ *  - `eir://open/my-page?item=x` → `/my-page?item=x` (generic open)
  *  - `/my-page?item=x` / `#/my-page?item=x` (hash-router paths)
  */
 
-export type HermesOpenTarget = string | { href: string } | { path: string; params?: Record<string, string> }
+export type EirOpenTarget = string | { href: string } | { path: string; params?: Record<string, string> }
 
-const HERMES_PROTOCOL = 'hermes:'
+const EIR_PROTOCOL = 'eir:'
 
 /** Hostnames owned by core deep-link handlers — never treated as plugin routes. */
 const RESERVED_DEEP_LINK_KINDS = new Set([
@@ -66,20 +66,20 @@ function isPluginDeepLinkHost(host: string): boolean {
 }
 
 /** Normalize a string target to a hash-router path, or null. */
-export function normalizeHermesOpenString(raw: string): string | null {
+export function normalizeEirOpenString(raw: string): string | null {
   const trimmed = raw.trim()
 
   if (!trimmed) {
     return null
   }
 
-  if (trimmed.startsWith('hermes://') || trimmed.startsWith(`${HERMES_PROTOCOL}//`)) {
+  if (trimmed.startsWith('eir://') || trimmed.startsWith(`${EIR_PROTOCOL}//`)) {
     try {
       const url = new URL(trimmed)
       const host = url.hostname || ''
       const rest = decodeURIComponent((url.pathname || '').replace(/^\//, ''))
 
-      // hermes://open/<path>?… → /<path>?…
+      // eir://open/<path>?… → /<path>?…
       if (host === 'open') {
         if (!rest) {
           return null
@@ -94,7 +94,7 @@ export function normalizeHermesOpenString(raw: string): string | null {
         return appendSearch(path, url.searchParams)
       }
 
-      // hermes://index-network/intent/1 → /index-network/intent/1
+      // eir://index-network/intent/1 → /index-network/intent/1
       if (!isPluginDeepLinkHost(host) || !rest) {
         return null
       }
@@ -121,13 +121,13 @@ export function normalizeHermesOpenString(raw: string): string | null {
 }
 
 /** Resolve any supported activate/open target to a hash-router path, or null. */
-export function resolveHermesOpenPath(target: HermesOpenTarget | null | undefined): string | null {
+export function resolveEirOpenPath(target: EirOpenTarget | null | undefined): string | null {
   if (target == null) {
     return null
   }
 
   if (typeof target === 'string') {
-    return normalizeHermesOpenString(target)
+    return normalizeEirOpenString(target)
   }
 
   if (typeof target !== 'object') {
@@ -135,11 +135,11 @@ export function resolveHermesOpenPath(target: HermesOpenTarget | null | undefine
   }
 
   if ('href' in target && typeof target.href === 'string') {
-    return normalizeHermesOpenString(target.href)
+    return normalizeEirOpenString(target.href)
   }
 
   if ('path' in target && typeof target.path === 'string') {
-    const base = normalizeHermesOpenString(target.path)
+    const base = normalizeEirOpenString(target.path)
 
     if (!base) {
       return null
@@ -153,25 +153,25 @@ export function resolveHermesOpenPath(target: HermesOpenTarget | null | undefine
 
 /**
  * Build a navigate path from a parsed deep-link payload
- * (`hermes://<kind>/<name>?…` → kind/name/params).
+ * (`eir://<kind>/<name>?…` → kind/name/params).
  */
-export function pathFromHermesDeepLink(kind: string, name: string, params: Record<string, string> = {}): string | null {
+export function pathFromEirDeepLink(kind: string, name: string, params: Record<string, string> = {}): string | null {
   if (!kind || !name) {
     return null
   }
 
   if (kind === 'open') {
-    return resolveHermesOpenPath({ path: `/${name.replace(/^\//, '')}`, params })
+    return resolveEirOpenPath({ path: `/${name.replace(/^\//, '')}`, params })
   }
 
   if (!isPluginDeepLinkHost(kind)) {
     return null
   }
 
-  return resolveHermesOpenPath({ path: `/${kind}/${name.replace(/^\//, '')}`, params })
+  return resolveEirOpenPath({ path: `/${kind}/${name.replace(/^\//, '')}`, params })
 }
 
-/** Convenience for `hermes://open/<name>?…` payloads. */
+/** Convenience for `eir://open/<name>?…` payloads. */
 export function pathFromOpenDeepLink(name: string, params: Record<string, string> = {}): string | null {
-  return pathFromHermesDeepLink('open', name, params)
+  return pathFromEirDeepLink('open', name, params)
 }

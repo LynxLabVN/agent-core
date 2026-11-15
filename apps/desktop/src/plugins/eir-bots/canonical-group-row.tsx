@@ -12,7 +12,7 @@ import {
   RowButton,
   useI18n,
   useValue
-} from '@hermes/plugin-sdk'
+} from '@eir/plugin-sdk'
 import { useState } from 'react'
 
 import { $canonicalRoomLive, canonicalRoomLiveKey } from './canonical-group-details'

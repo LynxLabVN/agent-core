@@ -4,7 +4,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 
 const request = vi.hoisted(() => vi.fn())
 
-vi.mock('@hermes/plugin-sdk', () => ({
+vi.mock('@eir/plugin-sdk', () => ({
   Button: (props: ComponentProps<'button'>) => <button {...props} />,
   Dialog: ({ children, open }: { children: ReactNode; open: boolean }) => (open ? <div>{children}</div> : null),
   DialogContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,

@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest'
 
-vi.mock('@hermes/plugin-sdk', async () => (await import('./group-test-utils')).pluginSdkMock({}))
+vi.mock('@eir/plugin-sdk', async () => (await import('./group-test-utils')).pluginSdkMock({}))
 
 import { CANONICAL_GROUP_LOCALES } from './canonical-group-locales'
 import { memberStatusText } from './group-room-ui'

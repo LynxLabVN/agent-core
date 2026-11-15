@@ -6,7 +6,7 @@ description: Display-only Markdown styling for Desktop assistant replies — the
 maintainer: ANNIPU
 tier: community
 category: desktop
-requires_hermes: ">=0.22.6"
+requires_eir: ">=0.22.6"
 version: "0.1.6"
 image: https://raw.githubusercontent.com/annipu/hermes-output-enhancement/1f0e8e0a0021a8220ebfdb4e7b94c2fc9f466754/docs/banner.png
 docs_url: https://github.com/annipu/hermes-output-enhancement/blob/1f0e8e0a0021a8220ebfdb4e7b94c2fc9f466754/README.md

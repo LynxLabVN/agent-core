@@ -7,11 +7,11 @@ import sqlite3
 import time
 from typing import Sequence
 
-from hermes_state_common import FTS_SQL, FTS_STALE_KEY, FTS_TRIGRAM_SQL, _FTS_TRIGGERS
-from hermes_state_errors import is_fts_scoped_corruption_error, is_sqlite_lock_error
+from eir_state_common import FTS_SQL, FTS_STALE_KEY, FTS_TRIGRAM_SQL, _FTS_TRIGGERS
+from eir_state_errors import is_fts_scoped_corruption_error, is_sqlite_lock_error
 
-# caplog tests pin the "hermes_state" logger name.
-logger = logging.getLogger("hermes_state")
+# caplog tests pin the "eir_state" logger name.
+logger = logging.getLogger("eir_state")
 
 _FTS_DDL_TABLES = ("messages_fts", "messages_fts_trigram")
 
@@ -289,7 +289,7 @@ class SessionFtsSetupMixin:
         self._fts_unavailable_warned = True
         logger.warning(
             "SQLite FTS5 unavailable for %s; full-text session search "
-            "disabled. Run `hermes update` to rebuild the venv with a "
+            "disabled. Run `eir update` to rebuild the venv with a "
             "current Python (managed uv guarantees FTS5). (underlying error: %s)",
             self.db_path,
             exc,
@@ -326,7 +326,7 @@ class SessionFtsSetupMixin:
         """Corruption SQLite identifies as FTS-scoped (SQLITE_CORRUPT_VTAB, or an ``fts5:``
         report naming ``messages_fts*`` on builds without result codes); a bare malformed
         image is structural. One rule, shared with ``classify_persistence_error`` and the
-        gateway transcript retry: see :func:`hermes_state_errors.is_fts_scoped_corruption_error`."""
+        gateway transcript retry: see :func:`eir_state_errors.is_fts_scoped_corruption_error`."""
         return is_fts_scoped_corruption_error(exc)
 
     def _enter_fts_fail_open(
@@ -395,7 +395,7 @@ class SessionFtsSetupMixin:
     # backfill and teardown run in chunks: each its own bounded transaction (WAL
     # growth stays small), resumable from its marker (claimed by CAS), and a
     # progress tick. They run back to back with no pause while no other process
-    # holds state.db: the foreground `hermes sessions optimize-storage` refuses to
+    # holds state.db: the foreground `eir sessions optimize-storage` refuses to
     # start under a holder (held_store_refusal, #110054), and a fixed 0.2 s pause
     # after each few-ms chunk was >95% of the wall time. Chunk size (in ROWS, never
     # an id span: a pruned store has id gaps) adapts toward TARGET seconds, since

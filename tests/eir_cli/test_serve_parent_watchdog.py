@@ -1,8 +1,8 @@
-"""Regression tests for Desktop-owned ``hermes serve`` lifecycle tracking."""
+"""Regression tests for Desktop-owned ``eir serve`` lifecycle tracking."""
 
 import pytest
 
-from hermes_cli.web_server_lifecycle import (
+from eir_cli.web_server_lifecycle import (
     _is_serve_orphaned,
     _parent_start_marker_mismatch_is_conclusive,
     _valid_parent_start_marker,
@@ -126,12 +126,12 @@ def test_macos_ps_marker_requires_full_lstart_not_a_truncated_weekday():
 
 
 def test_parent_watchdog_treats_empty_marker_env_as_absent(monkeypatch):
-    """Blank inherited HERMES_PARENT_START_MARKER/NONCE degrade to PID-only tracking."""
-    from hermes_cli import web_server_lifecycle
+    """Blank inherited EIR_PARENT_START_MARKER/NONCE degrade to PID-only tracking."""
+    from eir_cli import web_server_lifecycle
 
-    monkeypatch.setenv("HERMES_PARENT_PID", "4242")
-    monkeypatch.setenv("HERMES_PARENT_START_MARKER", "")
-    monkeypatch.setenv("HERMES_PARENT_NONCE", "")
+    monkeypatch.setenv("EIR_PARENT_PID", "4242")
+    monkeypatch.setenv("EIR_PARENT_START_MARKER", "")
+    monkeypatch.setenv("EIR_PARENT_NONCE", "")
     seen = {}
 
     def fake_orphaned(pid, marker):
@@ -159,16 +159,16 @@ def test_parent_watchdog_warns_when_disarmed_by_unusable_marker(monkeypatch, cap
     """Disarming is fail-safe but must leave a trace in the log."""
     import logging
 
-    from hermes_cli import web_server_lifecycle
+    from eir_cli import web_server_lifecycle
 
-    monkeypatch.setenv("HERMES_PARENT_PID", "4242")
-    monkeypatch.setenv("HERMES_PARENT_START_MARKER", "ps:Sat")
-    monkeypatch.setenv("HERMES_PARENT_NONCE", "n")
+    monkeypatch.setenv("EIR_PARENT_PID", "4242")
+    monkeypatch.setenv("EIR_PARENT_START_MARKER", "ps:Sat")
+    monkeypatch.setenv("EIR_PARENT_NONCE", "n")
     started = []
     monkeypatch.setattr(
         web_server_lifecycle.threading, "Thread", lambda *a, **k: started.append(1) or _NoThread()
     )
-    with caplog.at_level(logging.WARNING, logger="hermes_cli.web_server"):
+    with caplog.at_level(logging.WARNING, logger="eir_cli.web_server"):
         web_server_lifecycle._start_parent_death_watchdog()
     assert started == [], "an unusable marker must disarm, not arm, the watchdog"
     assert any("watchdog disabled" in r.getMessage() for r in caplog.records)
@@ -206,7 +206,7 @@ def test_ps_marker_probe_classifies_missing_process_vs_other_ps_failures(monkeyp
     of killing a healthy backend."""
     import subprocess
 
-    from hermes_cli import web_server_lifecycle
+    from eir_cli import web_server_lifecycle
 
     def fake_run(stderr):
         return lambda *a, **k: subprocess.CompletedProcess(args=a, returncode=2, stdout="", stderr=stderr)
@@ -230,11 +230,11 @@ def test_parent_watchdog_shuts_down_through_the_signal_path_not_os_exit(monkeypa
     import signal
     import threading
 
-    from hermes_cli import web_server_lifecycle
+    from eir_cli import web_server_lifecycle
 
-    monkeypatch.setenv("HERMES_PARENT_PID", "4242")
-    monkeypatch.delenv("HERMES_PARENT_START_MARKER", raising=False)
-    monkeypatch.delenv("HERMES_PARENT_NONCE", raising=False)
+    monkeypatch.setenv("EIR_PARENT_PID", "4242")
+    monkeypatch.delenv("EIR_PARENT_START_MARKER", raising=False)
+    monkeypatch.delenv("EIR_PARENT_NONCE", raising=False)
     monkeypatch.setattr(web_server_lifecycle, "_is_serve_orphaned", lambda *_args: True)
 
     hard_exits = []
@@ -279,7 +279,7 @@ def test_parent_watchdog_arms_a_daemon_hard_exit_ceiling(monkeypatch):
     import os
     import signal
 
-    from hermes_cli import web_server_lifecycle
+    from eir_cli import web_server_lifecycle
 
     raised = []
     monkeypatch.setattr(web_server_lifecycle.signal, "raise_signal", raised.append)

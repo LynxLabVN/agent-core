@@ -4,8 +4,8 @@ from __future__ import annotations
 import sys
 import types
 
-from hermes_agent.compat import moves
-from hermes_cli import plugin_host_child, plugin_isolation
+from eir_agent.compat import moves
+from eir_cli import plugin_host_child, plugin_isolation
 
 
 def test_a_base_imported_under_its_moved_name_still_matches(monkeypatch):

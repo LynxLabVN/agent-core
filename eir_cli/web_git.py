@@ -17,7 +17,7 @@ import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
-from hermes_cli._subprocess_compat import (
+from eir_cli._subprocess_compat import (
     FILTER_DISCOVERY_FAILED,
     harden_git_argv,
     noninteractive_git_env,
@@ -648,7 +648,7 @@ def _fetch_tracking_ref(root: str, remote: str, branch: str) -> bool:
     A tag-pinned narrow clone maps only the tag in ``remote.<remote>.fetch``, so a by-name
     fetch writes FETCH_HEAD without creating the tracking ref (#125686).
     """
-    from hermes_cli.update_cmd_check import tracking_refspec
+    from eir_cli.update_cmd_check import tracking_refspec
 
     return _git_write(root, ["fetch", remote, tracking_refspec(remote, branch)])[0] == 0
 
@@ -679,7 +679,7 @@ def _ensure_repo(cwd: str) -> None:
     else:
         needs_root = not _ref_exists(cwd, "HEAD", run=_git_write)
     if needs_root:
-        _git_ok(cwd, ["-c", "user.email=hermes@localhost", "-c", "user.name=Hermes",
+        _git_ok(cwd, ["-c", "user.email=eir@localhost", "-c", "user.name=Eir",
                       "commit", "--allow-empty", "-m", "Initial commit"])
 
 
@@ -757,12 +757,12 @@ def worktree_add(cwd: str, options: dict) -> dict:
     if options.get("existingBranch"):
         result = _worktree_for_existing(root, options["existingBranch"])
         if result.get("path") != root:  # a new checkout, not a switch of the main tree
-            from hermes_cli.worktree_registry import record_worktree_repo
+            from eir_cli.worktree_registry import record_worktree_repo
             record_worktree_repo(root)
         return result
 
     slug = _slugify(options.get("name") or f"work-{os.urandom(4).hex()}")
-    branch = _sanitize_branch(options.get("branch") or "") or f"hermes/{slug}"
+    branch = _sanitize_branch(options.get("branch") or "") or f"eir/{slug}"
     target = _unique_dir(os.path.join(root, ".worktrees", slug))
     args = ["worktree", "add", "-b", branch, target]
     if options.get("base"):
@@ -785,7 +785,7 @@ def worktree_add(cwd: str, options: dict) -> dict:
         if "already exists" not in (err or "").lower():
             raise RuntimeError(err.strip() or "git worktree add failed")
         _git_ok(root, ["worktree", "add", target, branch])
-    from hermes_cli.worktree_registry import record_worktree_repo
+    from eir_cli.worktree_registry import record_worktree_repo
     record_worktree_repo(root)
     return {"path": target, "branch": branch, "repoRoot": root}
 

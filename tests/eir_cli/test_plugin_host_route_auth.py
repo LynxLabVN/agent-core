@@ -4,15 +4,15 @@ from types import SimpleNamespace
 
 import pytest
 
-from hermes_cli.plugin_host import PluginHost
-from tests.hermes_cli import test_plugin_secondary_profile_host as secondary
+from eir_cli.plugin_host import PluginHost
+from tests.eir_cli import test_plugin_secondary_profile_host as secondary
 
 daemon = secondary.daemon
 
 _API = '''
 import os
 from fastapi import APIRouter, Request
-from hermes_cli.web_deps import late
+from eir_cli.web_deps import late
 
 router = APIRouter()
 
@@ -21,7 +21,7 @@ async def config(request: Request):
     late("_require_token")(request)
     return {"pid": os.getpid(), "saved": True,
             "credentials": [k for k in request.headers if k in
-                {"authorization", "cookie", "x-hermes-session-token", "x-hermes-gateway-ticket"}]}
+                {"authorization", "cookie", "x-eir-session-token", "x-eir-gateway-ticket"}]}
 '''
 
 
@@ -81,8 +81,8 @@ def test_launch_host_preserves_native_admission(daemon, monkeypatch):
 def test_admission_matches_normal_guard_and_preserves_unguarded_routes():
     from fastapi import FastAPI, HTTPException
     from starlette.requests import Request
-    from hermes_cli.plugin_host_http_auth import admitted_for_sensitive_route
-    from hermes_cli import web_server
+    from eir_cli.plugin_host_http_auth import admitted_for_sensitive_route
+    from eir_cli import web_server
 
     app = FastAPI()
     scope = {"type": "http", "method": "PUT", "path": "/config", "headers": [], "app": app}

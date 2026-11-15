@@ -1,4 +1,4 @@
-import { stringWidth, Text } from '@hermes/ink'
+import { stringWidth, Text } from '@eir/ink'
 import { useStore } from '@nanostores/react'
 
 import { type LoopLine, useLoopLine } from '../app/loopStatus.js'

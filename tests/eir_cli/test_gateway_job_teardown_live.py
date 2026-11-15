@@ -10,11 +10,11 @@ Three live proofs (no mocks of the code under test):
    by it. This is exactly the reporter's suspected kill path.
 
 2. ``TestWatcherRespawnLive`` — drives the REAL
-   ``hermes_cli.gateway._spawn_gateway_restart_watcher`` end to end with a
-   real stub gateway process, against a temp HERMES_HOME:
+   ``eir_cli.gateway._spawn_gateway_restart_watcher`` end to end with a
+   real stub gateway process, against a temp EIR_HOME:
    - the respawned process's stderr must land in ``logs/gateway-stdio.log``
      (on unfixed main it went to DEVNULL: a job-teardown kill left ZERO trace);
-   - the respawn env must carry ``_HERMES_GATEWAY_BREAKAWAY=1`` (the stamp
+   - the respawn env must carry ``_EIR_GATEWAY_BREAKAWAY=1`` (the stamp
      that makes a later job-teardown death diagnosable in exit-diag).
 
 3. ``TestResumeVerificationLive`` — the user-visible symptom: the updater's
@@ -148,7 +148,7 @@ def _start_driver_in_job(k, job: int, argv: list[str]) -> subprocess.Popen:
     grandchild, so the grandchild escaped the job and survived the teardown
     (~6% of CI runs before this).
     """
-    from hermes_cli.update_lock import resume_suspended_child
+    from eir_cli.update_lock import resume_suspended_child
 
     driver = subprocess.Popen(argv, cwd=str(_REPO_ROOT), creationflags=CREATE_SUSPENDED)
     if not k.AssignProcessToJobObject(job, int(driver._handle)):
@@ -191,7 +191,7 @@ class TestJobObjectMechanismLive:
         return (
             "import os, subprocess, sys, pathlib\n"
             f"sys.path.insert(0, r'{_REPO_ROOT!s}')\n"
-            "from hermes_cli._subprocess_compat import (\n"
+            "from eir_cli._subprocess_compat import (\n"
             "    windows_detach_flags, windows_detach_flags_without_breakaway)\n"
             f"flags = {flags_helper}()\n"
             f"p = subprocess.Popen([sys.executable, '-c', {_SLEEPER!r}],\n"
@@ -285,7 +285,7 @@ class TestWatcherRespawnLive:
     """Drive the real ``_spawn_gateway_restart_watcher`` with real processes."""
 
     def _run_watcher_cycle(self, tmp_path: Path, monkeypatch) -> tuple[Path, Path]:
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "home"))
+        monkeypatch.setenv("EIR_HOME", str(tmp_path / "home"))
         (tmp_path / "home").mkdir(parents=True, exist_ok=True)
 
         marker = tmp_path / "respawned.marker"
@@ -294,7 +294,7 @@ class TestWatcherRespawnLive:
         stub = (
             "import os, pathlib, sys\n"
             f"pathlib.Path(r'{marker}').write_text(\n"
-            "    os.environ.get('_HERMES_GATEWAY_BREAKAWAY', 'MISSING'),\n"
+            "    os.environ.get('_EIR_GATEWAY_BREAKAWAY', 'MISSING'),\n"
             "    encoding='utf-8')\n"
             "print('stub-gateway-stderr-trace', file=sys.stderr)\n"
         )
@@ -304,7 +304,7 @@ class TestWatcherRespawnLive:
         old = subprocess.Popen([sys.executable, "-c", "pass"])
         old.wait(timeout=30)
 
-        from hermes_cli import gateway
+        from eir_cli import gateway
 
         assert gateway._spawn_gateway_restart_watcher(
             old.pid, [sys.executable, "-c", stub]
@@ -342,12 +342,12 @@ class TestResumeVerificationLive:
     """The user-visible lie: '✓ Restarting' printed for a dead gateway."""
 
     def test_dead_relaunch_is_not_reported_as_success(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "home"))
+        monkeypatch.setenv("EIR_HOME", str(tmp_path / "home"))
         (tmp_path / "home").mkdir(parents=True, exist_ok=True)
 
-        from hermes_cli import gateway
-        import hermes_cli.main as hm
-        from hermes_cli.update_cmd import _resume_windows_gateways_after_update
+        from eir_cli import gateway
+        import eir_cli.main as hm
+        from eir_cli.update_cmd import _resume_windows_gateways_after_update
 
         # Peripheral only: don't regenerate launcher scripts into the temp home.
         monkeypatch.setattr(hm, "_refresh_windows_gateway_launchers", lambda: None)

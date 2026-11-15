@@ -16,11 +16,11 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import BinaryIO, Generator
 
-from hermes_cli.termination_guard import unwind_on_termination
+from eir_cli.termination_guard import unwind_on_termination
 
 logger = logging.getLogger(__name__)
-_PREFIX = ".hermes-backup-stage-"
-_NAME = re.compile(r"\.hermes-backup-stage-[0-9a-f]{32}\Z")
+_PREFIX = ".eir-backup-stage-"
+_NAME = re.compile(r"\.eir-backup-stage-[0-9a-f]{32}\Z")
 _LEGACY_NAME = re.compile(r"(?:tmp.+\.db|\..+\.zip\.\d+-\d+\.partial)\Z")
 _LEASE = "owner.lock"
 _PAYLOADS = frozenset(
@@ -46,7 +46,7 @@ def _plain_path(path: Path, *, directory: bool = False) -> bool:
 
 
 def _marker(stage: Path) -> bytes:
-    return f"hermes-backup-stage-v1:{stage.name}\n".encode("ascii")
+    return f"eir-backup-stage-v1:{stage.name}\n".encode("ascii")
 
 
 def is_backup_staging(stage: Path) -> bool:

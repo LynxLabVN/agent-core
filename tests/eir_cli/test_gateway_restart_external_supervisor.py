@@ -1,6 +1,6 @@
-"""``hermes gateway restart`` must hand an externally-supervised gateway back to its supervisor.
+"""``eir gateway restart`` must hand an externally-supervised gateway back to its supervisor.
 
-A custom launchd agent (a plist/label outside the canonical ``ai.hermes.gateway`` path, so
+A custom launchd agent (a plist/label outside the canonical ``ai.eir.gateway`` path, so
 ``_installed_service_kind_for`` returns None) fell through to the manual stop + foreground
 ``run_gateway`` fallback. The foreground run stamps the restart CLI's own PID into gateway.pid,
 and every KeepAlive respawn of ``gateway run --external-supervisor`` then refuses with
@@ -12,11 +12,11 @@ from types import SimpleNamespace
 import pytest
 
 from gateway import status as gateway_status
-from hermes_cli import gateway as gw
-from hermes_cli import gateway_supervised_restart as supervised
+from eir_cli import gateway as gw
+from eir_cli import gateway_supervised_restart as supervised
 
 SUPERVISED_ARGV = [
-    "/usr/bin/python", "-m", "hermes_cli.main", "gateway", "run", "--external-supervisor",
+    "/usr/bin/python", "-m", "eir_cli.main", "gateway", "run", "--external-supervisor",
 ]
 
 
@@ -50,7 +50,7 @@ def restart_calls(monkeypatch):
     monkeypatch.setattr(gw, "_wait_for_gateway_exit", lambda **k: None)
     monkeypatch.setattr(gw, "run_gateway", lambda **k: calls.__setitem__("started", True))
     # Hermetic on Linux CI: the runner's own /proc + systemd must not make the gateway look service-owned.
-    monkeypatch.setattr("hermes_cli.main_dashboard._get_systemd_service_for_pid", lambda pid: None)
+    monkeypatch.setattr("eir_cli.main_dashboard._get_systemd_service_for_pid", lambda pid: None)
     # PID 4321 is fake, but on a busy runner it can be a real process; an unknown start time keeps the
     # drain-timeout branch from reading that stranger as "still running live work" and returning.
     monkeypatch.setattr("gateway.status.get_process_start_time", lambda pid: None)
@@ -98,32 +98,32 @@ def test_handback_failure_never_takes_ownership(restart_calls, sigusr1_returns, 
 
 
 def test_plain_manual_gateway_still_uses_stop_and_run(restart_calls, monkeypatch):
-    monkeypatch.setattr(gw, "_capture_gateway_argv", lambda pid: ["/usr/bin/python", "-m", "hermes_cli.main", "gateway", "run"])
+    monkeypatch.setattr(gw, "_capture_gateway_argv", lambda pid: ["/usr/bin/python", "-m", "eir_cli.main", "gateway", "run"])
     _run_restart()
     assert restart_calls["sigusr1"] is None, "no supervisor marker: the detached fallback is the restart"
     assert restart_calls["started"], "a plain manually-run gateway must still be restarted in-process"
 
 
 @pytest.mark.parametrize("cgroup, hints", [
-    ("/system.slice/hermes.service", ["sudo systemctl restart hermes.service"]),
-    ("/user.slice/user-1000.slice/user@1000.service/app.slice/hermes.service",
-     ["systemctl --user restart hermes.service"]),
-    (None, ["systemctl --user restart hermes.service", "sudo systemctl restart hermes.service"]),
+    ("/system.slice/eir.service", ["sudo systemctl restart eir.service"]),
+    ("/user.slice/user-1000.slice/user@1000.service/app.slice/eir.service",
+     ["systemctl --user restart eir.service"]),
+    (None, ["systemctl --user restart eir.service", "sudo systemctl restart eir.service"]),
 ])
 def test_service_managed_gateway_refuses_fallback_takeover(restart_calls, monkeypatch, capsys, cgroup, hints):
     """A gateway supervised under ANY unit name must not be taken over by the fallback (#126474).
 
-    Pre-convention ``hermes.service`` unit, no ``--external-supervisor`` marker, control socket
+    Pre-convention ``eir.service`` unit, no ``--external-supervisor`` marker, control socket
     unreachable while busy serving webhooks: the identify/argv probe missed it, so the fallback
     SIGKILLed a live gateway and spawned an unsupervised orphan in the caller's cgroup while the
     unit's ``Restart=`` flapped against the stolen lock for hours. The hint follows the unit's
     scope; an unknown scope prints both forms.
     """
     monkeypatch.setattr(gw, "_capture_gateway_argv",
-                        lambda pid: ["/usr/bin/python", "-m", "hermes_cli.main", "gateway", "run"])
-    monkeypatch.setattr("hermes_cli.main_dashboard._get_systemd_service_for_pid",
-                        lambda pid: "hermes.service" if pid == 4321 else None)
-    monkeypatch.setattr("hermes_cli.main_dashboard._get_pid_cgroup_path",
+                        lambda pid: ["/usr/bin/python", "-m", "eir_cli.main", "gateway", "run"])
+    monkeypatch.setattr("eir_cli.main_dashboard._get_systemd_service_for_pid",
+                        lambda pid: "eir.service" if pid == 4321 else None)
+    monkeypatch.setattr("eir_cli.main_dashboard._get_pid_cgroup_path",
                         lambda pid: cgroup if pid == 4321 else None)
     with pytest.raises(SystemExit) as exc:
         _run_restart()

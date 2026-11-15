@@ -1,7 +1,7 @@
 """Bundled-resource env pointers baked into generated gateway service units.
 
-The ``hermes`` wrapper on packaged installs (Homebrew, Nix) exports ``HERMES_BUNDLED_*`` so bundled
-plugins/skills/locales/TUI assets outside site-packages (e.g. ``<prefix>/share/hermes-agent/plugins``)
+The ``eir`` wrapper on packaged installs (Homebrew, Nix) exports ``EIR_BUNDLED_*`` so bundled
+plugins/skills/locales/TUI assets outside site-packages (e.g. ``<prefix>/share/eir-agent/plugins``)
 are found. launchd and systemd start the venv python directly, bypassing the wrapper, so these must be
 written into the unit; otherwise the supervised gateway discovers zero bundled platform manifests and
 logs "No adapter available for <platform>" (#85357).
@@ -16,11 +16,11 @@ from xml.sax.saxutils import escape
 import os
 
 BUNDLED_RESOURCE_ENV_VARS = (
-    "HERMES_BUNDLED_PLUGINS",
-    "HERMES_BUNDLED_SKILLS",
-    "HERMES_BUNDLED_LOCALES",
-    "HERMES_OPTIONAL_SKILLS",
-    "HERMES_TUI_DIR",
+    "EIR_BUNDLED_PLUGINS",
+    "EIR_BUNDLED_SKILLS",
+    "EIR_BUNDLED_LOCALES",
+    "EIR_OPTIONAL_SKILLS",
+    "EIR_TUI_DIR",
 )
 
 
@@ -49,7 +49,7 @@ def systemd_env_line(name: str, value: str) -> str:
 
 def systemd_bundled_env_block(unit_path: Path) -> str:
     """Extra ``Environment=`` lines for the systemd unit at ``unit_path`` (``""`` when none apply)."""
-    from hermes_cli.gateway import _unit_environment_value
+    from eir_cli.gateway import _unit_environment_value
 
     prior = {name: (_unit_environment_value(unit_path, name) or "") for name in BUNDLED_RESOURCE_ENV_VARS}
     return "".join(systemd_env_line(name, value) for name, value in bundled_resource_env_pairs(prior))

@@ -1,6 +1,6 @@
 """chat() and its per-turn phases: image routing, staging, agent thread, interrupt monitor, rendering.
 
-Mixin bound onto ``HermesCLI`` via the MRO. cli.py-internal symbols are imported LAZILY
+Mixin bound onto ``EirCLI`` via the MRO. cli.py-internal symbols are imported LAZILY
 inside each method — importing ``cli`` at module load time would be a cycle.
 """
 
@@ -20,7 +20,7 @@ from typing import Optional
 
 from agent.i18n import t
 
-from hermes_cli.cli_agent_setup_mixin import _retire_agent
+from eir_cli.cli_agent_setup_mixin import _retire_agent
 
 
 class CLIChatTurnMixin:
@@ -38,8 +38,8 @@ class CLIChatTurnMixin:
         from cli import logger
         try:
             from gateway.run import GatewayRunner
-            from hermes_cli.config_effective import load_user_config_effective
-            from hermes_cli.fallback_config import get_fallback_chain
+            from eir_cli.config_effective import load_user_config_effective
+            from eir_cli.fallback_config import get_fallback_chain
             self._fallback_model = get_fallback_chain(load_user_config_effective(fail_closed=True))
         except Exception as e:
             logger.debug("fallback chain sync skipped (keeping current chain): %s", e)
@@ -168,7 +168,7 @@ class CLIChatTurnMixin:
         text = message if isinstance(message, str) else ""
         try:
             from agent.image_routing import build_native_content_parts, decide_image_input_mode
-            from hermes_cli.config import load_config
+            from eir_cli.config import load_config
 
             _img_model = (_split_model_config_default(self.model)[0]
                           if isinstance(self.model, dict) else str(self.model or ""))
@@ -256,12 +256,12 @@ class CLIChatTurnMixin:
             # _stream_delta already renders the text and this would print it twice.
             def display_callback(sentence: str):
                 if not turn.box_opened and getattr(self, "_modern_layout", False):
-                    from hermes_cli.cli_modern_layout import answer_label
+                    from eir_cli.cli_modern_layout import answer_label
                     turn.box_opened = True
                     _cprint(answer_label())
                 if not turn.box_opened:
                     turn.box_opened = True
-                    label = " ☤ Hermes "
+                    label = " ☤ Eir "
                     if self.show_timestamps:
                         label = f"{label}{datetime.now().strftime(self.timestamp_format)} "
                     w = self._scrollback_box_width(getattr(self.console, "width", 80))
@@ -361,7 +361,7 @@ class CLIChatTurnMixin:
         except Exception as exc:
             logging.error("run_conversation raised: %s", exc, exc_info=True)
             _summary = getattr(self.agent, '_summarize_api_error', lambda e: str(e)[:300])(exc)
-            from hermes_cli.cli_chat_error_copy import chat_error_response
+            from eir_cli.cli_chat_error_copy import chat_error_response
             turn.result = {
                 "final_response": chat_error_response(
                     exc, provider=str(getattr(self.agent, "provider", "") or self.provider or ""),
@@ -388,7 +388,7 @@ class CLIChatTurnMixin:
             # pre-refusal history; this makes the durable model read match it.
             if (turn.result or {}).get("failure_reason") == "content_policy_blocked":
                 from agent.turn_failure_copy import CONTENT_REFUSED_NOTICE
-                from hermes_state_rewind import retain_refused_turn_for_display
+                from eir_state_rewind import retain_refused_turn_for_display
                 retain_refused_turn_for_display(
                     getattr(self.agent, "_session_db", None), getattr(self.agent, "session_id", None),
                     notice=CONTENT_REFUSED_NOTICE,
@@ -516,9 +516,9 @@ class CLIChatTurnMixin:
         """/discard <admission_id>: acknowledge a turn the gateway lost in a restart without replaying
         it (the owner's fenced ``prompt.resolve_unknown``), so prompts may run again."""
         from cli import _cprint
-        from hermes_cli.gateway_chat_view import lost_admission
-        from hermes_cli.gateway_client import GatewayClientError
-        from hermes_cli.gateway_side import connection_for
+        from eir_cli.gateway_chat_view import lost_admission
+        from eir_cli.gateway_client import GatewayClientError
+        from eir_cli.gateway_side import connection_for
         admission_id = cmd_original.partition(" ")[2].strip()
         if not admission_id:
             _cprint("  Usage: /discard <admission_id>")
@@ -555,7 +555,7 @@ class CLIChatTurnMixin:
             return None
         # "failed"/"partial" with an empty final_response: no usable answer.
         if turn.result and (turn.result.get("failed") or turn.result.get("partial")) and not response:
-            from hermes_cli.cli_chat_error_copy import chat_error_response
+            from eir_cli.cli_chat_error_copy import chat_error_response
             response = chat_error_response(
                 str(turn.result.get("error") or t("cli.chat.unknown_error")),
                 provider=str(getattr(self.agent, "provider", "") or self.provider or ""),
@@ -684,7 +684,7 @@ class CLIChatTurnMixin:
         if self.show_reasoning and turn.result and not self._reasoning_shown_this_turn:
             reasoning = turn.result.get("last_reasoning")
             if reasoning and getattr(self, "_modern_layout", False):
-                from hermes_cli.cli_modern_layout import thought_rows
+                from eir_cli.cli_modern_layout import thought_rows
                 for line in thought_rows(None, reasoning, self.reasoning_full):
                     _cprint(line)
             elif reasoning:
@@ -709,13 +709,13 @@ class CLIChatTurnMixin:
         )
         if response and not (turn.result and turn.result.get("response_previewed", False)):
             try:
-                from hermes_cli.skin_engine import get_active_skin
+                from eir_cli.skin_engine import get_active_skin
                 _skin = get_active_skin()
-                label = _skin.get_branding("response_label", "☤ Hermes")
+                label = _skin.get_branding("response_label", "☤ Eir")
                 _resp_color = _maybe_remap_for_light_mode(_skin.get_color("response_border", "#CD7F32"))
                 _resp_text = _maybe_remap_for_light_mode(_skin.get_color("banner_text", "#FFF8DC"))
             except Exception:
-                label = "☤ Hermes"
+                label = "☤ Eir"
                 _resp_color = _maybe_remap_for_light_mode("#CD7F32")
                 _resp_text = _maybe_remap_for_light_mode("#FFF8DC")
 
@@ -731,14 +731,14 @@ class CLIChatTurnMixin:
                 (self._stream_started and self._stream_box_opened) or _interrupted_streamed
             ) and not is_error_response
             modern = getattr(self, "_modern_layout", False)
-            # A gateway refusal is Hermes's own copy (quoted user text, a /discard line to copy):
+            # A gateway refusal is Eir's own copy (quoted user text, a /discard line to copy):
             # markdown stripping or rendering would rewrite the quote and merge the lines.
             mode = ("raw" if turn.result and turn.result.get("failure_reason") == "gateway_connection"
                     else self.final_response_markdown)
             if turn.use_streaming_tts and turn.box_opened and not is_error_response:
                 # Text already printed sentence-by-sentence; just close the box.
                 if modern:
-                    from hermes_cli.cli_modern_layout import closing_separator
+                    from eir_cli.cli_modern_layout import closing_separator
                     _cprint(closing_separator(True))
                 else:
                     _cprint(f"\n{_ACCENT}╰{'─' * (self._scrollback_box_width() - 2)}╯{_RST}")
@@ -749,7 +749,7 @@ class CLIChatTurnMixin:
                 if _post_stream_text.strip():
                     _cprint(_post_stream_text)
             elif modern:
-                from hermes_cli.cli_modern_layout import answer_label, closing_separator
+                from eir_cli.cli_modern_layout import answer_label, closing_separator
                 _cprint(answer_label())
                 ChatConsole().print(_render_final_assistant_content(response, mode=mode),
                                     style=_resp_text, soft_wrap=True)  # terminal wraps; resize re-flows
@@ -766,7 +766,7 @@ class CLIChatTurnMixin:
             # stays visible instead of scrolling away inside the response prose.
             _limit = (turn.result or {}).get("usage_limit") if turn.result else None
             if isinstance(_limit, dict):
-                # Usage-window plan: what to do next, in commands that always work here. Hermes never
+                # Usage-window plan: what to do next, in commands that always work here. Eir never
                 # switches on its own; the user picks.
                 try:
                     from agent.plan_limits import limit_next_steps_from_payload

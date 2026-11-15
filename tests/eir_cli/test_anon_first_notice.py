@@ -6,9 +6,9 @@ import time
 
 import pytest
 
-from hermes_cli import anon_auth
-from hermes_cli.auth import _auth_store_lock, _load_auth_store, _save_auth_store
-from tests.hermes_cli.anon_portal import as_local_desktop_backend, claimed_trial, install_portal
+from eir_cli import anon_auth
+from eir_cli.auth import _auth_store_lock, _load_auth_store, _save_auth_store
+from tests.eir_cli.anon_portal import as_local_desktop_backend, claimed_trial, install_portal
 
 
 def _jwt(**claims) -> str:
@@ -45,7 +45,7 @@ def test_signed_in_account_is_never_told_about_the_free_tier(portal):
     with _auth_store_lock():
         store = _load_auth_store()
         store.setdefault("providers", {})["nous"] = {
-            "auth_method": "oauth", "access_token": _jwt(client_id="hermes-cli", account_tier="pro"),
+            "auth_method": "oauth", "access_token": _jwt(client_id="eir-cli", account_tier="pro"),
             "refresh_token": "rt", "expires_at": "2999-01-01T00:00:00+00:00"}
         _save_auth_store(store)
 

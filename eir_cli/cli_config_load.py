@@ -27,13 +27,13 @@ def _cli():
 def _load_prefill_messages(file_path: str, base_dir: Path | None = None) -> list[dict[str, Any]]:
     """Load prefill messages (JSON array) from *file_path*; missing/empty -> [].
 
-    Relative paths resolve against *base_dir*, defaulting to the CLI's hermes home.
+    Relative paths resolve against *base_dir*, defaulting to the CLI's eir home.
     """
     if not file_path:
         return []
     path = Path(file_path).expanduser()
     if not path.is_absolute():
-        path = (base_dir or _cli()._hermes_home) / path
+        path = (base_dir or _cli()._eir_home) / path
     if not path.exists():
         logger.warning("Prefill messages file not found: %s", path)
         return []
@@ -54,7 +54,7 @@ def _resolve_prefill_messages_file(config: dict[str, Any]) -> str:
     from agent.session_client_env import session_env
     agent_cfg = config.get("agent", {})
     return (
-        session_env("HERMES_PREFILL_MESSAGES_FILE").strip()
+        session_env("EIR_PREFILL_MESSAGES_FILE").strip()
         or str(config.get("prefill_messages_file", "") or "").strip()
         or (str(agent_cfg.get("prefill_messages_file", "") or "").strip() if isinstance(agent_cfg, dict) else "")
     )
@@ -62,7 +62,7 @@ def _resolve_prefill_messages_file(config: dict[str, Any]) -> str:
 
 def _parse_reasoning_config(effort) -> dict | None:
     """Parse a reasoning effort level (string or YAML bool; ``false``/``off`` = disabled)."""
-    from hermes_constants import parse_reasoning_effort
+    from eir_constants import parse_reasoning_effort
     result = parse_reasoning_effort(effort)
     if effort and str(effort).strip() and result is None:
         logger.warning("Unknown reasoning_effort '%s', using default (medium)", effort)
@@ -139,8 +139,8 @@ def _mirror_config_to_env(defaults, _file_has_terminal_config):
 
     # TERMINAL_CWD is force-exported (beats stale .env) except inside a gateway process,
     # whose config bridge already set it. Ask whether THIS process imported gateway.run:
-    # its _HERMES_GATEWAY env marker is inherited by every shell the gateway's terminal
-    # tool spawns, so a `hermes chat` launched there would keep the gateway's directory.
+    # its _EIR_GATEWAY env marker is inherited by every shell the gateway's terminal
+    # tool spawns, so a `eir chat` launched there would keep the gateway's directory.
     _is_gateway = "gateway.run" in sys.modules
     for config_key, env_var in _TERMINAL_ENV_MAPPINGS.items():
         if config_key not in terminal_config:
@@ -171,19 +171,19 @@ def _mirror_config_to_env(defaults, _file_has_terminal_config):
     if isinstance(security_config, dict):
         redact = security_config.get("redact_secrets")
         if redact is not None:
-            os.environ["HERMES_REDACT_SECRETS"] = str(redact).lower()
+            os.environ["EIR_REDACT_SECRETS"] = str(redact).lower()
 
-    # Session-search index knobs (hermes_state reads the env carriers).
+    # Session-search index knobs (eir_state reads the env carriers).
     sessions_config = defaults.get("sessions", {})
     if isinstance(sessions_config, dict):
         if "search_slow_ms" in sessions_config:
-            os.environ["HERMES_SEARCH_SLOW_MS"] = str(sessions_config["search_slow_ms"])
+            os.environ["EIR_SEARCH_SLOW_MS"] = str(sessions_config["search_slow_ms"])
 
 
 def _cli_config_defaults():
     """Built-in defaults for every config key the CLI reads (the file overlays these)."""
-    from hermes_cli.config import DEFAULT_CONFIG as shared, cfg_get
-    from hermes_cli.config_defaults import DEFAULT_SANDBOX_IMAGE as img
+    from eir_cli.config import DEFAULT_CONFIG as shared, cfg_get
+    from eir_cli.config_defaults import DEFAULT_SANDBOX_IMAGE as img
     return {
         "model": {"default": "", "base_url": "", "provider": "auto"},
         "terminal": {
@@ -198,11 +198,11 @@ def _cli_config_defaults():
         "agent": {
             "max_turns": cfg_get(shared, "agent", "max_turns"), "verbose": False, "system_prompt": "", "prefill_messages_file": "",  # max_turns shared with subagents
             "reasoning_effort": "", "service_tier": "",
-            "personalities": {},  # user overrides merged by name over hermes_cli.personality builtins
+            "personalities": {},  # user overrides merged by name over eir_cli.personality builtins
         },
         "display": {
             "compact": False,
-            # /resume recap tuning and show_reasoning: keep in sync with hermes_cli/config.py DEFAULT_CONFIG
+            # /resume recap tuning and show_reasoning: keep in sync with eir_cli/config.py DEFAULT_CONFIG
             "resume_display": "full", "resume_exchanges": 10, "resume_max_user_chars": 300,
             "resume_max_assistant_chars": 200, "resume_max_assistant_lines": 3, "resume_skip_tool_only": True,
             "show_reasoning": True, "reasoning_full": False, "streaming": True, "busy_input_mode": "interrupt",
@@ -229,7 +229,7 @@ def _merge_file_config(defaults: dict[str, Any], file_config: dict[str, Any]) ->
             defaults["model"]["default"] = file_config["model"]
         elif isinstance(file_config["model"], dict):
             defaults["model"].update(file_config["model"])
-            # Promote model.model -> model.default (HermesCLI checks "default" first).
+            # Promote model.model -> model.default (EirCLI checks "default" first).
             if "model" in file_config["model"] and "default" not in file_config["model"]:
                 defaults["model"]["default"] = file_config["model"]["model"]
 
@@ -255,22 +255,22 @@ def _merge_file_config(defaults: dict[str, Any], file_config: dict[str, Any]) ->
 
 
 def load_cli_config() -> dict[str, Any]:
-    """~/.hermes/config.yaml over built-in defaults; env vars win.
+    """~/.eir/config.yaml over built-in defaults; env vars win.
 
-    ``HERMES_IGNORE_USER_CONFIG=1`` skips the user config entirely (``.env`` still loads).
+    ``EIR_IGNORE_USER_CONFIG=1`` skips the user config entirely (``.env`` still loads).
     """
-    from cli import _cli_config_defaults, _hermes_home, _merge_file_config, _mirror_config_to_env
-    from hermes_cli.config_backend import config_exists, read_config_doc
-    config_path = _hermes_home / 'config.yaml'
+    from cli import _cli_config_defaults, _eir_home, _merge_file_config, _mirror_config_to_env
+    from eir_cli.config_backend import config_exists, read_config_doc
+    config_path = _eir_home / 'config.yaml'
 
     defaults = _cli_config_defaults()
 
     # Only a file's terminal section may overwrite terminal env vars already set by .env.
     _file_has_terminal_config = False
 
-    if os.environ.get("HERMES_IGNORE_USER_CONFIG") != "1" and config_exists(config_path):
+    if os.environ.get("EIR_IGNORE_USER_CONFIG") != "1" and config_exists(config_path):
         try:
-            from hermes_cli.config import _normalize_root_model_keys
+            from eir_cli.config import _normalize_root_model_keys
 
             file_config = _normalize_root_model_keys(read_config_doc(config_path) or {})
 
@@ -280,12 +280,12 @@ def load_cli_config() -> dict[str, Any]:
             logger.warning("Failed to load %s: %s", config_path, e)
 
     # Expand ${ENV_VAR} references before bridging to env vars.
-    from hermes_cli.config import _expand_env_vars
+    from eir_cli.config import _expand_env_vars
     defaults = _expand_env_vars(defaults)
 
     # Administrator-pinned (managed scope) values overlay LAST; cli.py builds its config
-    # independently of hermes_cli.config, so this keeps parity with `hermes config`. Fail-open.
-    from hermes_cli import managed_scope
+    # independently of eir_cli.config, so this keeps parity with `eir config`. Fail-open.
+    from eir_cli import managed_scope
 
     defaults = managed_scope.apply_managed_overlay(defaults)
 
@@ -302,9 +302,9 @@ def _init_logging_and_display_from_config() -> None:
         return _cli().CLI_CONFIG.get("display", {}).get(key, default)
 
     for step in (
-        lambda: _im("hermes_logging").setup_logging(mode="cli"),
-        lambda: _im("hermes_cli.config").print_config_warnings(),
-        lambda: _im("hermes_cli.skin_engine").init_skin_from_config(_cli().CLI_CONFIG),
+        lambda: _im("eir_logging").setup_logging(mode="cli"),
+        lambda: _im("eir_cli.config").print_config_warnings(),
+        lambda: _im("eir_cli.skin_engine").init_skin_from_config(_cli().CLI_CONFIG),
         lambda: _im("agent.display").set_tool_preview_max_len(int(_display("tool_preview_length", 0) or 0)),
         lambda: _im("agent.display").set_friendly_tool_labels(bool(_display("friendly_tool_labels", True))),
     ):

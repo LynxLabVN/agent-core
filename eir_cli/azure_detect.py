@@ -16,7 +16,7 @@ from urllib import request as urllib_request
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 
-from hermes_cli.urllib_security import open_credentialed_url
+from eir_cli.urllib_security import open_credentialed_url
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +84,7 @@ def _authed_request(url: str, api_key: Any, token_provider, *, method: str = "GE
         if mode != "entra_id":
             req.add_header("api-key", token)
         req.add_header("Authorization", f"Bearer {token}")
-    req.add_header("User-Agent", "hermes-agent/azure-detect")
+    req.add_header("User-Agent", "eir-agent/azure-detect")
     return req
 
 

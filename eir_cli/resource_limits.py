@@ -8,7 +8,7 @@ import os
 from collections.abc import Mapping
 from typing import Any
 
-from hermes_cli.config_defaults import DEFAULT_CONFIG
+from eir_cli.config_defaults import DEFAULT_CONFIG
 
 try:  # ``resource`` is POSIX-only (and unavailable on Windows).
     import resource as _resource
@@ -32,7 +32,7 @@ def _runtime_int(config: Mapping[str, Any] | None, key: str, default: int) -> in
     if config is None:
         try:
             # Profile-aware loader (applies managed-scope overlays and defaults).
-            from hermes_cli.config import load_config_readonly
+            from eir_cli.config import load_config_readonly
             config = load_config_readonly()
         except Exception:
             logger.debug("Could not load config for runtime.%s", key, exc_info=True)
@@ -110,7 +110,7 @@ def _arena_max_setting(env: Mapping[str, str]) -> str | None:
 def _launch_environ() -> dict[str, str] | None:
     """The environment this process was exec'd with (what glibc read at startup), or ``None``.
 
-    ``/proc/self/environ`` keeps the exec-time block; ``os.environ`` also holds values Hermes loaded
+    ``/proc/self/environ`` keeps the exec-time block; ``os.environ`` also holds values Eir loaded
     later from the profile ``.env``, which glibc never saw.
     """
     try:
@@ -144,7 +144,7 @@ def apply_malloc_arena_max(config: Mapping[str, Any] | None = None) -> bool:
     watchdog thread arms before config loads, so a gateway may hold one arena beyond a cap of 1.)
 
     An arena setting in the exec-time environment was already applied by glibc and wins. One that
-    is only in ``os.environ`` because Hermes loaded it from the profile ``.env`` is applied here with
+    is only in ``os.environ`` because Eir loaded it from the profile ``.env`` is applied here with
     the operator's number (glibc never read it). glibc only; never raises.
     """
     libc = glibc_malloc()
@@ -172,7 +172,7 @@ def apply_malloc_arena_max(config: Mapping[str, Any] | None = None) -> bool:
 def server_process_argv(argv: list[str]) -> bool:
     """True when *argv* (``sys.argv[1:]``) launches a long-lived server: ``serve``, ``dashboard`` or a
     foreground ``gateway`` (``gateway`` / ``gateway run``)."""
-    from hermes_cli._parser import command_argv
+    from eir_cli._parser import command_argv
 
     args = command_argv(argv)
     if not args:

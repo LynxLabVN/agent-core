@@ -5,7 +5,7 @@
  * connection (each selection there is refused), saying why instead.
  */
 
-import type * as HermesSdk from '@hermes/plugin-sdk'
+import type * as EirSdk from '@eir/plugin-sdk'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
@@ -19,8 +19,8 @@ import type { RosterRow } from './types'
 
 const { request } = vi.hoisted(() => ({ request: vi.fn() }))
 
-vi.mock('@hermes/plugin-sdk', async importOriginal => {
-  const sdk = await importOriginal<typeof HermesSdk>()
+vi.mock('@eir/plugin-sdk', async importOriginal => {
+  const sdk = await importOriginal<typeof EirSdk>()
   const { en } = await import('@/i18n/en')
 
   return {

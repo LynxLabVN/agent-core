@@ -1,4 +1,4 @@
-import type { ProfilesCreateResult } from '@hermes/plugin-sdk'
+import type { ProfilesCreateResult } from '@eir/plugin-sdk'
 import {
   Badge,
   Button,
@@ -28,7 +28,7 @@ import {
   Tip,
   useI18n,
   useValue
-} from '@hermes/plugin-sdk'
+} from '@eir/plugin-sdk'
 /**
  * The two creation dialogs: New Bot, and the group-chat creation flow the
  * roster's group button opens (plus the per-bot group membership dialog it
@@ -638,7 +638,7 @@ export function CreateAgentDialog({ open, onClose, onConfigureModel, roster }: C
           void requestForTarget('profiles.configure', {
             name: slug,
             ui_meta: {
-              'hermes-bots': look
+              'eir-bots': look
             }
           }).catch(() => undefined)
 

@@ -1,8 +1,8 @@
 """Runtime inventory + update plan for the fleet-update pipeline.
 
-One read-only pass answering, BEFORE any mutation: which Hermes runtimes run on this machine, how
+One read-only pass answering, BEFORE any mutation: which Eir runtimes run on this machine, how
 each is deployed, which ones this update touches, and how each restarts. Every collector is a
-side-effect-free probe, so ``hermes update --plan`` is safe on a live fleet.
+side-effect-free probe, so ``eir update --plan`` is safe on a live fleet.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class RuntimeRecord:
-    """One running (or expected) Hermes runtime on this machine."""
+    """One running (or expected) Eir runtime on this machine."""
 
     kind: str                     # gateway | dashboard | serve
     profile: str
@@ -38,7 +38,7 @@ class UpdatePlan:
 
     install_method: str = "unknown"       # git | docker | nix | apt | ...
     updatable_in_place: bool = True
-    update_mechanism: str = "hermes update"
+    update_mechanism: str = "eir update"
     expected_sha: Optional[str] = None    # current checkout HEAD (pre-pull)
     expected_version: Optional[str] = None
     profiles: list = field(default_factory=list)
@@ -70,7 +70,7 @@ def _detect_supervisor_for_pid(pid: int, service_pids: set, windows_service_pids
     if pid not in service_pids:
         return "manual"
     with suppress(Exception):
-        from hermes_cli.gateway import is_macos, supports_systemd_services
+        from eir_cli.gateway import is_macos, supports_systemd_services
 
         if supports_systemd_services():
             return "systemd"
@@ -118,7 +118,7 @@ def _restart_mechanism(supervisor: str, profile: str) -> str:
 def describe_restart_mechanism(mechanism: str, profile: str) -> str:
     """Human-readable description of a restart mechanism id."""
     return _MECHANISM_DESCRIPTIONS.get(mechanism) or (
-        f"hermes -p {profile} gateway restart" if profile != "default" else "hermes gateway restart"
+        f"eir -p {profile} gateway restart" if profile != "default" else "eir gateway restart"
     )
 
 
@@ -145,7 +145,7 @@ def _probe(label: str):
 
 def _collect_install_shape(plan: UpdatePlan) -> None:
     with _probe("Install-method probe"):
-        from hermes_cli.config import detect_install_method, get_managed_system, recommended_update_command_for_method
+        from eir_cli.config import detect_install_method, get_managed_system, recommended_update_command_for_method
 
         method = detect_install_method()
         managed = get_managed_system()
@@ -156,7 +156,7 @@ def _collect_install_shape(plan: UpdatePlan) -> None:
         # Fail-closed: an invalid marker still flips the plan to not-updatable.
         with _probe("Image provenance probe"):
             # See #91277.
-            from hermes_cli.image_provenance import read_image_provenance
+            from eir_cli.image_provenance import read_image_provenance
 
             provenance = read_image_provenance()
             if provenance is not None:
@@ -170,7 +170,7 @@ def _supervisor_classifier() -> Callable[[int], str]:
     """``pid -> supervisor`` over the service-PID sets; each probe degrades to an empty set."""
     service_pids: set = set()
     with _probe("Service-PID probe"):
-        from hermes_cli.gateway import _get_service_pids
+        from eir_cli.gateway import _get_service_pids
 
         service_pids = _get_service_pids(all_profiles=True) or set()
     # Windows SCM services (no-op off Windows): the update's pause phase stops these via `sc.exe
@@ -180,7 +180,7 @@ def _supervisor_classifier() -> Callable[[int], str]:
     # service PIDs (no-op off Windows). See #91277.
     windows_service_pids: set = set()
     with _probe("Windows SCM service-ownership probe"):
-        from hermes_cli.gateway import find_windows_gateway_services
+        from eir_cli.gateway import find_windows_gateway_services
 
         windows_service_pids = {int(service.gateway_pid) for service in find_windows_gateway_services()}
     return lambda pid: _detect_supervisor_for_pid(pid, service_pids, windows_service_pids)
@@ -193,7 +193,7 @@ def _collect_gateway_runtimes(plan: UpdatePlan, profile_homes: list, seen: set[i
     supervisor = _supervisor_classifier()
     with _probe("Gateway-state inventory"):
         from gateway.status import live_gateway_pid_for_home, read_runtime_status
-        from hermes_cli.update_receipt import _socket_identity
+        from eir_cli.update_receipt import _socket_identity
 
         for profile, home in profile_homes:
             sock = _socket_identity(home)
@@ -210,7 +210,7 @@ def _collect_gateway_runtimes(plan: UpdatePlan, profile_homes: list, seen: set[i
             else:
                 # Verified identity, not bare PID existence: a ``stopped`` record whose PID was recycled
                 # by an unrelated process fabricated a phantom gateway the restart phase could never
-                # touch, so `hermes update` exited partial (#109680).
+                # touch, so `eir update` exited partial (#109680).
                 pid = live_gateway_pid_for_home(home)
                 if pid is None or pid in seen:
                     continue
@@ -219,7 +219,7 @@ def _collect_gateway_runtimes(plan: UpdatePlan, profile_homes: list, seen: set[i
                 sup = supervisor(pid)
             plan.runtimes.append(_runtime("gateway", profile, pid, sup, record.get("code_sha"), record.get("code_version")))
     with _probe("PID-file gateway inventory"):
-        from hermes_cli.gateway import find_profile_gateway_processes
+        from eir_cli.gateway import find_profile_gateway_processes
 
         for proc in find_profile_gateway_processes():
             if proc.pid not in seen:
@@ -234,7 +234,7 @@ def _loaded_backend_launchd_jobs() -> list:
     to ``[]`` — classification falls back to the spawner probe and never aborts the inventory.
     See #116503."""
     with suppress(Exception):
-        from hermes_cli import main_dashboard as _dash
+        from eir_cli import main_dashboard as _dash
 
         return _dash._loaded_launchd_backend_jobs()
     return []
@@ -248,8 +248,8 @@ def _launchd_owner_for_ledger_entry(entry: dict, pid: int, jobs: list) -> tuple[
     fights the job's own KeepAlive respawn. The loaded-job match (live PID, an ancestor, or the
     normalized ``ProgramArguments``) is the authoritative classification. See #116503."""
     with suppress(Exception):
-        from hermes_cli import main_dashboard as _dash
-        from hermes_cli.dashboard_procs import _process_ancestors
+        from eir_cli import main_dashboard as _dash
+        from eir_cli.dashboard_procs import _process_ancestors
 
         try:
             cmdline = shlex.split(str(entry.get("argv") or "")) or None
@@ -262,13 +262,13 @@ def _launchd_owner_for_ledger_entry(entry: dict, pid: int, jobs: list) -> tuple[
 def _systemd_owner_for_ledger_pid(pid: int) -> tuple[str, str | None] | None:
     """``(unit, scope)`` of the systemd unit whose live ``MainPID`` is *pid*, if any.
 
-    A unit-launched backend sets neither ``HERMES_SPAWN`` nor ``HERMES_PARENT_PID``, so the spawner
+    A unit-launched backend sets neither ``EIR_SPAWN`` nor ``EIR_PARENT_PID``, so the spawner
     probe reads ``manual-serve`` and the update tells the user to "ask the owner to relaunch
-    `hermes dashboard`" for a process systemd owns (#141021). Ownership is the unit's MainPID, not
+    `eir dashboard`" for a process systemd owns (#141021). Ownership is the unit's MainPID, not
     cgroup membership (a hand-started dashboard inside some unrelated unit's cgroup is still manual);
     ``None`` off Linux, when unreadable, or when no unit owns it."""
     with suppress(Exception):
-        from hermes_cli import main_dashboard as _dash
+        from eir_cli import main_dashboard as _dash
 
         return _dash._systemd_owner_for_pid(pid)
     return None
@@ -278,7 +278,7 @@ def _is_desktop_ssh_ledger_entry(entry: dict) -> bool:
     """Is this row the backend a (possibly remote) Desktop spawned over SSH? The canonical argv
     predicate also classifies rows written before the ledger carried ``isolated``, which is exactly
     the pre-update serve the first update after this change inventories."""
-    from hermes_cli._startup_fast import is_desktop_ssh_backend_argv
+    from eir_cli._startup_fast import is_desktop_ssh_backend_argv
 
     try:
         return is_desktop_ssh_backend_argv(shlex.split(str(entry.get("argv") or "")))
@@ -288,14 +288,14 @@ def _is_desktop_ssh_ledger_entry(entry: dict) -> bool:
 
 def _collect_ledger_runtimes(plan: UpdatePlan, seen: set[int]) -> None:
     """Serve/dashboard backends from the spawn ledger — runtimes the gateway collectors can never see
-    (a manual `hermes serve --host <ip>` for a remote Desktop, a long-lived `hermes dashboard`).
+    (a manual `eir serve --host <ip>` for a remote Desktop, a long-lived `eir dashboard`).
     ledger_entries() live-verifies (pid, create_time) so PID reuse never fabricates a row. Desktop-
     supervised backends (spawner still alive) restart via the Desktop's own respawn, not ours.
     A backend owned by a loaded launchd job is classified ``launchd`` (kickstart restart, never a
     detached argv respawn) — the spawner probe cannot see that (#116503); one that is a systemd
     unit's MainPID is ``systemd`` for the same reason (#141021)."""
     with _probe("Serve/dashboard ledger inventory"):
-        from hermes_cli.process_identity import ledger_entries, spawner_is_dead
+        from eir_cli.process_identity import ledger_entries, spawner_is_dead
 
         launchd_jobs = _loaded_backend_launchd_jobs()
         for entry in ledger_entries():
@@ -335,14 +335,14 @@ def collect_runtime_inventory() -> UpdatePlan:
     plan = UpdatePlan()
     _collect_install_shape(plan)
     with _probe("Code-identity probe"):
-        from hermes_cli.version_info import get_code_identity
+        from eir_cli.version_info import get_code_identity
 
         identity = get_code_identity(refresh=True)
         plan.expected_sha = identity.get("sha")
         plan.expected_version = identity.get("version")
     profile_homes: list = []
     with _probe("Profile enumeration"):
-        from hermes_cli.update_receipt import _profile_homes
+        from eir_cli.update_receipt import _profile_homes
 
         profile_homes = _profile_homes()
         plan.profiles = [name for name, _ in profile_homes]
@@ -364,7 +364,7 @@ def print_update_plan(plan: UpdatePlan) -> None:
         print(f"    Update via: {plan.update_mechanism}")
     print(f"  Profiles: {', '.join(plan.profiles) if plan.profiles else '(none found)'}")
     if not plan.runtimes:
-        print("  Running Hermes services: none detected — code swap only.")
+        print("  Running Eir services: none detected — code swap only.")
         return
     print(f"  Running services to restart ({len(plan.runtimes)}):")
     for runtime in plan.runtimes:
@@ -374,31 +374,31 @@ def print_update_plan(plan: UpdatePlan) -> None:
 
 
 def _serve_unit_matches_profile(profile: str, unit: object) -> bool:
-    """Does *unit* name a ``hermes-serve*``/``hermes-dashboard*`` unit for *profile*? (OWN vocabulary;
-    the gateway's ``hermes-gateway*`` names never cover serve/dashboard runtimes.)
+    """Does *unit* name a ``eir-serve*``/``eir-dashboard*`` unit for *profile*? (OWN vocabulary;
+    the gateway's ``eir-gateway*`` names never cover serve/dashboard runtimes.)
 
-    Exact names only — ``work`` must not claim ``hermes-serve-workbench`` — and a scope prefix
-    (``user/hermes-serve``) is tolerated because the restart phase records scope-qualified identities in
+    Exact names only — ``work`` must not claim ``eir-serve-workbench`` — and a scope prefix
+    (``user/eir-serve``) is tolerated because the restart phase records scope-qualified identities in
     some lists. See #100479.
     """
     name = str(unit).removesuffix(".service").rsplit("/", 1)[-1]
     suffix = "" if profile == "default" else f"-{profile}"
-    return name in {f"hermes-serve{suffix}", f"hermes-dashboard{suffix}"}
+    return name in {f"eir-serve{suffix}", f"eir-dashboard{suffix}"}
 
 
 def _gateway_service_matches_profile(profile: str, service: object) -> bool:
     """Match an exact gateway service/label (systemd/launchd/s6 shapes) to a profile.
 
-    Never substring-match: ``foo`` must not claim ``hermes-gateway-foobar.service``.
-    Launchd labels are ``ai.hermes.gateway`` / ``ai.hermes.gateway-<profile>`` — they do
-    not contain the substring ``hermes-gateway``, so a successful macOS kickstart must
-    still credit the planned default gateway. A scope prefix (``user/hermes-gateway``,
-    ``gui/501/ai.hermes.gateway``) is stripped the same way serve units are.
+    Never substring-match: ``foo`` must not claim ``eir-gateway-foobar.service``.
+    Launchd labels are ``ai.eir.gateway`` / ``ai.eir.gateway-<profile>`` — they do
+    not contain the substring ``eir-gateway``, so a successful macOS kickstart must
+    still credit the planned default gateway. A scope prefix (``user/eir-gateway``,
+    ``gui/501/ai.eir.gateway``) is stripped the same way serve units are.
     """
     name = str(service).removesuffix(".service").rsplit("/", 1)[-1]
     if profile == "default":
-        return name in {"hermes-gateway", "ai.hermes.gateway", "gateway", "gateway-default"}
-    return name in {f"hermes-gateway-{profile}", f"ai.hermes.gateway-{profile}", f"gateway-{profile}"}
+        return name in {"eir-gateway", "ai.eir.gateway", "gateway", "gateway-default"}
+    return name in {f"eir-gateway-{profile}", f"ai.eir.gateway-{profile}", f"gateway-{profile}"}
 
 
 def _gateway_named_in(r: RuntimeRecord, names: set) -> bool:
@@ -439,7 +439,7 @@ def match_runtime_outcomes(
     profile it SERVES, while the restart bookkeeping names the SERVICE it runs under, and those two
     disagree whenever a service serves a profile its name does not encode — a root-home launchd
     label running the sticky active profile, a hash-suffixed systemd unit for a custom
-    ``HERMES_HOME``. No name rule can bridge that, so a planned PID that is gone while a gateway
+    ``EIR_HOME``. No name rule can bridge that, so a planned PID that is gone while a gateway
     answers for the same profile counts as ``restarted``. A missing successor, or the planned PID
     still answering, stays ``unaccounted`` — the tripwire keeps its teeth.
 
@@ -457,7 +457,7 @@ def match_runtime_outcomes(
     record at all while the fleet row still proves its successor runs the new code.
 
     See #91277.
-    They never borrow the gateway's outcome: ``relaunched_profiles`` and ``hermes-gateway*`` name a
+    They never borrow the gateway's outcome: ``relaunched_profiles`` and ``eir-gateway*`` name a
     different process that shares the profile, nothing more. See #100479.
 
     ``external_gateway_pids``: gateway pids the post-restart fleet probe verified as serving a
@@ -583,7 +583,7 @@ def report_unaccounted_runtimes(outcomes: list[dict[str, Any]]) -> bool:
         print()
         print("  ⚠ Manual serve restarts deferred to their owner (reminders retained until the old processes exit):")
         for o in manual:
-            print(f"    • {o['kind']} [{o['profile']}] pid {o['pid']}: relaunch `hermes serve` / `hermes dashboard`, or reconnect Desktop for an SSH backend")
+            print(f"    • {o['kind']} [{o['profile']}] pid {o['pid']}: relaunch `eir serve` / `eir dashboard`, or reconnect Desktop for an SSH backend")
     deferred = [o for o in outcomes if o.get("outcome") == "deferred" and o.get("mechanism") != "respawn-argv"]
     if deferred:
         # Surfaced but not escalated: the updater has no authority over these, so holding
@@ -618,12 +618,12 @@ def report_unaccounted_runtimes(outcomes: list[dict[str, Any]]) -> bool:
         print(f"    ✗ {o['kind']} [{o['profile']}] pid {o['pid']} — planned mechanism: {o['mechanism']}")
     print("    Restart them manually, then verify:")
     if any(o.get("kind") not in _SERVE_KINDS for o in missed):
-        print("      hermes gateway restart                # active profile")
-        print("      hermes -p <profile> gateway restart   # named profile")
+        print("      eir gateway restart                # active profile")
+        print("      eir -p <profile> gateway restart   # named profile")
     if any(o.get("kind") in _SERVE_KINDS for o in missed):
         # A serve/dashboard is not reachable by any `gateway restart` command: name the process, not the wrong verb.
         # See #100479.
-        from hermes_cli.main_dashboard import _systemd_restart_commands
+        from eir_cli.main_dashboard import _systemd_restart_commands
 
         for o in missed:
             if o.get("kind") in _SERVE_KINDS and o.get("systemd_unit"):
@@ -632,15 +632,15 @@ def report_unaccounted_runtimes(outcomes: list[dict[str, Any]]) -> bool:
                     print(f"      {command}   # pid {o['pid']}")
         if any(o.get("kind") in _SERVE_KINDS and not o.get("systemd_unit") for o in missed):
             if sys.platform == "linux":
-                print("      systemctl --user restart hermes-serve.service   # unit-managed serve")
-            print("      relaunch `hermes serve` / `hermes dashboard`")
+                print("      systemctl --user restart eir-serve.service   # unit-managed serve")
+            print("      relaunch `eir serve` / `eir dashboard`")
     return True
 
 
 def record_plan_in_receipt(plan: UpdatePlan) -> None:
     """Attach the inventory to the active update receipt. Never raises."""
     try:
-        import hermes_cli.update_receipt as ur
+        import eir_cli.update_receipt as ur
 
         current = ur._current.get()
         if current is not None:

@@ -1,13 +1,13 @@
-"""``hermes doctor`` names the Relay plugin files the runtime actually loads.
+"""``eir doctor`` names the Relay plugin files the runtime actually loads.
 
-Relay discovers user and system ``plugins.toml`` files outside the Hermes home, so doctor is the one
-Hermes surface that shows a user which files apply. It must agree with what initialization loads.
+Relay discovers user and system ``plugins.toml`` files outside the Eir home, so doctor is the one
+Eir surface that shows a user which files apply. It must agree with what initialization loads.
 """
 
 import pytest
 
 from agent import relay_runtime
-from hermes_cli.doctor_config import _check_relay_plugins
+from eir_cli.doctor_config import _check_relay_plugins
 
 ENABLED_OBSERVABILITY = (
     "version = 1\n\n[[components]]\nkind = \"observability\"\nenabled = true\n\n[components.config]\nversion = 4\n"

@@ -4,8 +4,8 @@ import contextlib
 import sqlite3
 from pathlib import Path
 
-from hermes_cli import kanban_db as kb
-from hermes_cli import kanban_db_connect as kbc
+from eir_cli import kanban_db as kb
+from eir_cli import kanban_db_connect as kbc
 
 
 def _make_legacy_db(path: Path) -> None:
@@ -47,9 +47,9 @@ def _make_legacy_db(path: Path) -> None:
 
 
 def _setup_home(tmp_path, monkeypatch) -> Path:
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     db_path = kb.kanban_db_path(board="legacy")
     db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -128,9 +128,9 @@ def test_migration_is_idempotent(tmp_path, monkeypatch):
 def _default_board_db(tmp_path, monkeypatch) -> Path:
     """Point the kanban root at a temp home and return the default board's DB
     (the back-compat top-level ``<root>/kanban.db`` #83445 reports on)."""
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     db_path = kb.kanban_db_path(board="default")
     db_path.parent.mkdir(parents=True, exist_ok=True)

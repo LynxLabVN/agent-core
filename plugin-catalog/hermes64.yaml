@@ -2,12 +2,12 @@ name: hermes64
 repo: https://github.com/Qhantom-Labs/hermes64
 sha: 17ab9a3a5be3ef7928181c303e6dd002e54fd96e
 subdir: ""
-title: Hermes64
-description: "Author and edit room-based N64-era-style 3D games with story checks, bot playtests and local exports. Disclosure — Builds and playtests run Godot, Blender, Python and ffmpeg as local child processes (macOS: sandboxed, no network, writes confined to the game project; Windows: only after the owner opts into the Job Object runner, which has no network or write confinement). `/hermes64 setup --fetch --yes`, typed by the user, downloads SHA-512-pinned official Godot 4.6.2 files from github.com/godotengine (export templates about 1.25 GB) and clears macOS quarantine on the verified app. Hub downloads stay off until the owner sets `hub_url`. A `pre_llm_call` hook adds a hint steering game requests to Hermes64 into the user's turn, and the Studio tab can start a local 127.0.0.1 server for a web export or launch exported macOS/Windows builds."
+title: Eir64
+description: "Author and edit room-based N64-era-style 3D games with story checks, bot playtests and local exports. Disclosure — Builds and playtests run Godot, Blender, Python and ffmpeg as local child processes (macOS: sandboxed, no network, writes confined to the game project; Windows: only after the owner opts into the Job Object runner, which has no network or write confinement). `/hermes64 setup --fetch --yes`, typed by the user, downloads SHA-512-pinned official Godot 4.6.2 files from github.com/godotengine (export templates about 1.25 GB) and clears macOS quarantine on the verified app. Hub downloads stay off until the owner sets `hub_url`. A `pre_llm_call` hook adds a hint steering game requests to Eir64 into the user's turn, and the Studio tab can start a local 127.0.0.1 server for a web export or launch exported macOS/Windows builds."
 maintainer: Qhantom-Labs
 tier: community
 category: tools
-requires_hermes: ">=0.18.2"
+requires_eir: ">=0.18.2"
 docs_url: https://github.com/Qhantom-Labs/hermes64#readme
 version: "1.0.0-rc"
 image: https://raw.githubusercontent.com/Qhantom-Labs/hermes64-media/054fdba10b448dc4b3f35583b59de8c78e0f06c5/catalog/hermes64-card.jpg
@@ -28,7 +28,7 @@ known_issues:
   - "Image audits can fail on some style packs even when bots complete; agent-designed games may need iteration."
   - "Godot setup is a human-confirmed download from official hosts; the optional export templates are about 1.25 GB."
   - "macOS apps are ad-hoc signed, not notarized; Gatekeeper acceptance on other Macs is not established."
-  - "Validation (hermes plugins validate --install-deps) passes with one warning, a guarded hermes_cli import used for older-version discovery, and an in-process isolation note for one proof tool."
+  - "Validation (eir plugins validate --install-deps) passes with one warning, a guarded eir_cli import used for older-version discovery, and an in-process isolation note for one proof tool."
 capabilities:
   provides_tools:
     - hermes64_scaffold

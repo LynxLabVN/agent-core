@@ -6,7 +6,7 @@ description: "Approve your agents' risky actions with your phone's passkey, even
 maintainer: codepilots
 tier: community
 category: tools
-requires_hermes: ">=0.23.0"
+requires_eir: ">=0.23.0"
 docs_url: https://github.com/codepilots/hermes-plugin-passkey-gate
 version: "0.8.1"
 platforms: [linux, macos]

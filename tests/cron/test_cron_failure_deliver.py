@@ -23,20 +23,20 @@ from cron.scheduler import _resolve_delivery_targets
 
 @pytest.fixture
 def cron_env(tmp_path, monkeypatch):
-    """Isolated cron environment with temp HERMES_HOME."""
-    hermes_home = tmp_path / ".hermes"
-    hermes_home.mkdir()
-    (hermes_home / "cron").mkdir()
-    (hermes_home / "cron" / "output").mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    """Isolated cron environment with temp EIR_HOME."""
+    eir_home = tmp_path / ".eir"
+    eir_home.mkdir()
+    (eir_home / "cron").mkdir()
+    (eir_home / "cron" / "output").mkdir()
+    monkeypatch.setenv("EIR_HOME", str(eir_home))
 
     import cron.jobs as jobs_mod
-    monkeypatch.setattr(jobs_mod, "HERMES_DIR", hermes_home)
-    monkeypatch.setattr(jobs_mod, "CRON_DIR", hermes_home / "cron")
-    monkeypatch.setattr(jobs_mod, "JOBS_FILE", hermes_home / "cron" / "jobs.json")
-    monkeypatch.setattr(jobs_mod, "OUTPUT_DIR", hermes_home / "cron" / "output")
+    monkeypatch.setattr(jobs_mod, "EIR_DIR", eir_home)
+    monkeypatch.setattr(jobs_mod, "CRON_DIR", eir_home / "cron")
+    monkeypatch.setattr(jobs_mod, "JOBS_FILE", eir_home / "cron" / "jobs.json")
+    monkeypatch.setattr(jobs_mod, "OUTPUT_DIR", eir_home / "cron" / "output")
 
-    return hermes_home
+    return eir_home
 
 
 @pytest.fixture
@@ -47,12 +47,12 @@ def run_env(monkeypatch, tmp_path):
     target resolution are real. Only the outbound platform sender is replaced.
     Tests drain explicitly so queue admission cannot masquerade as delivery.
     """
-    home = tmp_path / "hermes-home"
+    home = tmp_path / "eir-home"
     home.mkdir()
     (home / "config.yaml").write_text(
         "platforms:\n  slack:\n    enabled: true\n    token: xoxb-test\n"
     )
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
 
     send_calls = []
     transport = {"success": True}
@@ -64,7 +64,7 @@ def run_env(monkeypatch, tmp_path):
                 "message_id": "1.2", "error": None if transport["success"] else "transport refused"}
 
     import gateway.platform_registry as reg
-    import hermes_cli.plugins as hp
+    import eir_cli.plugins as hp
 
     entry = reg.platform_registry.get("slack")
     if entry is None:
@@ -492,7 +492,7 @@ class TestPreflightAndDashboardLanes:
         """The dashboard update lane normalizes failure_deliver like
         deliver: text stripped, empty clears (None) instead of
         coalescing to a target."""
-        from hermes_cli.web_routers.cron import _normalize_dashboard_cron_updates
+        from eir_cli.web_routers.cron import _normalize_dashboard_cron_updates
 
         out = _normalize_dashboard_cron_updates(
             {"failure_deliver": "  slack:D0ALERTS  "}, tmp_path

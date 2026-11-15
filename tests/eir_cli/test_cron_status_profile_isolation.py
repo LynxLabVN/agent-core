@@ -1,9 +1,9 @@
 """Regression guard for #98790 — profile isolation in cron status.
 
-Issue #98790: `hermes cron status` in profile B reports profile A's gateway
+Issue #98790: `eir cron status` in profile B reports profile A's gateway
 PID as proof that B's jobs will fire. Root causes:
 
-1. systemd branch of ``_get_service_pids()`` returns every hermes-gateway*
+1. systemd branch of ``_get_service_pids()`` returns every eir-gateway*
    unit's MainPID even when ``all_profiles=False``, contradicting its
    docstring («Default-scope callers keep seeing only the current profile's
    service») and ``find_gateway_pids()``'s contract.
@@ -43,35 +43,35 @@ class TestGetServicePidsProfileScope:
     """systemd branch must honor ``all_profiles`` and filter by profile."""
 
     def test_default_scope_filters_current_profile_systemd_unit(self, monkeypatch):
-        from hermes_cli import gateway as gateway_mod
+        from eir_cli import gateway as gateway_mod
 
         def _run_side_effect(args, **kwargs):
             cmd_str = " ".join(str(a) for a in args)
             if "list-units" in cmd_str:
                 # systemctl now filters: return only the unit that matches the pattern
-                if "hermes-gateway-jarvis" in cmd_str:
-                    stdout = "hermes-gateway-jarvis.service loaded active running\n"
-                elif "hermes-gateway-coder" in cmd_str:
-                    stdout = "hermes-gateway-coder.service loaded active running\n"
-                elif "hermes-gateway*" in cmd_str:
+                if "eir-gateway-jarvis" in cmd_str:
+                    stdout = "eir-gateway-jarvis.service loaded active running\n"
+                elif "eir-gateway-coder" in cmd_str:
+                    stdout = "eir-gateway-coder.service loaded active running\n"
+                elif "eir-gateway*" in cmd_str:
                     stdout = (
-                        "hermes-gateway-jarvis.service loaded active running\n"
-                        "hermes-gateway-coder.service loaded active running\n"
+                        "eir-gateway-jarvis.service loaded active running\n"
+                        "eir-gateway-coder.service loaded active running\n"
                     )
                 else:
                     stdout = ""
                 return MagicMock(returncode=0, stdout=stdout, stderr="")
             if "show" in cmd_str and "MainPID" in cmd_str:
-                if "hermes-gateway-jarvis" in cmd_str:
+                if "eir-gateway-jarvis" in cmd_str:
                     return MagicMock(returncode=0, stdout="123\n", stderr="")
-                elif "hermes-gateway-coder" in cmd_str:
+                elif "eir-gateway-coder" in cmd_str:
                     return MagicMock(returncode=0, stdout="456\n", stderr="")
             return MagicMock(returncode=0, stdout="", stderr="")
 
         with (
-            patch("hermes_cli.gateway.is_macos", return_value=False),
-            patch("hermes_cli.gateway.supports_systemd_services", return_value=True),
-            patch("hermes_cli.gateway.get_service_name", return_value="hermes-gateway-jarvis"),
+            patch("eir_cli.gateway.is_macos", return_value=False),
+            patch("eir_cli.gateway.supports_systemd_services", return_value=True),
+            patch("eir_cli.gateway.get_service_name", return_value="eir-gateway-jarvis"),
             patch("subprocess.run", side_effect=_run_side_effect),
         ):
             pids = gateway_mod._get_service_pids()
@@ -79,7 +79,7 @@ class TestGetServicePidsProfileScope:
         assert pids == {123}, "default scope must filter to current profile's unit"
 
     def test_all_profiles_true_enumerates_fleet(self, monkeypatch):
-        from hermes_cli import gateway as gateway_mod
+        from eir_cli import gateway as gateway_mod
 
         def _run_side_effect(args, **kwargs):
             cmd_str = " ".join(str(a) for a in (args[:4] if args else []))
@@ -87,22 +87,22 @@ class TestGetServicePidsProfileScope:
                 return MagicMock(
                     returncode=0,
                     stdout=(
-                        "hermes-gateway.service loaded active running\n"
-                        "hermes-gateway-profile-b.service loaded active running\n"
+                        "eir-gateway.service loaded active running\n"
+                        "eir-gateway-profile-b.service loaded active running\n"
                     ),
                     stderr="",
                 )
             if "show" in cmd_str and "MainPID" in cmd_str:
-                if "hermes-gateway.service" in " ".join(args):
+                if "eir-gateway.service" in " ".join(args):
                     return MagicMock(returncode=0, stdout="111\n", stderr="")
-                elif "hermes-gateway-profile-b.service" in " ".join(args):
+                elif "eir-gateway-profile-b.service" in " ".join(args):
                     return MagicMock(returncode=0, stdout="222\n", stderr="")
             return MagicMock(returncode=0, stdout="", stderr="")
 
         with (
-            patch("hermes_cli.gateway.is_macos", return_value=False),
-            patch("hermes_cli.gateway.supports_systemd_services", return_value=True),
-            patch("hermes_cli.gateway.get_service_name", return_value="hermes-gateway"),
+            patch("eir_cli.gateway.is_macos", return_value=False),
+            patch("eir_cli.gateway.supports_systemd_services", return_value=True),
+            patch("eir_cli.gateway.get_service_name", return_value="eir-gateway"),
             patch("subprocess.run", side_effect=_run_side_effect),
         ):
             pids = gateway_mod._get_service_pids(all_profiles=True)
@@ -117,7 +117,7 @@ class TestCronStatusMissingHeartbeat:
     def test_missing_heartbeat_green_when_gateway_just_started(self, tmp_cron_dir, capsys, monkeypatch):
         import io
         from contextlib import redirect_stdout
-        import hermes_cli.cron as cron_cli
+        import eir_cli.cron as cron_cli
         from cron.jobs import create_job
 
         create_job(prompt="Test", schedule="every 1h")
@@ -125,8 +125,8 @@ class TestCronStatusMissingHeartbeat:
         now = time.time()
         out = io.StringIO()
         with (
-            patch("hermes_cli.cron._active_cron_provider_name", return_value="builtin"),
-            patch("hermes_cli.gateway.find_gateway_pids", return_value=[4242]),
+            patch("eir_cli.cron._active_cron_provider_name", return_value="builtin"),
+            patch("eir_cli.gateway.find_gateway_pids", return_value=[4242]),
             patch("gateway.status.is_gateway_runtime_lock_active", return_value=True),
             patch("gateway.status.get_running_pid", return_value=4242),
             patch("cron.jobs.get_ticker_heartbeat_age", return_value=None),

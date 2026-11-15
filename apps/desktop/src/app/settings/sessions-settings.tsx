@@ -7,12 +7,12 @@ import { Input } from '@/components/ui/input'
 import { Tip } from '@/components/ui/tooltip'
 import {
   deleteSession,
-  getHermesConfigRecord,
+  getEirConfigRecord,
   peekConfigReadOrigin,
   retainConfigReadOrigin,
-  saveHermesConfig,
+  saveEirConfig,
   setSessionArchived
-} from '@/hermes'
+} from '@/eir'
 import { useI18n } from '@/i18n'
 import { sessionTitle } from '@/lib/chat-runtime'
 import { selectDesktopPaths } from '@/lib/desktop-fs'
@@ -29,7 +29,7 @@ import { $connection, applyConfiguredDefaultProjectDir, ensureDefaultWorkspaceCw
 import { untombstoneSessions } from '@/store/session-removal'
 import { forgetSessionUnread } from '@/store/session-unread'
 import { listEveryArchivedSession } from '@/store/sidebar-archive'
-import type { HermesConfigRecord, SessionInfo } from '@/types/hermes'
+import type { EirConfigRecord, SessionInfo } from '@/types/eir'
 
 import { EmptyState, ListRow, SectionHeading, SettingsContent, SettingsSkeleton, ToggleRow } from './primitives'
 import { SETTING_IDS, settingElementId } from './settings-manifest'
@@ -229,20 +229,20 @@ function ArchivedSessionsSettings({ includeDefaultDirectory }: { includeDefaultD
 function AutoArchiveSetting() {
   const { t } = useI18n()
   const s = t.settings.sessions
-  const [config, setConfig] = useState<HermesConfigRecord | null>(null)
+  const [config, setConfig] = useState<EirConfigRecord | null>(null)
   const [enabled, setEnabled] = useState(false)
   const [days, setDays] = useState(DEFAULT_AUTO_ARCHIVE_DAYS)
 
   useEffect(() => {
     // Config REST is only reachable through the Electron bridge; skip in
     // non-Electron contexts (tests/storybook) rather than throwing.
-    if (!window.hermesDesktop) {
+    if (!window.eirDesktop) {
       return
     }
 
     let alive = true
 
-    void getHermesConfigRecord()
+    void getEirConfigRecord()
       .then(record => {
         if (!alive) {
           return
@@ -285,7 +285,7 @@ function AutoArchiveSetting() {
       try {
         // Sparse patch: PUT /api/config deep-merges, and echoing the cached
         // snapshot would overwrite keys other surfaces changed since it loaded.
-        await saveHermesConfig({ sessions: { auto_archive: autoArchive, auto_archive_days: archiveDays } }, writeScope)
+        await saveEirConfig({ sessions: { auto_archive: autoArchive, auto_archive_days: archiveDays } }, writeScope)
       } catch (err) {
         notifyError(err, s.autoArchiveFailed)
       }
@@ -336,7 +336,7 @@ function AutoArchiveSetting() {
 
 // Lets the user pin the default cwd for new sessions. Without this, packaged
 // builds on Windows used to spawn sessions in the install dir (`win-unpacked`
-// / Program Files), which buried any files Hermes wrote there.
+// / Program Files), which buried any files Eir wrote there.
 function DefaultProjectDirSetting() {
   const { t } = useI18n()
   const s = t.settings.sessions
@@ -347,11 +347,11 @@ function DefaultProjectDirSetting() {
 
   useEffect(() => {
     // The bridge is only present when running inside Electron. In a Vitest
-    // / Storybook / non-Electron context `window.hermesDesktop` is
+    // / Storybook / non-Electron context `window.eirDesktop` is
     // undefined, so guard the WHOLE call chain rather than chaining
     // `?.settings.getDefaultProjectDir().then(...)` (the latter would
     // short-circuit to `undefined.then(...)` and throw at runtime).
-    const settings = window.hermesDesktop?.settings
+    const settings = window.eirDesktop?.settings
 
     if (!settings) {
       return
@@ -382,7 +382,7 @@ function DefaultProjectDirSetting() {
   }, [profile])
 
   const choose = useCallback(async () => {
-    const settings = window.hermesDesktop?.settings
+    const settings = window.eirDesktop?.settings
 
     if (!settings) {
       return
@@ -413,7 +413,7 @@ function DefaultProjectDirSetting() {
   }, [dir, s])
 
   const clear = useCallback(async () => {
-    const settings = window.hermesDesktop?.settings
+    const settings = window.eirDesktop?.settings
 
     if (!settings) {
       return

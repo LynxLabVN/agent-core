@@ -13,10 +13,10 @@ from tests.waiting import async_wait_until
 
 @pytest.fixture
 def cli(monkeypatch):
-    from cli import HermesCLI
+    from cli import EirCLI
 
-    monkeypatch.setenv("HERMES_DEFER_AGENT_STARTUP", "1")
-    cli = HermesCLI(model="fixture", provider="openai-compat", api_key="fixture",
+    monkeypatch.setenv("EIR_DEFER_AGENT_STARTUP", "1")
+    cli = EirCLI(model="fixture", provider="openai-compat", api_key="fixture",
                     base_url="http://127.0.0.1:1/v1")
     cli._tui_init_run_state()
     cli.conversation_history = [

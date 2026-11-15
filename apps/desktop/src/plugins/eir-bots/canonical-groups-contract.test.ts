@@ -3,11 +3,11 @@ import { beforeEach, expect, it, vi } from 'vitest'
 import type { captureGroupRequests } from './canonical-group-contract-test-utils'
 
 const doubles = vi.hoisted(() => ({ request: vi.fn(), capture: undefined as ReturnType<typeof captureGroupRequests> | undefined }))
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@eir/plugin-sdk', async () => {
   const { captureGroupRequests } = await import('./canonical-group-contract-test-utils')
   doubles.capture = captureGroupRequests(doubles.request)
 
-  return { host: { requestProfile: doubles.capture.request }, randomUuid: (await import('@hermes/shared')).randomUuid }
+  return { host: { requestProfile: doubles.capture.request }, randomUuid: (await import('@eir/shared')).randomUuid }
 })
 
 import {

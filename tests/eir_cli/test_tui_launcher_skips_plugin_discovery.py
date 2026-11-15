@@ -1,9 +1,9 @@
 
 """Regression test: the TUI launcher must not spend time on plugin discovery.
 
-`hermes --tui` just spawns a Node process; the spawned tui_gateway backend
+`eir --tui` just spawns a Node process; the spawned tui_gateway backend
 performs its own plugin discovery. Running discover_plugins() in the
-launcher added ~0.5s to every `hermes --tui` startup for work the backend
+launcher added ~0.5s to every `eir --tui` startup for work the backend
 then redoes. Plain chat must still discover plugins.
 """
 
@@ -13,8 +13,8 @@ from argparse import Namespace
 import sys
 import types
 
-from hermes_cli import main as main_mod
-from hermes_cli import mcp_startup
+from eir_cli import main as main_mod
+from eir_cli import mcp_startup
 
 
 def _install_discover_spy(monkeypatch):
@@ -25,7 +25,7 @@ def _install_discover_spy(monkeypatch):
 
     monkeypatch.setitem(
         sys.modules,
-        "hermes_cli.plugins",
+        "eir_cli.plugins",
         types.SimpleNamespace(
             discover_plugins=_discover,
             # main.py now kicks discovery off in a background thread; both
@@ -34,7 +34,7 @@ def _install_discover_spy(monkeypatch):
         ),
     )
     # The plain-chat path also arms MCP discovery. Its config probe imports
-    # ``hermes_cli.plugins`` (replaced by the stub above), fails, and falls
+    # ``eir_cli.plugins`` (replaced by the stub above), fails, and falls
     # back to "assume configured", which spawned a REAL ``cli-mcp-discovery``
     # daemon thread that was still importing ``tools.mcp_tool`` when pytest
     # exited. A daemon thread inside a C-extension import at interpreter

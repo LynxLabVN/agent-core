@@ -12,7 +12,7 @@ from html import escape as html_escape
 import json
 from typing import Any, Dict, Iterable, Iterator, List, Literal, Optional, Tuple
 
-from hermes_cli.timefmt import coerce_epoch
+from eir_cli.timefmt import coerce_epoch
 
 
 ExportFormat = Literal["jsonl", "markdown"]
@@ -59,7 +59,7 @@ def render_sessions_export(sessions: Iterable[dict[str, Any]], *, fmt: str = "js
         headings = (lambda s: f"User prompts for session {_heading_text(_session_id(s))}",
                     lambda s: f"Session {_heading_text(_session_id(s))}")
     else:
-        multi_title, append_body = "Hermes sessions export", _append_session_messages
+        multi_title, append_body = "Eir sessions export", _append_session_messages
         headings = (lambda s: f"Session: {_heading_text(_session_title_or_id(s))}",) * 2
     lines: list[str] = []
     single = len(session_list) == 1
@@ -221,7 +221,7 @@ def export_projection(transcript: bool) -> dict[str, bool]:
 def drop_undone_rows(export: dict[str, Any]) -> dict[str, Any]:
     """Keep live and compaction-archived rows in a ``/save`` JSON snapshot; rows removed by /undo, rewind
     or edit stay out. ``timings`` is rebuilt from the kept rows so it names no dropped row."""
-    from hermes_state_portability import _export_timings
+    from eir_state_portability import _export_timings
     export["messages"] = [m for m in export["messages"] if m["active"] or m["compacted"]]
     export["timings"] = _export_timings(export["messages"], export.get("id"))
     return export
@@ -230,7 +230,7 @@ def drop_undone_rows(export: dict[str, Any]) -> dict[str, Any]:
 def load_save_snapshot(db: Any, session_id: str, fmt: str) -> Optional[dict[str, Any]]:
     """The stored session a ``/save <fmt>`` writes, or None when it has no row. A JSON snapshot loads every
     stored row in memory, so it is refused past ``sessions.max_export_messages`` (raises
-    ``SessionExportTooLargeError``), like ``hermes sessions export``."""
+    ``SessionExportTooLargeError``), like ``eir sessions export``."""
     transcript = fmt in SAVE_TRANSCRIPT_FORMATS
     if not transcript:
         db.assert_export_safe(session_id)
@@ -250,7 +250,7 @@ Formats:
 
 Options:
   filename   optional output name/path (default: auto-named;
-             CLI saves under ~/.hermes/sessions/saved/)
+             CLI saves under ~/.eir/sessions/saved/)
   redact     scrub API keys, tokens, and credentials before writing
 
 Examples:
@@ -271,7 +271,7 @@ def normalize_save_format(fmt: Optional[str]) -> str:
 
 
 def _render_html_for_save(session: dict[str, Any]) -> str:
-    from hermes_cli.session_export_html import generate_html_export
+    from eir_cli.session_export_html import generate_html_export
 
     return generate_html_export(session)
 
@@ -294,4 +294,4 @@ def render_session_for_save(session: dict[str, Any], fmt: str) -> str:
 def default_save_filename(session_id: str, fmt: str) -> str:
     """Default filename for a /save export of the given session."""
     safe_id = "".join(ch for ch in str(session_id) if ch.isalnum() or ch in ("-", "_")) or "session"
-    return f"hermes_session_{safe_id}.{fmt}"
+    return f"eir_session_{safe_id}.{fmt}"

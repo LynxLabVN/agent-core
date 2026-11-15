@@ -27,7 +27,7 @@ const { ensureBotProfileMock, faceOnlyMock, hostMock, storageMock } = vi.hoisted
   storageMock: { get: vi.fn(), set: vi.fn() }
 }))
 
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@eir/plugin-sdk', async () => {
   const { atom } = await import('nanostores')
 
   return {
@@ -40,7 +40,7 @@ vi.mock('@hermes/plugin-sdk', async () => {
   }
 })
 
-vi.mock('./shared', () => ({ getPluginCtx: () => ({ storage: storageMock }), ID: 'hermes-bots' }))
+vi.mock('./shared', () => ({ getPluginCtx: () => ({ storage: storageMock }), ID: 'eir-bots' }))
 vi.mock('./avatar-image', () => ({ isBackfilledFacePng: (data: string) => faceOnlyMock(data) }))
 vi.mock('./canonical-chat', () => ({ ensureBotProfile: ensureBotProfileMock }))
 
@@ -96,7 +96,7 @@ describe('duplicating a bot', () => {
     })
 
     const configure = calls.filter(call => call.method === 'profiles.configure').at(-1)
-    const uiMeta = (configure?.params.ui_meta as Record<string, Record<string, unknown>>)['hermes-bots']
+    const uiMeta = (configure?.params.ui_meta as Record<string, Record<string, unknown>>)['eir-bots']
 
     expect(uiMeta.title).toBe('Researcher (copy)')
     expect(uiMeta.chat).toBeUndefined()

@@ -4,16 +4,16 @@ import { Buffer } from 'node:buffer'
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { HermesReadDirEntry, HermesReadDirResult } from '@/global'
+import type { EirReadDirEntry, EirReadDirResult } from '@/global'
 
 import { clearProjectDirCache, readProjectDir } from './ipc'
 import { $showIgnoredRoots, setShowIgnoredFiles } from './prefs'
 
-const readDir = vi.fn<(path: string) => Promise<HermesReadDirResult>>()
+const readDir = vi.fn<(path: string) => Promise<EirReadDirResult>>()
 const readFileDataUrl = vi.fn<(path: string) => Promise<string>>()
 const gitRoot = vi.fn<(path: string) => Promise<string | null>>()
 
-function ok(entries: HermesReadDirEntry[]): HermesReadDirResult {
+function ok(entries: EirReadDirEntry[]): EirReadDirResult {
   return { entries }
 }
 
@@ -24,13 +24,13 @@ function dataUrl(text: string) {
 function installBridge() {
   ;(
     window as unknown as {
-      hermesDesktop: {
+      eirDesktop: {
         gitRoot: typeof gitRoot
         readDir: typeof readDir
         readFileDataUrl: typeof readFileDataUrl
       }
     }
-  ).hermesDesktop = { gitRoot, readDir, readFileDataUrl }
+  ).eirDesktop = { gitRoot, readDir, readFileDataUrl }
 }
 
 describe('readProjectDir', () => {
@@ -45,11 +45,11 @@ describe('readProjectDir', () => {
   afterEach(() => {
     clearProjectDirCache()
     $showIgnoredRoots.set([])
-    delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
+    delete (window as unknown as { eirDesktop?: unknown }).eirDesktop
   })
 
   it('returns no-bridge when the desktop bridge is unavailable', async () => {
-    delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
+    delete (window as unknown as { eirDesktop?: unknown }).eirDesktop
 
     await expect(readProjectDir('/repo')).resolves.toEqual({ entries: [], error: 'no-bridge' })
   })

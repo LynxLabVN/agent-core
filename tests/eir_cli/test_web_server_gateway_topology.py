@@ -9,10 +9,10 @@ from pathlib import Path
 
 import pytest
 
-from hermes_cli import web_server
+from eir_cli import web_server
 import gateway.status as _gw_status
-import hermes_cli.web_server_gateway as _web_server_gateway
-from hermes_cli.web_server_gateway import _collect_profile_gateway_topology, _profile_platform_ports
+import eir_cli.web_server_gateway as _web_server_gateway
+from eir_cli.web_server_gateway import _collect_profile_gateway_topology, _profile_platform_ports
 
 
 # ---------------------------------------------------------------------------
@@ -56,7 +56,7 @@ def _patch_topology(monkeypatch, homes, running, runtimes):
     ``homes``: list of (name, Path); ``running``: set of profile names with a
     live gateway; ``runtimes``: {name: runtime dict}.
     """
-    import hermes_cli.profiles as profiles_mod
+    import eir_cli.profiles as profiles_mod
     import gateway.status as status_mod
 
     monkeypatch.setattr(profiles_mod, "profiles_to_serve", lambda multiplex, **kw: homes)
@@ -72,14 +72,14 @@ def _patch_topology(monkeypatch, homes, running, runtimes):
 
 class TestCollectProfileGatewayTopology:
     def test_running_standalone_profile_is_in_topology(self, tmp_path, monkeypatch):
-        from hermes_cli import profiles
+        from eir_cli import profiles
 
-        root = tmp_path / ".hermes"
+        root = tmp_path / ".eir"
         solo = root / "profiles" / "solo"
         solo.mkdir(parents=True)
         (solo / "config.yaml").write_text("gateway:\n  standalone: true\n")
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
-        monkeypatch.setenv("HERMES_HOME", str(root))
+        monkeypatch.setenv("EIR_HOME", str(root))
         monkeypatch.setattr(profiles, "_check_gateway_running", lambda home: home == solo)
         topo = _collect_profile_gateway_topology()
         assert "solo" in topo["profiles"]
@@ -252,7 +252,7 @@ class TestCollectProfileGatewayTopology:
 
 
     def test_enumeration_failure_degrades_gracefully(self, monkeypatch):
-        import hermes_cli.profiles as profiles_mod
+        import eir_cli.profiles as profiles_mod
 
         def _boom(multiplex):
             raise RuntimeError("no profiles root")
@@ -273,18 +273,18 @@ class TestCollectProfileGatewayTopology:
 
 class TestStatusEndpointTopology:
     @pytest.fixture(autouse=True)
-    def _setup_client(self, monkeypatch, _isolate_hermes_home):
+    def _setup_client(self, monkeypatch, _isolate_eir_home):
         try:
             from starlette.testclient import TestClient
         except ImportError:
             pytest.skip("fastapi/starlette not installed")
 
-        import hermes_state
-        from hermes_constants import get_hermes_home
-        from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
+        import eir_state
+        from eir_constants import get_eir_home
+        from eir_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
 
         monkeypatch.setattr(
-            hermes_state, "DEFAULT_DB_PATH", get_hermes_home() / "state.db"
+            eir_state, "DEFAULT_DB_PATH", get_eir_home() / "state.db"
         )
         self.client = TestClient(app)
         self.client.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
@@ -345,7 +345,7 @@ class TestStatusEndpointTopology:
         # ``components.platforms.configured: 0`` while its adapters were up and delivering
         # (#123088).
         from gateway.status import GatewayLiveness
-        import hermes_cli.web_routers.status as status_router
+        import eir_cli.web_routers.status as status_router
 
         record = {
             "gateway_state": "running",
@@ -382,7 +382,7 @@ class TestStatusEndpointTopology:
 
     def test_profile_scoped_status_folds_default_flat_adapters_on_default_root(self, monkeypatch, tmp_path):
         # ?profile=default resolves the DEFAULT ROOT directory itself — the shipped root is
-        # ``~/.hermes``, so the directory's basename (".hermes") is not the profile id. The
+        # ``~/.eir``, so the directory's basename (".eir") is not the profile id. The
         # re-key used to fold on that basename: the multiplexer rung's flat keys never matched
         # (the ``gateway_platforms: {}`` symptom of #123088, one call site over from the fix
         # bare /api/status got), and the basename read as a NAMED profile, so the mirror arm
@@ -390,14 +390,14 @@ class TestStatusEndpointTopology:
         from contextlib import nullcontext
 
         from gateway.status import GatewayLiveness
-        import hermes_cli.web_routers.status as status_router
-        from hermes_cli import web_server_profiles
+        import eir_cli.web_routers.status as status_router
+        from eir_cli import web_server_profiles
 
-        home = tmp_path / ".hermes"  # the shipped default root: basename != profile id
+        home = tmp_path / ".eir"  # the shipped default root: basename != profile id
         home.mkdir()
         # The resolver names a default root by IDENTITY, not basename: only the root the
-        # process resolves (HERMES_HOME here) folds as "default".
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        # process resolves (EIR_HOME here) folds as "default".
+        monkeypatch.setenv("EIR_HOME", str(home))
         record = {
             "gateway_state": "running",
             "served_profiles": ["default", "coder"],
@@ -447,8 +447,8 @@ class TestStatusEndpointTopology:
         from contextlib import nullcontext
 
         from gateway.status import GatewayLiveness
-        import hermes_cli.web_routers.status as status_router
-        from hermes_cli import web_server_profiles
+        import eir_cli.web_routers.status as status_router
+        from eir_cli import web_server_profiles
 
         profile = tmp_path / "profiles" / "coder"
         profile.mkdir(parents=True)
@@ -522,9 +522,9 @@ class TestStatusEndpointTopology:
         assert data["gateway_shared_with"] is None
 
     def test_unscoped_status_on_a_served_profiles_own_backend_uses_multiplexer_record(self, monkeypatch, tmp_path):
-        # `hermes -p coder serve` answers plain /api/status (no ?profile=) for its own home. That
+        # `eir -p coder serve` answers plain /api/status (no ?profile=) for its own home. That
         # home's gateway.lock is the multiplexer's too, so the same live record applies.
-        import hermes_cli.web_routers.status as status_router
+        import eir_cli.web_routers.status as status_router
 
         self._scope_to_served_profile(
             monkeypatch, tmp_path,
@@ -537,7 +537,7 @@ class TestStatusEndpointTopology:
                               "coder:telegram": {"state": "connected"}},
             },
         )
-        monkeypatch.setattr(status_router, "get_process_hermes_home", lambda: tmp_path / "profiles" / "coder")
+        monkeypatch.setattr(status_router, "get_process_eir_home", lambda: tmp_path / "profiles" / "coder")
 
         resp = self.client.get("/api/status")
 
@@ -589,7 +589,7 @@ class TestStatusEndpointTopology:
         # A health-probe answer carries the REMOTE container's PID, which can equal an unrelated
         # local host-record PID; only a PID proven on this host may select the local record.
         from gateway.status import GatewayLiveness
-        import hermes_cli.web_routers.status as status_router
+        import eir_cli.web_routers.status as status_router
 
         mux_runtime = {
             "gateway_state": "running", "served_profiles": ["default", "coder"],
@@ -626,8 +626,8 @@ class TestStatusEndpointTopology:
         # multiplexer's record, and the real lookup (host record + default root) resolves to it.
         from gateway import host_topology
         from gateway.status import GatewayLiveness
-        import hermes_cli.web_routers.status as status_router
-        from hermes_constants import get_process_hermes_home
+        import eir_cli.web_routers.status as status_router
+        from eir_constants import get_process_eir_home
 
         monkeypatch.setattr(_gw_status, "read_runtime_status", lambda path=None: record)
         monkeypatch.setattr(_gw_status, "get_runtime_status_running_pid",
@@ -641,7 +641,7 @@ class TestStatusEndpointTopology:
             "profiles": ["default", "reviewer"], "gateway_mode": "multiplex", "gateways": [],
             "profile_platforms": {}})
         # The lookup genuinely succeeds here (no zero-arg PID-probe trap making it raise).
-        assert _gw_status.multiplexer_liveness_for_profile(get_process_hermes_home()) == (4242, record)
+        assert _gw_status.multiplexer_liveness_for_profile(get_process_eir_home()) == (4242, record)
         resp = self.client.get("/api/status")
         assert resp.status_code == 200
         return resp.json()
@@ -769,7 +769,7 @@ class TestStatusEndpointTopology:
         # (gateway_mode == "multiple"). Each profile's failures live in its
         # own gateway_state.json; the machine-level /api/status must fold
         # them in as <profile>:<platform> so NAS health monitoring sees them.
-        import hermes_cli.profiles as profiles_mod
+        import eir_cli.profiles as profiles_mod
 
         monkeypatch.setattr(_gw_status, "get_running_pid_cached", lambda: 123)
         monkeypatch.setattr(
@@ -845,7 +845,7 @@ class TestStatusEndpointTopology:
     def test_profile_scoped_status_does_not_merge_other_profiles(self, monkeypatch):
         # ?profile=<name> targets one profile's view — merging every other
         # profile's failures into it would misattribute state.
-        import hermes_cli.profiles as profiles_mod
+        import eir_cli.profiles as profiles_mod
 
         monkeypatch.setattr(_gw_status, "get_running_pid_cached", lambda: 123)
         monkeypatch.setattr(
@@ -884,7 +884,7 @@ class TestStatusEndpointTopology:
 
     def test_profile_names_and_mode_public_when_auth_gated(self, monkeypatch):
         # Profile NAMES + gateway_mode are low-sensitivity product surface: the
-        # Hermes Cloud Portal reads /api/status over the network (a gated bind)
+        # Eir Cloud Portal reads /api/status over the network (a gated bind)
         # to render the profile list, so they must survive the auth gate.
         monkeypatch.setattr(
             _web_server_gateway, "_collect_profile_gateway_topology",
@@ -902,9 +902,9 @@ class TestStatusEndpointTopology:
             assert data["profiles"] == ["default", "coder"]
             assert data["gateway_mode"] == "multiplex"
             # But the per-gateway detail (host ports = recon) stays gated,
-            # alongside hermes_home / gateway_pid.
+            # alongside eir_home / gateway_pid.
             assert "gateways" not in data
-            assert "hermes_home" not in data
+            assert "eir_home" not in data
             assert "gateway_pid" not in data
         finally:
             monkeypatch.setattr(

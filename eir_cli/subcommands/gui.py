@@ -1,4 +1,4 @@
-"""``hermes gui`` subcommand parser."""
+"""``eir gui`` subcommand parser."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ def build_gui_parser(subparsers, *, cmd_gui: Callable) -> None:
     """Attach the ``gui`` subcommand to ``subparsers``."""
     gui_parser = subparsers.add_parser(
         "desktop", aliases=["gui"], help="Build and launch the native desktop app",
-        description="Launch the Hermes Electron desktop app. By default this installs "
+        description="Launch the Eir Electron desktop app. By default this installs "
             "workspace Node dependencies, builds the current OS's unpacked "
             "Electron app, then launches that packaged artifact.")
     gui_parser.add_argument(
@@ -23,15 +23,15 @@ def build_gui_parser(subparsers, *, cmd_gui: Callable) -> None:
         help="Enable deterministic desktop boot delays for validating startup UI")
     gui_parser.add_argument(
         "--ignore-existing", action="store_true",
-        help="Skip the installed Hermes runtime (~/.hermes/hermes-agent) so no local "
-             "backend starts and Desktop offers connect or install instead. --hermes-root "
+        help="Skip the installed Eir runtime (~/.eir/eir-agent) so no local "
+             "backend starts and Desktop offers connect or install instead. --eir-root "
              "and the bundled runtime still win; a runtime installed during this launch is used.")
     gui_parser.add_argument(
-        "--hermes-root",
-        help="Override the Hermes source root used by Desktop (sets HERMES_DESKTOP_HERMES_ROOT)")
+        "--eir-root",
+        help="Override the Eir source root used by Desktop (sets EIR_DESKTOP_EIR_ROOT)")
     gui_parser.add_argument(
         "--cwd",
-        help="Initial project directory for Desktop chat sessions (sets HERMES_DESKTOP_CWD)")
+        help="Initial project directory for Desktop chat sessions (sets EIR_DESKTOP_CWD)")
     gui_parser.add_argument(
         "--skip-build", action="store_true",
         help="Skip pnpm install/package and launch the existing unpacked app from apps/desktop/release",
@@ -51,8 +51,8 @@ def build_gui_parser(subparsers, *, cmd_gui: Callable) -> None:
             "rebuilds with a certificate-anchored identity. Idempotent — safe "
             "to re-run after updates.")
     gui_parser.add_argument(
-        "--identity", default="Hermes Local Signing",
-        help="Certificate name to create/use for --setup-tcc-identity (default: Hermes Local Signing)",
+        "--identity", default="Eir Local Signing",
+        help="Certificate name to create/use for --setup-tcc-identity (default: Eir Local Signing)",
     )
     gui_parser.add_argument(
         "--install-apparmor-profile", action="store_true",

@@ -1,4 +1,4 @@
-import type * as HermesSdk from '@hermes/plugin-sdk'
+import type * as EirSdk from '@eir/plugin-sdk'
 import { cleanup, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
@@ -13,8 +13,8 @@ import { $groupChats } from './group-chat'
 import { translateBotsIn } from './i18n-test-helper'
 
 const { request, locale, union } = vi.hoisted(() => ({ request: vi.fn(), locale: { value: 'en' }, union: { profiles: [] as unknown[] } }))
-vi.mock('@hermes/plugin-sdk', async importOriginal =>
-  localGatewaySdkMock(await importOriginal<typeof HermesSdk>(), request, () => translateBotsIn(locale.value)))
+vi.mock('@eir/plugin-sdk', async importOriginal =>
+  localGatewaySdkMock(await importOriginal<typeof EirSdk>(), request, () => translateBotsIn(locale.value)))
 vi.mock('./data', async importOriginal => ({ ...await importOriginal<typeof DataModule>(), cachedUnionRoster: () => union }))
 
 const binding = { connectionId: 'local', profile: 'default', roomId: 'linked' }

@@ -7,7 +7,7 @@ from fastapi.responses import Response
 from fastapi.testclient import TestClient
 from starlette.requests import Request
 
-from hermes_cli.dashboard_auth.cookies import (
+from eir_cli.dashboard_auth.cookies import (
     PKCE_COOKIE,
     SESSION_AT_COOKIE,
     SESSION_PROVIDER_COOKIE,
@@ -82,13 +82,13 @@ def test_session_cookies_use_host_prefix_on_https_direct():
 
 
 def test_session_cookies_use_secure_prefix_when_proxied():
-    """HTTPS + /hermes prefix → __Secure- prefix (__Host- forbids
+    """HTTPS + /eir prefix → __Secure- prefix (__Host- forbids
     Path != "/"; __Secure- keeps the Secure-required hardening)."""
-    client = TestClient(_build_app(use_https=True, prefix="/hermes"))
+    client = TestClient(_build_app(use_https=True, prefix="/eir"))
     r = client.get("/set")
     cookies = r.headers.get_list("set-cookie")
     at = next(c for c in cookies if c.startswith(f"__Secure-{SESSION_AT_COOKIE}="))
-    assert "Path=/hermes" in at
+    assert "Path=/eir" in at
     assert "Secure" in at
     # __Host- variant must NOT be emitted on the prefix path.
     assert not any(
@@ -143,7 +143,7 @@ def test_read_session_cookies_from_request_secure_prefix():
 
 def test_https_reader_ignores_bare_cookie_names():
     """Over HTTPS the server only ever sets ``__Host-``/``__Secure-`` names. A bare
-    ``hermes_session_*`` cookie there can only come from somewhere else (e.g. a sibling
+    ``eir_session_*`` cookie there can only come from somewhere else (e.g. a sibling
     subdomain setting ``Domain=`` on the parent), so the reader must not honour it."""
     bare = "; ".join(
         f"{name}=planted"
@@ -181,7 +181,7 @@ def _request(scheme: str, cookie_prefix: str, *, proxy_prefix: str = "") -> Requ
     # Direct HTTPS: the setter writes __Host-; a __Secure- cookie can be Domain=<parent>-planted.
     ("https", "", "__Host-", ("__Secure-", "")),
     # HTTPS behind a proxy prefix: the setter writes __Secure- (Path != /), never __Host-.
-    ("https", "/hermes", "__Secure-", ("__Host-", "")),
+    ("https", "/eir", "__Secure-", ("__Host-", "")),
 ])
 def test_https_readers_accept_only_the_name_the_setter_writes(scheme, proxy_prefix, written, planted):
     for cookie_prefix in planted:
@@ -287,7 +287,7 @@ def test_encode_parse_pkce_payload_round_trips_hostile_values():
     — byte-for-byte. This is the bug class the JSON codec kills: with
     delimiter-based formats, these bytes collide with the framing.
     """
-    from hermes_cli.dashboard_auth.cookies import (
+    from eir_cli.dashboard_auth.cookies import (
         encode_pkce_payload,
         parse_pkce_payload,
     )
@@ -311,7 +311,7 @@ def test_parse_pkce_payload_old_format_cookie_survives_rolling_upgrade():
     value containing ``%3B`` into a bogus delimiter and truncate the
     post-login target.
     """
-    from hermes_cli.dashboard_auth.cookies import parse_pkce_payload
+    from eir_cli.dashboard_auth.cookies import parse_pkce_payload
 
     old = (
         "provider=stub;state=s123;verifier=v456;"
@@ -337,7 +337,7 @@ def test_parse_pkce_payload_99176_url_encoded_format_survives_upgrade():
     """
     from urllib.parse import quote
 
-    from hermes_cli.dashboard_auth.cookies import parse_pkce_payload
+    from eir_cli.dashboard_auth.cookies import parse_pkce_payload
 
     payload = "provider=stub;state=s123;verifier=v456;next=%2Fsessions"
     wire = quote(payload, safe="")
@@ -363,9 +363,9 @@ def test_pkce_cookie_round_trip_preserves_all_segments():
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from conftest_dashboard_auth import StubAuthProvider  # type: ignore
-    from hermes_cli import web_server
-    from hermes_cli.dashboard_auth import clear_providers, register_provider
-    from hermes_cli.dashboard_auth.cookies import parse_pkce_payload
+    from eir_cli import web_server
+    from eir_cli.dashboard_auth import clear_providers, register_provider
+    from eir_cli.dashboard_auth.cookies import parse_pkce_payload
 
     clear_providers()
     register_provider(StubAuthProvider())
@@ -388,7 +388,7 @@ def test_pkce_cookie_round_trip_preserves_all_segments():
         assert r1.status_code == 302
         pkce_set = next(
             c for c in r1.headers.get_list("set-cookie")
-            if "hermes_session_pkce" in c
+            if "eir_session_pkce" in c
         )
         # Pull just the name=value portion so we can echo it back as
         # a Cookie header.
@@ -438,8 +438,8 @@ def test_pkce_callback_works_when_next_query_includes_encoded_path():
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from conftest_dashboard_auth import StubAuthProvider  # type: ignore
-    from hermes_cli import web_server
-    from hermes_cli.dashboard_auth import clear_providers, register_provider
+    from eir_cli import web_server
+    from eir_cli.dashboard_auth import clear_providers, register_provider
     from urllib.parse import quote, unquote
 
     clear_providers()
@@ -467,7 +467,7 @@ def test_pkce_callback_works_when_next_query_includes_encoded_path():
         assert r1.status_code == 302
         pkce_kv = next(
             c for c in r1.headers.get_list("set-cookie")
-            if "hermes_session_pkce" in c
+            if "eir_session_pkce" in c
         ).split(";", 1)[0]
         # Drive the callback — must succeed (302 to the post-login
         # target, NOT a 400 "Missing PKCE state cookie").
@@ -574,7 +574,7 @@ def test_clear_pkce_cookie_http_bare_deletion_is_insecure_lax():
 def test_clear_session_cookies_prefixed_deletions_carry_secure():
     """__Host-/__Secure- deletions must carry Secure (and __Host- Path=/):
     browsers reject a prefixed Set-Cookie that violates its prefix rules,
-    so an insecure deletion for __Host-hermes_session_at is silently
+    so an insecure deletion for __Host-eir_session_at is silently
     ignored and the session cookie survives logout on HTTPS origins."""
     client = TestClient(_build_app(use_https=True, prefix=""))
     cookies = client.get("/clear").headers.get_list("set-cookie")

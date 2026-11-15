@@ -1,36 +1,36 @@
-"""Tests for hermes_cli.relaunch — unified self-relaunch utility."""
+"""Tests for eir_cli.relaunch — unified self-relaunch utility."""
 
 import sys
 
 import pytest
 
-from hermes_cli import relaunch as relaunch_mod
+from eir_cli import relaunch as relaunch_mod
 
 
-class TestResolveHermesBin:
+class TestResolveEirBin:
     def test_prefers_absolute_argv0_when_executable(self, monkeypatch):
-        fake = "/nix/store/abc/bin/hermes"
+        fake = "/nix/store/abc/bin/eir"
         monkeypatch.setattr(sys, "argv", [fake])
         monkeypatch.setattr(relaunch_mod.os.path, "isfile", lambda p: p == fake)
         monkeypatch.setattr(relaunch_mod.os, "access", lambda p, mode: p == fake)
-        assert relaunch_mod.resolve_hermes_bin() == fake
+        assert relaunch_mod.resolve_eir_bin() == fake
 
     def test_resolves_relative_argv0(self, monkeypatch, tmp_path):
-        fake = tmp_path / "hermes"
+        fake = tmp_path / "eir"
         fake.write_text("#!/bin/sh\n")
         fake.chmod(0o755)
         monkeypatch.setattr(sys, "argv", [str(fake.name)])
         monkeypatch.chdir(tmp_path)
-        # Ensure we don't accidentally match a real 'hermes' on PATH
+        # Ensure we don't accidentally match a real 'eir' on PATH
         monkeypatch.setattr(relaunch_mod.shutil, "which", lambda _name: None)
-        assert relaunch_mod.resolve_hermes_bin() == str(fake)
+        assert relaunch_mod.resolve_eir_bin() == str(fake)
 
     def test_falls_back_to_path_which(self, monkeypatch):
         monkeypatch.setattr(sys, "argv", ["-c"])  # not a real path
         monkeypatch.setattr(
-            relaunch_mod.shutil, "which", lambda name: "/usr/bin/hermes" if name == "hermes" else None
+            relaunch_mod.shutil, "which", lambda name: "/usr/bin/eir" if name == "eir" else None
         )
-        assert relaunch_mod.resolve_hermes_bin() == "/usr/bin/hermes"
+        assert relaunch_mod.resolve_eir_bin() == "/usr/bin/eir"
 
 
 class TestExtractInheritedFlags:
@@ -62,7 +62,7 @@ class TestBuildRelaunchArgv:
 
 
     def test_preserves_inherited_flags(self, monkeypatch):
-        monkeypatch.setattr(relaunch_mod, "resolve_hermes_bin", lambda: "/usr/bin/hermes")
+        monkeypatch.setattr(relaunch_mod, "resolve_eir_bin", lambda: "/usr/bin/eir")
         original = ["--tui", "--dev", "--profile", "work", "sessions", "browse"]
         argv = relaunch_mod.build_relaunch_argv(["--resume", "abc"], original_argv=original)
         assert "--tui" in argv
@@ -76,13 +76,13 @@ class TestBuildRelaunchArgv:
         assert "browse" not in argv
 
     def test_can_disable_preserve(self, monkeypatch):
-        monkeypatch.setattr(relaunch_mod, "resolve_hermes_bin", lambda: "/usr/bin/hermes")
+        monkeypatch.setattr(relaunch_mod, "resolve_eir_bin", lambda: "/usr/bin/eir")
         original = ["--tui", "chat"]
         argv = relaunch_mod.build_relaunch_argv(
             ["--resume", "abc"], preserve_inherited=False, original_argv=original
         )
         assert "--tui" not in argv
-        assert argv == ["/usr/bin/hermes", "--resume", "abc"]
+        assert argv == ["/usr/bin/eir", "--resume", "abc"]
 
 
 class TestRelaunch:
@@ -94,18 +94,18 @@ class TestRelaunch:
             raise SystemExit(0)
 
         monkeypatch.setattr(relaunch_mod.os, "execvp", fake_execvp)
-        monkeypatch.setattr(relaunch_mod, "resolve_hermes_bin", lambda: "/usr/bin/hermes")
+        monkeypatch.setattr(relaunch_mod, "resolve_eir_bin", lambda: "/usr/bin/eir")
 
         with pytest.raises(SystemExit):
             relaunch_mod.relaunch(["--resume", "abc"])
 
-        assert calls == [("/usr/bin/hermes", ["/usr/bin/hermes", "--resume", "abc"])]
+        assert calls == [("/usr/bin/eir", ["/usr/bin/eir", "--resume", "abc"])]
 
     @pytest.mark.platforms("windows")
     def test_windows_uses_subprocess_not_execvp(self, monkeypatch):
         """On Windows, os.execvp raises OSError "Exec format error" when the
         target is a .cmd shim or console-script wrapper (both common for
-        hermes).  relaunch() must detect win32 and use subprocess.run +
+        eir).  relaunch() must detect win32 and use subprocess.run +
         sys.exit instead.
 
         ``platforms("windows")``: the bug is that ``os.execvp`` cannot exec a Windows
@@ -113,14 +113,14 @@ class TestRelaunch:
         platform only re-asserted the branch we wrote, never the constraint
         that motivated it.
         """
-        monkeypatch.setattr(relaunch_mod, "resolve_hermes_bin", lambda: r"C:\Users\test\hermes.exe")
+        monkeypatch.setattr(relaunch_mod, "resolve_eir_bin", lambda: r"C:\Users\test\eir.exe")
         # Pin sys.argv: relaunch() preserves inherited flags from the LIVE
         # argv, so under pytest it happily inherited the runner's own
         # "-m 'platforms and not integration'" and the assertion below saw
         # them in the child argv. Nothing to do with Windows — it only showed
         # up here because this is the first lane that actually executes the
         # test, and -m is how that lane selects it.
-        monkeypatch.setattr(relaunch_mod.sys, "argv", [r"C:\Users\test\hermes.exe"])
+        monkeypatch.setattr(relaunch_mod.sys, "argv", [r"C:\Users\test\eir.exe"])
 
         import subprocess as _subprocess
 
@@ -148,12 +148,12 @@ class TestRelaunch:
 
         assert exc_info.value.code == 0
         assert execvp_calls == []
-        assert captured_argv == [[r"C:\Users\test\hermes.exe", "chat"]]
+        assert captured_argv == [[r"C:\Users\test\eir.exe", "chat"]]
 
     @pytest.mark.platforms("windows")
     def test_windows_propagates_child_exit_code(self, monkeypatch):
         """A non-zero exit from the child should flow through to sys.exit."""
-        monkeypatch.setattr(relaunch_mod, "resolve_hermes_bin", lambda: r"C:\hermes.exe")
+        monkeypatch.setattr(relaunch_mod, "resolve_eir_bin", lambda: r"C:\eir.exe")
 
         import subprocess as _subprocess
 
@@ -170,8 +170,8 @@ class TestRelaunch:
         assert exc_info.value.code == 42
 
 
-class TestResolveHermesBinWindowsPyGuard:
-    """On Windows, resolve_hermes_bin MUST NOT return a .py path.
+class TestResolveEirBinWindowsPyGuard:
+    """On Windows, resolve_eir_bin MUST NOT return a .py path.
     os.access(x, os.X_OK) returns True for .py files on Windows because
     PATHEXT includes .py when the Python launcher is installed — but
     subprocess.run can't actually exec a .py directly, so the relaunch
@@ -191,40 +191,40 @@ class TestResolveHermesBinWindowsPyGuard:
         script.write_text("# stub")
 
         monkeypatch.setattr(relaunch_mod.sys, "argv", [str(script), "chat"])
-        # Force PATH lookup to return a hermes.exe so the test doesn't
+        # Force PATH lookup to return a eir.exe so the test doesn't
         # exercise the None-fallback path (that's a separate test).
         monkeypatch.setattr(
             relaunch_mod.shutil, "which",
-            lambda name: r"C:\venv\Scripts\hermes.exe" if name == "hermes" else None,
+            lambda name: r"C:\venv\Scripts\eir.exe" if name == "eir" else None,
         )
 
-        bin_path = relaunch_mod.resolve_hermes_bin()
-        # Must NOT be the .py — must be the hermes.exe PATH entry.
-        assert bin_path == r"C:\venv\Scripts\hermes.exe"
+        bin_path = relaunch_mod.resolve_eir_bin()
+        # Must NOT be the .py — must be the eir.exe PATH entry.
+        assert bin_path == r"C:\venv\Scripts\eir.exe"
 
     def test_posix_python_launcher_falls_through_to_path(self, monkeypatch, tmp_path):
         """A Python source launcher must not be re-executed through its shebang.
 
-        The git installer invokes ``hermes`` with the venv interpreter while the
+        The git installer invokes ``eir`` with the venv interpreter while the
         source launcher's shebang uses ``/usr/bin/env python3``.  Re-executing
         that source file directly can therefore escape the venv and lose core
         dependencies such as PyYAML.
         """
         if sys.platform == "win32":
             pytest.skip("POSIX semantics")
-        script = tmp_path / "hermes"
+        script = tmp_path / "eir"
         script.write_text("#!/usr/bin/env python3\n")
         script.chmod(0o755)
-        wrapper = tmp_path / "bin" / "hermes"
+        wrapper = tmp_path / "bin" / "eir"
         wrapper.parent.mkdir()
         wrapper.write_text("#!/usr/bin/env bash\n")
         wrapper.chmod(0o755)
         monkeypatch.setattr(relaunch_mod.sys, "argv", [str(script), "chat"])
         monkeypatch.setattr(
             relaunch_mod.shutil, "which",
-            lambda name: str(wrapper) if name == "hermes" else None,
+            lambda name: str(wrapper) if name == "eir" else None,
         )
-        assert relaunch_mod.resolve_hermes_bin() == str(wrapper)
+        assert relaunch_mod.resolve_eir_bin() == str(wrapper)
 
     def test_posix_python_launcher_on_path_falls_back_to_current_python(
         self, monkeypatch, tmp_path
@@ -232,35 +232,35 @@ class TestResolveHermesBinWindowsPyGuard:
         """PATH must not re-select the Python launcher rejected from argv[0]."""
         if sys.platform == "win32":
             pytest.skip("POSIX semantics")
-        script = tmp_path / "hermes"
+        script = tmp_path / "eir"
         script.write_text("#!/usr/bin/env python3\n")
         script.chmod(0o755)
         monkeypatch.setattr(relaunch_mod.sys, "argv", [str(script), "chat"])
         monkeypatch.setattr(
             relaunch_mod.shutil,
             "which",
-            lambda name: str(script) if name == "hermes" else None,
+            lambda name: str(script) if name == "eir" else None,
         )
 
-        assert relaunch_mod.resolve_hermes_bin() is None
+        assert relaunch_mod.resolve_eir_bin() is None
 
         # A console script pinned to the running interpreter keeps the venv: still exec-able.
-        pinned = tmp_path / "pinned" / "hermes"
+        pinned = tmp_path / "pinned" / "eir"
         pinned.parent.mkdir()
         pinned.write_text(f"#!{sys.executable}\n")
         pinned.chmod(0o755)
         monkeypatch.setattr(relaunch_mod.sys, "argv", [str(pinned), "chat"])
-        assert relaunch_mod.resolve_hermes_bin() == str(pinned)
+        assert relaunch_mod.resolve_eir_bin() == str(pinned)
 
     @pytest.mark.platforms("windows")
-    def test_windows_py_argv0_with_no_hermes_on_path_returns_none(self, monkeypatch, tmp_path):
-        """Bulletproof fallback: if argv0 is .py on Windows AND hermes.exe
+    def test_windows_py_argv0_with_no_eir_on_path_returns_none(self, monkeypatch, tmp_path):
+        """Bulletproof fallback: if argv0 is .py on Windows AND eir.exe
         isn't on PATH, return None so the caller falls back to
-        python -m hermes_cli.main."""
+        python -m eir_cli.main."""
         script = tmp_path / "main.py"
         script.write_text("# stub")
 
         monkeypatch.setattr(relaunch_mod.sys, "argv", [str(script), "chat"])
         monkeypatch.setattr(relaunch_mod.shutil, "which", lambda name: None)
 
-        assert relaunch_mod.resolve_hermes_bin() is None
+        assert relaunch_mod.resolve_eir_bin() is None

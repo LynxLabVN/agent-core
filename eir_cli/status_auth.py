@@ -1,16 +1,16 @@
-"""Credential sections of `hermes status`, run through ``status._SECTIONS`` with its shared context.
-Origin helpers (``_row``, ``_first_env_value``, ...) are resolved through the ``hermes_cli.status``
+"""Credential sections of `eir status`, run through ``status._SECTIONS`` with its shared context.
+Origin helpers (``_row``, ``_first_env_value``, ...) are resolved through the ``eir_cli.status``
 module object so tests that monkeypatch that module keep working."""
 
 from datetime import datetime, timezone, UTC
 
-from hermes_cli.auth import AuthError
-from hermes_cli.nous_account import (
+from eir_cli.auth import AuthError
+from eir_cli.nous_account import (
     format_nous_portal_entitlement_message, get_nous_portal_account_info)
-from hermes_cli.nous_subscription import get_nous_subscription_features
+from eir_cli.nous_subscription import get_nous_subscription_features
 from tools.tool_backend_helpers import managed_nous_tools_enabled
-from hermes_cli import config
-from hermes_time import safe_strftime
+from eir_cli import config
+from eir_time import safe_strftime
 
 
 def _format_iso_timestamp(value) -> str:
@@ -64,16 +64,16 @@ _FILE_REFRESH_ROWS = (
 
 _OAUTH_BLOCKS = (
     # (row name, auth getter, login hint, detail rows)
-    ("OpenAI Codex", "get_codex_auth_status", "hermes model", _FILE_REFRESH_ROWS),
+    ("OpenAI Codex", "get_codex_auth_status", "eir model", _FILE_REFRESH_ROWS),
     ("Qwen OAuth", "get_qwen_auth_status", "qwen auth qwen-oauth", (
         ("Auth file:", "auth_file", None, None),
         ("Access exp:", "expires_at_ms", _qwen_expiry, None),
         ("Error:", "error", None, False))),
-    ("MiniMax OAuth", "get_minimax_oauth_auth_status", "hermes auth add minimax-oauth", (
+    ("MiniMax OAuth", "get_minimax_oauth_auth_status", "eir auth add minimax-oauth", (
         ("Region:", "region", None, True),
         ("Access exp:", "expires_at", None, None),
         ("Error:", "error", None, False))),
-    ("xAI OAuth", "get_xai_oauth_auth_status", "hermes auth add xai-oauth", _FILE_REFRESH_ROWS))
+    ("xAI OAuth", "get_xai_oauth_auth_status", "eir auth add xai-oauth", _FILE_REFRESH_ROWS))
 
 _APIKEY_PROVIDERS = {
     "Z.AI / GLM": ("GLM_API_KEY", "ZAI_API_KEY", "Z_AI_API_KEY"), "Kimi / Moonshot": ("KIMI_API_KEY",),
@@ -90,7 +90,7 @@ _FEATURE_STATES = (
 
 def _render_api_keys(ctx):
     _status._section("API Keys")
-    from hermes_cli.auth import get_anthropic_key
+    from eir_cli.auth import get_anthropic_key
     # Anthropic uses the dedicated lookup (it also resolves OAuth tokens).
     for name, env_ref in (*_API_KEYS.items(), ("Anthropic", get_anthropic_key)):
         value = env_ref() if callable(env_ref) else _status._first_env_value(env_ref)
@@ -99,9 +99,9 @@ def _render_api_keys(ctx):
 
 def _render_auth_providers(ctx):
     _status._section("Auth Providers")
-    from hermes_cli import auth
+    from eir_cli import auth
     try:
-        # Read-only display: the refresh-free snapshot, so `hermes status` never performs an OAuth
+        # Read-only display: the refresh-free snapshot, so `eir status` never performs an OAuth
         # refresh or burns a single-use refresh token.
         nous_status = auth.get_nous_auth_status_local()
         statuses = {getter: getattr(auth, getter)() for _, getter, _, _ in _OAUTH_BLOCKS[:3]}
@@ -127,7 +127,7 @@ def _render_auth_providers(ctx):
     )
     if nous_status.get("free_tier"):
         # Free tier: never rendered as an account login (no account ids, no refresh row).
-        from hermes_cli.anon_auth import FREE_TIER_LABEL, GUEST_MODEL, UPGRADE_HINT
+        from eir_cli.anon_auth import FREE_TIER_LABEL, GUEST_MODEL, UPGRADE_HINT
         _status._row("Nous Portal", True, f"{FREE_TIER_LABEL} · {GUEST_MODEL}")
         _status._detail("", UPGRADE_HINT)
         inference_url = nous_status.get("inference_base_url")
@@ -139,7 +139,7 @@ def _render_auth_providers(ctx):
     nous_error = nous_status.get("error")
     _status._row("Nous Portal", logged_in,
          "logged in" if logged_in else "not logged in (Nous inference key configured)" if inference
-         else "not logged in (run: hermes portal)")
+         else "not logged in (run: eir portal)")
     portal_url = nous_status.get("portal_base_url") or "(unknown)"
     inference_url = nous_status.get("inference_base_url") or (info.inference_base_url if info else None)
     for label, value, show in (
@@ -183,12 +183,12 @@ def _render_apikey_providers(ctx):
     _status._section("API-Key Providers")
     for pname, env_vars in _APIKEY_PROVIDERS.items():
         configured = bool(_status._first_env_value(env_vars))
-        _status._row(pname, configured, "configured" if configured else "not configured (run: hermes model)", 16, " ")
+        _status._row(pname, configured, "configured" if configured else "not configured (run: eir model)", 16, " ")
 
     # LM Studio reachability: probe only when it is the active provider so users with foreign
     # configs see no noise. Auth rejection vs. a silent empty list is the common support case.
     if _status._effective_provider_label() == "LM Studio":
-        from hermes_cli.models_local import probe_lmstudio_models
+        from eir_cli.models_local import probe_lmstudio_models
         model_cfg = ctx.config.get("model")
         base = ((model_cfg.get("base_url") if isinstance(model_cfg, dict) else None)
                 or _status.get_env_value("LM_BASE_URL") or "http://127.0.0.1:1234/v1")
@@ -202,4 +202,4 @@ def _render_apikey_providers(ctx):
         _status._row("LM Studio", ok, msg, 16, " ")
 
 
-import hermes_cli.status as _status
+import eir_cli.status as _status

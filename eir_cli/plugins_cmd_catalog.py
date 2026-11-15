@@ -1,7 +1,7 @@
-"""``hermes plugins`` catalog surface: resolution, provenance sidecar, search/browse/info/validate,
+"""``eir plugins`` catalog surface: resolution, provenance sidecar, search/browse/info/validate,
 catalog-aware update, plus the dashboard/TUI-facing catalog payload helpers.
 
-Sibling of :mod:`hermes_cli.plugins_cmd` (the installer core, enable/disable state and console helpers
+Sibling of :mod:`eir_cli.plugins_cmd` (the installer core, enable/disable state and console helpers
 live there and are imported late — this module is imported BY ``plugins_cmd``).
 """
 
@@ -18,7 +18,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, NamedTuple, Optional
 
-from hermes_cli.plugin_catalog import (
+from eir_cli.plugin_catalog import (
     CATALOG_TIERS, PluginCatalogEntry, RemovedEntry, cached_removed_entries, entry_capability_summary, filter_entries,
     find_removed, get_live_catalog_entry, load_catalog_live, match_removed, resolved_removed_entries,
     _NAME_RE, _normalize_repo,
@@ -27,20 +27,20 @@ from pm.filesystem import is_junction
 
 logger = logging.getLogger(__name__)
 
-CATALOG_SIDECAR = ".hermes-catalog.json"
+CATALOG_SIDECAR = ".eir-catalog.json"
 
 # ── Resolution / provenance ──────────────────────────────────────────────────
 
 def looks_like_catalog_name(identifier: str) -> bool:
     """Bare ``[a-z0-9_-]`` token — not a URL, ``owner/repo`` or path."""
-    from hermes_cli.plugins_cmd import _URL_SCHEMES
+    from eir_cli.plugins_cmd import _URL_SCHEMES
     return bool(identifier) and "/" not in identifier and "\\" not in identifier \
         and not identifier.startswith(_URL_SCHEMES) and bool(_NAME_RE.match(identifier))
 
 
 def raise_if_removed(*candidates: str) -> None:
     """``PluginOperationError`` when any candidate (name or repo URL) is on the kill list."""
-    from hermes_cli.plugins_cmd import PluginOperationError
+    from eir_cli.plugins_cmd import PluginOperationError
     for candidate in candidates:
         removed = find_removed(candidate)
         if removed is not None:
@@ -48,24 +48,24 @@ def raise_if_removed(*candidates: str) -> None:
             if removed.date:
                 detail += f" (removed {removed.date})"
             raise PluginOperationError(
-                f"Plugin '{removed.name}' was removed from the Hermes plugin catalog and is blocked from "
+                f"Plugin '{removed.name}' was removed from the Eir plugin catalog and is blocked from "
                 f"installation: {detail}", failure_class="removed_from_catalog")
 
 
 def resolve_catalog_name(identifier: str, console) -> PluginCatalogEntry:
     """Bare name → live catalog entry, or exit 1 with a pointer to ``search``."""
-    from hermes_cli.plugins_cmd import _fail
+    from eir_cli.plugins_cmd import _fail
     entry = get_live_catalog_entry(identifier)
     if entry is None:
         _fail(console, (
-            f"[red]Error:[/red] '{identifier}' is not in the Hermes plugin catalog and is not a Git URL or "
-            "owner/repo shorthand. Browse entries with `hermes plugins search`."))
+            f"[red]Error:[/red] '{identifier}' is not in the Eir plugin catalog and is not a Git URL or "
+            "owner/repo shorthand. Browse entries with `eir plugins search`."))
         raise SystemExit(1)  # _fail exits; keeps type-checkers honest
     return entry
 
 
 def write_catalog_sidecar_record(target: Path, catalog: dict, sha: str) -> None:
-    """Human/Desktop-readable ``.hermes-catalog.json`` inside the install dir. It is a CONVENIENCE COPY:
+    """Human/Desktop-readable ``.eir-catalog.json`` inside the install dir. It is a CONVENIENCE COPY:
     the authoritative provenance is the ``catalog`` block on the ``.install-metadata.json`` record (see
     :func:`read_catalog_sidecar`), because anything inside the tree is under the repo's control."""
     sidecar = {
@@ -90,7 +90,7 @@ def write_catalog_sidecar(target: Path, entry: PluginCatalogEntry, sha: Optional
 
 def _install_record(plugin_dir: Path) -> Optional[dict]:
     """The installer-owned ``.install-metadata.json`` record for a dir under the plugins dir, else ``None``."""
-    from hermes_cli.plugins_cmd import PluginOperationError, _plugins_dir, _read_install_metadata
+    from eir_cli.plugins_cmd import PluginOperationError, _plugins_dir, _read_install_metadata
     if plugin_dir.parent != _plugins_dir():
         return None
     try:
@@ -102,7 +102,7 @@ def _install_record(plugin_dir: Path) -> Optional[dict]:
 
 def _write_catalog_block(plugin_dir: Path, record: dict, block: dict) -> dict:
     """Migrate one trusted installer record to the nested catalog contract."""
-    from hermes_cli.plugins_cmd import _update_install_record
+    from eir_cli.plugins_cmd import _update_install_record
 
     def migrate(current: Optional[dict]) -> Optional[dict]:
         if current is None:
@@ -141,7 +141,7 @@ def _adopt_legacy_sidecar(plugin_dir: Path, record: dict) -> Optional[dict]:
 
 # Archived Nous handoff repos of providers that left core -> the catalog entry that superseded them: a URL
 # install of one is adopted as that entry, so `update` re-pins it instead of pulling the archive forever.
-_HANDOFF_REPOS = {"github.com/nousresearch/hermes-plugin-holographic": "holographic"}
+_HANDOFF_REPOS = {"github.com/nousresearch/eir-plugin-holographic": "holographic"}
 
 
 def _adopt_handoff_install(plugin_dir: Path, record: dict) -> Optional[dict]:
@@ -157,7 +157,7 @@ def _adopt_handoff_install(plugin_dir: Path, record: dict) -> Optional[dict]:
 def read_catalog_sidecar(plugin_dir) -> Optional[dict]:
     """Catalog provenance of an installed plugin (``catalog_name``/``repo``/``sha``/``tier``/``pin``), or
     ``None`` for a non-catalog install. Read from the installer-owned metadata record, never from the
-    tree: a URL-installed repo that ships its own ``.hermes-catalog.json`` must not render as a reviewed
+    tree: a URL-installed repo that ships its own ``.eir-catalog.json`` must not render as a reviewed
     catalog install nor mark the real entry installed."""
     if not plugin_dir:
         return None
@@ -204,14 +204,14 @@ def catalog_install_record(plugin_dir) -> Optional[dict]:
 
 
 LOGIN_BACKEND_TIERS = frozenset({"official", "verified"})
-LOGIN_BACKEND_RULE = ("password-manager login backends are accepted only from plugins bundled with Hermes or "
-                      "installed from the Hermes plugin catalog at tier verified or official (published by the "
+LOGIN_BACKEND_RULE = ("password-manager login backends are accepted only from plugins bundled with Eir or "
+                      "installed from the Eir plugin catalog at tier verified or official (published by the "
                       "password-manager vendor itself or by Nous)")
-_NON_CATALOG_SOURCES = {"project": "a project .hermes/plugins directory", "entrypoint": "a pip entry point"}
+_NON_CATALOG_SOURCES = {"project": "a project .eir/plugins directory", "entrypoint": "a pip entry point"}
 
 
 BROWSER_PAGE_BACKEND_RULE = ("browser page backends (which carry browser_vault fill scripts) are accepted only from "
-                             "plugins bundled with Hermes or installed from the Hermes plugin catalog at tier "
+                             "plugins bundled with Eir or installed from the Eir plugin catalog at tier "
                              "verified or official")
 
 
@@ -225,8 +225,8 @@ def login_backend_provenance_error(manifest, rule: str = LOGIN_BACKEND_RULE) -> 
     """Why *manifest*'s plugin may not register a login backend, or "" when it may.
 
     Read from the installer-owned ``.install-metadata.json`` record of the CURRENT home's plugins dir, never
-    from the tree (a repo can commit a ``.hermes-catalog.json``). No config key relaxes it. This decides
-    which plugins Hermes offers the seam to; code already running in-process is not sandboxed by it."""
+    from the tree (a repo can commit a ``.eir-catalog.json``). No config key relaxes it. This decides
+    which plugins Eir offers the seam to; code already running in-process is not sandboxed by it."""
     if manifest.source == "bundled":
         return ""
     if manifest.source in _NON_CATALOG_SOURCES:
@@ -234,7 +234,7 @@ def login_backend_provenance_error(manifest, rule: str = LOGIN_BACKEND_RULE) -> 
     record = _install_record(Path(manifest.path)) if manifest.source == "user" and manifest.path else None
     block = (record or {}).get("catalog")
     if not isinstance(block, dict) or not block.get("name"):
-        return (f"{rule}; this plugin was not installed from the Hermes plugin catalog "
+        return (f"{rule}; this plugin was not installed from the Eir plugin catalog "
                 "(a local directory or Git URL install)")
     if record.get("allow_removed"):
         return f"{rule}; this plugin was installed with --allow-removed"
@@ -282,8 +282,8 @@ def normalized_platforms(platforms: list[str]) -> set[str]:
 def _refuse_unsupported_catalog_platform(entry: PluginCatalogEntry) -> None:
     if not entry.platforms:
         return
-    from hermes_cli.plugins_cmd import PluginOperationError
-    from hermes_platform.host.facts import os_family
+    from eir_cli.plugins_cmd import PluginOperationError
+    from eir_platform.host.facts import os_family
 
     current = os_family()
     if current not in normalized_platforms(entry.platforms):
@@ -293,26 +293,26 @@ def _refuse_unsupported_catalog_platform(entry: PluginCatalogEntry) -> None:
         )
 
 
-def catalog_hermes_error(entry: PluginCatalogEntry) -> Optional[str]:
-    """``<name> needs Hermes <spec>; this is <version>.`` when the entry's ``requires_hermes`` rejects the
-    running Hermes, else ``None``. The verdict IS the plugin.yaml gate's
-    (:func:`~hermes_cli.plugins_manifest.requires_hermes_error`): same version source, same comparison, so
+def catalog_eir_error(entry: PluginCatalogEntry) -> Optional[str]:
+    """``<name> needs Eir <spec>; this is <version>.`` when the entry's ``requires_eir`` rejects the
+    running Eir, else ``None``. The verdict IS the plugin.yaml gate's
+    (:func:`~eir_cli.plugins_manifest.requires_eir_error`): same version source, same comparison, so
     a dev checkout or canary build is judged the same by both, and an unknown version never blocks."""
-    from hermes_cli.plugins_manifest import requires_hermes_error, running_hermes_version
-    if not requires_hermes_error({"requires_hermes": entry.requires_hermes}):
+    from eir_cli.plugins_manifest import requires_eir_error, running_eir_version
+    if not requires_eir_error({"requires_eir": entry.requires_eir}):
         return None
-    return f"{entry.name} needs Hermes {entry.requires_hermes}; this is {running_hermes_version()}."
+    return f"{entry.name} needs Eir {entry.requires_eir}; this is {running_eir_version()}."
 
 
 def refuse_incompatible_catalog_entry(entry: PluginCatalogEntry) -> None:
     """``PluginOperationError`` when the catalog says *entry* cannot run here: a platform it does not list,
-    or a ``requires_hermes`` the running version fails. Every install by catalog name passes through here."""
-    from hermes_cli.config import recommended_update_command
-    from hermes_cli.plugins_cmd import PluginOperationError
+    or a ``requires_eir`` the running version fails. Every install by catalog name passes through here."""
+    from eir_cli.config import recommended_update_command
+    from eir_cli.plugins_cmd import PluginOperationError
     _refuse_unsupported_catalog_platform(entry)
-    reason = catalog_hermes_error(entry)
+    reason = catalog_eir_error(entry)
     if reason:
-        raise PluginOperationError(f"{reason} Update Hermes (`{recommended_update_command()}`) and install again.",
+        raise PluginOperationError(f"{reason} Update Eir (`{recommended_update_command()}`) and install again.",
                                    failure_class="incompatible")
 
 
@@ -324,7 +324,7 @@ def install_catalog_entry(entry: PluginCatalogEntry, *, force: bool, ref: Option
     install-metadata record at the sha ACTUALLY checked out (a ``--ref`` install is not at the reviewed
     pin, so ``update_available`` must say so). *inspected_sha*: the commit an install dialog showed; the
     checkout must be that commit. Returns the core's ``(target, manifest, installed_name)``."""
-    from hermes_cli.plugins_cmd import _install_plugin_core
+    from eir_cli.plugins_cmd import _install_plugin_core
     if not allow_removed:
         raise_if_removed(entry.name, entry.repo)
     refuse_incompatible_catalog_entry(entry)
@@ -360,13 +360,13 @@ def installed_plugin_removal(name: str, plugin_dir) -> Optional[RemovedEntry]:
 def refuse_if_installed_removed(name: str, plugin_dir) -> None:
     """``PluginOperationError`` form of :func:`installed_plugin_removal` for ``update``/``enable``, which
     otherwise keep pulling and activating code the catalog recalled."""
-    from hermes_cli.plugins_cmd import PluginOperationError
+    from eir_cli.plugins_cmd import PluginOperationError
     removed = installed_plugin_removal(name, plugin_dir)
     if removed is not None:
         raise PluginOperationError(
-            f"Plugin '{name}' was removed from the Hermes plugin catalog: "
-            f"{removed.reason or 'no reason recorded'}. Remove it with `hermes plugins remove {name}`, "
-            "or reinstall with `hermes plugins install <source> --force --allow-removed` if you trust it.")
+            f"Plugin '{name}' was removed from the Eir plugin catalog: "
+            f"{removed.reason or 'no reason recorded'}. Remove it with `eir plugins remove {name}`, "
+            "or reinstall with `eir plugins install <source> --force --allow-removed` if you trust it.")
 
 
 _PRESERVE_SKIP = ("__pycache__", ".git", CATALOG_SIDECAR)
@@ -400,7 +400,7 @@ def _revision_owned_without_git(rel: Path) -> bool:
 def _local_changes(target: Path) -> tuple[Optional[list[str]], list[str]]:
     """``(untracked_or_ignored, modified_tracked)`` in a git checkout. The first item is ``None``
     when git cannot classify the installed tree (notably subdirectory installs, which carry no ``.git``)."""
-    from hermes_cli.plugins_cmd import PluginOperationError, _resolve_git_executable, _run_plugin_git
+    from eir_cli.plugins_cmd import PluginOperationError, _resolve_git_executable, _run_plugin_git
     git_exe = _resolve_git_executable()
     if not (target / ".git").exists():
         return None, []
@@ -448,7 +448,7 @@ def _carry_user_files(old: Path, new: Path, local: Optional[list[str]]) -> list[
     install artefacts: they are neither carried nor inspected, so links inside them never stop an update.
     Returns the carried paths (POSIX, relative to the tree) so a later scan block can name them.
     """
-    from hermes_cli.plugins_cmd import PluginOperationError
+    from eir_cli.plugins_cmd import PluginOperationError
     from tools.plugin_guard import EXCLUDED_DIRS
 
     keep = {Path(rel) for rel in local or ()}
@@ -571,8 +571,8 @@ _SURFACE_LABELS = {"capabilities": "host capabilities", "tools": "tools", "hooks
 
 def plugin_surface(manifest: dict, tree: Path) -> dict[str, set]:
     """What an installed tree exposes: declared host capabilities, tools, hooks, Python deps, Desktop half."""
-    from hermes_cli.plugin_oauth import oauth_surface
-    from hermes_cli.plugins_cmd import _declared_capabilities_from_manifest
+    from eir_cli.plugin_oauth import oauth_surface
+    from eir_cli.plugins_cmd import _declared_capabilities_from_manifest
     manifest = manifest or {}
 
     def _list(key: str, *alts: str) -> set:
@@ -593,7 +593,7 @@ def plugin_surface(manifest: dict, tree: Path) -> dict[str, set]:
 
 def _desktop_surface(tree: Path) -> set:
     """The desktop entry the tree ships, by the installers' own layout rule (root or ``desktop/``)."""
-    from hermes_cli.desktop_plugin_halves import desktop_source
+    from eir_cli.desktop_plugin_halves import desktop_source
     source = desktop_source(tree)
     return {(source / "plugin.js").relative_to(tree).as_posix()} if source else set()
 
@@ -640,7 +640,7 @@ def repin_catalog_plugin(
 
     Publication stays PM-owned and recoverable. Untracked/ignored user files are copied into the
     staged replacement before publication; tracked edits are backed up under
-    ``<HERMES_HOME>/plugins-backup/<name>-<sha8>/``. A manifest rename moves the selection and removes
+    ``<EIR_HOME>/plugins-backup/<name>-<sha8>/``. A manifest rename moves the selection and removes
     the stale directory.
 
     A pin that widens the plugin (new tools, hooks, Python deps, host capabilities or a Desktop half)
@@ -648,7 +648,7 @@ def repin_catalog_plugin(
     :class:`RepinConsentRequired` with the installed tree untouched. The immutable catalog pin is
     previewed separately because the PM update transaction owns and publishes its own staged clone.
     """
-    from hermes_cli.plugins_cmd import (
+    from eir_cli.plugins_cmd import (
         PluginOperationError,
         _clone_plugin_repo,
         _plugins_dir,
@@ -664,18 +664,18 @@ def repin_catalog_plugin(
     if entry is None:
         raise PluginOperationError(
             f"Plugin '{catalog_name}' is no longer in the catalog — it may have been removed. "
-            "See `hermes plugins info` and the removed blocklist.")
+            "See `eir plugins info` and the removed blocklist.")
     refuse_if_installed_removed(catalog_name, target)
     if at_catalog_pin(sidecar, entry.sha):
         return RepinResult(entry.sha, False, target.name, [])
-    held = catalog_hermes_error(entry)
+    held = catalog_eir_error(entry)
     if held:
-        # The pin moved past what this Hermes can run: keep the installed tree, name the way forward.
-        from hermes_cli.config import recommended_update_command
+        # The pin moved past what this Eir can run: keep the installed tree, name the way forward.
+        from eir_cli.config import recommended_update_command
         raise PluginOperationError(
             f"Update of {catalog_name} to {entry.sha[:8]} not applied: {held} {catalog_name} stays at "
             f"{str(sidecar.get('sha') or '')[:8] or 'its installed version'}; the update is available after "
-            f"you update Hermes (`{recommended_update_command()}`).", failure_class="incompatible")
+            f"you update Eir (`{recommended_update_command()}`).", failure_class="incompatible")
 
     local, modified = _local_changes(target)
     old_sha8 = str(sidecar.get("sha") or "old")[:8]
@@ -699,7 +699,7 @@ def repin_catalog_plugin(
     # Outside the plugins dir: the discovery scanners recurse into every subdirectory there.
     backup = _plugins_dir().parent / "plugins-backup" / f"{target.name}-{old_sha8}"
     _stash_local_files(target, modified, backup)
-    from hermes_cli.plugins_transaction import update_plugin
+    from eir_cli.plugins_transaction import update_plugin
 
     update_plugin(
         target,
@@ -729,7 +729,7 @@ def repin_catalog_plugin(
         warnings.append(f"Local edits to {len(modified)} tracked file(s) were not carried over; copies are under "
                         f"{backup} (the previous version's files, re-apply by hand).")
     if new_target != target and target.exists():
-        from hermes_cli.plugins_cmd import (
+        from eir_cli.plugins_cmd import (
             _admit_and_save_plugin_sets, _get_disabled_set, _get_enabled_set, _remove_plugin_core)
         enabled, disabled = _get_enabled_set(), _get_disabled_set()
         selection_changed = False
@@ -750,7 +750,7 @@ def repin_catalog_plugin(
 def cmd_update_catalog(name: str, target: Path, sidecar: dict, console, *, interactive: bool = True) -> bool:
     """Re-pin a catalog install, printing progress; True when the pin moved. Refusals raise
     :class:`RepinConsentRequired` / ``PluginOperationError`` with nothing changed (the caller reports them)."""
-    from hermes_cli.plugins_cmd import (
+    from eir_cli.plugins_cmd import (
         _ask_yes, _declared_capabilities_from_manifest, _is_tty, _read_manifest, _run_capability_consent)
     console.print(f"[dim]Checking catalog pin for {name}...[/dim]")
 
@@ -760,7 +760,7 @@ def cmd_update_catalog(name: str, target: Path, sidecar: dict, console, *, inter
             console.print(f"    {line}")
         if not interactive or not _is_tty():
             console.print("  [yellow]Non-interactive session: update NOT applied (fail closed). "
-                          "Re-run `hermes plugins update` in a terminal to review and confirm.[/yellow]")
+                          "Re-run `eir plugins update` in a terminal to review and confirm.[/yellow]")
             return False
         return _ask_yes("  Apply this update? [y/N]: ")
 
@@ -775,14 +775,14 @@ def cmd_update_catalog(name: str, target: Path, sidecar: dict, console, *, inter
         new_target = target.parent / result.installed_name
         declared = _declared_capabilities_from_manifest(_read_manifest(new_target), result.installed_name)
         if declared:
-            from hermes_cli.plugin_capabilities import declared_set_changed, pending_capabilities
+            from eir_cli.plugin_capabilities import declared_set_changed, pending_capabilities
             if pending_capabilities(result.installed_name, declared) or declared_set_changed(result.installed_name, declared):
                 if interactive:
                     _run_capability_consent(console, result.installed_name, declared, context="update")
                 else:
                     console.print(
                         f"[yellow]Plugin {result.installed_name} has new capabilities; review them with "
-                        f"`hermes plugins capabilities {result.installed_name}`.[/yellow]")
+                        f"`eir plugins capabilities {result.installed_name}`.[/yellow]")
     return result.changed
 
 
@@ -805,29 +805,29 @@ def pin_label(entry: PluginCatalogEntry) -> str:
 
 
 def _render_entries(entries: list[PluginCatalogEntry], console) -> None:
-    from hermes_cli.plugins_cmd import _table
+    from eir_cli.plugins_cmd import _table
     table = _table(((("Name", "bold")), ("Category", None), ("Tier", None), ("Description", None),
-                    ("Pinned", "dim"), ("Capabilities", "dim")), title="Hermes Plugin Catalog (curated)")
+                    ("Pinned", "dim"), ("Capabilities", "dim")), title="Eir Plugin Catalog (curated)")
     rank = {name: i for i, name in enumerate(CATALOG_TIERS)}
     style = {"official": "cyan", "verified": "green", "community": "magenta"}
     for e in sorted(entries, key=lambda e: (e.category, rank.get(e.tier, len(rank)), e.name)):
         tier = f"[{style.get(e.tier, 'magenta')}]{e.tier}[/{style.get(e.tier, 'magenta')}]"
         desc = e.description if len(e.description) <= 60 else e.description[:57] + "..."
-        name = e.name + (f"\n[yellow]needs Hermes {e.requires_hermes}[/yellow]" if catalog_hermes_error(e) else "")
+        name = e.name + (f"\n[yellow]needs Eir {e.requires_eir}[/yellow]" if catalog_eir_error(e) else "")
         table.add_row(name, e.category, tier, desc, pin_label(e), _capability_counts(e))
     console.print()
     console.print(table)
     console.print()
-    console.print("[dim]Details:[/dim] hermes plugins info <name>    [dim]Install:[/dim] hermes plugins install <name>")
+    console.print("[dim]Details:[/dim] eir plugins info <name>    [dim]Install:[/dim] eir plugins install <name>")
 
 
 def cmd_search(term: str = "", *, json_output: bool = False) -> None:
     """Search the curated catalog (name/description/declared tools); empty term = browse everything."""
-    from hermes_cli.plugins_cmd import _console
+    from eir_cli.plugins_cmd import _console
     matches = filter_entries(load_catalog_live(), term)
     if json_output:
         print(json.dumps({"query": term, "results": [
-            {**e.to_dict(), "needs_newer_hermes": catalog_hermes_error(e)} for e in matches]}, indent=2))
+            {**e.to_dict(), "needs_newer_eir": catalog_eir_error(e)} for e in matches]}, indent=2))
         return
     console = _console()
     if not matches:
@@ -839,7 +839,7 @@ def cmd_search(term: str = "", *, json_output: bool = False) -> None:
 
 def cmd_info(name: str) -> None:
     """Full catalog entry for *name*; falls back to installed-plugin details for non-catalog names."""
-    from hermes_cli.plugins_cmd import _console, cmd_show
+    from eir_cli.plugins_cmd import _console, cmd_show
     entry = get_live_catalog_entry(name)
     if entry is None:
         cmd_show(name)
@@ -853,7 +853,7 @@ def cmd_info(name: str) -> None:
     console.print()
     rows = [("Repo", entry.repo), ("Subdir", entry.subdir), ("Version", entry.version), ("Pinned SHA", entry.sha),
             ("Image", entry.image),
-            ("Maintainer", entry.maintainer), ("Requires", f"hermes {entry.requires_hermes}" if entry.requires_hermes else ""),
+            ("Maintainer", entry.maintainer), ("Requires", f"eir {entry.requires_eir}" if entry.requires_eir else ""),
             ("Platforms", ", ".join(entry.platforms)), ("Docs", entry.docs_url)]
     for label, value in rows:
         if value:
@@ -868,20 +868,20 @@ def cmd_info(name: str) -> None:
         console.print(f"[red bold]✗ REMOVED from catalog: {removed.reason or 'no reason recorded'}"
                       f"{f' ({removed.date})' if removed.date else ''}[/red bold]")
         console.print()
-    held = catalog_hermes_error(entry)
+    held = catalog_eir_error(entry)
     if held:
-        from hermes_cli.config import recommended_update_command
-        console.print(f"[yellow]⚠ {held} Update Hermes (`{recommended_update_command()}`) to install it.[/yellow]")
+        from eir_cli.config import recommended_update_command
+        console.print(f"[yellow]⚠ {held} Update Eir (`{recommended_update_command()}`) to install it.[/yellow]")
         console.print()
-    console.print(f"[dim]Install:[/dim]     hermes plugins install {entry.name}")
+    console.print(f"[dim]Install:[/dim]     eir plugins install {entry.name}")
     console.print()
 
 
 def cmd_validate(path: str, as_json: bool = False, install_deps: bool = False) -> None:
     """Catalog-admission validation of a plugin directory (the CI gate); exits 0/1. *install_deps*
     installs the declared Python deps first so the capability probe imports what an install would."""
-    from hermes_cli.plugin_validate import validate_plugin_dir
-    from hermes_cli.plugins_cmd import _console
+    from eir_cli.plugin_validate import validate_plugin_dir
+    from eir_cli.plugins_cmd import _console
     probe = None
     if install_deps:
         import pm
@@ -909,7 +909,7 @@ def cmd_validate(path: str, as_json: bool = False, install_deps: bool = False) -
     for warning in report.warnings:
         console.print(f"[yellow]⚠ {warning}[/yellow]")
     if report.isolation:
-        from hermes_cli.plugin_isolation_audit import IsolationReport
+        from eir_cli.plugin_isolation_audit import IsolationReport
         iso = IsolationReport(report.isolation["verdict"], report.isolation["reasons"], report.isolation["notes"])
         console.print(f"{'[green]◆[/green]' if iso.host_ready else '[dim]◇[/dim]'} Isolation [dim]— {iso.summary()}[/dim]")
         for note in iso.notes:
@@ -924,7 +924,7 @@ def cmd_validate(path: str, as_json: bool = False, install_deps: bool = False) -
 def installed_catalog_state(installed: dict[str, dict[str, Any]]) -> dict[str, Any]:
     """Catalog entries merged with local state for the dashboard. *installed* maps every alias (name
     and registry key) of a discovered plugin to ``{"dir", "runtime_status"}``. A catalog name rarely
-    equals the manifest name (``hermes-plugin-x`` vs ``x``), so installs are matched through the
+    equals the manifest name (``eir-plugin-x`` vs ``x``), so installs are matched through the
     sidecar's ``catalog_name`` first and by name only as a fallback."""
     by_catalog_name: dict[str, dict[str, Any]] = {}
     for local in installed.values():

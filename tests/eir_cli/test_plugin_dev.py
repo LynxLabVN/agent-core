@@ -8,7 +8,7 @@ import pytest
 def test_doctor_uses_registration_to_reject_bad_hook_and_callback_signature(
     tmp_path: Path,
 ) -> None:
-    from hermes_cli.plugin_dev import doctor_plugin
+    from eir_cli.plugin_dev import doctor_plugin
 
     plugin = tmp_path / "bad-plugin"
     plugin.mkdir()
@@ -43,7 +43,7 @@ def test_doctor_uses_registration_to_reject_bad_hook_and_callback_signature(
 
 
 def test_doctor_accepts_manifest_defaults_from_runtime_parser(tmp_path: Path) -> None:
-    from hermes_cli.plugin_dev import doctor_plugin
+    from eir_cli.plugin_dev import doctor_plugin
 
     plugin = tmp_path / "minimal"
     plugin.mkdir()
@@ -61,7 +61,7 @@ def test_doctor_accepts_manifest_defaults_from_runtime_parser(tmp_path: Path) ->
 def test_doctor_restores_global_tool_policy_and_module_state(tmp_path: Path) -> None:
     import sys
 
-    from hermes_cli.plugin_dev import doctor_plugin
+    from eir_cli.plugin_dev import doctor_plugin
     from tools.registry import registry
 
     target = tmp_path / "cleanup-plugin"
@@ -83,7 +83,7 @@ def test_doctor_restores_global_tool_policy_and_module_state(tmp_path: Path) -> 
     before_modules = {
         name
         for name in sys.modules
-        if name == "hermes_plugins" or name.startswith("hermes_plugins.")
+        if name == "eir_plugins" or name.startswith("eir_plugins.")
     }
 
     report = doctor_plugin(target)
@@ -95,13 +95,13 @@ def test_doctor_restores_global_tool_policy_and_module_state(tmp_path: Path) -> 
     after_modules = {
         name
         for name in sys.modules
-        if name == "hermes_plugins" or name.startswith("hermes_plugins.")
+        if name == "eir_plugins" or name.startswith("eir_plugins.")
     }
     assert after_modules == before_modules
 
 
 def test_doctor_blocks_live_network(tmp_path: Path) -> None:
-    from hermes_cli.plugin_dev import doctor_plugin
+    from eir_cli.plugin_dev import doctor_plugin
 
     plugin = tmp_path / "network-plugin"
     plugin.mkdir()
@@ -121,16 +121,16 @@ def test_doctor_blocks_live_network(tmp_path: Path) -> None:
 def test_doctor_default_target_does_not_copy_cwd(
     tmp_path: Path, monkeypatch
 ) -> None:
-    """``hermes plugins doctor`` with no argument defaults to ``.``.
+    """``eir plugins doctor`` with no argument defaults to ``.``.
 
     Before the manifest guard, that copied the whole working directory into
-    a temporary HERMES_HOME — running it from ``$HOME`` copied the home
+    a temporary EIR_HOME — running it from ``$HOME`` copied the home
     directory, cloud-storage placeholders included.
     """
     import os
     import shutil
 
-    from hermes_cli import plugin_dev
+    from eir_cli import plugin_dev
 
     workdir = tmp_path / "workdir"
     (workdir / "big").mkdir(parents=True)
@@ -158,15 +158,15 @@ def test_doctor_does_not_copy_home_with_a_plugin_checkout(
     """A home with one plugin checkout next to other directories is not a category.
 
     ``_holds_plugin`` used to accept any immediate child manifest, so
-    ``hermes plugins doctor`` from ``$HOME`` resolved to the home and
+    ``eir plugins doctor`` from ``$HOME`` resolved to the home and
     ``copytree`` copied it. A category directory's children are plugins.
     """
     import os
 
-    from hermes_cli import plugin_dev
+    from eir_cli import plugin_dev
 
     home = tmp_path / "fake-home"
-    (home / ".hermes" / "cache" / "scratch").mkdir(parents=True)
+    (home / ".eir" / "cache" / "scratch").mkdir(parents=True)
     plugin = home / "plugin-checkout"
     plugin.mkdir()
     (plugin / "plugin.yaml").write_text("name: checkout\n", encoding="utf-8")
@@ -189,7 +189,7 @@ def test_doctor_does_not_copy_home_with_a_plugin_checkout(
 
 def test_resolve_accepts_category_layout(tmp_path: Path) -> None:
     """A category directory holds no manifest itself but discovery finds one."""
-    from hermes_cli.plugin_dev import resolve_plugin_path
+    from eir_cli.plugin_dev import resolve_plugin_path
 
     category = tmp_path / "image_gen"
     plugin = category / "openai"
@@ -205,7 +205,7 @@ def test_doctor_stages_only_the_plugin_of_a_category(tmp_path: Path, monkeypatch
     import os
     import shutil
 
-    from hermes_cli import plugin_dev
+    from eir_cli import plugin_dev
 
     category = tmp_path / "tools"
     plugin = category / "minimal"
@@ -236,7 +236,7 @@ def test_doctor_rejects_category_of_several_plugins_before_copying(
     tmp_path: Path, monkeypatch
 ) -> None:
     """Doctor validates one plugin, so copying a whole category first only wastes disk."""
-    from hermes_cli import plugin_dev
+    from eir_cli import plugin_dev
 
     category = tmp_path / "web"
     for name in ("a", "b"):
@@ -258,7 +258,7 @@ def test_doctor_names_plugin_dirs_of_a_target_that_is_not_a_category(
     """The refusal names the plugin inside, so the user knows what to pass instead."""
     import os
 
-    from hermes_cli import plugin_dev
+    from eir_cli import plugin_dev
 
     repo = tmp_path / "repo"
     (repo / "tests").mkdir(parents=True)
@@ -277,17 +277,17 @@ def test_resolve_prefers_installed_id_over_unrelated_local_dir(
     tmp_path: Path, monkeypatch
 ) -> None:
     """A same-named local directory must not shadow the installed plugin."""
-    from hermes_cli import plugin_dev
+    from eir_cli import plugin_dev
 
-    hermes_home = tmp_path / "hermes-home"
-    installed = hermes_home / "plugins" / "sample"
+    eir_home = tmp_path / "eir-home"
+    installed = eir_home / "plugins" / "sample"
     installed.mkdir(parents=True)
     (installed / "plugin.yaml").write_text("name: sample\n", encoding="utf-8")
 
     workdir = tmp_path / "workdir"
     (workdir / "sample").mkdir(parents=True)
     monkeypatch.chdir(workdir)
-    monkeypatch.setattr(plugin_dev, "get_hermes_home", lambda: hermes_home)
+    monkeypatch.setattr(plugin_dev, "get_eir_home", lambda: eir_home)
 
     assert plugin_dev.resolve_plugin_path("sample") == installed.resolve()
 
@@ -295,13 +295,13 @@ def test_resolve_prefers_installed_id_over_unrelated_local_dir(
 def test_doctor_removes_temp_home_when_staging_copy_fails(
     tmp_path: Path, monkeypatch
 ) -> None:
-    """A copy failure (e.g. ENOSPC) must not strand a hermes-plugin-doctor-* dir."""
+    """A copy failure (e.g. ENOSPC) must not strand a eir-plugin-doctor-* dir."""
     import errno
     import shutil
     import tempfile
 
 
-    from hermes_cli import plugin_dev
+    from eir_cli import plugin_dev
 
     plugin = tmp_path / "sample"
     plugin.mkdir()
@@ -330,8 +330,8 @@ def test_doctor_removes_temp_home_when_staging_copy_fails(
     # Check for leftovers WHILE the exception (and its traceback frames) is
     # still referenced: the old code relied on TemporaryDirectory's GC
     # finalizer, which cannot run while the traceback pins the frame — the
-    # exact window where a stranded hermes-plugin-doctor-* dir was observed.
-    leftovers = list(scratch.glob("hermes-plugin-doctor-*"))
+    # exact window where a stranded eir-plugin-doctor-* dir was observed.
+    leftovers = list(scratch.glob("eir-plugin-doctor-*"))
     assert leftovers == [], f"stranded doctor temp dirs: {leftovers}"
 
 
@@ -347,7 +347,7 @@ def test_doctor_never_copies_a_plugin_into_its_own_temp_dir(
     import shutil
     import tempfile
 
-    from hermes_cli import plugin_dev
+    from eir_cli import plugin_dev
 
     target = tmp_path / "target"
     plugin = target / "inner" if layout == "category" else target
@@ -388,7 +388,7 @@ def test_doctor_loads_model_provider_plugins_through_provider_discovery(tmp_path
     """`kind: model-provider` registers a ProviderProfile at import and has no register(ctx);
     doctor must judge it by that contract and leave the live registry untouched."""
     import providers
-    from hermes_cli.plugin_dev import doctor_plugin
+    from eir_cli.plugin_dev import doctor_plugin
 
     plugin = tmp_path / "acme-provider"
     plugin.mkdir()
@@ -417,7 +417,7 @@ def test_doctor_loads_a_model_provider_plugin_from_its_category(tmp_path: Path) 
     """``plugins/model-providers/<name>`` is the runtime layout; the provider loader must get the
     staged plugin directory, not the category around it."""
     import providers
-    from hermes_cli.plugin_dev import doctor_plugin
+    from eir_cli.plugin_dev import doctor_plugin
 
     plugin = tmp_path / "model-providers" / "acme-provider"
     plugin.mkdir(parents=True)

@@ -1,15 +1,15 @@
 """``plugins remove`` (CLI, dashboard, ``plugins.manage`` RPC) leaves no config residue and never
 follows a symlink (#54336, plugin-scan L2-F1/F2/F5).
 
-Real removal core against a temp HERMES_HOME; the RPC path goes through ``tui_gateway.server``.
+Real removal core against a temp EIR_HOME; the RPC path goes through ``tui_gateway.server``.
 """
 
 from __future__ import annotations
 
 import pytest
-import hermes_yaml as yaml
+import eir_yaml as yaml
 
-from hermes_cli import plugins_cmd
+from eir_cli import plugins_cmd
 from tui_gateway import server
 
 
@@ -23,10 +23,10 @@ def _write_plugin(root, rel, name, extra=""):
 
 @pytest.fixture
 def home(tmp_path, monkeypatch):
-    hermes_home = tmp_path / "hermes-home"
-    (hermes_home / "plugins").mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
-    return hermes_home
+    eir_home = tmp_path / "eir-home"
+    (eir_home / "plugins").mkdir(parents=True)
+    monkeypatch.setenv("EIR_HOME", str(eir_home))
+    return eir_home
 
 
 def _config(home):
@@ -57,7 +57,7 @@ def test_remove_forgets_every_config_trace_and_resets_the_memory_provider(home):
 
 def test_remove_clears_the_toolset_of_a_plugin_without_provides_tools(home):
     """``remove`` drops the plugin's toolset from a saved ``platform_toolsets`` list even when
-    plugin.yaml never declared ``provides_tools``; otherwise ``hermes config check`` warns about an
+    plugin.yaml never declared ``provides_tools``; otherwise ``eir config check`` warns about an
     unknown toolset forever."""
     from tools.registry import registry
 
@@ -70,14 +70,14 @@ def test_remove_clears_the_toolset_of_a_plugin_without_provides_tools(home):
         encoding="utf-8")
     (home / "config.yaml").write_text(yaml.safe_dump({
         "plugins": {"enabled": ["zznodecl"]},
-        "platform_toolsets": {"cli": ["hermes-cli", "zznodecl_ts"], "telegram": ["hermes-telegram"]},
+        "platform_toolsets": {"cli": ["eir-cli", "zznodecl_ts"], "telegram": ["eir-telegram"]},
     }), encoding="utf-8")
     try:
         assert plugins_cmd.dashboard_remove_user_plugin("zznodecl")["ok"] is True
     finally:
         registry.deregister("zznodecl_tool")
 
-    assert _config(home)["platform_toolsets"] == {"cli": ["hermes-cli"], "telegram": ["hermes-telegram"]}
+    assert _config(home)["platform_toolsets"] == {"cli": ["eir-cli"], "telegram": ["eir-telegram"]}
 
 
 def test_remove_of_a_symlink_inside_the_plugins_dir_unlinks_only_the_link(home):

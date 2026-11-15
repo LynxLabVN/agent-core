@@ -1,4 +1,4 @@
-"""Text / ``--json`` output helpers shared by the ``hermes kanban`` CLI modules."""
+"""Text / ``--json`` output helpers shared by the ``eir kanban`` CLI modules."""
 
 from __future__ import annotations
 
@@ -8,8 +8,8 @@ import sys
 import time
 from typing import Any, Callable, Iterable, Optional
 
-from hermes_cli import kanban_db as kb
-from hermes_cli import kanban_workflow
+from eir_cli import kanban_db as kb
+from eir_cli import kanban_workflow
 
 _STATUS_ICONS = {c.key: c.icon for c in kanban_workflow.DEFAULT_WORKFLOW} | {kanban_workflow.ARCHIVED: "—"}
 

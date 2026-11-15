@@ -1,4 +1,4 @@
-"""Comprehensive tests for hermes_cli.profiles module.
+"""Comprehensive tests for eir_cli.profiles module.
 
 Tests cover: validation, directory resolution, CRUD operations, active profile
 management, export/import, renaming, alias collision checks, profile isolation,
@@ -16,11 +16,11 @@ import types
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-import hermes_yaml as yaml
+import eir_yaml as yaml
 import pytest
 
-from hermes_cli import profiles
-from hermes_cli.profiles import (
+from eir_cli import profiles
+from eir_cli.profiles import (
     _clone_all_copytree_ignore,
     normalize_profile_name,
     validate_profile_name,
@@ -37,30 +37,30 @@ from hermes_cli.profiles import (
     remove_wrapper_script,
     rename_profile,
     export_profile,
-    _get_default_hermes_home,
+    _get_default_eir_home,
     NO_BUNDLED_SKILLS_MARKER,
     backfill_profile_envs,
     profiles_to_serve,
 )
-from hermes_cli.config import DEFAULT_CONFIG
+from eir_cli.config import DEFAULT_CONFIG
 
 
 # ---------------------------------------------------------------------------
-# Shared fixture: redirect Path.home() and HERMES_HOME for profile tests
+# Shared fixture: redirect Path.home() and EIR_HOME for profile tests
 # ---------------------------------------------------------------------------
 
 @pytest.fixture()
 def profile_env(tmp_path, monkeypatch):
     """Set up an isolated environment for profile tests.
 
-    * Path.home() -> tmp_path  (so _get_profiles_root() = tmp_path/.hermes/profiles)
-    * HERMES_HOME  -> tmp_path/.hermes  (so get_hermes_home() agrees)
-    * Creates the bare-minimum ~/.hermes directory.
+    * Path.home() -> tmp_path  (so _get_profiles_root() = tmp_path/.eir/profiles)
+    * EIR_HOME  -> tmp_path/.eir  (so get_eir_home() agrees)
+    * Creates the bare-minimum ~/.eir directory.
     """
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    default_home = tmp_path / ".hermes"
+    default_home = tmp_path / ".eir"
     default_home.mkdir(exist_ok=True)
-    monkeypatch.setenv("HERMES_HOME", str(default_home))
+    monkeypatch.setenv("EIR_HOME", str(default_home))
     return tmp_path
 
 
@@ -113,10 +113,10 @@ class TestValidateProfileName:
 class TestGetProfileDir:
     """Tests for get_profile_dir()."""
 
-    def test_default_returns_hermes_home(self, profile_env):
+    def test_default_returns_eir_home(self, profile_env):
         tmp_path = profile_env
         result = get_profile_dir("default")
-        assert result == tmp_path / ".hermes"
+        assert result == tmp_path / ".eir"
 
     @pytest.mark.parametrize("name", ["..", "../outside", "../../tmp", "a/b", "a\\b", ".hidden", "has space"])
     def test_traversal_and_invalid_names_rejected(self, name, profile_env):
@@ -163,7 +163,7 @@ class TestCreateProfile:
         with "No LLM provider configured" — created, but unable to run. Fresh
         means fresh skills and SOUL, not unreachable.
         """
-        default_home = profile_env / ".hermes"
+        default_home = profile_env / ".eir"
         (default_home / "config.yaml").write_text(
             "model:\n  provider: nous\n  default: some/model\n", encoding="utf-8"
         )
@@ -181,7 +181,7 @@ class TestCreateProfile:
         "Unknown provider 'my-gateway'" on its first turn (#101885 / #94071 class); the provider
         definition must travel with the model it backs, and nothing else from `providers:` does.
         """
-        default_home = profile_env / ".hermes"
+        default_home = profile_env / ".eir"
         (default_home / "config.yaml").write_text(
             "model:\n  provider: my-gateway\n  default: my-finetune\n"
             "providers:\n  my-gateway:\n    api: https://llm.internal.example.com/v1\n    key_env: GW_KEY\n"
@@ -200,7 +200,7 @@ class TestCreateProfile:
         The model block is copied at creation, so later edits to the source
         profile never reach one already created from it.
         """
-        default_home = profile_env / ".hermes"
+        default_home = profile_env / ".eir"
         (default_home / "config.yaml").write_text(
             "model:\n  provider: nous\n  default: some/model\n", encoding="utf-8"
         )
@@ -219,7 +219,7 @@ class TestCreateProfile:
 
     def test_clone_config_copies_files(self, profile_env):
         tmp_path = profile_env
-        default_home = tmp_path / ".hermes"
+        default_home = tmp_path / ".eir"
         # Create source config files in default profile
         (default_home / "config.yaml").write_text("model: test", encoding="utf-8")
         (default_home / ".env").write_text("KEY=val", encoding="utf-8")
@@ -238,12 +238,12 @@ class TestCreateProfile:
         so the clone booted with memory silently unavailable. Only the ACTIVE provider's
         ``<provider>/`` dir / ``<provider>.json`` travels; another provider's leftovers stay behind."""
         tmp_path = profile_env
-        default_home = tmp_path / ".hermes"
+        default_home = tmp_path / ".eir"
         (default_home / "config.yaml").write_text("memory:\n  provider: hindsight\n")
         (default_home / "hindsight").mkdir()
-        payload = '{"mode": "local_embedded", "bank_id": "hermes", "apiKey": "hs-secret"}'
+        payload = '{"mode": "local_embedded", "bank_id": "eir", "apiKey": "hs-secret"}'
         (default_home / "hindsight" / "config.json").write_text(payload)
-        (default_home / "mem0.json").write_text('{"agent_id": "hermes"}')
+        (default_home / "mem0.json").write_text('{"agent_id": "eir"}')
 
         profile_dir = create_profile("coder", clone_config=True, no_alias=True)
 
@@ -255,7 +255,7 @@ class TestCreateProfile:
 
     def test_clone_config_copies_source_plugins(self, profile_env):
         tmp_path = profile_env
-        default_home = tmp_path / ".hermes"
+        default_home = tmp_path / ".eir"
         plugin_dir = default_home / "plugins" / "example-plugin"
         plugin_dir.mkdir(parents=True)
         (plugin_dir / "plugin.yaml").write_text("name: example-plugin\n")
@@ -272,14 +272,14 @@ class TestCreateProfile:
     def test_clone_config_keeps_plugin_provenance_and_skips_install_staging(self, profile_env):
         """A catalog-installed memory provider keeps its install record in the clone, so the clone
         runs (and updates) the source's exact revision; an in-flight install staging dir stays behind."""
-        plugins = profile_env / ".hermes" / "plugins"
+        plugins = profile_env / ".eir" / "plugins"
         (plugins / "acme-memory").mkdir(parents=True)
         (plugins / "acme-memory" / "plugin.yaml").write_text("name: acme-memory\nkind: memory\n")
         (plugins / "acme-memory" / "__pycache__").mkdir()
         (plugins / ".install-abc123" / "plugin").mkdir(parents=True)
         record = '{"acme-memory": {"pinned": true, "revision": "%s", "source": "https://example.invalid/a.git"}}' % ("a" * 40)
         (plugins / ".install-metadata.json").write_text(record)
-        (profile_env / ".hermes" / "config.yaml").write_text("memory:\n  provider: acme-memory\n")
+        (profile_env / ".eir" / "config.yaml").write_text("memory:\n  provider: acme-memory\n")
 
         cloned = create_profile("coder", clone_config=True, no_alias=True) / "plugins"
 
@@ -292,7 +292,7 @@ class TestCreateProfile:
     def test_clone_config_ignores_unsafe_memory_provider_names(self, profile_env, provider):
         """A hand-edited ``memory.provider`` must never aim the copy outside the source profile."""
         tmp_path = profile_env
-        default_home = tmp_path / ".hermes"
+        default_home = tmp_path / ".eir"
         (default_home / "config.yaml").write_text(f"memory:\n  provider: {provider!r}\n")
         (tmp_path / "outside").mkdir()
         (tmp_path / "outside" / "config.json").write_text("{}")
@@ -309,7 +309,7 @@ class TestCreateProfile:
     def test_clone_sync_imports_carries_manifest_but_never_links_profiles(self, profile_env):
         """--sync-imports copies import-sync.json (a pointer at EXTERNAL agent trees) and nothing
         else changes: the clone still gets its own config/skills copies, never a live link."""
-        default_home = profile_env / ".hermes"
+        default_home = profile_env / ".eir"
         (default_home / "config.yaml").write_text("model: test", encoding="utf-8")
         manifest = {"version": 1, "agents": {"claude-code": {
             "source": str(profile_env / ".claude"), "digest": "d", "overwrite": False,
@@ -328,7 +328,7 @@ class TestCreateProfile:
     @staticmethod
     def _home_with_linked_skill(profile_env):
         """Source home: ``skills/foo`` links into an ``external_dirs`` root, ``skills/local`` is physical."""
-        default_home = profile_env / ".hermes"
+        default_home = profile_env / ".eir"
         external = profile_env / "agents-skills"
         (external / "foo").mkdir(parents=True)
         (external / "foo" / "SKILL.md").write_text("# external foo\n", encoding="utf-8")
@@ -386,7 +386,7 @@ class TestCreateProfile:
     def test_clone_all_does_not_copy_cron_jobs(self, profile_env):
         # Cron jobs are scheduled work bound to the source profile + origin channel; a clone
         # that inherits jobs.json fires every job twice (two gateways, same job ids).
-        default_home = profile_env / ".hermes"
+        default_home = profile_env / ".eir"
         (default_home / "config.yaml").write_text("model: test", encoding="utf-8")
         (default_home / "cron").mkdir()
         (default_home / "cron" / "jobs.json").write_text(json.dumps({"jobs": [{"id": "abc123def456"}]}), encoding="utf-8")
@@ -400,7 +400,7 @@ class TestCreateProfile:
 
     def test_clone_all_does_not_inherit_the_source_screen_or_browser_process_artifacts(self, profile_env):
         """A clone keeps browser data, never the source's screen or Chromium runtime files."""
-        default_home = profile_env / ".hermes"
+        default_home = profile_env / ".eir"
         (default_home / "config.yaml").write_text("model: test", encoding="utf-8")
         bd = default_home / "bot-desktop"
         browser_profile = bd / "browser-profile"
@@ -429,7 +429,7 @@ class TestCreateProfile:
         import threading
         from tools.browser_launcher import running_instance
 
-        default_home = profile_env / ".hermes"
+        default_home = profile_env / ".eir"
         (default_home / "config.yaml").write_text("model: test", encoding="utf-8")
         browser_profile = default_home / "bot-desktop" / "browser-profile"
         browser_profile.mkdir(parents=True)
@@ -466,7 +466,7 @@ class TestCreateProfile:
     def test_clone_all_skips_special_files(self, profile_env):
         # A live source profile holds special files copytree cannot copy (e.g. a suffixless
         # browser control socket); one of them must not abort the whole clone.
-        default_home = profile_env / ".hermes"
+        default_home = profile_env / ".eir"
         (default_home / "config.yaml").write_text("model: test", encoding="utf-8")
         browser_dir = default_home / "home" / ".agent-browser"
         browser_dir.mkdir(parents=True)
@@ -487,7 +487,7 @@ class TestCreateProfile:
 # ===================================================================
 
 class TestNoSkillsOptOut:
-    """Tests for `hermes profile create --no-skills` and the opt-out marker."""
+    """Tests for `eir profile create --no-skills` and the opt-out marker."""
 
     def test_no_skills_writes_marker_and_skips_seeding(self, profile_env):
         profile_dir = create_profile("orchestrator", no_alias=True, no_skills=True)
@@ -512,14 +512,14 @@ class TestNoSkillsOptOut:
 # ===================================================================
 
 class TestBackfillProfileEnvs:
-    """Tests for backfill_profile_envs() — the `hermes update` pass that
+    """Tests for backfill_profile_envs() — the `eir update` pass that
     gives pre-#44792 profiles (created before .env seeding) their own
     .env: the placeholder header, never a copy of the default's secrets."""
 
     def test_seeds_placeholder_never_the_default_env(self, profile_env):
         import stat
         tmp_path = profile_env
-        (tmp_path / ".hermes" / ".env").write_text("OPENROUTER_API_KEY=root-key\n", encoding="utf-8")
+        (tmp_path / ".eir" / ".env").write_text("OPENROUTER_API_KEY=root-key\n", encoding="utf-8")
         p1 = create_profile("old1", no_alias=True)
         p2 = create_profile("old2", no_alias=True)
         # Simulate pre-#44792 profiles: no .env
@@ -563,9 +563,9 @@ class TestDeleteProfile:
         profile_dir = create_profile("coder", no_alias=True)
         set_active_profile("coder")
 
-        with patch("hermes_cli.profiles._cleanup_gateway_service"), \
-             patch("hermes_cli.profiles.time.sleep"), \
-             patch("hermes_cli.profiles.shutil.rmtree", side_effect=PermissionError("locked")):
+        with patch("eir_cli.profiles._cleanup_gateway_service"), \
+             patch("eir_cli.profiles.time.sleep"), \
+             patch("eir_cli.profiles.shutil.rmtree", side_effect=PermissionError("locked")):
             with pytest.raises(RuntimeError, match="Could not remove profile directory"):
                 delete_profile("coder", yes=True)
 
@@ -580,14 +580,14 @@ class TestDeleteProfile:
         enters the routing index, resolves a profile whose directory is gone, and logs
         ``Profile '<name>' does not exist`` on every subsequent event.
         """
-        from hermes_state import SessionDB
+        from eir_state import SessionDB
         import time
 
         tmp_path = profile_env
         create_profile("gone", no_alias=True)
         create_profile("keepme", no_alias=True)
-        scope = str(tmp_path / ".hermes" / "sessions")
-        db = SessionDB(tmp_path / ".hermes" / "state.db")
+        scope = str(tmp_path / ".eir" / "sessions")
+        db = SessionDB(tmp_path / ".eir" / "state.db")
         db.save_gateway_routing_entry(
             "agent:gone:feishu:dm:chatA",
             json.dumps({"session_key": "agent:gone:feishu:dm:chatA",
@@ -607,11 +607,11 @@ class TestDeleteProfile:
         db.close()
 
         # No live multiplexer: nothing else owns the store, so this process purges the durable rows.
-        with patch("hermes_cli.profiles._cleanup_gateway_service"), \
-             patch("hermes_cli.profiles._live_default_multiplexer", return_value=False):
+        with patch("eir_cli.profiles._cleanup_gateway_service"), \
+             patch("eir_cli.profiles._live_default_multiplexer", return_value=False):
             delete_profile("gone", yes=True)
 
-        check = SessionDB(tmp_path / ".hermes" / "state.db")
+        check = SessionDB(tmp_path / ".eir" / "state.db")
         try:
             assert set(check.load_gateway_routing_entries(scope=scope)) == {
                 "agent:keepme:feishu:dm:chatB"}
@@ -631,21 +631,21 @@ class TestDeleteProfile:
         would be undone by its next save. When it cannot be reached the delete is NOT a clean
         success: the identity settlement is reported as pending, with the retry named.
         """
-        from hermes_state import SessionDB
-        from hermes_cli.profiles import ProfileIdentitySettlementPending
+        from eir_state import SessionDB
+        from eir_cli.profiles import ProfileIdentitySettlementPending
 
         tmp_path = profile_env
         create_profile("gone", no_alias=True)
-        scope = str(tmp_path / ".hermes" / "sessions")
-        db = SessionDB(tmp_path / ".hermes" / "state.db")
+        scope = str(tmp_path / ".eir" / "sessions")
+        db = SessionDB(tmp_path / ".eir" / "state.db")
         db.save_gateway_routing_entry(
             "agent:gone:feishu:dm:chatA",
             json.dumps({"session_key": "agent:gone:feishu:dm:chatA"}),
             scope=scope)
         db.close()
 
-        with patch("hermes_cli.profiles._cleanup_gateway_service"), \
-             patch("hermes_cli.profiles._live_default_multiplexer", return_value=True):
+        with patch("eir_cli.profiles._cleanup_gateway_service"), \
+             patch("eir_cli.profiles._live_default_multiplexer", return_value=True):
             with pytest.raises(ProfileIdentitySettlementPending,
                                match="identity settlement is still pending") as ei:
                 delete_profile("gone", yes=True)
@@ -653,12 +653,12 @@ class TestDeleteProfile:
         # Typed partial success: the filesystem delete completed, the identity did not, and the
         # payload carries what a surfacing caller needs to report it and retry.
         assert ei.value.profile == "gone"
-        assert ei.value.retry_command == "hermes profile purge-identity gone"
+        assert ei.value.retry_command == "eir profile purge-identity gone"
         assert not ei.value.path.exists()
         assert isinstance(ei.value, RuntimeError)  # the CLI handler catches RuntimeError
 
-        assert "hermes profile purge-identity gone" in capsys.readouterr().err
-        check = SessionDB(tmp_path / ".hermes" / "state.db")
+        assert "eir profile purge-identity gone" in capsys.readouterr().err
+        check = SessionDB(tmp_path / ".eir" / "state.db")
         try:
             # The CLI left the identity alone rather than racing the live owner.
             assert set(check.load_gateway_routing_entries(scope=scope)) == {
@@ -688,13 +688,13 @@ class TestDeleteProfile:
         self_pid = os.getpid()
         procs = [
             # Backend bound to coder → matched.
-            FakeProc(101, ["python", "-m", "hermes_cli.main", "--profile", "coder", "serve"]),
+            FakeProc(101, ["python", "-m", "eir_cli.main", "--profile", "coder", "serve"]),
             # Interactive chat for coder → NOT a backend subcommand, skipped.
-            FakeProc(102, ["python", "-m", "hermes_cli.main", "--profile", "coder", "chat"]),
+            FakeProc(102, ["python", "-m", "eir_cli.main", "--profile", "coder", "chat"]),
             # Backend for a different profile → skipped.
-            FakeProc(103, ["python", "-m", "hermes_cli.main", "--profile", "other", "serve"]),
+            FakeProc(103, ["python", "-m", "eir_cli.main", "--profile", "other", "serve"]),
             # This very process → skipped even if it matched.
-            FakeProc(self_pid, ["python", "-m", "hermes_cli.main", "--profile", "coder", "serve"]),
+            FakeProc(self_pid, ["python", "-m", "eir_cli.main", "--profile", "coder", "serve"]),
         ]
 
         fake_psutil = types.SimpleNamespace(
@@ -709,10 +709,10 @@ class TestDeleteProfile:
         pids = profiles._profile_bound_backend_pids("coder", profile_dir)
         assert pids == [101]
 
-    def test_backend_scan_matches_shebang_exec_of_hermes_shim(self, profile_env, monkeypatch):
-        """A `hermes` console-script shim spawned directly (e.g. Electron's
-        findOnPath('hermes') resolution) reports argv[0] as the interpreter
-        (python3) and argv[1] as the shim's path -- not "hermes" -- because
+    def test_backend_scan_matches_shebang_exec_of_eir_shim(self, profile_env, monkeypatch):
+        """A `eir` console-script shim spawned directly (e.g. Electron's
+        findOnPath('eir') resolution) reports argv[0] as the interpreter
+        (python3) and argv[1] as the shim's path -- not "eir" -- because
         the OS execs the shebang. The scanner must still recognize it so
         profile delete doesn't leave a zombie Desktop-spawned backend behind
         (issue: deleting a Desktop profile kept reappearing after relaunch).
@@ -737,12 +737,12 @@ class TestDeleteProfile:
         self_pid = os.getpid()
         procs = [
             # Shebang-exec'd shim bound to coder → matched despite argv[0]
-            # being the python interpreter, not "hermes".
-            FakeProc(201, ["/usr/bin/python3", "/Users/x/.local/bin/hermes", "--profile", "coder", "serve",
+            # being the python interpreter, not "eir".
+            FakeProc(201, ["/usr/bin/python3", "/Users/x/.local/bin/eir", "--profile", "coder", "serve",
                             "--host", "127.0.0.1", "--port", "0"]),
             # Same shape but a different profile → skipped.
-            FakeProc(202, ["/usr/bin/python3", "/Users/x/.local/bin/hermes", "--profile", "other", "serve"]),
-            # Non-hermes script run by python3 → skipped.
+            FakeProc(202, ["/usr/bin/python3", "/Users/x/.local/bin/eir", "--profile", "other", "serve"]),
+            # Non-eir script run by python3 → skipped.
             FakeProc(203, ["/usr/bin/python3", "/Users/x/some_script.py", "--profile", "coder", "serve"]),
         ]
 
@@ -758,12 +758,12 @@ class TestDeleteProfile:
         pids = profiles._profile_bound_backend_pids("coder", profile_dir)
         assert pids == [201]
 
-    def test_backend_scan_rejects_unrelated_hermes_prefixed_script(self, profile_env, monkeypatch):
-        """A user's own script that happens to start with "hermes" (e.g.
-        hermes-notes.py, hermes-unrelated-tool) must NOT be misidentified as
+    def test_backend_scan_rejects_unrelated_eir_prefixed_script(self, profile_env, monkeypatch):
+        """A user's own script that happens to start with "eir" (e.g.
+        eir-notes.py, eir-unrelated-tool) must NOT be misidentified as
         the console-script shim just because argv[0] is a python interpreter
-        and argv[1]'s basename starts with "hermes" -- only the actual known
-        console-script entry points (hermes, hermes-agent, hermes-acp) count.
+        and argv[1]'s basename starts with "eir" -- only the actual known
+        console-script entry points (eir, eir-agent, eir-acp) count.
         """
         create_profile("coder", no_alias=True)
         profile_dir = get_profile_dir("coder")
@@ -786,9 +786,9 @@ class TestDeleteProfile:
         procs = [
             # Looks like the shim by prefix alone, but is the user's own
             # unrelated tool -- must be rejected, not killed by profile delete.
-            FakeProc(301, ["/usr/bin/python3", "/Users/x/scripts/hermes-notes.py",
+            FakeProc(301, ["/usr/bin/python3", "/Users/x/scripts/eir-notes.py",
                             "--profile", "coder", "serve"]),
-            FakeProc(302, ["/usr/bin/python3", "/Users/x/scripts/hermes-unrelated-tool",
+            FakeProc(302, ["/usr/bin/python3", "/Users/x/scripts/eir-unrelated-tool",
                             "--profile", "coder", "serve"]),
         ]
 
@@ -805,9 +805,9 @@ class TestDeleteProfile:
         assert pids == []
 
     def test_backend_scan_matches_all_known_console_script_shims(self, profile_env, monkeypatch):
-        """The other two real console-script entry points (hermes-agent,
-        hermes-acp -- see pyproject.toml [project.scripts]) must also be
-        recognized via the shebang-exec path, not just the primary "hermes"
+        """The other two real console-script entry points (eir-agent,
+        eir-acp -- see pyproject.toml [project.scripts]) must also be
+        recognized via the shebang-exec path, not just the primary "eir"
         shim.
         """
         create_profile("coder", no_alias=True)
@@ -829,9 +829,9 @@ class TestDeleteProfile:
 
         self_pid = os.getpid()
         procs = [
-            FakeProc(401, ["/usr/bin/python3", "/Users/x/.local/bin/hermes-agent",
+            FakeProc(401, ["/usr/bin/python3", "/Users/x/.local/bin/eir-agent",
                             "--profile", "coder", "serve"]),
-            FakeProc(402, ["/usr/bin/python3", "/Users/x/.local/bin/hermes-acp",
+            FakeProc(402, ["/usr/bin/python3", "/Users/x/.local/bin/eir-acp",
                             "--profile", "coder", "serve"]),
         ]
 
@@ -876,7 +876,7 @@ class TestListProfiles:
         import threading
         import tui_gateway.server as srv
 
-        skills = profile_env / ".hermes" / "skills" / "cat"
+        skills = profile_env / ".eir" / "skills" / "cat"
         for i in range(3):
             (skills / f"s{i}").mkdir(parents=True)
             (skills / f"s{i}" / "SKILL.md").write_text("# s\n", encoding="utf-8")
@@ -896,21 +896,21 @@ class TestListProfiles:
             return srv._methods["profiles.list"](1, {"include_sessions": False})["result"]["profiles"]
 
         first = _rpc()
-        assert walks == [] or set(walks) == {"hermes-skill-count"}
+        assert walks == [] or set(walks) == {"eir-skill-count"}
         assert first[0]["skill_count"] in (0, 3)  # 0 until the refresh lands, never a stall
         for t in threading.enumerate():
-            if t.name == "hermes-skill-count":
+            if t.name == "eir-skill-count":
                 t.join(timeout=10)
-        assert walks == ["hermes-skill-count"]
+        assert walks == ["eir-skill-count"]
         assert _rpc()[0]["skill_count"] == 3
         assert list_profiles(lazy_skill_count=True)[0].skill_count == 3
-        assert walks == ["hermes-skill-count"]  # a second poll inside the window schedules nothing
+        assert walks == ["eir-skill-count"]  # a second poll inside the window schedules nothing
 
         # GET /api/profiles (the router's own ``lazy_skill_count=True`` call) and the per-keystroke
         # ``@<profile>`` completion must be just as walk-free: same spy, still one background walk.
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
-        from hermes_cli.web_routers import profiles as profiles_router
+        from eir_cli.web_routers import profiles as profiles_router
         from tui_gateway import methods_complete
         app = FastAPI()
         app.include_router(profiles_router.router)
@@ -919,9 +919,9 @@ class TestListProfiles:
         resp = TestClient(app).get("/api/profiles")
         assert resp.status_code == 200
         assert resp.json()["profiles"][0]["name"] == "default"
-        assert walks == ["hermes-skill-count"]
+        assert walks == ["eir-skill-count"]
         assert any(i["text"] == "@default" for i in methods_complete._profile_mention_items("def"))
-        assert walks == ["hermes-skill-count"]
+        assert walks == ["eir-skill-count"]
 
         # Control: the detail/CLI path counts synchronously on the caller's thread.
         profiles._SKILL_COUNT_CACHE.clear()
@@ -931,7 +931,7 @@ class TestListProfiles:
     def test_skill_count_survives_subtree_vanishing_mid_walk(self, profile_env, monkeypatch):
         """A skill removed while the tree is being counted (concurrent install/update) must
         degrade the count, not abort profile enumeration with ``FileNotFoundError``."""
-        skills = profile_env / ".hermes" / "skills" / "cat"
+        skills = profile_env / ".eir" / "skills" / "cat"
         for i in range(4):
             (skills / f"s{i}" / "references").mkdir(parents=True)
             (skills / f"s{i}" / "SKILL.md").write_text("# s\n", encoding="utf-8")
@@ -967,7 +967,7 @@ class TestListProfiles:
             return _Listing(entries)
 
         monkeypatch.setattr(os, "scandir", vanishing_scandir)
-        assert profiles._count_skills(profile_env / ".hermes") == 3
+        assert profiles._count_skills(profile_env / ".eir") == 3
         assert [p.name for p in list_profiles()] == ["default"]
 
 
@@ -983,7 +983,7 @@ class TestActiveProfile:
         tmp_path = profile_env
         create_profile("coder", no_alias=True)
         set_active_profile("coder")
-        active_path = tmp_path / ".hermes" / "active_profile"
+        active_path = tmp_path / ".eir" / "active_profile"
         assert active_path.exists()
 
         set_active_profile("default")
@@ -1001,17 +1001,17 @@ class TestGetActiveProfileName:
     def test_profile_path_returns_profile_name(self, profile_env, monkeypatch):
         tmp_path = profile_env
         create_profile("coder", no_alias=True)
-        profile_dir = tmp_path / ".hermes" / "profiles" / "coder"
-        monkeypatch.setenv("HERMES_HOME", str(profile_dir))
+        profile_dir = tmp_path / ".eir" / "profiles" / "coder"
+        monkeypatch.setenv("EIR_HOME", str(profile_dir))
         assert get_active_profile_name() == "coder"
 
     def test_custom_path_returns_default(self, profile_env, monkeypatch):
-        """A custom HERMES_HOME (Docker, etc.) IS the default root."""
+        """A custom EIR_HOME (Docker, etc.) IS the default root."""
         tmp_path = profile_env
         custom = tmp_path / "some" / "other" / "path"
         custom.mkdir(parents=True)
-        monkeypatch.setenv("HERMES_HOME", str(custom))
-        # With Docker-aware roots, a custom HERMES_HOME is the default —
+        monkeypatch.setenv("EIR_HOME", str(custom))
+        # With Docker-aware roots, a custom EIR_HOME is the default —
         # not "custom".  The user is on the default profile of their
         # custom deployment.
         assert get_active_profile_name() == "default"
@@ -1039,7 +1039,7 @@ class TestAliasCollision:
         wrapper_dir = profile_env / ".local" / "bin"
         wrapper_dir.mkdir(parents=True, exist_ok=True)
         bat_path = wrapper_dir / "mybot.bat"
-        bat_path.write_text("@echo off\r\nhermes -p mybot %*\r\n", encoding="utf-8")
+        bat_path.write_text("@echo off\r\neir -p mybot %*\r\n", encoding="utf-8")
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(
                 returncode=0, stdout=str(bat_path),
@@ -1064,19 +1064,19 @@ class TestWrapperScript:
     """Tests for create_wrapper_script() and remove_wrapper_script()."""
 
     def test_creates_sh_on_posix(self, profile_env, monkeypatch):
-        monkeypatch.setattr("hermes_cli.profiles.shutil.which", lambda name: "/opt/hermes/bin/hermes")
-        from hermes_cli.profiles import create_wrapper_script
+        monkeypatch.setattr("eir_cli.profiles.shutil.which", lambda name: "/opt/eir/bin/eir")
+        from eir_cli.profiles import create_wrapper_script
         wrapper = create_wrapper_script("mybot")
         assert wrapper is not None
         assert wrapper.name == "mybot"
         content = wrapper.read_text(encoding="utf-8-sig")
         assert content.startswith("#!/bin/sh")
-        assert "exec /opt/hermes/bin/hermes -p mybot" in content
+        assert "exec /opt/eir/bin/eir -p mybot" in content
 
 
     @pytest.mark.platforms("windows")
     def test_remove_finds_bat_on_windows(self, profile_env):
-        from hermes_cli.profiles import create_wrapper_script
+        from eir_cli.profiles import create_wrapper_script
         wrapper = create_wrapper_script("mybot")
         assert wrapper is not None
         assert wrapper.exists()
@@ -1123,14 +1123,14 @@ class TestFindAliasForProfile:
     """Tests for find_alias_for_profile() and alias display in list/show."""
 
     def test_profile_named_alias(self, profile_env):
-        from hermes_cli.profiles import create_wrapper_script, find_alias_for_profile
+        from eir_cli.profiles import create_wrapper_script, find_alias_for_profile
         create_wrapper_script("steve")
         assert find_alias_for_profile("steve") == "steve"
 
 
     def test_ignores_unrelated_files(self, profile_env):
         # ~/.local/bin commonly holds unrelated binaries; they must not match.
-        from hermes_cli.profiles import _get_wrapper_dir, find_alias_for_profile
+        from eir_cli.profiles import _get_wrapper_dir, find_alias_for_profile
         wrapper_dir = _get_wrapper_dir()
         wrapper_dir.mkdir(parents=True, exist_ok=True)
         (wrapper_dir / "pip").write_text("#!/bin/sh\nexec python -m pip \"$@\"\n", encoding="utf-8")
@@ -1138,7 +1138,7 @@ class TestFindAliasForProfile:
 
 
     def test_list_profiles_surfaces_custom_alias(self, profile_env):
-        from hermes_cli.profiles import (
+        from eir_cli.profiles import (
             create_profile,
             create_wrapper_script,
             list_profiles,
@@ -1161,26 +1161,26 @@ class TestRenameProfile:
     def test_renames_directory(self, profile_env):
         tmp_path = profile_env
         create_profile("oldname", no_alias=True)
-        old_dir = tmp_path / ".hermes" / "profiles" / "oldname"
+        old_dir = tmp_path / ".eir" / "profiles" / "oldname"
         assert old_dir.is_dir()
 
         # Mock alias collision to avoid subprocess calls
-        with patch("hermes_cli.profiles.check_alias_collision", return_value="skip"):
+        with patch("eir_cli.profiles.check_alias_collision", return_value="skip"):
             new_dir = rename_profile("oldname", "newname")
 
         assert not old_dir.is_dir()
         assert new_dir.is_dir()
-        assert new_dir == tmp_path / ".hermes" / "profiles" / "newname"
+        assert new_dir == tmp_path / ".eir" / "profiles" / "newname"
 
     def test_multiplexed_rename_unroutes_old_then_hot_serves_new(self, profile_env):
         """Under a live multiplexer the old name is tombstoned + unrouted BEFORE the directory
         moves and the new name is hot-served after, so a stale runtime mkdir of the old home is
         refused instead of resurrecting a ghost served profile (#109267)."""
-        from hermes_constants import mkdir_under_hermes_home
+        from eir_constants import mkdir_under_eir_home
         tmp_path = profile_env
         create_profile("oldname", no_alias=True)
-        old_dir = tmp_path / ".hermes" / "profiles" / "oldname"
-        new_dir = tmp_path / ".hermes" / "profiles" / "newname"
+        old_dir = tmp_path / ".eir" / "profiles" / "oldname"
+        new_dir = tmp_path / ".eir" / "profiles" / "newname"
 
         calls = []
 
@@ -1190,11 +1190,11 @@ class TestRenameProfile:
             if name == "oldname" and old_dir.exists():
                 # A still-live component of the multiplexer writing into the old home mid-teardown.
                 with pytest.raises(FileNotFoundError):
-                    mkdir_under_hermes_home(old_dir / "logs")
+                    mkdir_under_eir_home(old_dir / "logs")
 
-        with patch("hermes_cli.profiles.check_alias_collision", return_value="skip"), \
-             patch("hermes_cli.profiles._live_default_multiplexer", return_value=True), \
-             patch("hermes_cli.profiles._notify_multiplexer", side_effect=_record_notify):
+        with patch("eir_cli.profiles.check_alias_collision", return_value="skip"), \
+             patch("eir_cli.profiles._live_default_multiplexer", return_value=True), \
+             patch("eir_cli.profiles._notify_multiplexer", side_effect=_record_notify):
             rename_profile("oldname", "newname")
 
         # (name, old_exists, new_exists, old_tombstoned): unroute first, hot-serve last.
@@ -1207,53 +1207,53 @@ class TestRenameProfile:
         """No live multiplexer → rename must neither tombstone nor ping (single-profile installs)."""
         tmp_path = profile_env
         create_profile("oldname", no_alias=True)
-        old_dir = tmp_path / ".hermes" / "profiles" / "oldname"
+        old_dir = tmp_path / ".eir" / "profiles" / "oldname"
 
-        with patch("hermes_cli.profiles.check_alias_collision", return_value="skip"), \
-             patch("hermes_cli.profiles._live_default_multiplexer", return_value=False), \
-             patch("hermes_cli.profiles._notify_multiplexer") as notify:
+        with patch("eir_cli.profiles.check_alias_collision", return_value="skip"), \
+             patch("eir_cli.profiles._live_default_multiplexer", return_value=False), \
+             patch("eir_cli.profiles._notify_multiplexer") as notify:
             new_dir = rename_profile("oldname", "newname")
 
         notify.assert_not_called()
-        assert not (tmp_path / ".hermes" / "profiles" / ".deleted").exists()
+        assert not (tmp_path / ".eir" / "profiles" / ".deleted").exists()
         assert not old_dir.exists() and new_dir.is_dir()
 
     def test_rename_migrates_session_identity_without_live_gateway(self, profile_env):
         """No live gateway → the CLI performs the durable rekey itself so a renamed profile's session
         keys / profile_name / routing rows follow the new name (else inbound events on the old name's
         chats resolve to a nonexistent profile and flood errors.log)."""
-        from hermes_state import SessionDB
+        from eir_state import SessionDB
         tmp_path = profile_env
         create_profile("oldname", no_alias=True)
-        old_dir = tmp_path / ".hermes" / "profiles" / "oldname"
+        old_dir = tmp_path / ".eir" / "profiles" / "oldname"
         # Seed a session owned by the old profile in the profile's own store + the root routing index.
         pdb = SessionDB(old_dir / "state.db")
         pdb.create_session(
             "sess1", "feishu", session_key="agent:oldname:feishu:dm:chatA",
             profile_name="oldname", chat_id="chatA", chat_type="dm")
         pdb.close()
-        root_db = SessionDB(tmp_path / ".hermes" / "state.db")
+        root_db = SessionDB(tmp_path / ".eir" / "state.db")
         root_db.save_gateway_routing_entry(
             "agent:oldname:feishu:dm:chatA",
             json.dumps({"session_key": "agent:oldname:feishu:dm:chatA", "session_id": "sess1",
                         "origin": {"platform": "feishu", "chat_id": "chatA", "profile": "oldname"}}),
-            scope=str(tmp_path / ".hermes" / "sessions"))
+            scope=str(tmp_path / ".eir" / "sessions"))
         root_db.close()
 
-        with patch("hermes_cli.profiles.check_alias_collision", return_value="skip"), \
-             patch("hermes_cli.profiles._live_default_multiplexer", return_value=False):
+        with patch("eir_cli.profiles.check_alias_collision", return_value="skip"), \
+             patch("eir_cli.profiles._live_default_multiplexer", return_value=False):
             rename_profile("oldname", "newname")
 
-        new_dir = tmp_path / ".hermes" / "profiles" / "newname"
+        new_dir = tmp_path / ".eir" / "profiles" / "newname"
         moved_db = SessionDB(new_dir / "state.db")
         row = moved_db._read_one(
             "SELECT session_key, profile_name FROM sessions WHERE id = ?", ("sess1",))
         assert row["session_key"] == "agent:newname:feishu:dm:chatA"
         assert row["profile_name"] == "newname"
         moved_db.close()
-        root_db2 = SessionDB(tmp_path / ".hermes" / "state.db")
+        root_db2 = SessionDB(tmp_path / ".eir" / "state.db")
         routing = root_db2.load_gateway_routing_entries(
-            scope=str(tmp_path / ".hermes" / "sessions"))
+            scope=str(tmp_path / ".eir" / "sessions"))
         assert "agent:oldname:feishu:dm:chatA" not in routing
         assert "agent:newname:feishu:dm:chatA" in routing
         root_db2.close()
@@ -1263,12 +1263,12 @@ class TestRenameProfile:
         it in memory and would clobber the write); it delegates to the control verb instead."""
         create_profile("oldname", no_alias=True)
 
-        with patch("hermes_cli.profiles.check_alias_collision", return_value="skip"), \
-             patch("hermes_cli.profiles._live_default_multiplexer", return_value=True), \
-             patch("hermes_cli.profiles._notify_multiplexer"), \
+        with patch("eir_cli.profiles.check_alias_collision", return_value="skip"), \
+             patch("eir_cli.profiles._live_default_multiplexer", return_value=True), \
+             patch("eir_cli.profiles._notify_multiplexer"), \
              patch("gateway.control_socket.migrate_gateway_profile_identity",
                    return_value={"ok": True, "rekeyed": 1, "db": {}}) as verb, \
-             patch("hermes_state_registry.acquire") as acquire:
+             patch("eir_state_registry.acquire") as acquire:
             rename_profile("oldname", "newname")
 
         # Delegated to the gateway; the CLI's own durable-rewrite branch never ran.
@@ -1279,39 +1279,39 @@ class TestRenameProfile:
 
 
     def test_migrate_identity_command_repairs_a_failed_live_migration(self, profile_env, capsys):
-        """The failed-live-migration end state must be recoverable: `hermes profile
+        """The failed-live-migration end state must be recoverable: `eir profile
         migrate-identity <old> <new>` rekeys the durable rows once no gateway holds the store, and
         is idempotent (a second run has nothing left to rekey but still succeeds)."""
-        from hermes_cli.profile_cmd import cmd_profile
-        from hermes_state import SessionDB
+        from eir_cli.profile_cmd import cmd_profile
+        from eir_state import SessionDB
         from argparse import Namespace
         tmp_path = profile_env
         create_profile("oldname", no_alias=True)
-        old_dir = tmp_path / ".hermes" / "profiles" / "oldname"
+        old_dir = tmp_path / ".eir" / "profiles" / "oldname"
         pdb = SessionDB(old_dir / "state.db")
         pdb.create_session(
             "sess1", "feishu", session_key="agent:oldname:feishu:dm:chatA",
             profile_name="oldname", chat_id="chatA", chat_type="dm")
         pdb.close()
-        root_db = SessionDB(tmp_path / ".hermes" / "state.db")
+        root_db = SessionDB(tmp_path / ".eir" / "state.db")
         root_db.save_gateway_routing_entry(
             "agent:oldname:feishu:dm:chatA",
             json.dumps({"session_key": "agent:oldname:feishu:dm:chatA", "session_id": "sess1",
                         "origin": {"platform": "feishu", "chat_id": "chatA", "profile": "oldname"}}),
-            scope=str(tmp_path / ".hermes" / "sessions"))
+            scope=str(tmp_path / ".eir" / "sessions"))
         root_db.close()
 
         # Rename under a live multiplexer whose control verb answers nothing: the CLI warns and
         # leaves the (in-memory-owned) store alone, so the rows still name the old profile.
-        with patch("hermes_cli.profiles.check_alias_collision", return_value="skip"), \
-             patch("hermes_cli.profiles._live_default_multiplexer", return_value=True), \
-             patch("hermes_cli.profiles._notify_multiplexer"), \
+        with patch("eir_cli.profiles.check_alias_collision", return_value="skip"), \
+             patch("eir_cli.profiles._live_default_multiplexer", return_value=True), \
+             patch("eir_cli.profiles._notify_multiplexer"), \
              patch("gateway.control_socket.migrate_gateway_profile_identity", return_value=None):
             rename_profile("oldname", "newname")
-        assert "hermes profile migrate-identity oldname newname" in capsys.readouterr().err
+        assert "eir profile migrate-identity oldname newname" in capsys.readouterr().err
 
         # Gateway restarted/stopped → the retry command repairs both stores.
-        with patch("hermes_cli.profiles._live_default_multiplexer", return_value=False):
+        with patch("eir_cli.profiles._live_default_multiplexer", return_value=False):
             cmd_profile(Namespace(profile_action="migrate-identity",
                                   old_name="oldname", new_name="newname"))
             assert "✓ Session/routing identity migrated" in capsys.readouterr().out
@@ -1319,16 +1319,16 @@ class TestRenameProfile:
             cmd_profile(Namespace(profile_action="migrate-identity",
                                   old_name="oldname", new_name="newname"))
 
-        moved_db = SessionDB(tmp_path / ".hermes" / "profiles" / "newname" / "state.db")
+        moved_db = SessionDB(tmp_path / ".eir" / "profiles" / "newname" / "state.db")
         row = moved_db._read_one(
             "SELECT session_key, profile_name FROM sessions WHERE id = ?", ("sess1",))
         assert row is not None
         assert row["session_key"] == "agent:newname:feishu:dm:chatA"
         assert row["profile_name"] == "newname"
         moved_db.close()
-        root_db2 = SessionDB(tmp_path / ".hermes" / "state.db")
+        root_db2 = SessionDB(tmp_path / ".eir" / "state.db")
         routing = root_db2.load_gateway_routing_entries(
-            scope=str(tmp_path / ".hermes" / "sessions"))
+            scope=str(tmp_path / ".eir" / "sessions"))
         assert "agent:oldname:feishu:dm:chatA" not in routing
         assert "agent:newname:feishu:dm:chatA" in routing
         root_db2.close()
@@ -1337,7 +1337,7 @@ class TestRenameProfile:
     def test_rename_accumulates_previous_names(self, profile_env):
         create_profile("firstname", no_alias=True)
 
-        with patch("hermes_cli.profiles.check_alias_collision", return_value="skip"):
+        with patch("eir_cli.profiles.check_alias_collision", return_value="skip"):
             rename_profile("firstname", "secondname")
             rename_profile("secondname", "thirdname")
 
@@ -1348,8 +1348,8 @@ class TestRenameProfile:
         create_profile("oldname", no_alias=True)
 
         # The history write is best-effort: it must never fail the rename.
-        with patch("hermes_cli.profiles.check_alias_collision", return_value="skip"), \
-             patch("hermes_cli.profiles.write_profile_meta", side_effect=OSError("disk full")):
+        with patch("eir_cli.profiles.check_alias_collision", return_value="skip"), \
+             patch("eir_cli.profiles.write_profile_meta", side_effect=OSError("disk full")):
             new_dir = rename_profile("oldname", "newname")
 
         assert new_dir.is_dir()
@@ -1372,10 +1372,10 @@ class TestExportImport:
 
     def test_export_default_includes_profile_data(self, profile_env, tmp_path):
         """Profile data files end up in the archive (credentials excluded)."""
-        # Write through HERMES_HOME, not get_profile_dir("default"): the latter resolves to the
+        # Write through EIR_HOME, not get_profile_dir("default"): the latter resolves to the
         # OPERATOR's real install whenever basetest sits inside it, so this test used to
         # overwrite the live config.yaml / .env / MEMORY.md with its fixtures.
-        default_dir = profile_env / ".hermes"
+        default_dir = profile_env / ".eir"
         (default_dir / "config.yaml").write_text("model: test", encoding="utf-8")
         (default_dir / ".env").write_text("KEY=val", encoding="utf-8")
         (default_dir / "SOUL.md").write_text("Be nice.", encoding="utf-8")
@@ -1405,7 +1405,7 @@ class TestExportImport:
         symlinks; the link and its target are both retained.
         """
         # Same reason as above: never resolve the operator's real default home from a test.
-        default_dir = profile_env / ".hermes"
+        default_dir = profile_env / ".eir"
         (default_dir / "config.yaml").write_text("ok", encoding="utf-8")
         # Place broken symlink *inside* the allowed ``skills/`` tree so the
         # root-level allow-list passes the directory through; the
@@ -1450,11 +1450,11 @@ class TestExportImport:
 
 
 # ===================================================================
-# TestGetProfilesRoot / TestGetDefaultHermesHome (internal helpers)
+# TestGetProfilesRoot / TestGetDefaultEirHome (internal helpers)
 # ===================================================================
 
 class TestInternalHelpers:
-    """Tests for _get_profiles_root() and _get_default_hermes_home()."""
+    """Tests for _get_profiles_root() and _get_default_eir_home()."""
 
 
 
@@ -1462,11 +1462,11 @@ class TestInternalHelpers:
 
 
     def test_create_profile_docker(self, tmp_path, monkeypatch):
-        """Profile created in Docker lands under HERMES_HOME/profiles/."""
+        """Profile created in Docker lands under EIR_HOME/profiles/."""
         docker_home = tmp_path / "opt" / "data"
         docker_home.mkdir(parents=True)
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
-        monkeypatch.setenv("HERMES_HOME", str(docker_home))
+        monkeypatch.setenv("EIR_HOME", str(docker_home))
         result = create_profile("orchestrator", no_alias=True)
         expected = docker_home / "profiles" / "orchestrator"
         assert result == expected
@@ -1502,7 +1502,7 @@ class TestWriteProfileMetaDurability:
     def _interrupted_write(profile_dir):
         """Run a ``write_profile_meta`` whose serialization fails mid-call.
 
-        ``utils.atomic_yaml_write`` serializes through ``hermes_yaml.safe_dump``.
+        ``utils.atomic_yaml_write`` serializes through ``eir_yaml.safe_dump``.
         Breaking that seam measures durability rather than the choice of writer. A
         scoped ``MonkeyPatch.context`` is used instead of the fixture so the
         patch is reverted immediately, without touching the session-wide env
@@ -1600,10 +1600,10 @@ class TestEdgeCases:
         """
         import os
         import gateway.status as gw_status
-        from hermes_cli.profiles import _check_gateway_running
+        from eir_cli.profiles import _check_gateway_running
 
         tmp_path = profile_env
-        default_home = tmp_path / ".hermes"
+        default_home = tmp_path / ".eir"
         default_home.mkdir(parents=True, exist_ok=True)
 
         # Write a realistic gateway_state.json pointing at THIS live process with
@@ -1613,8 +1613,8 @@ class TestEdgeCases:
             json.dumps(
                 {
                     "pid": live_pid,
-                    "kind": "hermes-gateway",
-                    "argv": ["hermes", "gateway", "run"],
+                    "kind": "eir-gateway",
+                    "argv": ["eir", "gateway", "run"],
                     "start_time": gw_status._get_process_start_time(live_pid),
                     "gateway_state": "running",
                     "active_agents": 0,
@@ -1632,7 +1632,7 @@ class TestEdgeCases:
         # runs the gateway with no profile flag).
         with patch("gateway.status.get_running_pid", return_value=None), patch(
             "gateway.status._read_process_cmdline",
-            return_value="hermes gateway run --replace",
+            return_value="eir gateway run --replace",
         ):
             assert _check_gateway_running(default_home) is True
 
@@ -1664,10 +1664,10 @@ class TestProfilesToServe:
 
 
     def test_off_returns_only_active_named(self, profile_env, monkeypatch):
-        # A named profile's gateway runs with HERMES_HOME pointing at the
+        # A named profile's gateway runs with EIR_HOME pointing at the
         # profile dir; get_active_profile_name() infers the name from there.
         create_profile("coder", no_alias=True)
-        monkeypatch.setenv("HERMES_HOME", str(get_profile_dir("coder")))
+        monkeypatch.setenv("EIR_HOME", str(get_profile_dir("coder")))
         serve = profiles_to_serve(multiplex=False)
         assert len(serve) == 1
         assert serve[0][0] == "coder"
@@ -1678,7 +1678,7 @@ class TestProfilesToServe:
         create_profile("writer", no_alias=True)
         serve = dict(profiles_to_serve(multiplex=True))
         assert set(serve) == {"default", "coder", "writer"}
-        assert serve["default"] == _get_default_hermes_home()
+        assert serve["default"] == _get_default_eir_home()
         assert serve["coder"] == get_profile_dir("coder")
 
     # ------------------------------------------------------------------
@@ -1700,10 +1700,10 @@ class TestProfilesToServe:
         """The default profile IS the host: the key is ignored (still served, never
         standalone) with exactly one warning per process."""
         profiles._STANDALONE_WARNED = False
-        default_home = _get_default_hermes_home()
+        default_home = _get_default_eir_home()
         (default_home / "config.yaml").write_text("gateway:\n  standalone: true\n", encoding="utf-8")
         caplog.clear()
-        with caplog.at_level("WARNING", logger="hermes_cli.profiles"):
+        with caplog.at_level("WARNING", logger="eir_cli.profiles"):
             serve = dict(profiles_to_serve(multiplex=True))
             assert profiles.profile_is_standalone(default_home) is False
             assert profiles.profile_is_standalone(default_home) is False
@@ -1724,7 +1724,7 @@ class TestProfilesToServe:
 
     @pytest.mark.parametrize("failure_at", ["stat", "read", "decode"])
     def test_standalone_io_failure_is_bounded_and_recovers(self, profile_env, monkeypatch, caplog, failure_at):
-        from hermes_cli import config
+        from eir_cli import config
 
         create_profile("solo", no_alias=True)
         home = get_profile_dir("solo")
@@ -1777,7 +1777,7 @@ class TestProfilesToServe:
 
 
 class TestResolveProfileEnvSpelling:
-    """resolve_profile_env() keeps the configured HERMES_HOME spelling as
+    """resolve_profile_env() keeps the configured EIR_HOME spelling as
 
     the launch root (junction installs) while preserving the pre-existing
     profile-path handling and existence/validation semantics.
@@ -1790,7 +1790,7 @@ class TestResolveProfileEnvSpelling:
         never fall back to the platform default.
         """
         root = tmp_path / "configured-root"
-        custom = tmp_path / "custom-hermes"
+        custom = tmp_path / "custom-eir"
         for profile_dir in (root / "profiles" / "beta", root / "profiles" / "coder", custom / "profiles" / "beta"):
             profile_dir.mkdir(parents=True)
             (profile_dir / "config.yaml").write_text("{}\n", encoding="utf-8")  # identity marker: a bare dir does not resolve
@@ -1801,19 +1801,19 @@ class TestResolveProfileEnvSpelling:
             (custom, "beta", custom / "profiles" / "beta"),
         ]
         for env_home, profile, expected in cases:
-            monkeypatch.setenv("HERMES_HOME", str(env_home))
+            monkeypatch.setenv("EIR_HOME", str(env_home))
             assert Path(resolve_profile_env(profile)) == expected
 
     def test_missing_named_profile_still_raises(self, monkeypatch, tmp_path):
         root = tmp_path / "configured-root"
-        monkeypatch.setenv("HERMES_HOME", str(root))
+        monkeypatch.setenv("EIR_HOME", str(root))
         with pytest.raises(FileNotFoundError):
             resolve_profile_env("nope")
 
     def test_unset_env_falls_back_to_default_root(self, monkeypatch):
-        # No HERMES_HOME: the platform default root applies (existing contract).
-        monkeypatch.delenv("HERMES_HOME", raising=False)
-        assert Path(resolve_profile_env("default")) == _get_default_hermes_home()
+        # No EIR_HOME: the platform default root applies (existing contract).
+        monkeypatch.delenv("EIR_HOME", raising=False)
+        assert Path(resolve_profile_env("default")) == _get_default_eir_home()
 
 
 
@@ -1848,8 +1848,8 @@ def test_profile_delete_and_rename_stop_the_profiles_bot_desktop(profile_env, op
     (profile_dir / "bot-desktop" / "lease.json").write_text(
         json.dumps({"holder": "human", "viewer_id": "gone", "since": 1.0, "epoch": 3, "reason": ""}), encoding="utf-8")
     try:
-        with patch("hermes_cli.profiles._cleanup_gateway_service"), \
-             patch("hermes_cli.profiles.check_alias_collision", return_value="skip"):
+        with patch("eir_cli.profiles._cleanup_gateway_service"), \
+             patch("eir_cli.profiles.check_alias_collision", return_value="skip"):
             if op == "delete":
                 delete_profile("coder", yes=True)
             else:
@@ -1890,7 +1890,7 @@ def test_export_leaves_the_bot_desktop_browser_profile_out(profile_env, tmp_path
 
 class TestCloneAllExcludesRuntimeTrees:
     """``--clone-all`` from the default profile must not copy the machine-scoped
-    runtime trees the local-models flow puts under ``~/.hermes``: ``models/``
+    runtime trees the local-models flow puts under ``~/.eir``: ``models/``
     (GGUF weights, tens of GB), ``runtimes/`` (llama.cpp binaries) and ``node/``
     (managed Node). ``backup.py`` already excludes exactly these; the clone-all
     ignore list had not followed.
@@ -1909,7 +1909,7 @@ class TestCloneAllExcludesRuntimeTrees:
         (home / "config.yaml").write_text("model: test\n", encoding="utf-8")
 
     def test_ignore_drops_runtime_trees_only_at_the_default_root(self, profile_env):
-        default_home = profile_env / ".hermes"
+        default_home = profile_env / ".eir"
         self._seed(default_home)
         # a skill that happens to carry a nested models/ dir is user data
         (default_home / "skills" / "greet" / "models").mkdir()
@@ -1930,7 +1930,7 @@ class TestCloneAllExcludesRuntimeTrees:
 
 
     def test_clone_all_from_default_skips_runtime_trees_but_keeps_the_rest(self, profile_env):
-        default_home = profile_env / ".hermes"
+        default_home = profile_env / ".eir"
         self._seed(default_home)
 
         clone = create_profile("clone", clone_all=True, no_alias=True)
@@ -1944,7 +1944,7 @@ class TestCloneAllExcludesRuntimeTrees:
 def test_count_skills_publishes_timestamp_after_the_walk(tmp_path, monkeypatch):
     """A scan longer than the TTL must not publish an already-expired cache entry (#107151):
     the cached timestamp is taken after _walk_skill_count returns, not before it starts."""
-    from hermes_cli import profiles as mod
+    from eir_cli import profiles as mod
 
     skills_dir = tmp_path / "skills"
     skills_dir.mkdir()

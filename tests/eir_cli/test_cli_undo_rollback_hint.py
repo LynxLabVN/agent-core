@@ -7,14 +7,14 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from hermes_state import SessionDB
-from tests.hermes_cli.test_cli_init import _make_cli
+from eir_state import SessionDB
+from tests.eir_cli.test_cli_init import _make_cli
 from tools.checkpoint_manager import CheckpointManager
 
 
 @pytest.fixture
 def setup(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path / "home"))
     project = tmp_path / "proj"
     (project / ".git").mkdir(parents=True)
     (project / "app.js").write_text("hello\n")

@@ -1,7 +1,7 @@
-"""Timezone-aware clock for Hermes.
+"""Timezone-aware clock for Eir.
 
 ``now()`` returns a tz-aware datetime in the user's configured IANA timezone. Resolution order:
-``HERMES_TIMEZONE`` env var, then ``timezone`` in ``~/.hermes/config.yaml``, else server-local
+``EIR_TIMEZONE`` env var, then ``timezone`` in ``~/.eir/config.yaml``, else server-local
 time. Invalid timezone values log a warning and fall back — never crash.
 """
 
@@ -14,12 +14,12 @@ from datetime import datetime
 from typing import Dict, Optional, Tuple
 from zoneinfo import ZoneInfo
 
-from hermes_constants import get_config_path
+from eir_constants import get_config_path
 
 logger = logging.getLogger(__name__)
 
 # Cache keyed by timezone *source* identity. This process can multiplex profiles by switching
-# HERMES_HOME, so one unkeyed global would leak the first profile's timezone into later
+# EIR_HOME, so one unkeyed global would leak the first profile's timezone into later
 # profile-scoped work (e.g. the desktop multiplex cron ticker persisting another profile's
 # ``next_run_at``). Entries are published atomically under ``_cache_lock`` as one
 # ``identity -> (name, ZoneInfo | None)`` value, so racing resolvers can never publish a mixed
@@ -65,14 +65,14 @@ def safe_strftime(value: datetime, fmt: str) -> str:
 
 
 def _env_timezone() -> str:
-    """``HERMES_TIMEZONE`` when it may speak for the active profile. Under the multiplexed
+    """``EIR_TIMEZONE`` when it may speak for the active profile. Under the multiplexed
     gateway the env var holds only the DEFAULT profile's value (bridged from its config.yaml at
     startup), so every routed profile must read its own config.yaml instead."""
     from agent.secret_scope import is_multiplex_active  # lazy: secret_scope pulls in more than a clock needs
 
     if is_multiplex_active():
         return ""
-    return os.getenv("HERMES_TIMEZONE", "").strip()
+    return os.getenv("EIR_TIMEZONE", "").strip()
 
 
 def _timezone_cache_identity() -> tuple[str, str]:
@@ -92,10 +92,10 @@ def _resolve_timezone_name() -> str:
         # parse through the config backend is the fallback when the effective loader cannot be
         # imported (any failure there lands in the outer except: no configured timezone).
         try:
-            from hermes_cli.config_effective import load_user_config_effective
+            from eir_cli.config_effective import load_user_config_effective
             cfg = load_user_config_effective(get_config_path())
         except Exception:
-            from hermes_cli.config_backend import config_exists, read_config_doc
+            from eir_cli.config_backend import config_exists, read_config_doc
             config_path = get_config_path()
             cfg = (read_config_doc(config_path) or {}) if config_exists(config_path) else {}
         if cfg:

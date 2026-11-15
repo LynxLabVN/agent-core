@@ -1,4 +1,4 @@
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@hermes/plugin-sdk'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@eir/plugin-sdk'
 
 import type { CanonicalGroupEvent } from './canonical-group-history'
 import { useCanonicalGroupLabels } from './canonical-group-labels'

@@ -7,7 +7,7 @@ description: "Drive Microduck, the open-source bipedal duck robot from Pollen Ro
 maintainer: Arca Computer (arcabotai)
 tier: community
 category: tools
-requires_hermes: ">=0.21.6"
+requires_eir: ">=0.21.6"
 docs_url: https://github.com/arcabotai/hermes-microduck#readme
 readme: true
 screenshots:

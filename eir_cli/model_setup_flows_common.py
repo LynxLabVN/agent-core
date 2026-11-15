@@ -3,7 +3,7 @@ persist, confirmation — one copy of each step. Prompt strings and the config k
 their insertion order = config.yaml key order) are behavior; keep them byte-identical.
 
 main_provider_setup / auth / config imports are lazy on purpose: main.py imports the flows (import
-cycle) and tests patch ``hermes_cli.config.load_config`` etc. at call time.
+cycle) and tests patch ``eir_cli.config.load_config`` etc. at call time.
 """
 
 from __future__ import annotations
@@ -12,15 +12,15 @@ import contextlib
 import subprocess
 from urllib.parse import urlparse
 
-from hermes_cli.cli_output import line_input
-from hermes_cli.config import clear_model_endpoint_credentials
+from eir_cli.cli_output import line_input
+from eir_cli.config import clear_model_endpoint_credentials
 
 _HTTP = ("http://", "https://")
 
 
 def _note_setup_failure(failure_class: str) -> None:
     """Why a flow returns without a pick, for the provider-setup metric (no-op outside a tracked flow)."""
-    from hermes_cli.observability.shared_metrics_setup import note_provider_setup_failure
+    from eir_cli.observability.shared_metrics_setup import note_provider_setup_failure
 
     note_provider_setup_failure(failure_class)
 
@@ -36,7 +36,7 @@ def _ask(prompt: str, *, secret: bool = False, raw: bool = False, cancel_msg: st
     ``secret`` the masked prompt, else ``line_input``. Ctrl-C/EOF prints *cancel_msg*
     (``None`` = silent) and returns *on_cancel*."""
     if secret:
-        from hermes_cli.secret_prompt import masked_secret_prompt as fn
+        from eir_cli.secret_prompt import masked_secret_prompt as fn
     else:
         fn = input if raw else line_input
     try:
@@ -49,7 +49,7 @@ def _ask(prompt: str, *, secret: bool = False, raw: bool = False, cancel_msg: st
 
 def _existing_api_key_for_model_flow(provider_id: str, pconfig) -> tuple[str, str]:
     """Resolve an existing wizard credential without changing its storage."""
-    from hermes_cli.auth import _resolve_api_key_provider_secret
+    from eir_cli.auth import _resolve_api_key_provider_secret
     return _resolve_api_key_provider_secret(provider_id, pconfig)
 
 
@@ -59,7 +59,7 @@ def _ensure_flow_api_key(provider_id: str, pconfig, *, missing_hint=()) -> tuple
 
     Returns ``(existing_key, resolved_key, abort)``.
     """
-    from hermes_cli.main_provider_setup import _prompt_api_key
+    from eir_cli.main_provider_setup import _prompt_api_key
     existing_key, existing_source = _existing_api_key_for_model_flow(provider_id, pconfig)
     if not existing_key:
         for line in missing_hint:
@@ -70,7 +70,7 @@ def _ensure_flow_api_key(provider_id: str, pconfig, *, missing_hint=()) -> tuple
 
 def _load_config_model_section() -> tuple[dict, dict]:
     """Return ``(cfg, cfg["model"])`` with the model section coerced to a dict."""
-    from hermes_cli.config import load_config
+    from eir_cli.config import load_config
     cfg = load_config()
     model = cfg.get("model")
     if not isinstance(model, dict):
@@ -82,7 +82,7 @@ def _load_config_model_section() -> tuple[dict, dict]:
 def _begin_model_config(selected: str, provider: str) -> tuple[dict, dict]:
     """Record *selected* as the model choice and open the config model section
     with ``provider`` set; callers set endpoint fields then ``_commit_model_config``."""
-    from hermes_cli.auth import _save_model_choice
+    from eir_cli.auth import _save_model_choice
     _save_model_choice(selected)
     cfg, model = _load_config_model_section()
     model["provider"] = provider
@@ -91,8 +91,8 @@ def _begin_model_config(selected: str, provider: str) -> tuple[dict, dict]:
 
 def _commit_model_config(cfg: dict) -> None:
     """Persist *cfg* and deactivate any OAuth provider."""
-    from hermes_cli.auth import deactivate_provider
-    from hermes_cli.config import save_config
+    from eir_cli.auth import deactivate_provider
+    from eir_cli.config import save_config
     save_config(cfg)
     deactivate_provider()
 
@@ -132,7 +132,7 @@ def _activate_provider_model(selected, provider_id: str, base_url: str, done: st
                              no_change: str | None = "No change.") -> None:
     """OAuth-provider persist: model choice + ``_update_config_for_provider`` (which owns
     the auth-state bookkeeping), then *done*; *no_change* (``None`` = silent) otherwise."""
-    from hermes_cli.auth import _save_model_choice, _update_config_for_provider
+    from eir_cli.auth import _save_model_choice, _update_config_for_provider
     if not selected:
         if no_change is not None:
             print(no_change)
@@ -154,7 +154,7 @@ def _ensure_dict_section(cfg: dict, key: str) -> dict:
 def _pick_model_or_prompt(model_list, prompt: str, **kwargs):
     """Radio picker when *model_list* is non-empty, else a free-text ``line_input``
     (None on Ctrl-C/EOF)."""
-    from hermes_cli.auth import _prompt_model_selection
+    from eir_cli.auth import _prompt_model_selection
     if model_list:
         return _prompt_model_selection(model_list, **kwargs)
     return _ask(prompt, cancel_msg=None)
@@ -162,28 +162,28 @@ def _pick_model_or_prompt(model_list, prompt: str, **kwargs):
 
 def _login_retry_context(args) -> tuple[str, str]:
     """(retry_command, service_host) for a login helper's failure copy, from the ``ProviderConfig``
-    among its positional args. Nous keeps ``hermes portal``; every other OAuth provider is retried
-    with ``hermes auth add <provider>`` and named by its own portal host (``hermes login`` no longer
-    exists). Falls back to ``hermes model`` when no provider config is in play."""
+    among its positional args. Nous keeps ``eir portal``; every other OAuth provider is retried
+    with ``eir auth add <provider>`` and named by its own portal host (``eir login`` no longer
+    exists). Falls back to ``eir model`` when no provider config is in play."""
     pconfig = next((a for a in args if hasattr(a, "id") and hasattr(a, "portal_base_url")), None)
     if pconfig is None:
-        return "hermes model", "the sign-in service"
+        return "eir model", "the sign-in service"
     provider_id = str(getattr(pconfig, "id", "") or "")
     host = urlparse(str(getattr(pconfig, "portal_base_url", "") or "")).hostname or "the sign-in service"
     if provider_id == "nous":
-        return "hermes portal", host
-    return (f"hermes auth add {provider_id}" if provider_id else "hermes model"), host
+        return "eir portal", host
+    return (f"eir auth add {provider_id}" if provider_id else "eir model"), host
 
 
 def _run_login(login_fn, *args, **kwargs) -> bool:
     """Run an OAuth login helper; print plain failure copy (what happened + retry command) and
     return False on SystemExit / any exception. The retry command and service host come from the
-    provider config passed to the helper, so a MiniMax failure never says ``hermes portal`` /
+    provider config passed to the helper, so a MiniMax failure never says ``eir portal`` /
     ``portal.nousresearch.com``. Helpers that print their own copy raise ``SystemExit(1)`` with no
     message, which stays silent; a SystemExit that carries a message (or a non-cancel code from a
     helper that printed nothing) gets a one-line explanation so the user is never left with no
     output."""
-    from hermes_cli.auth_error_copy import sign_in_failure_lines
+    from eir_cli.auth_error_copy import sign_in_failure_lines
     retry_command, service_host = _login_retry_context(args)
     try:
         login_fn(*args, **kwargs)
@@ -230,7 +230,7 @@ def _models_dev_merged(provider_id: str, curated) -> list:
     it comes from the provider). Live-first providers keep
     models.dev order ahead of curated, matching ``_profile_live_catalog``. Empty list when
     models.dev has nothing / is unavailable."""
-    from hermes_cli.models_catalog_static import _LIVE_FIRST_PICKER_PROVIDERS
+    from eir_cli.models_catalog_static import _LIVE_FIRST_PICKER_PROVIDERS
     mdev_models: list = []
     with contextlib.suppress(Exception):
         from agent.models_dev import list_agentic_models
@@ -256,7 +256,7 @@ def _prune_replaced_custom_model_config_credentials(base_url: str, *, provider_n
     points at the previous endpoint and could be selected before the fresh config."""
     try:
         from agent.credential_pool import CUSTOM_POOL_PREFIX, custom_provider_pool_key_candidates
-        from hermes_cli.auth import read_credential_pool, write_credential_pool
+        from eir_cli.auth import read_credential_pool, write_credential_pool
 
         # A keyed ``providers.<key>`` endpoint stores under the durable slug while
         # legacy pools keep ``custom:<display-name>``; every identity the active
@@ -291,7 +291,7 @@ def _curses_choice(title: str, rows: list, default_idx: int):
     """``_curses_prompt_choice`` index, or None when curses is unavailable (piped stdin,
     non-TTY) so the caller can fall back to a numbered prompt."""
     try:
-        from hermes_cli.setup import _curses_prompt_choice
+        from eir_cli.setup import _curses_prompt_choice
         return _curses_prompt_choice(title, rows, default_idx)
     except Exception:
         return None
@@ -301,7 +301,7 @@ def _radiolist(title: str, items: list, default_idx: int = 0, **kw):
     """``curses_radiolist`` index (-1 = cancelled), or None when curses is unavailable so the
     caller can fall back to a numbered prompt."""
     try:
-        from hermes_cli.curses_ui import curses_radiolist
+        from eir_cli.curses_ui import curses_radiolist
         return curses_radiolist(title, items, selected=default_idx, cancel_returns=-1, **kw)
     except (ImportError, NotImplementedError, OSError, subprocess.SubprocessError):
         return None

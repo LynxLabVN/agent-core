@@ -33,11 +33,11 @@ def _turn_message_thread(platform: str, required: dict[str, Any]) -> str:
     the thread-less chat is the chat's top level, which its route does not cover (#147602)."""
     from gateway.session_context import get_session_env
 
-    if (required.get("message_id") != get_session_env("HERMES_SESSION_MESSAGE_ID")
-            or required.get("chat_id") != get_session_env("HERMES_SESSION_CHAT_ID")
-            or str(platform).strip().lower() != get_session_env("HERMES_SESSION_PLATFORM")):
+    if (required.get("message_id") != get_session_env("EIR_SESSION_MESSAGE_ID")
+            or required.get("chat_id") != get_session_env("EIR_SESSION_CHAT_ID")
+            or str(platform).strip().lower() != get_session_env("EIR_SESSION_PLATFORM")):
         return ""
-    return get_session_env("HERMES_SESSION_THREAD_ID")
+    return get_session_env("EIR_SESSION_THREAD_ID")
 
 
 # -- per-platform verb implementations (adapter, *args) -> result ------------
@@ -98,7 +98,7 @@ class PlatformActions:
 
     def _capability_granted(self) -> bool:
         try:
-            from hermes_cli.plugin_capabilities import plugin_capability_granted
+            from eir_cli.plugin_capabilities import plugin_capability_granted
 
             return plugin_capability_granted(self._plugin_id, CAPABILITY_ID)
         except Exception:
@@ -130,7 +130,7 @@ class PlatformActions:
         resolve_fn = getattr(runner, "_authorization_adapter", None)
         if callable(resolve_fn):
             try:
-                from hermes_cli.profiles import get_active_profile_name
+                from eir_cli.profiles import get_active_profile_name
 
                 profile_name = get_active_profile_name()
             except Exception:

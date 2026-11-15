@@ -24,7 +24,7 @@ from typing import Any, Callable, Optional
 
 from packaging.version import InvalidVersion, Version
 
-from hermes_cli.plugins_provenance import (
+from eir_cli.plugins_provenance import (
     Provenance,
     ProvenanceClass,
     plugins_provenance,
@@ -51,7 +51,7 @@ class CheckResult:
     latest: Optional[str] = None
     update_available: Optional[bool] = None   # None = unknown/uncheckable
     needs_fixing: Optional[str] = None        # mismatch reason when set
-    min_hermes: Optional[str] = None          # feed floor / catalog requires_hermes, if any
+    min_eir: Optional[str] = None          # feed floor / catalog requires_eir, if any
     reason: str = ""
 
     def to_json(self) -> dict:
@@ -62,14 +62,14 @@ class CheckResult:
             "latest": self.latest,
             "update_available": self.update_available,
             "needs_fixing": self.needs_fixing,
-            "min_hermes": self.min_hermes,
+            "min_eir": self.min_eir,
             "reason": self.reason,
         }
 
 
 def _read_manifest_field(plugin_dir: Path, key: str) -> Optional[str]:
     """One field from the installed plugin.yaml (claims, not provenance)."""
-    import hermes_yaml as yaml
+    import eir_yaml as yaml
 
     manifest = plugin_dir / "plugin.yaml"
     if not manifest.is_file():
@@ -89,9 +89,9 @@ def _self_cloned_next_step(path: Path) -> str:
     from pm.filesystem import is_junction
 
     if path.is_symlink() or is_junction(path):
-        # `adopt` refuses a link on purpose: Hermes never updates or deletes files outside its plugins dir.
+        # `adopt` refuses a link on purpose: Eir never updates or deletes files outside its plugins dir.
         return f"linked to {os.path.realpath(path)}; pull updates in that checkout"
-    return "self-cloned; run `hermes plugins adopt` first"
+    return "self-cloned; run `eir plugins adopt` first"
 
 
 def check_local_provenance(prov: Provenance) -> CheckResult:
@@ -126,29 +126,29 @@ def check_local_provenance(prov: Provenance) -> CheckResult:
         # threat class as a swap; never adopt silently
         result.needs_fixing = (
             f"manifest declares update_url {claimed!r} but no url was saved "
-            "at install; run `hermes plugins trust-update-url` after review"
+            "at install; run `eir plugins trust-update-url` after review"
         )
         return result
     if saved is not None and claimed != saved:
         result.needs_fixing = (
             f"update_url mismatch: saved {saved!r}, manifest declares "
-            f"{claimed!r}; run `hermes plugins trust-update-url` after review"
+            f"{claimed!r}; run `eir plugins trust-update-url` after review"
         )
         return result
 
     return result
 
 
-def held_for_newer_hermes(result: CheckResult) -> Optional[str]:
-    """``needs Hermes <spec>; this is <version>`` when the update's ``min_hermes`` (a feed floor or the
-    catalog entry's ``requires_hermes``) rejects the running Hermes, else ``None``. The update path refuses
-    such an update, so listings name it as waiting on a Hermes update instead of offering it."""
-    if not result.min_hermes:
+def held_for_newer_eir(result: CheckResult) -> Optional[str]:
+    """``needs Eir <spec>; this is <version>`` when the update's ``min_eir`` (a feed floor or the
+    catalog entry's ``requires_eir``) rejects the running Eir, else ``None``. The update path refuses
+    such an update, so listings name it as waiting on a Eir update instead of offering it."""
+    if not result.min_eir:
         return None
-    from hermes_cli.plugins_manifest import requires_hermes_error, running_hermes_version
-    if not requires_hermes_error({"requires_hermes": result.min_hermes}):
+    from eir_cli.plugins_manifest import requires_eir_error, running_eir_version
+    if not requires_eir_error({"requires_eir": result.min_eir}):
         return None
-    return f"needs Hermes {result.min_hermes}; this is {running_hermes_version()}"
+    return f"needs Eir {result.min_eir}; this is {running_eir_version()}"
 
 
 def check_provenanced(
@@ -163,7 +163,7 @@ def check_provenanced(
     catalog: dict = catalog_value if isinstance(catalog_value, dict) else {}
     catalog_name = catalog.get("name") or row.get("catalog_name")
     if catalog_name:
-        from hermes_cli.plugin_catalog import find_removed, get_live_catalog_entry
+        from eir_cli.plugin_catalog import find_removed, get_live_catalog_entry
 
         result = CheckResult(name=prov.name, klass="catalog", current=row.get("revision"))
         removed = None if row.get("allow_removed") is True else (
@@ -179,7 +179,7 @@ def check_provenanced(
             return result
         result.latest = entry.sha
         result.update_available = result.current != entry.sha
-        result.min_hermes = entry.requires_hermes or None
+        result.min_eir = entry.requires_eir or None
         return result
     result = check_local_provenance(prov)
     if result.reason or result.needs_fixing:
@@ -200,7 +200,7 @@ def check_provenanced(
             result.reason = f"feed unparseable: {exc}"
             return result
         result.latest = feed.get("version")
-        result.min_hermes = feed.get("min_hermes")
+        result.min_eir = feed.get("min_eir")
         # Like-for-like identity only (audit C17): a feed that ships a full
         # git SHA compares SHA vs recorded revision; otherwise the feed's
         # semantic version compares against the installed manifest's
@@ -258,8 +258,8 @@ def check_provenanced(
 
 def parse_feed_yml(text: str) -> dict:
     """The electron-updater-derived feed shape: version, released,
-    min_hermes, artifacts{git,bundle,bundle_sha256}, notes_url."""
-    import hermes_yaml as yaml
+    min_eir, artifacts{git,bundle,bundle_sha256}, notes_url."""
+    import eir_yaml as yaml
 
     try:
         data = yaml.safe_load(text)
@@ -271,7 +271,7 @@ def parse_feed_yml(text: str) -> dict:
     if not isinstance(version, str) or not version.strip():
         raise ValueError("feed missing 'version'")
     out: dict[str, Any] = {"version": version.strip()}
-    for key in ("min_hermes", "notes_url"):
+    for key in ("min_eir", "notes_url"):
         value = data.get(key)
         if isinstance(value, str) and value.strip():
             out[key] = value.strip()
@@ -308,7 +308,7 @@ def check_pip_plugins(
     recorded, nothing to drift."""
     if entry_points is None:
         entry_points = list(
-            importlib.metadata.entry_points().select(group="hermes_agent.plugins")
+            importlib.metadata.entry_points().select(group="eir_agent.plugins")
         )
     results: list[CheckResult] = []
     for ep in entry_points:
@@ -384,7 +384,7 @@ def https_update_url(url: object) -> str:
 def default_fetch(url: str) -> str:
     """The real feed fetcher: url -> text (raises on failure).
 
-    ONE implementation shared by the manual ``hermes plugins
+    ONE implementation shared by the manual ``eir plugins
     check-updates`` and the cadence tick — callers never re-derive it.
     """
     import urllib.request
@@ -410,7 +410,7 @@ def default_ls_remote(source: str) -> str:
     imports plugins_cmd (which lazily imports this module) — no import
     cycle at module load.
     """
-    from hermes_cli.plugins_cmd import _resolve_git_executable, _run_plugin_git
+    from eir_cli.plugins_cmd import _resolve_git_executable, _run_plugin_git
 
     # Through the plugin git runner, like clone and pull: no terminal and no ambient credential
     # helper (PM's PortableGit names a GUI chooser there, which outlives the timeout below), and a

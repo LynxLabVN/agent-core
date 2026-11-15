@@ -1,9 +1,9 @@
-# Tính năng của Hermes Agent
+# Tính năng của Eir Agent
 
 ## Trò chuyện
 
-- **Đa nền tảng** — nói chuyện với Hermes qua Telegram, Discord, Slack, WhatsApp, Signal, hoặc dùng trực tiếp trên máy (CLI, ứng dụng desktop). Một cuộc chuyện, nối liền giữa các nơi.
-- **Tin nhắn âm thanh** — gửi voice memo, Hermes nghe và hành động.
+- **Đa nền tảng** — nói chuyện với Eir qua Telegram, Discord, Slack, WhatsApp, Signal, hoặc dùng trực tiếp trên máy (CLI, ứng dụng desktop). Một cuộc chuyện, nối liền giữa các nơi.
+- **Tin nhắn âm thanh** — gửi voice memo, Eir nghe và hành động.
 - **Hỏi lại khi cần** — thiếu thông tin thì nó hỏi, không tự đoán bừa.
 
 ## Làm việc
@@ -45,5 +45,5 @@
 
 - **Chọn model tuỳ ý** — Nous Portal, OpenRouter, OpenAI, endpoint riêng... đổi model không cần sửa code.
 - **Chạy ở đâu cũng được** — Linux, macOS, Windows, Android (Termux); trên máy cá nhân, VPS, hoặc serverless.
-- **Profile riêng biệt** — mỗi profile là một Hermes độc lập (config, key, bộ nhớ riêng), chạy song song.
+- **Profile riêng biệt** — mỗi profile là một Eir độc lập (config, key, bộ nhớ riêng), chạy song song.
 - **An toàn** — việc nguy hiểm xin phép trước khi làm.

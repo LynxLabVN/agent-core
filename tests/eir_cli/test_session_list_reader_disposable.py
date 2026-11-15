@@ -26,10 +26,10 @@ from __future__ import annotations
 
 import shutil
 
-from hermes_cli.sqlite_safe_read import LiveConnectionError, offline_file_access
-from hermes_cli.web_server_sessions import _open_session_db_at_path
-from hermes_state import SessionDB
-from hermes_state_repair import _db_fingerprint
+from eir_cli.sqlite_safe_read import LiveConnectionError, offline_file_access
+from eir_cli.web_server_sessions import _open_session_db_at_path
+from eir_state import SessionDB
+from eir_state_repair import _db_fingerprint
 
 
 def _ids(db) -> list:
@@ -48,7 +48,7 @@ def test_poll_observes_a_replaced_state_db(tmp_path):
     finally:
         first.close()
 
-    # `hermes sessions recover` writes a clean database, which the operator
+    # `eir sessions recover` writes a clean database, which the operator
     # then installs over the corrupt one.
     recovered = tmp_path / "recovered-state.db"
     rebuilt = SessionDB(db_path=recovered)

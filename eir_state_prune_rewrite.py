@@ -1,6 +1,6 @@
 """In-place row-rewrite persistence for the proactive prune (#124102).
 
-Split out of :mod:`hermes_state_messages` (FILE_LINES ratchet): the prune's own commit primitive and
+Split out of :mod:`eir_state_messages` (FILE_LINES ratchet): the prune's own commit primitive and
 its lease-less staleness probe. Both are ``SessionMessagesMixin`` methods; this sibling defines a
 ``SessionPruneRewriteMixin`` the facade binds into the same MRO slot, so every existing
 ``session_db.rewrite_pruned_rows(...)`` / ``rewritten_held_row_ids(...)`` call site and test patch
@@ -13,8 +13,8 @@ from typing import Any, Optional
 
 from agent.context_compressor import _DB_PERSISTED_MARKER as _DB_PERSISTED_MARKER_KEY
 from agent.message_metadata import DB_ROW_SNAPSHOT
-from hermes_state_common import _id_chunks, _placeholders
-from hermes_state_messages import _INSERT_MESSAGE_SQL, _parse_tool_calls
+from eir_state_common import _id_chunks, _placeholders
+from eir_state_messages import _INSERT_MESSAGE_SQL, _parse_tool_calls
 
 # _INSERT_MESSAGE_SQL's columns in bind order, so a row rewrite can diff _message_row_params by name.
 _MESSAGE_ROW_COLUMNS = tuple(
@@ -164,7 +164,7 @@ class SessionPruneRewriteMixin:
         from agent.conversation_compression_archive import ABSORBED_ROW_IDS
         from agent.message_metadata import DB_ROW_SNAPSHOT
         from agent.transcript_repair import transcript_row_snapshot
-        from hermes_state_errors import PruneRowStaleError, PruneRowUnresolvedError
+        from eir_state_errors import PruneRowStaleError, PruneRowUnresolvedError
 
         def _call_ids(tool_calls: Any) -> list[Any]:
             return [call.get("id") if isinstance(call, dict) else None for call in (_parse_tool_calls(tool_calls) or [])]

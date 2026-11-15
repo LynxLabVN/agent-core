@@ -4,7 +4,7 @@ SQLite protects a live WAL generation with two POSIX advisory locks: a SHARED lo
 file's lock range and a shared lock on the DMS byte of ``state.db-shm``. A sibling process may
 checkpoint and unlink ``-wal``/``-shm`` at its close only after taking both EXCLUSIVE. POSIX locks
 are per process, so any ``open()``/``close()`` of those two files inside the holder — a raw probe,
-a plugin, a tool reading ``~/.hermes`` — cancels both (sqlite.org/howtocorrupt.html §2.2) and the
+a plugin, a tool reading ``~/.eir`` — cancels both (sqlite.org/howtocorrupt.html §2.2) and the
 next foreign close strands the holder on a deleted generation (``DeletedWalGenerationError``).
 
 This module adds the same two ranges as *open file description* locks (``F_OFD_SETLK``) on the
@@ -32,7 +32,7 @@ import sys
 import threading
 from typing import Dict, Optional, Set, Tuple
 
-logger = logging.getLogger("hermes_state")
+logger = logging.getLogger("eir_state")
 
 # SQLite's unix VFS lock geometry (os_unix.c): the SHARED range on the main file and the
 # deadman-switch byte of the -shm file.
@@ -45,7 +45,7 @@ _SHM_DMS_BYTE = 128
 # platform FIRST: some Windows installs have a third-party module importable as `fcntl` (stock
 # CPython for Windows ships none), and letting the import decide would arm the guard on a
 # lookalike. Off Windows a partial module is equally fatal at import time — every importer of
-# hermes_state dies before supported() can say "no" (#118026) — so tolerate a missing attribute
+# eir_state dies before supported() can say "no" (#118026) — so tolerate a missing attribute
 # the same way as a missing module and fall back to the no-op.
 if os.name == "nt":
     fcntl = None  # type: ignore[assignment]

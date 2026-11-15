@@ -17,16 +17,16 @@ from contextlib import contextmanager
 
 import pytest
 
-from hermes_state import SessionDB
+from eir_state import SessionDB
 
 class TestHandoffStateDB:
     """Test the handoff schema + helper methods on SessionDB."""
 
     @pytest.fixture
     def db(self, tmp_path, monkeypatch):
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".eir"
         home.mkdir()
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("EIR_HOME", str(home))
         return SessionDB(db_path=home / "state.db")
 
     def _make_session(self, db, session_id, source="cli", title=None):

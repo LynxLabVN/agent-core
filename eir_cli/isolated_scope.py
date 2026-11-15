@@ -9,7 +9,7 @@ containers.
 
 Captured once at launch as a canonical path (never a name string: ``get_active_profile_name()``
 answers ``default``/``custom`` sentinels that are also valid profile ids), because a
-multi-profile host mirrors a turn's profile into ``HERMES_HOME`` later. The root home and
+multi-profile host mirrors a turn's profile into ``EIR_HOME`` later. The root home and
 Desktop-owned backends (its SSH ``serve --isolated`` is one backend per connection serving every
 profile by ``?profile=``) stay unscoped.
 """
@@ -28,10 +28,10 @@ def record_launch_scope(*, isolated: bool, desktop_owned: bool) -> Optional[str]
     global _LAUNCH_PROFILE
     _LAUNCH_PROFILE = None
     if isolated and not desktop_owned:
-        from hermes_constants import get_default_hermes_root, get_process_hermes_home, profile_name_for_home
+        from eir_constants import get_default_eir_root, get_process_eir_home, profile_name_for_home
 
-        home = get_process_hermes_home().resolve()
-        if home != get_default_hermes_root().resolve():
+        home = get_process_eir_home().resolve()
+        if home != get_default_eir_root().resolve():
             _LAUNCH_PROFILE = profile_name_for_home(home)
     return _LAUNCH_PROFILE
 

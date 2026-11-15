@@ -2,8 +2,8 @@
  * A retry after a lost `groups.create` reply is the same request: display data that changed in
  * between (a Bot's title, a mirrored room taking the generated name) never mints a second room.
  */
-import { host } from '@hermes/plugin-sdk'
-import type * as HermesSdk from '@hermes/plugin-sdk'
+import { host } from '@eir/plugin-sdk'
+import type * as EirSdk from '@eir/plugin-sdk'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
@@ -20,8 +20,8 @@ import { setPluginCtx } from './shared'
 import type { RosterRow } from './types'
 
 const { request, notify } = vi.hoisted(() => ({ request: vi.fn(), notify: vi.fn() }))
-vi.mock('@hermes/plugin-sdk', async importOriginal => (await import('./canonical-group-contract-test-utils'))
-  .localGatewaySdkMock(await importOriginal<typeof HermesSdk>(), request, () => translateBots, { notify }))
+vi.mock('@eir/plugin-sdk', async importOriginal => (await import('./canonical-group-contract-test-utils'))
+  .localGatewaySdkMock(await importOriginal<typeof EirSdk>(), request, () => translateBots, { notify }))
 
 const words = CANONICAL_GROUP_LOCALES.en
 const here: RosterRow = { name: 'default', connectionId: 'local' }
@@ -29,7 +29,7 @@ const beta: RosterRow = { name: 'beta', connectionId: 'local' }
 const mini = peerRosterRow('mini', 'Mac Mini')
 
 beforeEach(() => {
-  ;(host.state.gateway as ReturnType<typeof HermesSdk.atom<string>>).set('open')
+  ;(host.state.gateway as ReturnType<typeof EirSdk.atom<string>>).set('open')
   $canonicalGroupBindings.set({})
   $botMeta.set({})
   $groupChats.set({})
@@ -143,10 +143,10 @@ it('invites every Bot of another computer at once, so a slow computer holds up n
   await submit()
   const registered = () => request.mock.calls.filter(call => call[1] === 'groups.peer.register').map(call => call[2].member_id)
   // The Mac Mini has not answered its invitation yet; the Studio's Bot joins anyway.
-  await waitFor(() => expect(registered()).toEqual(['hermes-studio']))
+  await waitFor(() => expect(registered()).toEqual(['eir-studio']))
   await act(async () => { release() })
   await waitFor(() => expect(onCreated).toHaveBeenCalledOnce())
-  expect(registered()).toEqual(['hermes-studio', 'hermes-mac-mini'])
+  expect(registered()).toEqual(['eir-studio', 'eir-mac-mini'])
   expect(notify).not.toHaveBeenCalled()
 })
 

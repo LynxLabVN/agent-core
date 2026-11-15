@@ -3,11 +3,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from cli import HermesCLI
+from cli import EirCLI
 
 
 def _make_cli():
-    cli_obj = HermesCLI.__new__(HermesCLI)
+    cli_obj = EirCLI.__new__(EirCLI)
     cli_obj.session_id = "current_session"
     cli_obj._resumed = False
     cli_obj._pending_title = None
@@ -57,7 +57,7 @@ class TestCliResumeCommand:
         cli_obj._session_db.resolve_resume_session_id.return_value = "sess_001"
 
         with (
-            patch("hermes_cli.main._resolve_session_by_name_or_id", return_value=None),
+            patch("eir_cli.main._resolve_session_by_name_or_id", return_value=None),
             patch("cli._cprint") as mock_cprint,
         ):
             cli_obj._handle_resume_command("/resume 2")
@@ -83,7 +83,7 @@ class TestCliResumeCommand:
 
 class TestCliResumeRestoresCwd:
     """Mid-chat /resume must retarget the working directory to where the
-    session was started — the same contract as a startup ``hermes -c`` /
+    session was started — the same contract as a startup ``eir -c`` /
     ``--resume``.
 
     Regression coverage for #38562: ``_restore_session_cwd()`` was wired into
@@ -110,7 +110,7 @@ class TestCliResumeRestoresCwd:
         cli_obj = self._resumable_cli({"id": "sess_dir", "title": "Dir", "cwd": recorded})
 
         with (
-            patch("hermes_cli.main._resolve_session_by_name_or_id", return_value="sess_dir"),
+            patch("eir_cli.main._resolve_session_by_name_or_id", return_value="sess_dir"),
             patch("cli._cprint"),
             patch.object(cli_obj, "_console_print"),
             patch("os.chdir") as mock_chdir,
@@ -129,7 +129,7 @@ class TestCliResumeRestoresCwd:
         cli_obj = self._resumable_cli({"id": "sess_dir", "title": "Dir", "cwd": recorded})
 
         with (
-            patch("hermes_cli.main._resolve_session_by_name_or_id", return_value="sess_dir"),
+            patch("eir_cli.main._resolve_session_by_name_or_id", return_value="sess_dir"),
             patch("cli._cprint"),
             patch.object(cli_obj, "_console_print"),
             patch("os.chdir") as mock_chdir,
@@ -185,7 +185,7 @@ class TestPendingResumeNumberedSelection:
         cli_obj._session_db.resolve_resume_session_id.return_value = "sess_001"
 
         with (
-            patch("hermes_cli.main._resolve_session_by_name_or_id", return_value=None),
+            patch("eir_cli.main._resolve_session_by_name_or_id", return_value=None),
             patch("cli._cprint"),
         ):
             consumed = cli_obj._consume_pending_resume_selection("2")
@@ -231,7 +231,7 @@ class TestResumeFlushesBeforeEndSession:
         cli_obj._session_db.resolve_resume_session_id.return_value = "target"
 
         with (
-            patch("hermes_cli.main._resolve_session_by_name_or_id", return_value="target"),
+            patch("eir_cli.main._resolve_session_by_name_or_id", return_value="target"),
             patch("cli._cprint"),
         ):
             cli_obj._handle_resume_command("/resume target")
@@ -249,9 +249,9 @@ class TestResumeOpensTheTargetOnTheGateway:
     a ``GatewaySessionStore`` and skips it); the gateway double admits or refuses ``session.resume``."""
 
     def _switch(self, refusal=None):
-        from hermes_cli.gateway_client import GatewayRPCError
-        from hermes_cli.gateway_connection import GatewayConnection
-        from hermes_cli.gateway_session_store import GatewaySessionStore
+        from eir_cli.gateway_client import GatewayRPCError
+        from eir_cli.gateway_connection import GatewayConnection
+        from eir_cli.gateway_session_store import GatewaySessionStore
 
         calls = []
 
@@ -277,7 +277,7 @@ class TestResumeOpensTheTargetOnTheGateway:
         cli_obj = _make_cli()
         cli_obj._session_db = store
         with (
-            patch("hermes_cli.main._resolve_session_by_name_or_id", return_value="target"),
+            patch("eir_cli.main._resolve_session_by_name_or_id", return_value="target"),
             patch("cli._cprint") as mock_cprint,
         ):
             cli_obj._handle_resume_command("/resume target")

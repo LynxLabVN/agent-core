@@ -1,4 +1,4 @@
-"""hermes memory setup|status — configure memory provider plugins."""
+"""eir memory setup|status — configure memory provider plugins."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ import sys
 import shlex
 from pathlib import Path
 
-from hermes_constants import get_hermes_home
-from hermes_cli.secret_prompt import masked_secret_prompt
+from eir_constants import get_eir_home
+from eir_cli.secret_prompt import masked_secret_prompt
 
 _CANCELLED = -1
 
@@ -17,7 +17,7 @@ def _curses_select(
     title: str, items: list[tuple[str, str]], default: int = 0, *, cancel_returns: int | None = None
 ) -> int:
     """Interactive single-select with arrow keys."""
-    from hermes_cli.curses_ui import curses_radiolist
+    from eir_cli.curses_ui import curses_radiolist
 
     if cancel_returns is None:
         cancel_returns = default
@@ -53,7 +53,7 @@ def _prompt(label: str, default: str | None = None, secret: bool = False) -> str
 
 def memory_provider_dependency_inputs(provider_name: str) -> tuple[dict, dict]:
     """Read one candidate declaration for preparation and passive readiness."""
-    from hermes_cli.plugins_cmd import PluginOperationError, _read_manifest_for_install
+    from eir_cli.plugins_cmd import PluginOperationError, _read_manifest_for_install
     from pm.package import InstallError
     from pm.plugin_inputs import Candidates
     from pm.workspace import _is_member_candidate
@@ -100,7 +100,7 @@ def _install_dependencies(provider_name: str) -> None:
     if status:
         print(f"  ✓ Dependencies prepared for {provider_name}")
         if status == "restart_required":
-            print("  Restart Hermes to use the prepared dependencies.")
+            print("  Restart Eir to use the prepared dependencies.")
 
     # Also show external (non-pip) dependencies that are missing.
     for dep in meta.get("external_dependencies", []):
@@ -157,7 +157,7 @@ def _find_provider(providers: list, provider_name: str):
 def _catalog_install_hint(provider_name: str):
     """The install command for a catalog memory provider that resolves nowhere, else None."""
     from plugins.memory import find_provider_dir
-    from hermes_cli.memory_provider_migration import catalog_install_hint
+    from eir_cli.memory_provider_migration import catalog_install_hint
     if not provider_name or find_provider_dir(provider_name) is not None:
         return None
     return catalog_install_hint(provider_name, category="memory")
@@ -169,14 +169,14 @@ def _post_setup_hook(provider, config: dict) -> bool:
     if not isinstance(config.get("memory"), dict):
         config["memory"] = {}
     if hasattr(provider, "post_setup"):
-        provider.post_setup(str(get_hermes_home()), config)
+        provider.post_setup(str(get_eir_home()), config)
         return True
     return False
 
 
 def cmd_setup_provider(provider_name: str) -> None:
     """Run memory setup for a specific provider, skipping the picker."""
-    from hermes_cli.config import load_config, save_config
+    from eir_cli.config import load_config, save_config
 
     match = _find_provider(_get_available_providers(), provider_name)
     if not match:
@@ -185,7 +185,7 @@ def cmd_setup_provider(provider_name: str) -> None:
         if install:
             print(f"  It is a catalog plugin that is not installed. Install it with: {install}\n")
         else:
-            print("  Run 'hermes memory setup' to see available providers.\n")
+            print("  Run 'eir memory setup' to see available providers.\n")
         return
     name, _, provider = match
 
@@ -257,12 +257,12 @@ def _prompt_schema_fields(name: str, schema: list, provider_config: dict, env_wr
 
 def cmd_setup(args) -> None:
     """Interactive memory provider setup wizard."""
-    from hermes_cli.config import load_config, save_config
+    from eir_cli.config import load_config, save_config
 
     providers = _get_available_providers()
     if not providers:
         print("\n  No memory provider plugins detected.")
-        print("  Install a plugin to ~/.hermes/plugins/ and try again.\n")
+        print("  Install a plugin to ~/.eir/plugins/ and try again.\n")
         return
 
     items = [(name, f"— {desc}") for name, desc, _ in providers]
@@ -303,7 +303,7 @@ def cmd_setup(args) -> None:
 
     if provider_config and hasattr(provider, "save_config"):
         try:
-            provider.save_config(provider_config, str(get_hermes_home()))
+            provider.save_config(provider_config, str(get_eir_home()))
         except Exception as e:
             print(f"  Failed to write provider config: {e}")
     if env_writes:
@@ -319,14 +319,14 @@ def cmd_setup(args) -> None:
 
 
 def _write_env_vars(
-    env_writes: dict, hermes_home: str | os.PathLike[str] | None = None) -> None:
+    env_writes: dict, eir_home: str | os.PathLike[str] | None = None) -> None:
     """Persist memory-provider env vars through the canonical ``.env`` writer.
 
-    Delegates to ``hermes_cli.config.save_env_value`` so every key flows
+    Delegates to ``eir_cli.config.save_env_value`` so every key flows
     through the same input-validation gate as every other ``.env`` writer:
     the ``_ENV_VAR_NAME_RE`` regex (no malformed identifiers), the
     ``_ENV_VAR_NAME_DENYLIST`` (no ``LD_PRELOAD`` / ``PYTHONPATH`` /
-    ``HERMES_HOME`` / etc.), CR/LF stripping on the value, and the atomic
+    ``EIR_HOME`` / etc.), CR/LF stripping on the value, and the atomic
     0o600-from-creation write (no TOCTOU permission window).
 
     Validation failures (``ValueError`` from ``save_env_value`` — a
@@ -337,16 +337,16 @@ def _write_env_vars(
     intentionally NOT caught — those indicate the wizard cannot safely
     persist any subsequent key either and should propagate.
 
-    ``hermes_home`` may be supplied by plugin ``post_setup`` hooks that
+    ``eir_home`` may be supplied by plugin ``post_setup`` hooks that
     already received an explicit home directory (e.g. a non-default
-    profile). It is applied through the context-local Hermes home override
+    profile). It is applied through the context-local Eir home override
     so ``save_env_value`` still owns the validation, sanitization, and
     atomic-write path without mutating global ``os.environ``.
     """
-    from hermes_cli.config import save_env_value
-    from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+    from eir_cli.config import save_env_value
+    from eir_constants import reset_eir_home_override, set_eir_home_override
 
-    token = set_hermes_home_override(hermes_home) if hermes_home is not None else None
+    token = set_eir_home_override(eir_home) if eir_home is not None else None
     try:
         for key, val in env_writes.items():
             try:
@@ -355,7 +355,7 @@ def _write_env_vars(
                 print(f"  Skipping {key}: {exc}")
     finally:
         if token is not None:
-            reset_hermes_home_override(token)
+            reset_eir_home_override(token)
 
 
 def _mark(enabled) -> str:
@@ -364,7 +364,7 @@ def _mark(enabled) -> str:
 
 def cmd_status(args) -> None:
     """Show current memory provider config."""
-    from hermes_cli.config import load_config
+    from eir_cli.config import load_config
 
     config = load_config()
     mem_config = config.get("memory", {})
@@ -372,7 +372,7 @@ def cmd_status(args) -> None:
 
     # Memory tool enablement for the CLI platform via the canonical resolver, respecting the
     # check_fn gate when both stores are disabled.
-    from hermes_cli.tools_config import _get_platform_tools
+    from eir_cli.tools_config import _get_platform_tools
     from tools.memory_tool import check_memory_requirements
     cli_tools = _get_platform_tools(config, "cli", include_default_mcp_servers=False)
     memory_tool_enabled = ("memory" in cli_tools) and check_memory_requirements()
@@ -425,7 +425,7 @@ def cmd_status(args) -> None:
                         if url and not is_set:
                             line += f"  → {url}"
                         print(line)
-                print("  Note: systemd/gateway services do not inherit ~/.hermes/.env —")
+                print("  Note: systemd/gateway services do not inherit ~/.eir/.env —")
                 print("        set any variables above in the service environment.")
         else:
             print("\n  Plugin:    NOT installed ✗")
@@ -433,7 +433,7 @@ def cmd_status(args) -> None:
             if install:
                 print(f"  Install it with: {install}")
             else:
-                print(f"  Install the '{provider_name}' memory plugin to ~/.hermes/plugins/")
+                print(f"  Install the '{provider_name}' memory plugin to ~/.eir/plugins/")
 
     if providers:
         print("\n  Installed plugins:")

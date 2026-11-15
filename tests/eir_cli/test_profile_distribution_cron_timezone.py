@@ -17,9 +17,9 @@ import pytest
 
 pytest.importorskip("croniter")
 
-import hermes_time
+import eir_time
 from cron import jobs
-from hermes_cli.profile_distribution import (
+from eir_cli.profile_distribution import (
     DistributionError, DistributionManifest, install_distribution, update_distribution,
     write_manifest)
 
@@ -29,17 +29,17 @@ PRE_MARKET = "0 9 * * 1-5"
 
 @pytest.fixture
 def operator_env(tmp_path, monkeypatch):
-    """An isolated Hermes root plus a frozen clock (Wed 2026-11-04 18:00 UTC)."""
+    """An isolated Eir root plus a frozen clock (Wed 2026-11-04 18:00 UTC)."""
     monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
-    (tmp_path / ".hermes").mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
-    monkeypatch.delenv("HERMES_TIMEZONE", raising=False)
+    (tmp_path / ".eir").mkdir()
+    monkeypatch.setenv("EIR_HOME", str(tmp_path / ".eir"))
+    monkeypatch.delenv("EIR_TIMEZONE", raising=False)
     instant = datetime(2026, 11, 4, 18, 0, tzinfo=UTC)
-    monkeypatch.setattr(jobs, "_hermes_now",
-                        lambda: instant.astimezone(hermes_time.get_timezone() or UTC))
-    hermes_time.reset_cache()
+    monkeypatch.setattr(jobs, "_eir_now",
+                        lambda: instant.astimezone(eir_time.get_timezone() or UTC))
+    eir_time.reset_cache()
     yield tmp_path
-    hermes_time.reset_cache()
+    eir_time.reset_cache()
 
 
 def _ship(root, records):
@@ -105,15 +105,15 @@ def test_a_shipped_pin_fires_on_new_york_time_for_every_user(operator_env, user_
          "deliver": "local"}])
     plan = install_distribution(str(staged), name="desk")
     (plan.target_dir / "config.yaml").write_text(f"timezone: {user_zone}\n", encoding="utf-8")
-    from hermes_constants import reset_hermes_home_override, set_hermes_home_override
-    token = set_hermes_home_override(str(plan.target_dir))
+    from eir_constants import reset_eir_home_override, set_eir_home_override
+    token = set_eir_home_override(str(plan.target_dir))
     try:
-        hermes_time.reset_cache()
+        eir_time.reset_cache()
         with jobs.use_cron_store(plan.target_dir):
             pre = jobs.resume_job("premarket0001")
             brief = jobs.resume_job("morningbrf01")
     finally:
-        reset_hermes_home_override(token)
+        reset_eir_home_override(token)
     assert datetime.fromisoformat(pre["next_run_at"]) == datetime(2026, 11, 5, 9, 0, tzinfo=NY)
     brief_at = datetime.fromisoformat(brief["next_run_at"]).astimezone(ZoneInfo(user_zone))
     assert (brief_at.hour, brief_at.minute) == (7, 0)

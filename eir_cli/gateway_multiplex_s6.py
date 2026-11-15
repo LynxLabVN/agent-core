@@ -1,9 +1,9 @@
 """s6 leg of the one-gateway-per-host convergence, shared by container boot and in-process migration.
 
-Inside the official image every profile has an s6 slot (``/run/hermes-service/gateway-<profile>``). The
-container's boot (``hermes_cli/container_boot.py``) registers every NAMED slot down and lets the
-root slot inherit their autostart intent; ``hermes gateway migrate --multiplex`` (and the hook
-``hermes update`` runs) must be able to do the same thing to a slot that is UP, from inside the
+Inside the official image every profile has an s6 slot (``/run/eir-service/gateway-<profile>``). The
+container's boot (``eir_cli/container_boot.py``) registers every NAMED slot down and lets the
+root slot inherit their autostart intent; ``eir gateway migrate --multiplex`` (and the hook
+``eir update`` runs) must be able to do the same thing to a slot that is UP, from inside the
 running container, without a container restart. Both paths decide "which named intents fold into
 the root slot" through :func:`fold_named_slot_intent` so they can never disagree.
 """
@@ -37,7 +37,7 @@ def fold_named_slot_intent(default_prior_state: Optional[str],
 
     A named slot is never booted from its own intent (a started named slot IS a second gateway on
     this host); its ``running`` intent moves to the root slot, which is the process that serves it.
-    Without the fold an image only ever driven as ``hermes -p coder gateway start`` came up with
+    Without the fold an image only ever driven as ``eir -p coder gateway start`` came up with
     ZERO gateways: no root state, every named slot registered down, every action "registered".
     """
     folded = tuple(sorted(name for name, prior in named_states if prior in AUTOSTART_STATES))
@@ -46,14 +46,14 @@ def fold_named_slot_intent(default_prior_state: Optional[str],
 
 
 def named_slot_name(profile: str) -> str:
-    from hermes_cli.service_manager import S6_SERVICE_PREFIX
+    from eir_cli.service_manager import S6_SERVICE_PREFIX
     return f"{S6_SERVICE_PREFIX}{profile}"
 
 
 def running_named_slots(profiles: Sequence[str], manager=None) -> list[str]:
     """Named profiles whose s6 slot is UP right now — the only s6 state that is a second gateway.
 
-    A registered-down slot (what boot leaves behind) is a start target for ``hermes -p X gateway
+    A registered-down slot (what boot leaves behind) is a start target for ``eir -p X gateway
     start``, not a running gateway, and must never veto the multiplex default.
     """
     manager = manager or _manager()
@@ -87,12 +87,12 @@ def park_named_slot(profile: str, manager=None) -> None:
 def _set_down_marker(service_dir: Path, *, down: bool) -> None:
     """Create or remove a slot's ``down`` file without following symlinks.
 
-    Slots live in the hermes-owned scandir, so a root caller must not ``touch`` through a ``down``
+    Slots live in the eir-owned scandir, so a root caller must not ``touch`` through a ``down``
     (or slot) symlink planted there. The slot is opened O_NOFOLLOW and ``down`` is handled
     relative to that fd. An existing marker that resolves is left untouched; a dangling ``down``
     symlink (which s6 would not honour) is replaced by a regular file.
     """
-    from hermes_cli.service_manager import _root_hermes_account
+    from eir_cli.service_manager import _root_eir_account
 
     slot_fd = os.open(service_dir, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
     try:
@@ -115,7 +115,7 @@ def _set_down_marker(service_dir: Path, *, down: bool) -> None:
             os.unlink("down", dir_fd=slot_fd)
             fd = os.open("down", flags, 0o644, dir_fd=slot_fd)
         try:
-            account = _root_hermes_account()
+            account = _root_eir_account()
             if account is not None:
                 os.fchown(fd, account.pw_uid, account.pw_gid)
         finally:
@@ -125,9 +125,9 @@ def _set_down_marker(service_dir: Path, *, down: bool) -> None:
 
 
 def _wait_down(service_dir: Path, timeout_ms: int = 15000) -> None:
-    from hermes_cli.service_manager import S6ServiceManager
+    from eir_cli.service_manager import S6ServiceManager
     try:
-        # As root, s6-svwait would create its subscription FIFO through a hermes-owned event/.
+        # As root, s6-svwait would create its subscription FIFO through a eir-owned event/.
         S6ServiceManager._s6("s6-svwait", "-d", "-t", str(timeout_ms), str(service_dir),
                              timeout=timeout_ms / 1000 + 5)
     except Exception:
@@ -147,5 +147,5 @@ def bring_root_slot_up(manager=None) -> str:
 
 
 def _manager():
-    from hermes_cli.service_manager import S6ServiceManager
+    from eir_cli.service_manager import S6ServiceManager
     return S6ServiceManager()

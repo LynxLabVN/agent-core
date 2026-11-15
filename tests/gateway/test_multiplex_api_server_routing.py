@@ -44,7 +44,7 @@ class TestApiServerProfileResolution:
     def test_unserved_prefix_is_rejected(self, monkeypatch):
         adapter = _make_adapter(multiplex=True)
         monkeypatch.setattr(
-            "hermes_cli.profiles.profiles_to_serve",
+            "eir_cli.profiles.profiles_to_serve",
             lambda multiplex: [
                 ("default", "/profiles/default"),
                 ("worker", "/profiles/worker"),
@@ -60,13 +60,13 @@ class TestApiServerProfileResolution:
             is _PROFILE_REJECTED
         )
 
-    def test_hermes_handle_aliases_to_default_profile(self, monkeypatch):
-        """A peer advertises its default profile's @handle as 'hermes' (botHandle()), but the
-        mirror is keyed by profile name — '/p/hermes/' must reach the same profile '/p/default/'
+    def test_eir_handle_aliases_to_default_profile(self, monkeypatch):
+        """A peer advertises its default profile's @handle as 'eir' (botHandle()), but the
+        mirror is keyed by profile name — '/p/eir/' must reach the same profile '/p/default/'
         does (#118076), not 404."""
         adapter = _make_adapter(multiplex=True)
         monkeypatch.setattr(
-            "hermes_cli.profiles.profiles_to_serve",
+            "eir_cli.profiles.profiles_to_serve",
             lambda multiplex: [
                 ("default", "/profiles/default"),
                 ("worker", "/profiles/worker"),
@@ -74,25 +74,25 @@ class TestApiServerProfileResolution:
         )
 
         assert (
-            adapter._resolve_request_profile(cast(Any, _FakeReq("hermes")))
+            adapter._resolve_request_profile(cast(Any, _FakeReq("eir")))
             == "default"
         )
 
-    def test_real_hermes_profile_is_not_shadowed_by_the_alias(self, monkeypatch):
-        """A gateway that genuinely serves a profile literally named 'hermes' must keep
+    def test_real_eir_profile_is_not_shadowed_by_the_alias(self, monkeypatch):
+        """A gateway that genuinely serves a profile literally named 'eir' must keep
         resolving to itself, never silently redirect to 'default'."""
         adapter = _make_adapter(multiplex=True)
         monkeypatch.setattr(
-            "hermes_cli.profiles.profiles_to_serve",
+            "eir_cli.profiles.profiles_to_serve",
             lambda multiplex: [
                 ("default", "/profiles/default"),
-                ("hermes", "/profiles/hermes"),
+                ("eir", "/profiles/eir"),
             ],
         )
 
         assert (
-            adapter._resolve_request_profile(cast(Any, _FakeReq("hermes")))
-            == "hermes"
+            adapter._resolve_request_profile(cast(Any, _FakeReq("eir")))
+            == "eir"
         )
 
 
@@ -101,31 +101,31 @@ _NOT_SERVED = "profile_not_served"
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("multiplex,gateway_home,legacy_hermes,answers", [
+@pytest.mark.parametrize("multiplex,gateway_home,legacy_eir,answers", [
     # Single-profile gateways: the handle is the default profile's, and nobody else's.
-    (False, "", None, {"hermes": None, "default": None, "worker": _UNKNOWN}),
-    (False, "profiles/worker", None, {"hermes": _UNKNOWN, "default": _UNKNOWN, "worker": None}),
-    (False, "profiles/hermes", "live", {"hermes": None, "default": _UNKNOWN}),
-    # A real legacy 'hermes' profile the gateway does not serve is never answered by default.
-    (False, "", "live", {"hermes": _NOT_SERVED, "default": None}),
-    (True, "", None, {"hermes": "default", "worker": "worker"}),
-    (True, "", "live", {"hermes": "hermes", "default": "default"}),
-    (True, "", "parked", {"hermes": _NOT_SERVED, "default": "default"}),
+    (False, "", None, {"eir": None, "default": None, "worker": _UNKNOWN}),
+    (False, "profiles/worker", None, {"eir": _UNKNOWN, "default": _UNKNOWN, "worker": None}),
+    (False, "profiles/eir", "live", {"eir": None, "default": _UNKNOWN}),
+    # A real legacy 'eir' profile the gateway does not serve is never answered by default.
+    (False, "", "live", {"eir": _NOT_SERVED, "default": None}),
+    (True, "", None, {"eir": "default", "worker": "worker"}),
+    (True, "", "live", {"eir": "eir", "default": "default"}),
+    (True, "", "parked", {"eir": _NOT_SERVED, "default": "default"}),
 ])
-async def test_hermes_handle_reaches_the_default_profile_only_when_no_hermes_profile_exists(
-        tmp_path, monkeypatch, multiplex, gateway_home, legacy_hermes, answers):
-    """'/p/hermes/' is Bot Mode's handle for the default profile (#118076): a gateway serving the
+async def test_eir_handle_reaches_the_default_profile_only_when_no_eir_profile_exists(
+        tmp_path, monkeypatch, multiplex, gateway_home, legacy_eir, answers):
+    """'/p/eir/' is Bot Mode's handle for the default profile (#118076): a gateway serving the
     default profile answers it, one running another profile refuses it with the unknown-profile
     404 (peer clients report it as ambiguous, never reroute), and a host with a real pre-reservation
-    'hermes' profile keeps the name for it (refusing distinctly when this gateway does not serve it)."""
+    'eir' profile keeps the name for it (refusing distinctly when this gateway does not serve it)."""
     root = tmp_path / "root"
-    homes = [root, root / "profiles" / "worker"] + ([root / "profiles" / "hermes"] if legacy_hermes else [])
+    homes = [root, root / "profiles" / "worker"] + ([root / "profiles" / "eir"] if legacy_eir else [])
     for home in homes:
         home.mkdir(parents=True, exist_ok=True)
         (home / "config.yaml").write_text("{}\n", encoding="utf-8")
-    if legacy_hermes == "parked":
-        (root / "profiles" / "hermes" / "gateway.parked").write_text("", encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(root / gateway_home))
+    if legacy_eir == "parked":
+        (root / "profiles" / "eir" / "gateway.parked").write_text("", encoding="utf-8")
+    monkeypatch.setenv("EIR_HOME", str(root / gateway_home))
     adapter = _make_adapter(multiplex=multiplex)
 
     async def handler(request):
@@ -146,22 +146,22 @@ async def test_hermes_handle_reaches_the_default_profile_only_when_no_hermes_pro
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("multiplex,legacy_hermes,answers", [
-    (True, True, {"Hermes": "hermes", "HERMES": "hermes", "Worker": "worker", "Default": "default"}),
-    (True, False, {"Hermes": "default", "Worker": "worker"}),
-    (False, True, {"Hermes": _NOT_SERVED}),
-    (False, False, {"Hermes": None}),
+@pytest.mark.parametrize("multiplex,legacy_eir,answers", [
+    (True, True, {"Eir": "eir", "EIR": "eir", "Worker": "worker", "Default": "default"}),
+    (True, False, {"Eir": "default", "Worker": "worker"}),
+    (False, True, {"Eir": _NOT_SERVED}),
+    (False, False, {"Eir": None}),
 ])
-async def test_profile_prefix_names_the_same_profile_in_any_case(tmp_path, monkeypatch, multiplex, legacy_hermes, answers):
-    """Profile ids are lowercase (``normalize_profile_name``), so ``/p/Hermes/`` is ``/p/hermes/``:
-    a real 'hermes' profile keeps it, and only without one does it alias the default. An
-    exact-case comparison answered it with the unknown-profile 404, so box/Hermes reached no
+async def test_profile_prefix_names_the_same_profile_in_any_case(tmp_path, monkeypatch, multiplex, legacy_eir, answers):
+    """Profile ids are lowercase (``normalize_profile_name``), so ``/p/Eir/`` is ``/p/eir/``:
+    a real 'eir' profile keeps it, and only without one does it alias the default. An
+    exact-case comparison answered it with the unknown-profile 404, so box/Eir reached no
     agent (and older peer clients, which rerouted on that 404, sent it to the default profile)."""
     root = tmp_path / "root"
-    for home in [root, root / "profiles" / "worker"] + ([root / "profiles" / "hermes"] if legacy_hermes else []):
+    for home in [root, root / "profiles" / "worker"] + ([root / "profiles" / "eir"] if legacy_eir else []):
         home.mkdir(parents=True, exist_ok=True)
         (home / "config.yaml").write_text("{}\n", encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(root))
+    monkeypatch.setenv("EIR_HOME", str(root))
     adapter = _make_adapter(multiplex=multiplex)
 
     async def handler(request):
@@ -186,9 +186,9 @@ class TestApiServerModelsUnderProfile:
     def test_resolve_model_name_follows_active_profile(self, monkeypatch):
         """When the request is scoped to a named profile, advertise that name."""
         adapter = _make_adapter(multiplex=True)
-        adapter._model_name = "hermes-agent"
+        adapter._model_name = "eir-agent"
         monkeypatch.setattr(
-            "hermes_cli.profiles.get_active_profile_name",
+            "eir_cli.profiles.get_active_profile_name",
             lambda: "coder",
         )
         token_prof = _api_request_profile.set("coder")
@@ -199,11 +199,11 @@ class TestApiServerModelsUnderProfile:
 
 
 class TestApiServerSessionProfileBinding:
-    """HERMES_SESSION_PROFILE must be bound per /p/<profile>/ request.
+    """EIR_SESSION_PROFILE must be bound per /p/<profile>/ request.
 
     Regression guard for cross-profile sandbox reuse: before the fix,
     _bind_api_server_session never passed ``profile`` to set_session_vars,
-    so every API-server turn bound HERMES_SESSION_PROFILE="" and the
+    so every API-server turn bound EIR_SESSION_PROFILE="" and the
     terminal tool collapsed ALL api_server sessions (default AND org
     profiles) onto the shared "default" container key — letting org-profile
     turns reuse the default profile's sandbox (SSH key / secrets exposure).
@@ -220,7 +220,7 @@ class TestApiServerSessionProfileBinding:
             profile="nm-media",
         )
         try:
-            assert get_session_env("HERMES_SESSION_PROFILE") == "nm-media"
+            assert get_session_env("EIR_SESSION_PROFILE") == "nm-media"
         finally:
             clear_session_vars(tokens)
 

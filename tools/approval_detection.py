@@ -17,27 +17,27 @@ from tools import approval_parser_budget as _parser_budget
 from tools.approval_parser_budget import _scan_backtick_end, _scan_dollar_paren_end, _scan_shell
 from tools.approval_ansi_c import _is_shell_comment_start, expand_ansi_c_quotes
 from tools.approval_git_options import _GIT, _GIT_PUSH, _GIT_PUSH_ARGS, _join_escaped_word_chars
-from tools.approval_home_fold import _rewrite_resolved_hermes_home, _rewrite_resolved_user_home
+from tools.approval_home_fold import _rewrite_resolved_eir_home, _rewrite_resolved_user_home
 from tools.approval_env_split import _split_env_string
 
 logger = logging.getLogger("tools.approval")
 
-# Sensitive write targets, matched via ~ / $HOME / $HERMES_HOME spellings. The resolved absolute
+# Sensitive write targets, matched via ~ / $HOME / $EIR_HOME spellings. The resolved absolute
 # home is folded into these forms at detection time by _normalize_command_for_detection(), so no
-# import-time path snapshot (stale once HERMES_HOME is set after import) lives in the patterns.
+# import-time path snapshot (stale once EIR_HOME is set after import) lives in the patterns.
 _SSH_SENSITIVE_PATH = r'(?:~|\$home|\$\{home\})/\.ssh(?:/|$)'
-# A Hermes home: the default root or a named profile under it (profiles/<name>/ has its own config.yaml/.env).
-_HERMES_HOME_DIR = (
-    r'(?:~\/\.hermes/|(?:\$home|\$\{home\})/\.hermes/|(?:\$hermes_home|\$\{hermes_home\})/)'
+# A Eir home: the default root or a named profile under it (profiles/<name>/ has its own config.yaml/.env).
+_EIR_HOME_DIR = (
+    r'(?:~\/\.eir/|(?:\$home|\$\{home\})/\.eir/|(?:\$eir_home|\$\{eir_home\})/)'
     r'(?:profiles/[^/\s"\'`]+/)?'
 )
-_HERMES_ENV_PATH = (
-    _HERMES_HOME_DIR + r'(?:\.op)?\.env\b'
+_EIR_ENV_PATH = (
+    _EIR_HOME_DIR + r'(?:\.op)?\.env\b'
 )
-# ~/.hermes/config.yaml IS the security policy (approvals.mode, yolo, allowlist) and the config cache is mtime-keyed,
+# ~/.eir/config.yaml IS the security policy (approvals.mode, yolo, allowlist) and the config cache is mtime-keyed,
 # so a write takes effect mid-session. Terminal-side coverage (sed -i, tee, >, cp) pairs the file_tools deny.
-_HERMES_CONFIG_PATH = (
-    _HERMES_HOME_DIR + r'config\.yaml\b'
+_EIR_CONFIG_PATH = (
+    _EIR_HOME_DIR + r'config\.yaml\b'
 )
 _PROJECT_ENV_PATH = r'(?:(?:/|\.{1,2}/)?(?:[^\s/"\'`]+/)*\.env(?:\.[^/\s"\'`]+)?)'
 _PROJECT_CONFIG_PATH = r'(?:(?:/|\.{1,2}/)?(?:[^\s/"\'`]+/)*config\.yaml)'
@@ -45,7 +45,7 @@ _SHELL_RC_FILES = r'(?:~|\$home|\$\{home\})/\.' r'(?:bashrc|zshrc|profile|bash_p
 _CREDENTIAL_FILES = r'(?:~|\$home|\$\{home\})/\.' r'(?:netrc|pgpass|npmrc|pypirc)\b'
 _HOME_PREFIX = r'(?:~|\$home|\$\{home\})/'
 _SECRET_FILE = (
-    rf'(?:{_SSH_SENSITIVE_PATH}|{_HERMES_ENV_PATH}|{_CREDENTIAL_FILES}|{_PROJECT_ENV_PATH}(?![\w-])'
+    rf'(?:{_SSH_SENSITIVE_PATH}|{_EIR_ENV_PATH}|{_CREDENTIAL_FILES}|{_PROJECT_ENV_PATH}(?![\w-])'
     rf'|{_HOME_PREFIX}\.(?:aws/credentials|git-credentials|config/gh/hosts\.yml|docker/config\.json|kube/config)\b'
     r'|/etc/(?:shadow|passwd)\b|\bid_(?:rsa|ed25519|ecdsa|dsa)\b)'
 )
@@ -85,7 +85,7 @@ _CONTAINER_GLOBAL_FLAGS = r'(?:-\S++(?:\s++(?!-\S)\S++)?\s++)*'
 _MACOS_PRIVATE_SYSTEM_PATH = r'/private/(?:etc|var|tmp|home)/'
 _SYSTEM_CONFIG_PATH = rf'(?:/etc/|{_MACOS_PRIVATE_SYSTEM_PATH})'
 _SENSITIVE_WRITE_TARGET = (
-    rf'(?:{_SYSTEM_CONFIG_PATH}|/dev/sd|{_SSH_SENSITIVE_PATH}|{_HERMES_ENV_PATH}|{_HERMES_CONFIG_PATH}|'
+    rf'(?:{_SYSTEM_CONFIG_PATH}|/dev/sd|{_SSH_SENSITIVE_PATH}|{_EIR_ENV_PATH}|{_EIR_CONFIG_PATH}|'
     rf'{_SHELL_RC_FILES}|{_CREDENTIAL_FILES})'
 )
 _USER_SENSITIVE_WRITE_TARGET = rf'(?:{_SSH_SENSITIVE_PATH}|{_SHELL_RC_FILES}|{_CREDENTIAL_FILES})'
@@ -120,35 +120,35 @@ _CMDPOS = (
     r'(?:(?:exec|nohup|setsid|time)\s++)*+' r'\s*+'  # optional wrapper commands
 )
 
-# Top-level `hermes` flags that consume a SEPARATE word (`--profile work`): the value-taking subset
-# of `hermes_cli._parser.top_level_value_flag_sets`, so `hermes --profile work config set ...` does
+# Top-level `eir` flags that consume a SEPARATE word (`--profile work`): the value-taking subset
+# of `eir_cli._parser.top_level_value_flag_sets`, so `eir --profile work config set ...` does
 # not read "work" as the subcommand. Any other flag is a bare token (`--json`, `--flag=value`).
-_HERMES_TOP_LEVEL_VALUE_FLAGS = (
+_EIR_TOP_LEVEL_VALUE_FLAGS = (
     r'(?:--profile|-p|--config|--model|-m|--provider|--reasoning|--toolsets|-t'
     r'|--resume|-r|--skills|-s|--oneshot|-z|--usage-file|--in|--cpu-profile)'
 )
 
 # `-p`/`--profile` is stripped from ANYWHERE before `--` (`_parser.scan_profile_flag`), so it can sit
 # between `config` and `set` or before the key too. A `VAR=value` word may be quoted (`NOTE='a b'`).
-_HERMES_PROFILE_OPTION = r'(?:(?:-p|--profile)[ \t]+[^\s]++|--profile=[^\s]++)'
+_EIR_PROFILE_OPTION = r'(?:(?:-p|--profile)[ \t]+[^\s]++|--profile=[^\s]++)'
 _SHELL_WORD = r'''(?:[^\s'"]++|'[^']*+'|"[^"]*+")*+'''
 
-# `hermes config set|unset <key>` — the invocations that rewrite the agent's own approval
+# `eir config set|unset <key>` — the invocations that rewrite the agent's own approval
 # policy. Anchored to the INVOCATION (program word, `config set|unset`, policy key), so a read of
-# the text (`grep -r 'hermes config set' docs`) stays ungated. Option runs are ATOMIC/possessive:
+# the text (`grep -r 'eir config set' docs`) stays ungated. Option runs are ATOMIC/possessive:
 # nested `(?:\s+...)*` backtracked exponentially on long flag runs (0.34s at 30 flags).
-_HERMES_CONFIG_SET_APPROVAL_POLICY = (
-    # The program: the `hermes` binary (or the macOS `ai.hermes`), or the module form
-    # `python -m hermes_cli.main` that the updater and the cron lifecycle guard invoke.
-    # Optional leading `VAR=value` assignments (`HERMES_HOME=... hermes config set ...`).
+_EIR_CONFIG_SET_APPROVAL_POLICY = (
+    # The program: the `eir` binary (or the macOS `ai.eir`), or the module form
+    # `python -m eir_cli.main` that the updater and the cron lifecycle guard invoke.
+    # Optional leading `VAR=value` assignments (`EIR_HOME=... eir config set ...`).
     r'(?>(?:\w++=' + _SHELL_WORD + r'[ \t]+)*)'
-    r'(?:(?:(?:[a-z]:)?[^\s:]*?/)?(?:ai\.)?hermes(?:\.exe)?\b'
-    r'|(?:(?:[a-z]:)?[^\s:]*?/)?python[0-9.]*(?:\.exe)?\b[ \t]+(?:-[^\s]+[ \t]+)*?-m[ \t]*hermes_cli\.main\b)'
-    r'(?>(?:[ \t]+(?:' + _HERMES_TOP_LEVEL_VALUE_FLAGS + r'[ \t]+[^\s]++'
+    r'(?:(?:(?:[a-z]:)?[^\s:]*?/)?(?:ai\.)?eir(?:\.exe)?\b'
+    r'|(?:(?:[a-z]:)?[^\s:]*?/)?python[0-9.]*(?:\.exe)?\b[ \t]+(?:-[^\s]+[ \t]+)*?-m[ \t]*eir_cli\.main\b)'
+    r'(?>(?:[ \t]+(?:' + _EIR_TOP_LEVEL_VALUE_FLAGS + r'[ \t]+[^\s]++'
     r'|--?[\w-]++(?:=[^\s]++)?))*)'  # global options before the subcommand
-    r'[ \t]+config(?>(?:[ \t]+' + _HERMES_PROFILE_OPTION + r')*)'  # `-p` also parses after a subcommand
+    r'[ \t]+config(?>(?:[ \t]+' + _EIR_PROFILE_OPTION + r')*)'  # `-p` also parses after a subcommand
     r'[ \t]+(?:set|unset)\b[ \t]*'  # the `config set` / `config unset` subcommand
-    r'(?>(?:(?:' + _HERMES_PROFILE_OPTION + r'|--?[\w-]++)[ \t]+)*)'  # `--force`, `-p work`
+    r'(?>(?:(?:' + _EIR_PROFILE_OPTION + r'|--?[\w-]++)[ \t]+)*)'  # `--force`, `-p work`
     r'["\']?(?:approvals(?:\.[\w.-]++)*|command_allowlist)\b'  # the approval-policy key, maybe quoted
 )
 
@@ -194,7 +194,7 @@ HARDLINE_PATTERNS = [
     # Drive-letter root (`C:/`, `c:/*`; `C:\` reaches here as `C:/` via the Windows-path variant): same floor as "/".
     # A quoted bare `"C:"` counts only when the next quoted/bare segment starts the root slash (`"C:"'/'`).
     # PowerShell's `rm` alias with a literal narrowing `-Include` (`rm -r C:/* -Include *.tmp`) deletes only matches.
-    # Caveat: Hermes runs the bare command through bash, where GNU rm rejects `-Include` unless POSIXLY_CORRECT is
+    # Caveat: Eir runs the bare command through bash, where GNU rm rejects `-Include` unless POSIXLY_CORRECT is
     # set; then getopt stops at the root operand and `-Include` is a file name, so that delete only prompts.
     (_CMDPOS + r'rm\s+' + _PS_INCLUDE_NARROWS + r'(-[^\s]*\s+)*' + _hardline_rm_path(r'[a-z]:/(?:(?:\.\.?)?/)*(?:\.\.?)?\**|[a-z]:/ \*|[a-z]:(?=["\']["\']?/)'),
      "recursive delete of drive root"),
@@ -648,7 +648,7 @@ DANGEROUS_PATTERNS = [
     (r'\bsc(?:\.exe)?\s+(?:stop|delete)\b', "stop/delete service (sc)"),
     # Windows-form credential paths; the POSIX ~/.ssh patterns never match drive-letter or backslash spellings.
     (r'\busers[\\/][^\\/\s]+[\\/]\.ssh\b', "access to SSH keys (Windows path)"),
-    (r'\bappdata[\\/](?:local|roaming)[\\/]hermes[^\n]*\.env\b', "access to Hermes secrets (Windows path)"),
+    (r'\bappdata[\\/](?:local|roaming)[\\/]eir[^\n]*\.env\b', "access to Eir secrets (Windows path)"),
     # ── end of Windows tier
     (r'\bchmod\s+(-[^\s]*\s+)*(777|666|o\+[rwx]*w|a\+[rwx]*w)\b', "world/other-writable permissions"),
     (r'\bchmod\s+--recursive\b.*(777|666|o\+[rwx]*w|a\+[rwx]*w)', "recursive world/other-writable (long flag)"),
@@ -755,9 +755,9 @@ DANGEROUS_PATTERNS = [
     (r'\b(?:rg|sort|ag|man)\b[^;|&\n]*(?<!\S)--(?:pre|hostname-bin|compress-program|pager|html)(?:\{|[*?\[])',
      "dynamic shell word may expand to arbitrary program execution flag"),
     # Gateway lifecycle: stopping/restarting the gateway kills all running agents. Global flags
-    # between `hermes` and `gateway` (`hermes -p ade gateway restart`) are allowed so a profile flag can't slip past.
-    (r'\bhermes\s+' + _GLOBAL_FLAGS + r'gateway\s+(stop|restart)\b', "stop/restart hermes gateway (kills running agents)"),
-    (r'\bhermes\s+update\b', "hermes update (restarts gateway, kills running agents)"),
+    # between `eir` and `gateway` (`eir -p ade gateway restart`) are allowed so a profile flag can't slip past.
+    (r'\beir\s+' + _GLOBAL_FLAGS + r'gateway\s+(stop|restart)\b', "stop/restart eir gateway (kills running agents)"),
+    (r'\beir\s+update\b', "eir update (restarts gateway, kills running agents)"),
     # Docker/Podman daemon redirect — global flags or env that point the CLI at a DIFFERENT (often remote) daemon:
     # `docker -H ssh://prod stop app` looks local but operates on remote infra, so any redirect requires approval
     # regardless of subcommand. The flag must be in global position (before the subcommand) and -H/--host/--context
@@ -777,36 +777,36 @@ DANGEROUS_PATTERNS = [
     # Removing a container or volume is strictly more destructive than stopping it, and the canonical
     # `container` spelling and the prunes (every stopped container, unused volume/image data) are the same
     # verbs (#132483). `docker image rm`/`rmi`/`network rm` stay ungated: a pull or a recreate restores them.
-    # Descriptions must name a word `hermes approvals suggest` treats as destructive (`rm`, `delete`), or
+    # Descriptions must name a word `eir approvals suggest` treats as destructive (`rm`, `delete`), or
     # it offers the class for the permanent allowlist.
     (r'\b(?:docker|podman)\s+' + _CONTAINER_GLOBAL_FLAGS + r'(?:rm|container\s+(?:rm|remove))\b', "docker/podman rm (container destruction)"),
     (r'\bdocker(?:-compose|\s+compose)\s+' + _CONTAINER_GLOBAL_FLAGS + r'rm\b', "docker compose rm (container destruction)"),
     (r'\b(?:docker|podman)\s+' + _CONTAINER_GLOBAL_FLAGS + r'volume\s+(?:rm|remove|prune)\b', "docker/podman volume rm/prune (volume data destruction)"),
     (r'\b(?:docker|podman)\s+' + _CONTAINER_GLOBAL_FLAGS + r'(?:container\s+prune|system\s+(?:prune|reset))\b', "docker/podman container/system prune, podman system reset (deletes stopped containers and unused data)"),
     # Gateway protection: never start gateway outside systemd management
-    (r'gateway\s+run\b.*(&\s*$|&\s*;|\bdisown\b|\bsetsid\b)', "start gateway outside systemd (use 'systemctl --user restart hermes-gateway')"),
-    (r'\bnohup\b.*gateway\s+run\b', "start gateway outside systemd (use 'systemctl --user restart hermes-gateway')"),
+    (r'gateway\s+run\b.*(&\s*$|&\s*;|\bdisown\b|\bsetsid\b)', "start gateway outside systemd (use 'systemctl --user restart eir-gateway')"),
+    (r'\bnohup\b.*gateway\s+run\b', "start gateway outside systemd (use 'systemctl --user restart eir-gateway')"),
     # Self-termination protection: prevent agent from killing its own process
-    (r'\b(pkill|killall)\b.*\b(hermes|gateway|cli\.py)\b', "kill hermes/gateway process (self-termination)"),
+    (r'\b(pkill|killall)\b.*\b(eir|gateway|cli\.py)\b', "kill eir/gateway process (self-termination)"),
     # Self-termination via kill + $(pgrep/pidof): the substitution is opaque to the name-based
     # pattern above, so catch the structural form.
     (r'\bkill\b.*\$\(\s*(pgrep|pidof)\b', "kill process via pgrep/pidof expansion (self-termination)"),
     (r'\bkill\b.*`\s*(pgrep|pidof)\b', "kill process via backtick pgrep/pidof expansion (self-termination)"),
-    # launchctl-driven gateway stop/restart on macOS (label `ai.hermes.gateway`). Two independent lookaheads, NOT a
-    # sequential match: a for-loop building the label from a list defined EARLIER (`for item in 'ai.hermes...'; do
-    # launchctl bootout "$label"`) never has "hermes" after the verb, and that slipped past and restarted 4 gateways
+    # launchctl-driven gateway stop/restart on macOS (label `ai.eir.gateway`). Two independent lookaheads, NOT a
+    # sequential match: a for-loop building the label from a list defined EARLIER (`for item in 'ai.eir...'; do
+    # launchctl bootout "$label"`) never has "eir" after the verb, and that slipped past and restarted 4 gateways
     # with zero approval. Erring broad is correct for an approval gate: an extra prompt is cheap.
     # Anchor whole-input lookaheads: re.search otherwise rescans every suffix of
     # long non-matching commands, holding the GIL and starving Gateway threads.
-    (r'\A(?=[\s\S]*\blaunchctl\s+(?:stop|kickstart|bootout|unload|kill|disable|remove)\b)(?=[\s\S]*\b(?:hermes|ai\.hermes)\b)', "stop/restart hermes launchd service (kills running agents)"),
+    (r'\A(?=[\s\S]*\blaunchctl\s+(?:stop|kickstart|bootout|unload|kill|disable|remove)\b)(?=[\s\S]*\b(?:eir|ai\.eir)\b)', "stop/restart eir launchd service (kills running agents)"),
     (rf'\b(cp|mv|install)\b.*\s{_SYSTEM_CONFIG_PATH}', "copy/move file into system config path"),
     (rf'\b(cp|mv|install)\b.*\s["\']?{_PROJECT_SENSITIVE_WRITE_TARGET}["\']?{_COMMAND_TAIL}', "overwrite project env/config file"),
-    # cp/mv/install OVERWRITING a credential/SSH/shell-rc/Hermes file (key implant, login-time
+    # cp/mv/install OVERWRITING a credential/SSH/shell-rc/Eir file (key implant, login-time
     # injection) — pairs the tee/redirection coverage. Anchored to the command tail so only the
     # DESTINATION fires; reading OUT of a sensitive path (`cp ~/.ssh/config /tmp/x`) stays safe.
     # The trailing `[^\s"\']*` consumes the rest of the destination filename.
     # The tee/redirection patterns above already gate _SENSITIVE_WRITE_TARGET (~/.ssh/*,
-    # ~/.netrc/.pgpass/.npmrc/.pypirc, shell rc files, ~/.hermes/config.yaml/.env), but cp/mv/install was
+    # ~/.netrc/.pgpass/.npmrc/.pypirc, shell rc files, ~/.eir/config.yaml/.env), but cp/mv/install was
     # only paired for /etc and project-relative env/config — so `cp evil ~/.ssh/authorized_keys` (key
     # implant), `cp creds ~/.netrc`, and `cp evil ~/.bashrc` (login-time command injection) slipped through
     # with auto-approve. Same unpaired-door rationale as #14639 / the sed-tee-redirect pairing on these
@@ -819,18 +819,18 @@ DANGEROUS_PATTERNS = [
     (rf'\b(?:perl|ruby)\b.*(?:^|\s)-[^\s]*i\b.*(?:{_USER_SENSITIVE_WRITE_TARGET})[^\s"\']*', "in-place edit of sensitive credential/SSH/shell-rc path (perl/ruby)"),
     (rf'\bsed\s+-[^\s]*i.*\s{_SYSTEM_CONFIG_PATH}', "in-place edit of system config"),
     (rf'\bsed\s+--in-place\b.*\s{_SYSTEM_CONFIG_PATH}', "in-place edit of system config (long flag)"),
-    # sed -i on Hermes config/.env bypasses the redirection/tee rules; pairs the file_tools
+    # sed -i on Eir config/.env bypasses the redirection/tee rules; pairs the file_tools
     # write_file/patch deny so the terminal side is not an open door.
-    # In-place edit of a Hermes-managed security file (~/.hermes/config.yaml or .env). sed -i bypasses the
+    # In-place edit of a Eir-managed security file (~/.eir/config.yaml or .env). sed -i bypasses the
     # redirection/tee patterns above because it mutates the file directly. See #14639.
-    (rf'\bsed\s+-[^\s]*i.*(?:{_HERMES_CONFIG_PATH}|{_HERMES_ENV_PATH})', "in-place edit of Hermes config/env"),
-    (rf'\bsed\s+--in-place\b.*(?:{_HERMES_CONFIG_PATH}|{_HERMES_ENV_PATH})', "in-place edit of Hermes config/env (long flag)"),
+    (rf'\bsed\s+-[^\s]*i.*(?:{_EIR_CONFIG_PATH}|{_EIR_ENV_PATH})', "in-place edit of Eir config/env"),
+    (rf'\bsed\s+--in-place\b.*(?:{_EIR_CONFIG_PATH}|{_EIR_ENV_PATH})', "in-place edit of Eir config/env (long flag)"),
     # perl/ruby -i: the flag may be its own token after other flags (`-p -i -e`), combined (`-pi`), or carry a backup
     # suffix (`-i.bak`), so match any flag token containing `i` anywhere; `perl -e '...'` (no -i) does not trip.
     # perl -i and ruby -i perform the same in-place mutation as sed -i but are not caught by the -e/-c
     # script-execution pattern above (which targets code evaluation, not file mutation). Pairs the sed -i
     # coverage from #14639.
-    (rf'\b(?:perl|ruby)\b.*(?:^|\s)-[^\s]*i\b.*(?:{_HERMES_CONFIG_PATH}|{_HERMES_ENV_PATH})', "in-place edit of Hermes config/env (perl/ruby)"),
+    (rf'\b(?:perl|ruby)\b.*(?:^|\s)-[^\s]*i\b.*(?:{_EIR_CONFIG_PATH}|{_EIR_ENV_PATH})', "in-place edit of Eir config/env (perl/ruby)"),
     # Interpreter heredocs are handled by _execution_flag_findings(); only shell heredocs stay
     # regex-based. `bash <<'EOF'` runs arbitrary commands without triggering the `bash -c` path.
     (rf'\b(?:{_SHELL_NAMES_RE})\s+<<', "shell execution via heredoc"),
@@ -852,15 +852,15 @@ DANGEROUS_PATTERNS = [
     # whole blank run sits between the option and its value (`-o  +foo`).
     (rf'{_GIT_PUSH}{_GIT_PUSH_ARGS}(?<!\s)(?<!\s-o)(?<!\s--push-option)\s+["\']?\+[^\s;&|\n]+',
      "git force push (rewrites remote history)"),
-    # `hermes config set` can rewrite the agent's own approval policy (approvals.mode, approvals.deny,
+    # `eir config set` can rewrite the agent's own approval policy (approvals.mode, approvals.deny,
     # command_allowlist) — gate it like the file-tool path so a default empty deny list is not an open door.
-    # Anchored to a real INVOCATION: the command must BE `hermes config set <policy key>`. The
-    # `\bhermes\b.*\bconfig\b.*\bset\b` form matched that TEXT anywhere in the command, so a plain
-    # read of it (`grep -r 'hermes config set' docs/approvals.md`) demanded an approval it has no
+    # Anchored to a real INVOCATION: the command must BE `eir config set <policy key>`. The
+    # `\beir\b.*\bconfig\b.*\bset\b` form matched that TEXT anywhere in the command, so a plain
+    # read of it (`grep -r 'eir config set' docs/approvals.md`) demanded an approval it has no
     # business demanding. The global-option run uses possessive quantifiers inside an atomic group,
     # so it cannot backtrack exponentially the way a plain nested `*` does.
-    (_CMDPOS + _HERMES_CONFIG_SET_APPROVAL_POLICY,
-     "hermes config set approval settings"),
+    (_CMDPOS + _EIR_CONFIG_SET_APPROVAL_POLICY,
+     "eir config set approval settings"),
     (rf'{_GIT}clean\s+-[^\s]*f', "git clean with force (deletes untracked files)"),
     # `-D` = `-d --force`: only the capital short flag is force-delete, so the group opts out of
     # the module-wide re.IGNORECASE and relies on _lower_preserving_flags keeping dash-prefixed
@@ -975,11 +975,11 @@ def _normalize_command_for_detection(command: str) -> str:
     # precede the generic escape strip below, whose [^\n] class skips newlines and would leave the
     # backslash wedged between tokens, defeating the structured rm/mkfs/dd patterns incl. the HARDLINE floor.
     command = re.sub(r'\\\r?\n', '', command)
-    # Fold absolute user/Hermes home prefixes to ~/ and ~/.hermes/ so the static patterns catch /home/alice/.bashrc
-    # and C:\Users\alice\.bashrc. Resolved at detection time (not import time) so it tracks HOME/HERMES_HOME set
-    # later. MUST run before the backslash strip (which would dissolve C:\Users\alice to C:Usersalice). Hermes home
+    # Fold absolute user/Eir home prefixes to ~/ and ~/.eir/ so the static patterns catch /home/alice/.bashrc
+    # and C:\Users\alice\.bashrc. Resolved at detection time (not import time) so it tracks HOME/EIR_HOME set
+    # later. MUST run before the backslash strip (which would dissolve C:\Users\alice to C:Usersalice). Eir home
     # first: on Windows it nests under the user home, and folding the user home first would eat the prefix it needs.
-    command = _rewrite_resolved_hermes_home(command)
+    command = _rewrite_resolved_eir_home(command)
     command = _rewrite_resolved_user_home(command)
     # Strip backslash-escapes (r\m -> rm) and empty-string literals (r''m -> rm).
     command = re.sub(r'\\([^\n])', r'\1', command)
@@ -1103,7 +1103,7 @@ _SCAN_INCOMPLETE_DESCRIPTION = "command too complex to scan fully; review before
 # A refusal from the budget-trip fallback, which also reads quoted text as code: say so, so the block
 # message can point at splitting the command instead of claiming the operation was seen.
 _FALLBACK_MATCH_SUFFIX = " (a quick re-read of a command too complex to scan fully; quoted text can match)"
-_GATEWAY_LIFECYCLE_SPLICE_DESCRIPTION = "stop/restart hermes gateway via shell-spliced verb (kills running agents)"
+_GATEWAY_LIFECYCLE_SPLICE_DESCRIPTION = "stop/restart eir gateway via shell-spliced verb (kills running agents)"
 
 
 def _command_parser_limit_exceeded(command: str) -> bool:
@@ -1887,7 +1887,7 @@ def _command_detection_variants(command: str, eval_depth: int = 0, capped: list[
 
 
 def _is_verification_artifact_cleanup(command: str) -> bool:
-    """Return whether *command* only removes one Hermes ad-hoc temp script."""
+    """Return whether *command* only removes one Eir ad-hoc temp script."""
     try:
         argv = shlex.split(command, posix=True)
     except ValueError:
@@ -1900,7 +1900,7 @@ def _is_verification_artifact_cleanup(command: str) -> bool:
     return (
         operand == os.path.join(temp_dir, basename)
         and os.path.dirname(os.path.realpath(operand)) == temp_dir
-        and re.fullmatch(r"hermes-(?:verify|ad-hoc)-[A-Za-z0-9_.-]+", basename) is not None
+        and re.fullmatch(r"eir-(?:verify|ad-hoc)-[A-Za-z0-9_.-]+", basename) is not None
     )
 
 
@@ -1909,8 +1909,8 @@ def _is_shell_token_spliced_gateway_lifecycle(command: str) -> bool:
     Backslash splicing (``kick\\start``) is undone by normalization, but quote splicing is not:
     ``_deobfuscate_shell_word_for_detection`` is deliberately scoped to command-position words
     (widening it would let quoted prose like ``git commit -m "rm -rf /"`` match), and the spliced
-    verb is an ARGUMENT, so ``launchctl kick"start" -k gui/501/ai.hermes.gateway`` auto-approved.
-    Delegates to ``cron.lifecycle_guard`` (shlex-tokenized, anchored on a hermes-gateway
+    verb is an ARGUMENT, so ``launchctl kick"start" -k gui/501/ai.eir.gateway`` auto-approved.
+    Delegates to ``cron.lifecycle_guard`` (shlex-tokenized, anchored on a eir-gateway
     identifier). Runs last so an ordinary pattern match keeps its more specific reason; this layer
     only prompts — the non-bypassable block still lives in ``cron.lifecycle_guard``.
 

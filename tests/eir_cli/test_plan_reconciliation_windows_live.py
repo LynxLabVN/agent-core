@@ -1,11 +1,11 @@
 """LIVE Windows E2E for plan-reconciliation (#92902) on windows-latest.
 
-Real processes with real Hermes-shaped argv, real inventory collection
+Real processes with real Eir-shaped argv, real inventory collection
 (PID-file discovery + supervisor detection on REAL Windows), real
 reconciliation. No mocks on the components under test.
 
  1. Spawn a real process with a `gateway run` command line registered as the
-    profile gateway (state file in a temp HERMES_HOME) — real
+    profile gateway (state file in a temp EIR_HOME) — real
     collect_runtime_inventory() must verify and find it, classify
     supervisor=manual, mechanism id 'manual' (machine id, not display string).
  2. Reconcile with bookkeeping that MISSES it -> unaccounted + escalation.
@@ -47,16 +47,16 @@ def _argv_visible(pid: int, marker: str) -> bool:
 
 
 def test_plan_reconciliation_live_windows(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
 
     # Real live process standing in for a manual gateway. The inventory's
     # state-file fallback proves identity through live_gateway_pid_for_home,
     # which requires a live `gateway run` command line (#109680), so the
     # stand-in wears one; a bare sleeper is recorded too and must NOT count.
     child = subprocess.Popen(
-        [sys.executable, sleeper_script_path(), "hermes", "gateway", "run"],
+        [sys.executable, sleeper_script_path(), "eir", "gateway", "run"],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
     foreign = subprocess.Popen(
@@ -74,16 +74,16 @@ def test_plan_reconciliation_live_windows(tmp_path, monkeypatch):
             "pid": child.pid,
             "create_time": create_time,
             "gateway_state": "running",
-            "kind": "hermes-gateway",
+            "kind": "eir-gateway",
             "code_sha": "f" * 40,
             "code_version": "0.20.5",
         }), encoding="utf-8")
 
-        import hermes_cli.profiles as profiles_mod
-        monkeypatch.setattr(profiles_mod, "_get_default_hermes_home", lambda: home)
+        import eir_cli.profiles as profiles_mod
+        monkeypatch.setattr(profiles_mod, "_get_default_eir_home", lambda: home)
         monkeypatch.setattr(profiles_mod, "_get_profiles_root", lambda: tmp_path / "none")
 
-        from hermes_cli.update_inventory import (
+        from eir_cli.update_inventory import (
             collect_runtime_inventory,
             match_runtime_outcomes,
             report_unaccounted_runtimes,
@@ -127,7 +127,7 @@ def test_plan_reconciliation_live_windows(tmp_path, monkeypatch):
             "pid": foreign.pid,
             "create_time": psutil.Process(foreign.pid).create_time(),
             "gateway_state": "running",
-            "kind": "hermes-gateway",
+            "kind": "eir-gateway",
             "code_sha": "f" * 40,
         }), encoding="utf-8")
         plan2 = collect_runtime_inventory()

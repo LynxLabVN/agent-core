@@ -3,7 +3,7 @@
 This is a separate capability namespace from Dashboard's client-selected chat IDs.
 The existing PTY registry owns processes/drains; this module owns host admission.
 A shell dies with its profile: once a named home is missing or deleted (main's
-tombstone rule, ``hermes_constants.assert_named_profile_home_live``) its input is
+tombstone rule, ``eir_constants.assert_named_profile_home_live``) its input is
 refused and the reaper closes it.
 """
 from __future__ import annotations
@@ -20,12 +20,12 @@ import time
 
 from fastapi import HTTPException, WebSocket, WebSocketDisconnect
 
-from hermes_cli.pty_session import (
+from eir_cli.pty_session import (
     _VIEWER_SEND_ERRORS, _VIEWER_SEND_TIMEOUT_SECONDS, WS_CLOSE_VIEWER_STALLED,
     WS_CLOSE_VIEWER_STALLED_REASON, PtySession, PtySessionRegistry, RegistryFull, _close_ws, run_reaper,
 )
-from hermes_cli.web_host_terminal import META_PREFIX
-from hermes_constants import assert_named_profile_home_live, get_hermes_home
+from eir_cli.web_host_terminal import META_PREFIX
+from eir_constants import assert_named_profile_home_live, get_eir_home
 
 # No survival across backend restart. Disconnects retain a bounded ANSI tail.
 RETENTION_SECONDS = 15 * 60
@@ -95,7 +95,7 @@ class HostOwner:
 
 def _request_identity(ws: WebSocket) -> tuple[str, str]:
     """``(provider, user)`` from the admitted host-terminal ticket, or relay ticket for SSH."""
-    identity = getattr(ws, "_hermes_auth_identity", None) or {}
+    identity = getattr(ws, "_eir_auth_identity", None) or {}
     user, provider = identity.get("user_id"), identity.get("provider")
     if not isinstance(user, str) or not user or not isinstance(provider, str) or not provider:
         raise TerminalDenied()
@@ -103,11 +103,11 @@ def _request_identity(ws: WebSocket) -> tuple[str, str]:
 
 
 def _request_home(profile: str | None) -> Path:
-    from hermes_cli.web_server_profiles import _resolve_profile_dir
+    from eir_cli.web_server_profiles import _resolve_profile_dir
     requested = (profile or "").strip()
     return (
         _resolve_profile_dir(requested)
-        if requested and requested.lower() != "current" else get_hermes_home()
+        if requested and requested.lower() != "current" else get_eir_home()
     ).resolve()
 
 
@@ -134,15 +134,15 @@ class HostTerminalRegistry(PtySessionRegistry):
         raise RegistryFull()
 
     async def create(self, ws: WebSocket, identity: tuple[str, str]):
-        from hermes_cli.web_host_terminal import query_dimension, resolve_argv
-        from hermes_cli.web_server_chat import PtyBridge
+        from eir_cli.web_host_terminal import query_dimension, resolve_argv
+        from eir_cli.web_server_chat import PtyBridge
         token = secrets.token_urlsafe(32)
         owner = None
 
         def spawn():
             nonlocal owner
             if getattr(ws.state, "ssh_terminal", None) is not None:
-                from hermes_cli.web_host_terminal_ssh import prepare_shell
+                from eir_cli.web_host_terminal_ssh import prepare_shell
                 owner, argv, cwd, env = prepare_shell(ws, identity)
             else:
                 home = _request_home(ws.query_params.get("profile"))
@@ -157,7 +157,7 @@ class HostTerminalRegistry(PtySessionRegistry):
             return bridge
 
         if getattr(ws.state, "ssh_terminal", None) is not None:
-            from hermes_cli.web_host_terminal_ssh import warm_tunnel
+            from eir_cli.web_host_terminal_ssh import warm_tunnel
             await asyncio.to_thread(warm_tunnel, ws)
         session, _ = await self.attach_or_spawn(token, spawn=spawn)
         assert owner is not None  # spawn completed
@@ -471,7 +471,7 @@ async def _resize(session: PtySession, ws: WebSocket, size: tuple[int, int], und
     """Apply ``size``; return what the next resize needs to tell whether it undoes this one.
 
     A program can read the size well after its SIGWINCH (Node, behind its event loop, and reports a
-    'resize', which Hermes' TUI redraws on, only when the size it reads has changed). A step undone
+    'resize', which Eir' TUI redraws on, only when the size it reads has changed). A step undone
     before it looks is never seen: both signals find the size it already had. So a resize back to
     the size before the previous one first waits until the program has written output since that
     one, as a program that redraws on a resize does, or ``_RESIZE_ANSWER_SECONDS`` for one that
@@ -503,7 +503,7 @@ async def _pump_input(ws: WebSocket, registry: HostTerminalRegistry, token: str,
     exited or the terminal was closed) or a deleted profile drops the session. ConPTY
     buffers input itself, so Windows writes land at once and keep the bridge's deadline.
     """
-    from hermes_cli.web_server_chat import _RESIZE_RE
+    from eir_cli.web_server_chat import _RESIZE_RE
     inbox: asyncio.Queue = _InputQueue()
     ended = asyncio.get_running_loop().create_future()
     reader = asyncio.create_task(_read_frames(ws, inbox, ended))
@@ -550,8 +550,8 @@ async def _pump_input(ws: WebSocket, registry: HostTerminalRegistry, token: str,
 
 async def host_terminal(ws: WebSocket) -> None:
     """Called only after both the existing WS gate and host policy have passed."""
-    from hermes_cli.pty_session import WS_CLOSE_PROCESS_EXITED, WS_CLOSE_PROCESS_EXITED_REASON
-    from hermes_cli.web_server_chat import _pty_fail
+    from eir_cli.pty_session import WS_CLOSE_PROCESS_EXITED, WS_CLOSE_PROCESS_EXITED_REASON
+    from eir_cli.web_server_chat import _pty_fail
     session = None
     try:
         registry = get_host_terminals(ws.app)

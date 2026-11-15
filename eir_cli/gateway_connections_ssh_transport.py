@@ -43,7 +43,7 @@ _IPV6_RE = re.compile(r"^[0-9A-Fa-f:.]+(?:%[A-Za-z0-9._-]+)?$")
 
 
 class SshReachError(RuntimeError):
-    """A classified failure reaching or starting a remote Hermes over SSH."""
+    """A classified failure reaching or starting a remote Eir over SSH."""
 
     def __init__(self, kind: str, message: str):
         super().__init__(message)
@@ -55,8 +55,8 @@ class SshReachError(RuntimeError):
 # ---------------------------------------------------------------------------
 
 _REDACTIONS = (
-    (re.compile(r"(HERMES_DASHBOARD_SESSION_TOKEN=)(\S+)"), r"\1<redacted>"),
-    (re.compile(r"""(X-Hermes-Session-Token["']?\s*[:=]\s*["']?)([^\s"'&]+)""", re.IGNORECASE), r"\1<redacted>"),
+    (re.compile(r"(EIR_DASHBOARD_SESSION_TOKEN=)(\S+)"), r"\1<redacted>"),
+    (re.compile(r"""(X-Eir-Session-Token["']?\s*[:=]\s*["']?)([^\s"'&]+)""", re.IGNORECASE), r"\1<redacted>"),
     (re.compile(r"""(Authorization["']?\s*:\s*Bearer\s+)(\S+)""", re.IGNORECASE), r"\1<redacted>"),
     (re.compile(r"""([?&](?:token|ticket)=)([^\s&"']+)""", re.IGNORECASE), r"\1<redacted>"),
     # A mistyped password in the host field (user@host:SECRET) must never reach logs verbatim.
@@ -123,7 +123,7 @@ def validate_key_path(key_path: str) -> None:
 
 def short_control_dir() -> Path:
     # no-tmp: ok — AF_UNIX's 104-byte sun_path rules out a deep root; parent and child are checked before use.
-    return Path(f"/tmp/hermes-ssh-{os.getuid()}")  # windows-footgun: ok — POSIX-only (win32 refused upstream)
+    return Path(f"/tmp/eir-ssh-{os.getuid()}")  # windows-footgun: ok — POSIX-only (win32 refused upstream)
 
 
 def default_control_dir(root: Path) -> Path:
@@ -281,7 +281,7 @@ def ssh_error_message(kind: str, endpoint: SshEndpoint, stderr: str = "") -> str
             f"change is expected, then remove the old key with `ssh-keygen -R {endpoint.host}` and reconnect."
             f"\n\n{detail}"),
         "auth-failed": (
-            f"SSH authentication to {target} failed. Hermes runs ssh non-interactively (BatchMode), so a "
+            f"SSH authentication to {target} failed. Eir runs ssh non-interactively (BatchMode), so a "
             "key requiring a passphrase or 2FA must be loaded into ssh-agent first, or set an IdentityFile "
             f"in ~/.ssh/config. Original error: {detail}"),
         "interactive-auth": (
@@ -508,7 +508,7 @@ def resolve_ssh_binary() -> str:
     if sys.platform == "win32":
         raise SshReachError("unsupported-platform",
                             "Gateway SSH connections need OpenSSH ControlMaster, which Windows does not support.")
-    from hermes_platform.resolver import locate_command
+    from eir_platform.resolver import locate_command
 
     found = locate_command("ssh").command
     if not found:

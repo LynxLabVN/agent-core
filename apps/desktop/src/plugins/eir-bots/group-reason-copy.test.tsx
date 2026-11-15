@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
 
 const selection = vi.hoisted(() => ({ locale: 'en' }))
-vi.mock('@hermes/plugin-sdk', async () => ({
+vi.mock('@eir/plugin-sdk', async () => ({
   ...await (await import('./group-test-utils')).pluginSdkMock({}),
   Tip: ({ children, label }: { children: ReactNode; label: string }) => <div title={label}>{children}</div>
 }))

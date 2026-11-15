@@ -1,4 +1,4 @@
-"""``hermes --cpu-profile PATH``: process-wide cProfile, written when the process exits.
+"""``eir --cpu-profile PATH``: process-wide cProfile, written when the process exits.
 
 Enabled once after argument parsing and written from ``atexit``, so short commands and
 long-running ones (``gateway run``) are covered without wrapping every handler. The one-shot
@@ -23,12 +23,12 @@ _profile_path: Path | None = None
 
 
 def resolve_profile_path(path: str | os.PathLike[str]) -> Path:
-    """Absolute (or ``~``) paths as given; relative ones under ``<hermes home>/logs/profiles``."""
+    """Absolute (or ``~``) paths as given; relative ones under ``<eir home>/logs/profiles``."""
     target = Path(path).expanduser()
     if not target.is_absolute():
-        from hermes_constants import get_hermes_home
+        from eir_constants import get_eir_home
 
-        target = get_hermes_home() / "logs" / "profiles" / target
+        target = get_eir_home() / "logs" / "profiles" / target
     return target.resolve()
 
 

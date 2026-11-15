@@ -6,8 +6,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from hermes_state import SessionDB
-from tests.hermes_cli.test_cli_init import _make_cli
+from eir_state import SessionDB
+from tests.eir_cli.test_cli_init import _make_cli
 
 
 def _active(db, session_id):

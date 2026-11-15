@@ -8,14 +8,14 @@ import json
 
 import pytest
 
-from hermes_cli import gateway_connections as store
+from eir_cli import gateway_connections as store
 
 LOCKED = {"encoding": "safeStorage", "value": "djEwAAAAlocked"}
 
 
 @pytest.fixture
 def home(monkeypatch, tmp_path):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     store.store_path().write_text(json.dumps({
         "version": 2, "revision": 1, "primary": "local", "launchMode": "primary", "lastUsed": "local",
         "connections": [{"id": "local", "kind": "local", "label": "This device"},

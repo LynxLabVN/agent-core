@@ -1,4 +1,4 @@
-"""Regression tests for TOCTOU-safe credential file writers in ``hermes_cli.auth``.
+"""Regression tests for TOCTOU-safe credential file writers in ``eir_cli.auth``.
 
 Background
 ==========
@@ -29,16 +29,16 @@ pytestmark = pytest.mark.platforms("posix")  # POSIX mode bits not enforced on W
 
 
 # ---------------------------------------------------------------------------
-# _save_auth_store  (~/.hermes/auth.json — every native OAuth provider)
+# _save_auth_store  (~/.eir/auth.json — every native OAuth provider)
 # ---------------------------------------------------------------------------
 
 
 def test_save_auth_store_writes_0o600_with_0o700_parent(tmp_path, monkeypatch):
     """``_save_auth_store`` must land ``auth.json`` at 0o600 and parent at 0o700."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     old_umask = os.umask(0o022)  # make the race observable if it regresses
     try:
-        from hermes_cli import auth as auth_mod
+        from eir_cli import auth as auth_mod
 
         auth_store = {
             "version": auth_mod.AUTH_STORE_VERSION,
@@ -71,12 +71,12 @@ def test_save_auth_store_writes_0o600_with_0o700_parent(tmp_path, monkeypatch):
 
 def test_save_qwen_cli_tokens_writes_0o600_with_0o700_parent(tmp_path, monkeypatch):
     """``_save_qwen_cli_tokens`` must land the token file at 0o600 and parent at 0o700."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     # The Qwen CLI auth path lives under $HOME/.qwen by default — isolate it.
     monkeypatch.setenv("HOME", str(tmp_path))
     old_umask = os.umask(0o022)
     try:
-        from hermes_cli import auth as auth_mod
+        from eir_cli import auth as auth_mod
 
         tokens = {
             "access_token": "qwen-secret",
@@ -109,17 +109,17 @@ def test_save_qwen_cli_tokens_writes_0o600_with_0o700_parent(tmp_path, monkeypat
 
 def test_shared_nous_store_writes_0o600_with_0o700_parent(tmp_path, monkeypatch):
     """The Nous shared-credential store must land at 0o600 / parent 0o700."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     # _nous_shared_store_path() refuses to touch the real shared store during
     # pytest runs; redirect it into tmp_path explicitly. Use a distinct
     # subdirectory name (``shared_override``) so the guard's "real user
-    # home" reference — which currently tracks HERMES_HOME via
-    # get_default_hermes_root() — can't collide with our override and
+    # home" reference — which currently tracks EIR_HOME via
+    # get_default_eir_root() — can't collide with our override and
     # falsely claim we're writing to the real user's shared store.
-    monkeypatch.setenv("HERMES_SHARED_AUTH_DIR", str(tmp_path / "shared_override"))
+    monkeypatch.setenv("EIR_SHARED_AUTH_DIR", str(tmp_path / "shared_override"))
     old_umask = os.umask(0o022)
     try:
-        from hermes_cli import auth as auth_mod
+        from eir_cli import auth as auth_mod
 
         state = {
             "access_token": "nous-access-xxx",

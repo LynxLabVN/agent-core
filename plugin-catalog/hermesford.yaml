@@ -1,8 +1,8 @@
 name: hermesford
 repo: https://github.com/XpycT/hermesford
 sha: cfa2555a22400edd181a0f8d1c9945d37c382ca7
-title: HermesFord
-description: 'An HD-2D pixel-art village page for Hermes Desktop: every chat is a villager who walks to the
+title: EirFord
+description: 'An HD-2D pixel-art village page for Eir Desktop: every chat is a villager who walks to the
   forge, library, woods or town hall depending on the tool its agent is running, waits at the town hall
   when the chat needs you, and goes home to sleep when the chat is not active. Click a villager to open
   its chat. Built on the Luminati engine (MIT). Desktop-only (desktop/plugin.js inside the plugin SDK
@@ -11,7 +11,7 @@ description: 'An HD-2D pixel-art village page for Hermes Desktop: every chat is 
 maintainer: XpycT
 tier: community
 category: desktop
-requires_hermes: ">=0.22.5"
+requires_eir: ">=0.22.5"
 version: "1.0.0"
 docs_url: https://github.com/XpycT/hermesford
 image: https://raw.githubusercontent.com/XpycT/hermesford/cfa2555a22400edd181a0f8d1c9945d37c382ca7/assets/banner.jpg

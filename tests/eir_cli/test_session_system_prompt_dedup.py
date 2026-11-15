@@ -8,8 +8,8 @@ import time
 
 import pytest
 
-from hermes_state import SessionDB
-from hermes_state_common import SCHEMA_VERSION
+from eir_state import SessionDB
+from eir_state_common import SCHEMA_VERSION
 
 
 @pytest.fixture()
@@ -26,7 +26,7 @@ def _prompt_count(db: SessionDB) -> int:
 
 
 def test_prompt_snapshots_are_deduplicated_and_hydrated_for_readers(db):
-    prompt = "You are Hermes.\n" + ("Follow the profile policy.\n" * 5)
+    prompt = "You are Eir.\n" + ("Follow the profile policy.\n" * 5)
     db.create_session(
         "s1",
         "telegram",
@@ -63,7 +63,7 @@ def test_route_changes_keep_the_prompt_and_replacement_collects_orphans(db):
     shared_prompt = "Model: x-ai/grok-4.5\nProvider: nous"
     db.create_session(
         "s1",
-        "hermes_browser",
+        "eir_browser",
         model="x-ai/grok-4.5",
         model_config={"_branched_from": "parent"},
         system_prompt=shared_prompt,
@@ -203,7 +203,7 @@ def test_compression_child_continues_the_parents_tool_pin(db):
 
 
 def test_recovery_cleanup_keeps_tool_pins_and_drops_dangling_pin_refs(tmp_path):
-    from hermes_cli.session_recovery import _cleanup_partial_orphans
+    from eir_cli.session_recovery import _cleanup_partial_orphans
 
     pin = {"version": "sha", "tools": [{"type": "function", "function": {"name": "read_file"}}]}
     with SessionDB(db_path=tmp_path / "state.db") as db:

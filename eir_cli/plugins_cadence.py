@@ -23,11 +23,11 @@ _DEFAULT_INTERVAL_HOURS = 24
 
 def _marker_path() -> Path:
     """The last-run marker, resolved per call (tests monkeypatch
-    get_hermes_home). Derivation only — NO mkdir: a due-check or any
+    get_eir_home). Derivation only — NO mkdir: a due-check or any
     read path must not create user state."""
-    from hermes_constants import get_hermes_home
+    from eir_constants import get_eir_home
 
-    return get_hermes_home() / _MARKERS_DIR / "last-run"
+    return get_eir_home() / _MARKERS_DIR / "last-run"
 
 
 def _results_path() -> Path:
@@ -38,7 +38,7 @@ def _results_path() -> Path:
 def snapshot_installs(plugins_dir: Path) -> dict:
     """The install records an update check is about to compare against. Take it BEFORE the check runs:
     a record read afterwards may already include an update that finished during the check."""
-    from hermes_cli.plugins_provenance import read_sidecar_rows
+    from eir_cli.plugins_provenance import read_sidecar_rows
 
     return read_sidecar_rows(plugins_dir)
 
@@ -125,7 +125,7 @@ def auto_apply_enabled(config_get: Callable | None = None) -> bool:
 
 def _default_config_get(section: str, key: str):
     try:
-        from hermes_cli.config import cfg_get, load_config_readonly
+        from eir_cli.config import cfg_get, load_config_readonly
 
         return cfg_get(load_config_readonly(), section, key, default=None)
     except Exception:
@@ -194,9 +194,9 @@ def _auto_apply(updates: list, checked_installs: dict, apply_updates_fn: Callabl
     """Apply each update row the opt-in tick may move. A catalog install held with ``--ref`` is left
     where the user put it. A widened catalog pin is a pending review, not a failure: one line naming
     the command that walks it, no traceback every tick; other refusals are one line too."""
-    from hermes_cli.plugins_auto_update import HELD_WITH_REF, HeldWithRef, held_with_ref
-    from hermes_cli.plugins_cmd import PluginOperationError
-    from hermes_cli.plugins_cmd_catalog import RepinConsentRequired
+    from eir_cli.plugins_auto_update import HELD_WITH_REF, HeldWithRef, held_with_ref
+    from eir_cli.plugins_cmd import PluginOperationError
+    from eir_cli.plugins_cmd_catalog import RepinConsentRequired
 
     for r in updates:
         if getattr(r, "klass", "") not in ("git", "catalog"):
@@ -209,7 +209,7 @@ def _auto_apply(updates: list, checked_installs: dict, apply_updates_fn: Callabl
         except HeldWithRef as exc:  # held with --ref while the check ran
             log.info("plugin %s not auto-updated: %s", r.name, exc)
         except RepinConsentRequired:
-            log.info("plugin %s has an update that needs your review: run `hermes plugins update %s`",
+            log.info("plugin %s has an update that needs your review: run `eir plugins update %s`",
                      r.name, r.name)
         except PluginOperationError as exc:
             log.warning("auto-apply of %s not applied: %s", r.name, exc)
@@ -258,21 +258,21 @@ def _run_check_locked(
     if updates:
         names = ", ".join(r.name for r in updates)
         log.info(
-            "plugin updates available: %s — run `hermes plugins check-updates` "
-            "and `hermes plugins update <name>`",
+            "plugin updates available: %s — run `eir plugins check-updates` "
+            "and `eir plugins update <name>`",
             names,
         )
     if needs_fixing:
         names = ", ".join(r.name for r in needs_fixing)
         log.warning(
             "plugin update_url mismatches need attention: %s — run "
-            "`hermes plugins trust-update-url <name>` after review",
+            "`eir plugins trust-update-url <name>` after review",
             names,
         )
 
-    # Opt-in unattended apply: the classes `hermes plugins update` can move (catalog re-pins to the
+    # Opt-in unattended apply: the classes `eir plugins update` can move (catalog re-pins to the
     # reviewed sha, tracked git pulls), scan-gated by the update path itself, which also refuses a
-    # widened catalog pin or a too-new requires_hermes without a terminal. Pinned/manual/drift/pip
+    # widened catalog pin or a too-new requires_eir without a terminal. Pinned/manual/drift/pip
     # are never auto-applied (their update_available is False/None or their class excludes it).
     if apply_updates_fn and updates and auto_apply_enabled(config_get):
         _auto_apply(updates, checked_installs, apply_updates_fn, log)
@@ -303,9 +303,9 @@ def maybe_run_gateway_check(
 
     Fills in the REAL seams ``run_scheduled_check`` leaves injectable:
     the same read-only ``plugins_updates.run_checks`` the manual
-    ``hermes plugins check-updates`` uses (urllib feed fetch, git
+    ``eir plugins check-updates`` uses (urllib feed fetch, git
     ls-remote, PyPI latest), the real plugins dir, and the manual
-    ``hermes plugins update <name>`` flow as the opt-in apply path —
+    ``eir plugins update <name>`` flow as the opt-in apply path —
     auto-apply rides the identical security/consent/scan pipeline.
 
     Returns the check results, or None when not due / disabled. Due-gated
@@ -313,20 +313,20 @@ def maybe_run_gateway_check(
     costs one warning and a stamped marker — never an apply.
     """
     if plugins_dir is None:
-        from hermes_cli import plugins_cmd
+        from eir_cli import plugins_cmd
 
         plugins_dir = plugins_cmd._plugins_dir()
     if run_checks_fn is None:
         # ONE shared network-default implementation — plugins_updates
         # owns default_fetch / default_ls_remote / _default_pypi_latest;
-        # the manual `hermes plugins check-updates` passes the same
+        # the manual `eir plugins check-updates` passes the same
         # defaults. No boilerplate re-derivation here.
-        from hermes_cli.plugins_updates import run_checks
+        from eir_cli.plugins_updates import run_checks
 
         run_checks_fn = run_checks
     if apply_updates_fn is None:
         # update_one with no terminal, refusals raised (cmd_update would turn them into an exit)
-        from hermes_cli import plugins_auto_update
+        from eir_cli import plugins_auto_update
 
         apply_updates_fn = plugins_auto_update.apply_unattended
     return run_scheduled_check(

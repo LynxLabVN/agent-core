@@ -3,8 +3,8 @@ import sqlite3
 
 import pytest
 
-from hermes_state import SessionDB
-import hermes_state_runtime as rt
+from eir_state import SessionDB
+import eir_state_runtime as rt
 
 
 def legacy(path, rows):

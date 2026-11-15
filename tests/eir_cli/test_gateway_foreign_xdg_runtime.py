@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-import hermes_cli.gateway as gateway_cli
+import eir_cli.gateway as gateway_cli
 
 pytestmark = pytest.mark.platforms("linux")
 
@@ -119,7 +119,7 @@ class TestPreflightForeignRuntimeNoLeak:
     """#86558: preflight surfaces a remediable error, not a raw PermissionError."""
 
     def test_foreign_xdg_runtime_dir_raises_unavailable_not_permission_error(self, monkeypatch):
-        # runuser -u user -- hermes gateway restart, from a root shell.
+        # runuser -u user -- eir gateway restart, from a root shell.
         monkeypatch.setattr(gateway_cli, "_ensure_user_systemd_env", lambda: None)
         # Both socket paths resolve under the leaked /run/user/0 and are 0700 root.
         monkeypatch.setattr(Path, "exists", _eacces)

@@ -5,8 +5,8 @@ import threading
 import time
 from http.client import HTTPConnection
 
-from hermes_cli.auth import AuthError
-from hermes_cli.auth_device_flow import (
+from eir_cli.auth import AuthError
+from eir_cli.auth_device_flow import (
     _bind_loopback_callback_server, _make_loopback_callback_handler, _serve_loopback_callback)
 
 

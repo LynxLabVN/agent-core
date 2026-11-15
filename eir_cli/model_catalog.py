@@ -1,7 +1,7 @@
 """Remote model catalog fetcher.
 
 ``get_catalog()`` returns the parsed manifest: in-process cache (TTL) → disk cache at
-``~/.hermes/cache/model_catalog.json`` → master URL fetch; any fetch failure keeps the stale copy
+``~/.eir/cache/model_catalog.json`` → master URL fetch; any fetch failure keeps the stale copy
 (or ``{}``, and the URL is not retried for ``FETCH_RETRY_DELAY_SECONDS``). ``get_curated_openrouter_models()`` / ``get_curated_nous_models()`` are thin accessors
 whose callers fall back to the in-repo lists on ``None``.
 """
@@ -18,7 +18,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-from hermes_cli.version_info import hermes_user_agent
+from eir_cli.version_info import eir_user_agent
 from utils import atomic_json_write
 
 logger = logging.getLogger(__name__)
@@ -55,8 +55,8 @@ _fetch_retry_lock = threading.Lock()
 
 
 def _backoff_key(kind: str, url: str) -> tuple[str, str, str]:
-    from hermes_constants import hermes_home_key
-    return (hermes_home_key(), kind, url)
+    from eir_constants import eir_home_key
+    return (eir_home_key(), kind, url)
 
 
 def _backing_off(kind: str, url: str) -> bool:
@@ -76,8 +76,8 @@ def _note_fetch_result(kind: str, url: str, ok: bool) -> None:
 
 def clear_fetch_backoff() -> None:
     """Forget the active profile's fetch failures so an explicit refresh retries every URL."""
-    from hermes_constants import hermes_home_key
-    home = hermes_home_key()
+    from eir_constants import eir_home_key
+    home = eir_home_key()
     with _fetch_retry_lock:
         for key in [k for k in _fetch_retry_after if k[0] == home]:
             del _fetch_retry_after[key]
@@ -86,7 +86,7 @@ def clear_fetch_backoff() -> None:
 def _load_catalog_config() -> dict[str, Any]:
     """Load the ``model_catalog`` config block with defaults filled in."""
     try:
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
         cfg = load_config() or {}
     except Exception:
         cfg = {}
@@ -118,14 +118,14 @@ def _load_catalog_config() -> dict[str, Any]:
 
 def _cache_path() -> Path:
     """Disk cache path; imported lazily so tests can monkeypatch home."""
-    from hermes_constants import get_hermes_home
-    return get_hermes_home() / "cache" / "model_catalog.json"
+    from eir_constants import get_eir_home
+    return get_eir_home() / "cache" / "model_catalog.json"
 
 
 def _fetch_manifest(url: str, timeout: float) -> dict[str, Any] | None:
     """HTTP GET the manifest URL and return a validated dict, or None on failure."""
     try:
-        req = urllib.request.Request(url, headers={"Accept": "application/json", "User-Agent": hermes_user_agent()})
+        req = urllib.request.Request(url, headers={"Accept": "application/json", "User-Agent": eir_user_agent()})
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             data = json.loads(resp.read().decode())
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
@@ -227,7 +227,7 @@ def _spawn_catalog_swr_refresh(url: str) -> None:
             with _catalog_swr_lock:
                 _catalog_swr_inflight.discard(inflight_key)
 
-    # copy_context: the picker may be serving a profile scoped by the HERMES_HOME ContextVar
+    # copy_context: the picker may be serving a profile scoped by the EIR_HOME ContextVar
     # (tui_gateway ``_profile_scoped``), so the worker must write THAT profile's cache file.
     context = contextvars.copy_context()
     threading.Thread(target=lambda: context.run(_refresh), daemon=True, name="model-catalog-swr").start()
@@ -299,9 +299,9 @@ def refresh_catalogs() -> bool:
     catalog = get_catalog(force_refresh=True)
     try:
         from agent.secret_scope import get_secret
-        from hermes_cli.anon_auth import current_nous_state, is_guest_state
-        from hermes_cli.auth import read_credential_pool
-        from hermes_cli.models import _resolve_nous_portal_url, fetch_nous_recommended_models, fetch_openrouter_models
+        from eir_cli.anon_auth import current_nous_state, is_guest_state
+        from eir_cli.auth import read_credential_pool
+        from eir_cli.models import _resolve_nous_portal_url, fetch_nous_recommended_models, fetch_openrouter_models
 
         fetch_openrouter_models(force_refresh=True)
         logins = [current_nous_state(), *read_credential_pool("nous")]
@@ -366,7 +366,7 @@ def _default_model_from_block(block: dict[str, Any] | None) -> str | None:
 
 
 def get_default_model_from_cache(provider: str) -> str | None:
-    """The manifest's labeled default for ``provider`` (the model Hermes silently lands on when the
+    """The manifest's labeled default for ``provider`` (the model Eir silently lands on when the
     user never picked one) — in-process then disk cache only, never a fetch."""
     cached = _in_process_catalog()
     found = _default_model_from_block(_block_of(cached, provider)) if cached is not None else None
@@ -378,7 +378,7 @@ def get_default_model_from_cache(provider: str) -> str | None:
 
 def seed_cache_from_checkout(project_root: Path | str) -> bool:
     """Overwrite the disk cache with the checkout's ``website/static/api/model-catalog.json``.
-    After ``hermes update`` that file IS the newest catalog, so the picker stays current even when
+    After ``eir update`` that file IS the newest catalog, so the picker stays current even when
     the remote fetch is bot-gated. Validated, then written via the same atomic writer."""
     src = Path(project_root) / "website" / "static" / "api" / "model-catalog.json"
     try:
@@ -396,7 +396,7 @@ def seed_cache_from_checkout(project_root: Path | str) -> bool:
 
 
 def reset_cache() -> None:
-    """Clear the in-process cache and fetch-failure backoff. Used by tests and ``hermes model --refresh``."""
+    """Clear the in-process cache and fetch-failure backoff. Used by tests and ``eir model --refresh``."""
     global _catalog_cache, _catalog_cache_source_mtime, _catalog_cache_source_path
     with _fetch_retry_lock:
         _fetch_retry_after.clear()

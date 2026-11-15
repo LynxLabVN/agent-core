@@ -1,9 +1,9 @@
 """SQLite-safe restore and archive-member publish plumbing for backups.
 
-Owns the restore side of ``hermes_cli.backup``: the page-copy SQLite restore
+Owns the restore side of ``eir_cli.backup``: the page-copy SQLite restore
 (``_safe_restore_db`` plus the foreign-holder scan) and the zip-member publish
-helpers used by ``hermes import`` and ``/snapshot restore``.  Backup
-*creation* (``run_backup``, full-zip writing) stays in ``hermes_cli.backup``,
+helpers used by ``eir import`` and ``/snapshot restore``.  Backup
+*creation* (``run_backup``, full-zip writing) stays in ``eir_cli.backup``,
 which composes these helpers.
 """
 
@@ -20,9 +20,9 @@ from contextlib import closing, contextmanager
 from pathlib import Path
 from typing import Any, List, Optional, Tuple
 
-from hermes_state_holders import read_only_db_uri
-from hermes_cli.backup_sqlite import _safe_copy_db
-from hermes_cli.config_backend import drop_other_access
+from eir_state_holders import read_only_db_uri
+from eir_cli.backup_sqlite import _safe_copy_db
+from eir_cli.config_backend import drop_other_access
 from utils import (
     _preserve_file_mode, _preserve_file_owner, _restore_file_mode, _restore_file_owner, atomic_replace,
     mkstemp_beside,
@@ -138,8 +138,8 @@ def _restore_auth_json(src: Path, dst: Path) -> bool:
         }
 
     try:
-        from hermes_cli.auth import _auth_store_lock, _load_auth_store, _save_auth_store
-        from hermes_cli.auth_oauth_grants import (
+        from eir_cli.auth import _auth_store_lock, _load_auth_store, _save_auth_store
+        from eir_cli.auth_oauth_grants import (
             merge_snapshot_auth_preserving_live_single_use_grants,
         )
 
@@ -166,7 +166,7 @@ def _safe_restore_db(src: Path, dst: Path) -> bool:
     ``state.db`` epoch floor cannot be proven.
     """
     from gateway.runtime_ownership import OwnershipConflict, exclusive_maintenance
-    from hermes_cli.backup import verify_sqlite_integrity
+    from eir_cli.backup import verify_sqlite_integrity
 
     # backup() copies pages without validating their contents; its fallback
     # copies bytes even when SQLite rejected the source. Neither may touch the
@@ -187,7 +187,7 @@ def _safe_restore_db(src: Path, dst: Path) -> bool:
 def _restore_epoch(path: Path) -> int:
     if not path.exists():
         return 0
-    from hermes_cli.sqlite_safe_read import connect_tracked
+    from eir_cli.sqlite_safe_read import connect_tracked
 
     with closing(connect_tracked(read_only_db_uri(path), uri=True, tracking_path=path,
                                  connect_fn=sqlite3.connect)) as conn:
@@ -203,7 +203,7 @@ def _restore_destination_epoch(dst: Path) -> int:
     except (OSError, sqlite3.Error, ValueError) as exc:
         raise OSError(
             f"Cannot read the canonical runtime epoch at {dst}; refusing in-place restore. "
-            "Use `hermes sessions recover --source <snapshot> --output <separate-path>` "
+            "Use `eir sessions recover --source <snapshot> --output <separate-path>` "
             "to salvage transcripts into a separate output."
         ) from exc
 
@@ -271,7 +271,7 @@ def _restore_db_pages(src: Path, dst: Path) -> bool:
     Callers go through ``_safe_restore_db``, which validates *src* and holds
     the maintenance reservation and epoch floor around this publication.
     """
-    from hermes_cli.sqlite_safe_read import connect_tracked
+    from eir_cli.sqlite_safe_read import connect_tracked
 
     dst_conn: Optional[sqlite3.Connection] = None
     try:
@@ -309,7 +309,7 @@ def _restore_db_pages(src: Path, dst: Path) -> bool:
                 logger.debug("Closing %s before the fallback restore failed: %s", dst, close_exc)
         # Fallback: unlink+move (the old approach).  This still works for
         # the common case where no other process holds the DB open.
-        from hermes_cli.sqlite_safe_read import (
+        from eir_cli.sqlite_safe_read import (
             LiveConnectionError,
             offline_file_access,
         )
@@ -362,7 +362,7 @@ def _restore_db_pages(src: Path, dst: Path) -> bool:
         except LiveConnectionError as exc2:
             logger.error(
                 "Refusing unlink+move restore of %s: %s Close the in-process "
-                "database handles (or restart Hermes) and retry.",
+                "database handles (or restart Eir) and retry.",
                 dst, exc2,
             )
             return False
@@ -396,7 +396,7 @@ def _restore_snapshot_entry(rel: str, src: Path, dst: Path) -> bool:
             shutil.copy2(src, dst)
             if dst.name == "config.yaml":  # the snapshot copy carries the mode it was taken with
                 drop_other_access(dst)
-            elif dst.name == ".env":  # secrets file: owner-only, as `hermes import` leaves it
+            elif dst.name == ".env":  # secrets file: owner-only, as `eir import` leaves it
                 os.chmod(dst, 0o600)
         return True
     except (OSError, PermissionError) as exc:
@@ -405,7 +405,7 @@ def _restore_snapshot_entry(rel: str, src: Path, dst: Path) -> bool:
 
 
 def _validate_backup_zip(zf: zipfile.ZipFile) -> tuple[bool, str]:
-    """Check that a zip looks like a Hermes backup.
+    """Check that a zip looks like a Eir backup.
 
     Returns (ok, reason).
     """
@@ -413,7 +413,7 @@ def _validate_backup_zip(zf: zipfile.ZipFile) -> tuple[bool, str]:
     if not names:
         return False, "zip archive is empty"
 
-    # Look for telltale files that a hermes home would have
+    # Look for telltale files that a eir home would have
     markers = {"config.yaml", ".env", "state.db"}
     found = set()
     for n in names:
@@ -424,7 +424,7 @@ def _validate_backup_zip(zf: zipfile.ZipFile) -> tuple[bool, str]:
 
     if not found:
         return False, (
-            "zip does not appear to be a Hermes backup "
+            "zip does not appear to be a Eir backup "
             "(no config.yaml, .env, or state databases found)"
         )
 
@@ -434,7 +434,7 @@ def _validate_backup_zip(zf: zipfile.ZipFile) -> tuple[bool, str]:
 def _detect_prefix(zf: zipfile.ZipFile) -> str:
     """Detect if the zip has a common directory prefix wrapping all entries.
 
-    Some tools zip as `.hermes/config.yaml` instead of `config.yaml`.
+    Some tools zip as `.eir/config.yaml` instead of `config.yaml`.
     Returns the prefix to strip (empty string if none).
     """
     names = [n for n in zf.namelist() if not n.endswith("/")]
@@ -448,8 +448,8 @@ def _detect_prefix(zf: zipfile.ZipFile) -> str:
     first_parts = {p[0] for p in parts_list if len(p) > 1}
     if len(first_parts) == 1:
         prefix = first_parts.pop()
-        # Only strip if it looks like a hermes dir name
-        if prefix in {".hermes", "hermes"}:
+        # Only strip if it looks like a eir dir name
+        if prefix in {".eir", "eir"}:
             return prefix + "/"
 
     return ""
@@ -487,7 +487,7 @@ def _extract_member_atomically(
     ``open(target, "wb")`` truncates the user's existing file to zero *before*
     any replacement bytes exist.  A Ctrl-C, an ENOSPC, a corrupt member, or a
     crash between the truncate and the write therefore leaves that file empty
-    with nothing behind it — during ``hermes import``, which is the
+    with nothing behind it — during ``eir import``, which is the
     disaster-recovery path a user reaches for *because* they already lost
     something.  Staging into the target's own directory and publishing with a
     rename means the target only ever moves from its old contents to the
@@ -506,7 +506,7 @@ def _extract_member_atomically(
     Permission bits *and* ownership are carried across the replace so routing
     through mkstemp does not change the file the caller would otherwise have
     produced.  ``os.replace`` swaps in a temp file owned by the *writing* user,
-    so without the chown a ``sudo hermes import`` would silently re-own every
+    so without the chown a ``sudo eir import`` would silently re-own every
     restored file to root — on the disaster-recovery path, and on exactly the
     Docker/NAS installs ``utils._restore_file_owner`` documents.  Both concerns
     delegate to the shared ``utils`` helpers rather than being re-derived here.
@@ -534,9 +534,9 @@ def _extract_member_atomically(
         # ``_preserve_file_mode`` returns ``stat.S_IMODE``, i.e. all twelve
         # bits, and the content replacing this file comes from the archive.
         # Carrying the elevated bits across would let archive-controlled bytes
-        # take over an existing setuid/setgid file, so ``hermes import`` would
+        # take over an existing setuid/setgid file, so ``eir import`` would
         # hand whoever produced the zip the identity that file runs as.  Nothing
-        # constrains that to Hermes' own state either: the ``_external/`` branch
+        # constrains that to Eir' own state either: the ``_external/`` branch
         # of ``run_import`` publishes members anywhere under ``$HOME``.  The
         # sticky bit is kept — it is inert on a regular file.
         mode &= ~(stat.S_ISUID | stat.S_ISGID)
@@ -581,7 +581,7 @@ def _count_session_rows(path: Path) -> Optional[tuple[int, int]]:
     """Return ``(sessions, messages)`` stored in the session database *path*.
 
     Read-only and best effort.  ``None`` means "unknown" — a missing file, a
-    database that is not a Hermes session store, or one that cannot be read.
+    database that is not a Eir session store, or one that cannot be read.
     Callers must never read ``None`` as "zero rows": acting on an unreadable
     database would mask the very loss this count exists to surface.  Same
     contract as :func:`_count_cron_jobs`.
@@ -589,7 +589,7 @@ def _count_session_rows(path: Path) -> Optional[tuple[int, int]]:
     if not path.is_file():
         return None
     try:
-        from hermes_cli.sqlite_safe_read import connect_tracked
+        from eir_cli.sqlite_safe_read import connect_tracked
 
         conn = connect_tracked(read_only_db_uri(path), uri=True, tracking_path=path, connect_fn=sqlite3.connect)
     except sqlite3.Error:
@@ -635,7 +635,7 @@ def _import_db_member_exclusive(
     describes the database that was just unlinked.  Nothing fails, so nothing
     is reported — the sessions simply are not there afterwards (issue #100960).
 
-    ``hermes import`` is the disaster-recovery path, so that failure mode lands
+    ``eir import`` is the disaster-recovery path, so that failure mode lands
     on users who have already lost something once.  Route the member through
     the same ``_safe_restore_db`` page copy that ``/snapshot restore`` has used
     since #65942: the live inode is preserved, every open connection converges
@@ -676,7 +676,7 @@ def _import_db_member_exclusive(
             dst.flush()
             os.fsync(dst.fileno())
         if not _safe_restore_db(Path(tmp_name), target):
-            from hermes_cli.backup import verify_sqlite_integrity
+            from eir_cli.backup import verify_sqlite_integrity
 
             # Re-check only on failure so the user gets the real cause; the
             # detailed integrity message was already logged by _safe_restore_db.

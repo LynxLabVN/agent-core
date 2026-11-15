@@ -5,7 +5,7 @@ description: "Discover skill APIs across sellers, publish tested services, and b
 maintainer: snuff12
 tier: community
 category: tools
-requires_hermes: ">=0.22.7"
+requires_eir: ">=0.22.7"
 version: "0.1.0"
 docs_url: https://github.com/snuff12/hermes-market-server/blob/ac916e764b13718e68cacf7588748cc841d83ed7/docs/public-hosting.md
 screenshots:
@@ -15,7 +15,7 @@ screenshots:
   - https://raw.githubusercontent.com/snuff12/hermes-market/3def9a2c282330a080d6e43f221daa2ca5d9988f/docs/screenshots/native-tools.png
 readme: true
 platforms: [linux, macos]
-title: Hermes Market
+title: Eir Market
 known_issues:
   - Seller execution and the local browser approval gateway are separately operated services.
   - The public demo uses a fixed Cloudflare Tunnel and depends on its host computer staying online.

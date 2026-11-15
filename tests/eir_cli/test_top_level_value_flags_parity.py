@@ -3,11 +3,11 @@
 ``_first_positional_argv`` and ``_apply_profile_override`` in ``main.py``
 historically kept hand-maintained copies of "which top-level options consume
 a value". Those copies drift — ``--reasoning`` was a value-taking top-level
-option absent from both sets, so every ``hermes --reasoning high <cmd> …``
+option absent from both sets, so every ``eir --reasoning high <cmd> …``
 invocation mis-classified ``high`` as the first positional and forced eager
 plugin CLI discovery (~500-650ms startup tax).
 
-Both sites now share ``hermes_cli._parser.top_level_value_flag_sets()``,
+Both sites now share ``eir_cli._parser.top_level_value_flag_sets()``,
 derived from ``build_top_level_parser()`` (mirroring the
 ``update_cmd._holder_value_flags`` precedent). These tests pin:
 
@@ -20,8 +20,8 @@ derived from ``build_top_level_parser()`` (mirroring the
 
 import pytest
 
-from hermes_cli._parser import build_top_level_parser, top_level_value_flag_sets
-from hermes_cli.main import _first_positional_argv, _plugin_cli_discovery_needed
+from eir_cli._parser import build_top_level_parser, top_level_value_flag_sets
+from eir_cli.main import _first_positional_argv, _plugin_cli_discovery_needed
 
 
 def _parser_value_flags() -> tuple[set, set]:
@@ -59,14 +59,14 @@ def test_helper_sets_match_top_level_parser():
 
 
 def test_first_positional_skips_reasoning_value(monkeypatch):
-    monkeypatch.setattr("sys.argv", ["hermes", "--reasoning", "high", "chat", "hello"])
+    monkeypatch.setattr("sys.argv", ["eir", "--reasoning", "high", "chat", "hello"])
     assert _first_positional_argv() == "chat"
     assert _plugin_cli_discovery_needed() is False
 
 
 @pytest.mark.parametrize("argv", [
-    ["hermes", "--reasoning", "ultra", "--provider", "openai", "-z", "prompt here"],
-    ["hermes", "-m", "x", "--reasoning=low", "chat"],
+    ["eir", "--reasoning", "ultra", "--provider", "openai", "-z", "prompt here"],
+    ["eir", "-m", "x", "--reasoning=low", "chat"],
 ])
 def test_reasoning_forms_do_not_shadow_the_subcommand(monkeypatch, argv):
     monkeypatch.setattr("sys.argv", argv)

@@ -1,19 +1,19 @@
 """Where third-party Python plugin code is allowed to run (``plugins.isolation``).
 
-``in_process`` (default) imports every plugin into the Hermes process, as always. ``host`` keeps
+``in_process`` (default) imports every plugin into the Eir process, as always. ``host`` keeps
 third-party plugin code OUT of it: general plugins load in one plugin-host process per profile
-(:mod:`hermes_cli.plugin_host`) and talk to Hermes only through ``ctx``; every other path that would
+(:mod:`eir_cli.plugin_host`) and talk to Eir only through ``ctx``; every other path that would
 import a user-supplied module in-process (category providers, model-provider profiles, dashboard
-plugin APIs) refuses with a stated reason. Bundled plugins ship with Hermes and stay in-process.
+plugin APIs) refuses with a stated reason. Bundled plugins ship with Eir and stay in-process.
 
-That second half is the property a pooled deployment needs: one Hermes process serving many
+That second half is the property a pooled deployment needs: one Eir process serving many
 profiles must never share an interpreter with a profile's plugin code. The same boundary gives a
 single-user install crash isolation (a plugin that segfaults or hangs takes down its host, not the
 gateway), which is why it is a plain config value and not a cloud-only switch.
 
 The ctx surface tables below are the single source of truth for both the runtime boundary
-(:mod:`hermes_cli.plugin_host_child` refuses these methods) and the static audit
-(:mod:`hermes_cli.plugin_isolation_audit`), so "the audit says pool-safe" and "it loads in the host"
+(:mod:`eir_cli.plugin_host_child` refuses these methods) and the static audit
+(:mod:`eir_cli.plugin_isolation_audit`), so "the audit says pool-safe" and "it loads in the host"
 cannot drift apart.
 """
 
@@ -27,7 +27,7 @@ import sys
 from types import ModuleType
 from typing import Any, Dict, FrozenSet, Iterator, List, Mapping, Optional
 
-logger = logging.getLogger("hermes_cli.plugins")
+logger = logging.getLogger("eir_cli.plugins")
 
 ISOLATION_IN_PROCESS = "in_process"
 ISOLATION_HOST = "host"
@@ -38,7 +38,7 @@ _ISOLATION_MODES = frozenset({ISOLATION_IN_PROCESS, ISOLATION_HOST})
 # launch-scope dashboard auth registry. A plugin calling one of these runs only in-process.
 HOST_UNSUPPORTED_CTX_METHODS: dict[str, str] = {
     "register_login_backend": "browser-vault fills hold a server-local context manager",
-    "register_browser_page_backend": "browser-vault fill scripts carry credentials that stay in the Hermes process",
+    "register_browser_page_backend": "browser-vault fill scripts carry credentials that stay in the Eir process",
     "register_platform": "platform adapters run on the gateway's event loop with native SDK clients",
     "register_platform_handler": "the handler factory receives the platform's native SDK client",
     "register_telegram_handler": "the handler factory receives the native Telegram Application",
@@ -47,13 +47,13 @@ HOST_UNSUPPORTED_CTX_METHODS: dict[str, str] = {
     "register_approval_transport": "approval transports hold the live approval request/response channel",
     "post_message": "the returned handle is bound to the gateway's event loop and live adapter",
     "apost_message": "the returned handle is bound to the gateway's event loop and live adapter",
-    "fork_session": "the returned handle tracks a fork thread of the live session agent in the Hermes process",
+    "fork_session": "the returned handle tracks a fork thread of the live session agent in the Eir process",
 }
 
 # Registered in-process only; skipped (with a warning, the plugin still loads) inside the host
 # because the surface they extend does not exist in a server process.
 HOST_SKIPPED_CTX_METHODS: dict[str, str] = {
-    "register_cli_command": "`hermes <command>` subcommands are wired into the local CLI parser",
+    "register_cli_command": "`eir <command>` subcommands are wired into the local CLI parser",
 }
 
 # Live ctx facades the host reaches by method call; each call returns plain data.
@@ -87,15 +87,15 @@ HOST_DEGRADED_HOOKS: dict[str, str] = {
 
 def _plugins_config(config: Optional[Mapping[str, Any]] = None) -> Mapping[str, Any]:
     if config is None:
-        from hermes_cli.config import load_config_readonly
+        from eir_cli.config import load_config_readonly
         config = load_config_readonly() or {}
     section = config.get("plugins") if isinstance(config, Mapping) else None
     return section if isinstance(section, Mapping) else {}
 
 
-# Set in the plugin host's environment: inside the host, plugin code is already out of Hermes, so
+# Set in the plugin host's environment: inside the host, plugin code is already out of Eir, so
 # every loader there imports directly (a host must never spawn a host of its own).
-HOST_PROCESS_ENV = "HERMES_PLUGIN_HOST_PROCESS"
+HOST_PROCESS_ENV = "EIR_PLUGIN_HOST_PROCESS"
 
 
 def isolation_mode(config: Optional[Mapping[str, Any]] = None) -> str:
@@ -127,13 +127,13 @@ def in_process_import_refusal(what: str, *, source: str = "user",
                               config: Optional[Mapping[str, Any]] = None) -> Optional[str]:
     """Reason an in-process import of third-party code must not happen, or ``None`` when allowed.
 
-    Every loader that imports a user-supplied module into the Hermes process asks this first;
+    Every loader that imports a user-supplied module into the Eir process asks this first;
     bundled code always passes.
     """
     if source == "bundled" or isolation_mode(config) != ISOLATION_HOST:
         return None
     return (f"{what} runs only in-process, and plugins.isolation is 'host' (third-party plugin code "
-            f"never runs inside the Hermes process); set plugins.isolation: in_process to load it")
+            f"never runs inside the Eir process); set plugins.isolation: in_process to load it")
 
 
 def import_user_code(path: Any, module_name: str) -> Optional[ModuleType]:
@@ -166,7 +166,7 @@ def user_plugin_host() -> Any:
     """
     if isolation_mode() != ISOLATION_HOST:
         return None
-    from hermes_cli.plugins import get_plugin_manager
+    from eir_cli.plugins import get_plugin_manager
     return get_plugin_manager()._plugin_host()
 
 
@@ -182,7 +182,7 @@ def transient_plugin_host(before_stop: Optional[Any] = None) -> Iterator[None]:
     if isolation_mode() != ISOLATION_HOST:
         yield
         return
-    from hermes_cli.plugins import get_plugin_manager
+    from eir_cli.plugins import get_plugin_manager
     manager = get_plugin_manager()
     was_running = manager._running_plugin_host() is not None
     try:

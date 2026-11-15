@@ -1,12 +1,12 @@
-"""``hermes clipboard`` subcommand parser."""
+"""``eir clipboard`` subcommand parser."""
 
 from __future__ import annotations
 
-from hermes_cli.subcommands._shared import add_json_flag
+from eir_cli.subcommands._shared import add_json_flag
 
 
 def _cmd_clipboard(args):
-    from hermes_cli.clipboard_cmd import cmd_clipboard
+    from eir_cli.clipboard_cmd import cmd_clipboard
 
     return cmd_clipboard(args)
 

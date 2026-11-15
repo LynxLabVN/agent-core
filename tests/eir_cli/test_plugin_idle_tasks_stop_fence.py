@@ -12,9 +12,9 @@ from datetime import UTC, datetime
 
 import pytest
 
-from hermes_cli import plugins_idle_tasks
-from hermes_cli.plugins import PluginContext, PluginManager, PluginManifest
-from hermes_cli.plugins_idle_tasks import IdleTaskFence, load_state, run_plugin_idle_tasks
+from eir_cli import plugins_idle_tasks
+from eir_cli.plugins import PluginContext, PluginManager, PluginManifest
+from eir_cli.plugins_idle_tasks import IdleTaskFence, load_state, run_plugin_idle_tasks
 from tests.waiting import wait_until
 
 T0 = datetime(2026, 1, 1, tzinfo=UTC)
@@ -23,7 +23,7 @@ IDLE = 10 * 3600.0
 
 @pytest.fixture
 def ctx(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     return PluginContext(PluginManifest(name="wisdom", source="user"), PluginManager())
 
 

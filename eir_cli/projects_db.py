@@ -16,13 +16,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, List, Optional
 
-from hermes_cli.sqlite_util import add_column_if_missing as _add_column_if_missing, open_db, write_txn
-from hermes_constants import get_hermes_home
+from eir_cli.sqlite_util import add_column_if_missing as _add_column_if_missing, open_db, write_txn
+from eir_constants import get_eir_home
 
 
 def projects_db_path() -> Path:
-    """The per-profile projects DB path (``$HERMES_HOME/projects.db``)."""
-    return get_hermes_home() / "projects.db"
+    """The per-profile projects DB path (``$EIR_HOME/projects.db``)."""
+    return get_eir_home() / "projects.db"
 
 
 SCHEMA_SQL = """
@@ -114,7 +114,7 @@ def _normalize_path(path: str) -> str:
 def connect(db_path: Optional[Path] = None) -> sqlite3.Connection:
     """Open (and initialize if needed) the per-profile projects DB.
 
-    WAL with DELETE fallback for network filesystems (``hermes_state`` helper). Schema init is
+    WAL with DELETE fallback for network filesystems (``eir_state`` helper). Schema init is
     idempotent (``CREATE TABLE IF NOT EXISTS`` + additive migrations) and cached per-path per-process.
     """
     path = db_path if db_path is not None else projects_db_path()

@@ -51,10 +51,10 @@ def where_to_set_key(env_var: str) -> str:
     it there. Says so when the variable exists only in this process's environment while a routed
     (named) profile is served: that is the copy users hit after exporting keys in an SSH shell."""
     from agent.secret_scope import serves_routed_profile
-    from hermes_constants import display_hermes_home, get_hermes_home, profile_cli_selector, profile_name_for_home
-    profile = profile_name_for_home(get_hermes_home()) or "default"
-    env_path = f"{display_hermes_home()}/.env"
-    hint = (f"Add it to profile '{profile}': run `hermes {profile_cli_selector()}config set {env_var} <your key>` "
+    from eir_constants import display_eir_home, get_eir_home, profile_cli_selector, profile_name_for_home
+    profile = profile_name_for_home(get_eir_home()) or "default"
+    env_path = f"{display_eir_home()}/.env"
+    hint = (f"Add it to profile '{profile}': run `eir {profile_cli_selector()}config set {env_var} <your key>` "
             f"(stored in {env_path}).")
     if serves_routed_profile() and os.environ.get(env_var):
         hint = (f"{env_var} is set in this server's environment, but profile '{profile}' reads keys only "
@@ -66,9 +66,9 @@ def named_profile_key_hint(env_vars) -> str:
     """``" <where_to_set_key>"`` for a registry provider's missing key while a NAMED profile is
     active, else ``""``: the default profile also reads the process environment, so the plain
     "Set X." already tells it everything."""
-    from hermes_constants import get_hermes_home, profile_name_for_home
+    from eir_constants import get_eir_home, profile_name_for_home
     names = [str(v) for v in (env_vars or ()) if str(v or "").strip()]
-    if not names or profile_name_for_home(get_hermes_home()) in (None, "default"):
+    if not names or profile_name_for_home(get_eir_home()) in (None, "default"):
         return ""
     return f" {where_to_set_key(names[0])}"
 
@@ -102,7 +102,7 @@ def raise_if_declared_key_missing(requested_provider: Optional[str], runtime: di
     label, key_env = _declared_custom_key(str(requested_provider or "").strip().lower(), runtime, model_cfg, config)
     if not key_env or get_secret_str(key_env, "").strip():
         return
-    from hermes_cli.auth import AuthError
+    from eir_cli.auth import AuthError
     raise AuthError(f"No API key for {label}: it reads {key_env}, which is not set for this profile, so the "
                     f"request was not sent. {where_to_set_key(key_env)}",
                     provider=str(requested_provider or "custom"), code="missing_api_key")

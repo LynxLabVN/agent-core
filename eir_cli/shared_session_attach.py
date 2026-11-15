@@ -4,9 +4,9 @@ The owner's handshake supplies the existing authenticated WebSocket URL. A
 registry entry is discovery information, not authority to mint a credential.
 The handshake lets the requester prove it read the registry without the lease
 id travelling in the request: the client sends ``nonce`` plus
-``client_proof = hex(HMAC_SHA256(lease_id, "hermes-session-attach-request:<session_id>:<nonce>"))``,
+``client_proof = hex(HMAC_SHA256(lease_id, "eir-session-attach-request:<session_id>:<nonce>"))``,
 and the reply must echo the request fields and return
-``attach_proof = hex(HMAC_SHA256(lease_id, "hermes-session-attach:<session_id>:<nonce>:<profile_home>:<websocket_url>"))``,
+``attach_proof = hex(HMAC_SHA256(lease_id, "eir-session-attach:<session_id>:<nonce>:<profile_home>:<websocket_url>"))``,
 covering the returned socket so a relay holding a genuine proof cannot swap in its own.
 The client checks the reply proof against its own registry copy, which refuses
 a listener that only echoes request parameters. That check proves the listener
@@ -26,8 +26,8 @@ from urllib.parse import urlencode, urlsplit
 
 import httpx
 
-from hermes_constants import get_hermes_home
-from hermes_cli.active_sessions import active_session_registry_snapshot, session_owner_details
+from eir_constants import get_eir_home
+from eir_cli.active_sessions import active_session_registry_snapshot, session_owner_details
 
 
 def _local_origin(url: str, scheme: str) -> tuple[str, int]:
@@ -50,7 +50,7 @@ def discover_attach_url(session_id: str, *, registry_home: str | Path | None = N
     must advertise ``metadata.shared_runtime_url`` and implement the local
     ``/api/session-attach`` handshake. Unsupported owners keep their lease.
     """
-    home = Path(registry_home if registry_home is not None else get_hermes_home()).resolve()
+    home = Path(registry_home if registry_home is not None else get_eir_home()).resolve()
     owners = [entry for entry in active_session_registry_snapshot(home, strict=True)
               if entry.get("session_id") == session_id]
     if not owners:
@@ -60,9 +60,9 @@ def discover_attach_url(session_id: str, *, registry_home: str | Path | None = N
     owner = owners[0]
     endpoint = (owner.get("metadata") or {}).get("shared_runtime_url")
     if not isinstance(endpoint, str) or not endpoint:
-        raise ValueError("This chat is open in another Hermes window/terminal, and attaching "
+        raise ValueError("This chat is open in another Eir window/terminal, and attaching "
                          "this terminal to it is not available in this build. Close the chat "
-                         "there and run hermes --resume " + session_id + " here to take it over.\n"
+                         "there and run eir --resume " + session_id + " here to take it over.\n"
                          + session_owner_details(session_id, owner))
     origin = _local_origin(endpoint, "http")
     parts = urlsplit(endpoint)
@@ -73,7 +73,7 @@ def discover_attach_url(session_id: str, *, registry_home: str | Path | None = N
     # responder checks this instead of a lease_id parameter so the secret is never transmitted.
     client_proof = hmac.new(
         str(owner["lease_id"]).encode("utf-8"),
-        f"hermes-session-attach-request:{session_id}:{nonce}".encode(),
+        f"eir-session-attach-request:{session_id}:{nonce}".encode(),
         hashlib.sha256,
     ).hexdigest()
     query = urlencode({"session_id": session_id, "nonce": nonce,
@@ -92,9 +92,9 @@ def discover_attach_url(session_id: str, *, registry_home: str | Path | None = N
                 reply = json.loads(body)
     except (httpx.HTTPError, json.JSONDecodeError) as exc:
         # Never include a remote body or authenticated URL in diagnostics.
-        raise ValueError("This chat is open in another Hermes window/terminal, and attaching "
+        raise ValueError("This chat is open in another Eir window/terminal, and attaching "
                          "this terminal to it just failed. Use the chat where it is open, or "
-                         "close it there and run hermes --resume " + session_id + " here.\n"
+                         "close it there and run eir --resume " + session_id + " here.\n"
                          + session_owner_details(session_id, owner)) from exc
     # Echoed fields only prove the listener heard the request; the proof is what ties the
     # reply to the registry's lease id, which a rogue listener cannot learn from the request.
@@ -105,7 +105,7 @@ def discover_attach_url(session_id: str, *, registry_home: str | Path | None = N
         raise ValueError("Shared runtime handshake identity does not match the requested owner.")
     expected_proof = hmac.new(
         str(owner["lease_id"]).encode("utf-8"),
-        f"hermes-session-attach:{session_id}:{nonce}:{home}:{websocket_url}".encode("utf-8", "replace"),
+        f"eir-session-attach:{session_id}:{nonce}:{home}:{websocket_url}".encode("utf-8", "replace"),
         hashlib.sha256,
     ).hexdigest()
     if (any(reply.get(key) != value for key, value in {
@@ -124,8 +124,8 @@ def discover_attach_url(session_id: str, *, registry_home: str | Path | None = N
 def configure_tui_attachment(env: dict[str, str], session_id: str | None, *,
                              registry_home: str | Path | None = None) -> None:
     """Retain an explicit transport, otherwise attach a resumed owner's runtime."""
-    if not session_id or env.get("HERMES_TUI_GATEWAY_URL", "").strip():
+    if not session_id or env.get("EIR_TUI_GATEWAY_URL", "").strip():
         return
     url = discover_attach_url(session_id, registry_home=registry_home)
     if url is not None:
-        env["HERMES_TUI_GATEWAY_URL"] = url
+        env["EIR_TUI_GATEWAY_URL"] = url

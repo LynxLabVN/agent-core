@@ -2,9 +2,9 @@
 
 Regression for #118026: the module gated only on ``ImportError``, so a Windows install whose
 venv has some other module importable as ``fcntl`` (stock CPython for Windows ships none) hit an
-unguarded ``fcntl.F_RDLCK`` read at import time. ``hermes_state`` imports this module at module
-level, so the ``AttributeError`` killed every importer — ``hermes serve`` (Desktop backend
-"exited before port announcement (1)"), ``hermes doctor``, the gateway, cron — before
+unguarded ``fcntl.F_RDLCK`` read at import time. ``eir_state`` imports this module at module
+level, so the ``AttributeError`` killed every importer — ``eir serve`` (Desktop backend
+"exited before port announcement (1)"), ``eir doctor``, the gateway, cron — before
 ``supported()`` existed to report the guard as unavailable.
 """
 
@@ -20,14 +20,14 @@ import pytest
 
 def _reimport_with_fcntl(monkeypatch, stub: types.ModuleType | None):
     """Import the guard fresh with ``fcntl`` replaced (or absent), leaving sys.modules clean."""
-    monkeypatch.delitem(sys.modules, "hermes_state_lockguard", raising=False)
+    monkeypatch.delitem(sys.modules, "eir_state_lockguard", raising=False)
 
     if stub is None:
         monkeypatch.setitem(sys.modules, "fcntl", None)  # import fcntl -> ImportError
     else:
         monkeypatch.setitem(sys.modules, "fcntl", stub)
 
-    return importlib.import_module("hermes_state_lockguard")
+    return importlib.import_module("eir_state_lockguard")
 
 
 def _windows_fcntl_lookalike() -> types.ModuleType:

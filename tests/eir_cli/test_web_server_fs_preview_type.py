@@ -5,8 +5,8 @@ import base64
 import pytest
 from starlette.testclient import TestClient
 
-from hermes_cli import web_server
-from hermes_cli.web_routers import files as file_routes
+from eir_cli import web_server
+from eir_cli.web_routers import files as file_routes
 
 
 @pytest.fixture
@@ -118,7 +118,7 @@ class _FakeSshFs:
 
 @pytest.mark.parametrize("endpoint", ["/api/fs/read-text", "/api/fs/read-data-url"])
 def test_an_ssh_link_named_html_to_a_secret_is_refused_before_any_read(client, monkeypatch, endpoint):
-    workspace = _FakeSshFs("/home/dev/.hermes/.env")
+    workspace = _FakeSshFs("/home/dev/.eir/.env")
     monkeypatch.setattr(file_routes, "_fs_backend", lambda profile=None: workspace)
 
     response = client.get(endpoint, params={"path": "/srv/repos/page.html", "profile": "remote-dev"})

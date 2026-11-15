@@ -1,4 +1,4 @@
-"""Pairing launches of bridge.js (dashboard and `hermes whatsapp`) never inherit Hermes' credentials (#38079)."""
+"""Pairing launches of bridge.js (dashboard and `eir whatsapp`) never inherit Eir' credentials (#38079)."""
 
 from types import SimpleNamespace
 
@@ -14,7 +14,7 @@ _OPERATOR_SECRETS = {
 
 @pytest.fixture
 def bridge_dir(tmp_path, monkeypatch):
-    import hermes_constants
+    import eir_constants
     from gateway.platforms import whatsapp_common
 
     for key, value in _OPERATOR_SECRETS.items():
@@ -23,12 +23,12 @@ def bridge_dir(tmp_path, monkeypatch):
     bridge.mkdir()
     (bridge / "bridge.js").write_text("", encoding="utf-8")
     monkeypatch.setattr(whatsapp_common, "resolve_whatsapp_bridge_dir", lambda: bridge)
-    monkeypatch.setattr(hermes_constants, "find_node_executable", lambda name: "/usr/bin/node")
+    monkeypatch.setattr(eir_constants, "find_node_executable", lambda name: "/usr/bin/node")
     return bridge
 
 
 def test_dashboard_pairing_bridge_env_is_scrubbed(bridge_dir, tmp_path, monkeypatch):
-    from hermes_cli.web_routers import messaging
+    from eir_cli.web_routers import messaging
 
     monkeypatch.setattr(messaging, "_ensure_whatsapp_bridge_dependencies", lambda _dir: None)
     captured = {}
@@ -44,10 +44,10 @@ def test_dashboard_pairing_bridge_env_is_scrubbed(bridge_dir, tmp_path, monkeypa
 def test_cli_pairing_bridge_env_is_scrubbed(bridge_dir, tmp_path, monkeypatch):
     import subprocess
 
-    from hermes_cli import main, main_platform_setup as setup
+    from eir_cli import main, main_platform_setup as setup
 
     monkeypatch.setattr(main, "_require_tty", lambda _name: None)
-    monkeypatch.setattr(main, "get_hermes_home", lambda: tmp_path / "home")
+    monkeypatch.setattr(main, "get_eir_home", lambda: tmp_path / "home")
     monkeypatch.setattr(setup, "_whatsapp_choose_mode", lambda *_a: "bot")
     monkeypatch.setattr(setup, "_whatsapp_allowed_users", lambda *_a: None)
     monkeypatch.setattr(setup, "_whatsapp_install_bridge", lambda _dir: True)

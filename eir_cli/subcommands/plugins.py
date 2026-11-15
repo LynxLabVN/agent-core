@@ -1,17 +1,17 @@
-"""``hermes plugins`` subcommand parser."""
+"""``eir plugins`` subcommand parser."""
 
 from __future__ import annotations
 
 from typing import Callable
 
-from hermes_cli.subcommands._shared import add_json_flag
+from eir_cli.subcommands._shared import add_json_flag
 
 
 def build_plugins_parser(subparsers, *, cmd_plugins: Callable) -> None:
     """Attach the ``plugins`` subcommand to ``subparsers``."""
     plugins_parser = subparsers.add_parser(
         "plugins", help="Manage and validate plugins",
-        description="Install, update, remove, list, or validate native Hermes plugins "
+        description="Install, update, remove, list, or validate native Eir plugins "
             "and portable Agent Plugins v1 packages. Portable packages install disabled.")
     plugins_subparsers = plugins_parser.add_subparsers(dest="plugins_action")
 
@@ -19,8 +19,8 @@ def build_plugins_parser(subparsers, *, cmd_plugins: Callable) -> None:
         "install", help="Install a plugin from the curated catalog, a Git URL, or owner/repo")
     plugins_install.add_argument(
         "identifier",
-        help="Bare plugin catalog entry name (see `hermes plugins search`), Git URL, or owner/repo "
-            "shorthand (e.g. anpicasso/hermes-plugin-chrome-profiles)")
+        help="Bare plugin catalog entry name (see `eir plugins search`), Git URL, or owner/repo "
+            "shorthand (e.g. anpicasso/eir-plugin-chrome-profiles)")
     plugins_install.add_argument(
         "--force", "-f", action="store_true",
         help="Reinstall over an existing plugin (from the same source, your untracked files are kept)")
@@ -44,11 +44,11 @@ def build_plugins_parser(subparsers, *, cmd_plugins: Callable) -> None:
         help="Auto-enable the plugin after install (skip confirmation prompt)")
     _install_enable_group.add_argument(
         "--no-enable", action="store_true",
-        help="Install disabled (skip confirmation prompt); enable later with `hermes plugins enable <name>`",
+        help="Install disabled (skip confirmation prompt); enable later with `eir plugins enable <name>`",
     )
 
     plugins_search = plugins_subparsers.add_parser(
-        "search", help="Search the curated Hermes plugin catalog")
+        "search", help="Search the curated Eir plugin catalog")
     plugins_search.add_argument(
         "term", nargs="?", default="",
         help="Query matched against entry names, descriptions and declared tools (omit to list the whole catalog)")
@@ -82,7 +82,7 @@ def build_plugins_parser(subparsers, *, cmd_plugins: Callable) -> None:
         help="Show or set unattended plugin updates (plugins.auto_apply)",
         description=(
             "With auto-update on, the gateway's update check (every plugins.auto_update_check_hours) "
-            "applies the catalog and tracked Git updates `hermes plugins update` would apply, through the "
+            "applies the catalog and tracked Git updates `eir plugins update` would apply, through the "
             "same security scan. Updated code loads in new sessions; a widened catalog pin or new "
             "capabilities are never accepted unattended. Off by default."))
     plugins_auto.add_argument("state", nargs="?", choices=["on", "off"], help="Omit to show the current setting")
@@ -119,7 +119,7 @@ def build_plugins_parser(subparsers, *, cmd_plugins: Callable) -> None:
             "saved-tag update_url feeds (with mismatch protection), git "
             "ls-remote for git installs, and a stateless PyPI probe for "
             "pip entry-point plugins. NEVER mutates anything — apply with "
-            "`hermes plugins update <name>`."
+            "`eir plugins update <name>`."
         ),
     )
     plugins_check.add_argument(
@@ -185,7 +185,7 @@ def build_plugins_parser(subparsers, *, cmd_plugins: Callable) -> None:
         "--ci", action="store_true", help="Exit non-zero when validation reports an error")
 
     plugins_pack = plugins_subparsers.add_parser(
-        "pack", help="Declarative, shareable plugin sets (hermes-pack.yaml)",
+        "pack", help="Declarative, shareable plugin sets (eir-pack.yaml)",
         description="Install, export, or inspect plugin packs — a single YAML file "
             "pinning a set of plugins to exact commit SHAs, with optional "
             "non-secret config seeds. Installing a pack fans out to ordinary "
@@ -194,7 +194,7 @@ def build_plugins_parser(subparsers, *, cmd_plugins: Callable) -> None:
 
     pack_install = pack_subparsers.add_parser(
         "install", help="Review and install a pack from a file path or https URL")
-    pack_install.add_argument("source", help="Path to a hermes-pack.yaml file, or an https:// URL")
+    pack_install.add_argument("source", help="Path to a eir-pack.yaml file, or an https:// URL")
     pack_install.add_argument(
         "--force", "-f", action="store_true", help="Reinstall plugins that already exist")
 
@@ -204,11 +204,11 @@ def build_plugins_parser(subparsers, *, cmd_plugins: Callable) -> None:
         "--enabled-only", action="store_true",
         help="Only include plugins currently in plugins.enabled")
     pack_export.add_argument(
-        "--name", default="my-hermes-pack", help="Pack name to embed in the exported YAML")
+        "--name", default="my-eir-pack", help="Pack name to embed in the exported YAML")
 
     pack_show = pack_subparsers.add_parser(
         "show", help="Dry-run: parse and display a pack without installing")
-    pack_show.add_argument("source", help="Path to a hermes-pack.yaml file, or an https:// URL")
+    pack_show.add_argument("source", help="Path to a eir-pack.yaml file, or an https:// URL")
 
     plugins_show = plugins_subparsers.add_parser(
         "show", aliases=["info"], help="Show details for a single plugin (including emits/listens)")

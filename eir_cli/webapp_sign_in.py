@@ -2,16 +2,16 @@
 
 On the gateway's Webapp (``app.state.ui_surface == "webapp"``) with the sign-in gate engaged, every
 successful cookie login (a password login or an OAuth callback) also sets the cookie
-``hermes_webapp_signin_<gateway>``: the hex HMAC-SHA256 of ``"webapp-sign-in"`` keyed with the browser
+``eir_webapp_signin_<gateway>``: the hex HMAC-SHA256 of ``"webapp-sign-in"`` keyed with the browser
 session token the gateway serves (``web_server._SESSION_TOKEN``, kept in the gateway home by ``gateway.webapp_listener``). The gate treats
-a cookie session without a matching value as signed out. Replacing that token (``hermes webapp
+a cookie session without a matching value as signed out. Replacing that token (``eir webapp
 --sign-out``, or the CLI replacing the stored token while no gateway runs) therefore signs every browser
 out, whichever provider it signed in with. ``<gateway>`` comes from a digest of the gateway's home
 (:func:`cookie_gateway`), and the Webapp's listener names every sign-in cookie it sets that way, so two
 gateways' Webapps on one hostname keep their own logins and leave the standalone dashboard's alone.
 
 A request that passes records the generation of the credential it was checked against
-(``hermes_cli.browser_credential``) on ``request.state.webapp_sign_in``; the socket tickets it mints
+(``eir_cli.browser_credential``) on ``request.state.webapp_sign_in``; the socket tickets it mints
 carry that generation, so the sockets they open are tracked (``web_session_sockets.track``) and close
 at sign-out, and a ticket minted before a sign-out opens nothing after it. The standalone dashboard
 never sets or checks the binding.
@@ -25,7 +25,7 @@ gave it to a native app's sign-in (RFC 8252: ``/auth/native/token``, then ``/aut
 listener keeps a digest of each such token until it expires, in ``RECORD_PATH`` under the gateway home
 (``app.state.webapp_home``), so native apps stay signed in across a restart and a sign-out. A browser
 login's tokens therefore work only as that login's cookies and end with it. The deployment session
-token (``HERMES_DASHBOARD_SESSION_TOKEN``) also works as a bearer or ``?token=`` while the
+token (``EIR_DASHBOARD_SESSION_TOKEN``) also works as a bearer or ``?token=`` while the
 session-token provider is registered (:func:`access_token_works_alone`): no browser login holds it,
 and it has no refresh.
 """
@@ -43,7 +43,7 @@ from typing import Optional
 from fastapi import Request
 from fastapi.responses import Response
 
-from hermes_cli import browser_credential
+from eir_cli import browser_credential
 
 _MESSAGE = b"webapp-sign-in"
 _log = logging.getLogger(__name__)
@@ -61,7 +61,7 @@ _records: dict[Optional[Path], dict[str, int]] = {}
 
 
 def binding(token: str) -> str:
-    """The ``hermes_webapp_signin`` value for browser session token *token*."""
+    """The ``eir_webapp_signin`` value for browser session token *token*."""
     return hmac.new(token.encode(), _MESSAGE, hashlib.sha256).hexdigest()
 
 
@@ -74,7 +74,7 @@ def applies(request: Request) -> bool:
 def check(request: Request) -> bool:
     """Whether the cookie login on *request* is bound to the browser credential in use now. When it
     is, records that credential's generation on ``request.state.webapp_sign_in``."""
-    from hermes_cli.dashboard_auth.cookies import read_webapp_signin_cookie
+    from eir_cli.dashboard_auth.cookies import read_webapp_signin_cookie
 
     token = browser_credential.current()
     presented = read_webapp_signin_cookie(request, _gateway(request)) or ""
@@ -91,8 +91,8 @@ def sign_in_of(request: Request) -> Optional[str]:
 
 
 def _set(response: Response, request: Request, token: str) -> None:
-    from hermes_cli.dashboard_auth.cookies import detect_https, set_webapp_signin_cookie
-    from hermes_cli.dashboard_auth.prefix import prefix_from_request
+    from eir_cli.dashboard_auth.cookies import detect_https, set_webapp_signin_cookie
+    from eir_cli.dashboard_auth.prefix import prefix_from_request
 
     set_webapp_signin_cookie(response, value=binding(token), use_https=detect_https(request),
                              prefix=prefix_from_request(request), gateway=_gateway(request))
@@ -135,7 +135,7 @@ def access_token_works_alone(request: Request, token: str) -> bool:
 def _is_deployment_token(token: str) -> bool:
     """Whether *token* is the deployment session token the registered session-token provider read at
     startup. No browser login holds it: that provider has no sign-in."""
-    from hermes_cli.dashboard_auth import get_provider
+    from eir_cli.dashboard_auth import get_provider
 
     matches = getattr(get_provider("session-token"), "matches_token", None) if token else None
     return callable(matches) and bool(matches(token))
@@ -171,8 +171,8 @@ def _home(request: Request) -> Optional[Path]:
 
 
 def cookie_gateway(request: Request) -> str:
-    """The suffix the gateway's Webapp gives every sign-in cookie it sets (``hermes_session_at_<it>``
-    and the rest, ``hermes_cli.dashboard_auth.cookies``): cookies are not scoped to a port. ``""`` off
+    """The suffix the gateway's Webapp gives every sign-in cookie it sets (``eir_session_at_<it>``
+    and the rest, ``eir_cli.dashboard_auth.cookies``): cookies are not scoped to a port. ``""`` off
     the Webapp, where the standalone dashboard keeps main's names."""
     return _gateway(request) if getattr(request.app.state, "ui_surface", None) == "webapp" else ""
 

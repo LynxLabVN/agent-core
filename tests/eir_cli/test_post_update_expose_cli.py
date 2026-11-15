@@ -1,6 +1,6 @@
 """expose_cli — the launcher owner repairs PATH conveniences.
 
-The installers write ~/.local/bin/hermes* once, at install time. This
+The installers write ~/.local/bin/eir* once, at install time. This
 step rewrites them when they drift (moved checkout, recreated venv,
 deleted by hand) and — just as load-bearing — REFUSES to touch a
 launcher that belongs to a different install sharing the link dir.
@@ -23,7 +23,7 @@ from pathlib import Path
 
 import pytest
 
-from hermes_cli import _launchers, post_update
+from eir_cli import _launchers, post_update
 
 posix_only = pytest.mark.platforms("posix")
 
@@ -44,17 +44,17 @@ def fake_install(tmp_path, monkeypatch):
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setattr(Path, "home", staticmethod(lambda: home))
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
 
     root = tmp_path / "checkout"
     (root / "venv" / "bin").mkdir(parents=True)
     (root / "venv" / "bin" / "python").write_text("#!fake\n", encoding="utf-8")
-    (root / "hermes").write_text("# entrypoint\n", encoding="utf-8")
+    (root / "eir").write_text("# entrypoint\n", encoding="utf-8")
     (root / "run_agent.py").write_text("# agent\n", encoding="utf-8")
-    monkeypatch.setenv("HERMES_INSTALL_ROOT", str(root))
+    monkeypatch.setenv("EIR_INSTALL_ROOT", str(root))
     store = tmp_path / "tools"
     store.mkdir()
-    monkeypatch.setenv("HERMES_RUNTIME_DIR", str(store))
+    monkeypatch.setenv("EIR_RUNTIME_DIR", str(store))
     interpreter = Path(sys._base_executable).resolve()
     (store / "facts.json").write_text(json.dumps({"schema": 1, "packages": {"python": {
         "entry": str(interpreter.parent if os.name == "nt" else interpreter.parents[1]),
@@ -65,12 +65,12 @@ def fake_install(tmp_path, monkeypatch):
 @pytest.mark.platforms("windows")
 @pytest.mark.parametrize("create", [True, False])
 def test_windows_converges_on_the_installer_user_bin(create, monkeypatch, tmp_path):
-    """Windows converges on the installer's convention ($HERMES_HOME\\bin + User PATH); an update
+    """Windows converges on the installer's convention ($EIR_HOME\\bin + User PATH); an update
     no longer skips as "installer-owned" and leaves a venv\\Scripts machine behind."""
     calls = []
     monkeypatch.setattr(_launchers, "_expose_windows_user_bin",
                         lambda root, *, create: calls.append(create) or {"ok": True, "written": []})
-    monkeypatch.setenv("HERMES_INSTALL_ROOT", str(tmp_path))
+    monkeypatch.setenv("EIR_INSTALL_ROOT", str(tmp_path))
     assert _launchers.expose_cli(create=create) == {"ok": True, "written": []}
     assert calls == [create]
 
@@ -91,12 +91,12 @@ def user_path_writes(monkeypatch):
 
 @pytest.mark.platforms("windows")
 def test_sandbox_home_keeps_its_launchers_off_the_user_path(user_path_writes, tmp_path, monkeypatch):
-    """A review sandbox's HERMES_HOME publishes into its own bin and never reaches the User PATH.
+    """A review sandbox's EIR_HOME publishes into its own bin and never reaches the User PATH.
 
     The console environment is not stubbed: Windows builds it from the user's
     stored variables, so these overrides are exactly what a sandbox sets."""
     box = tmp_path / "box"
-    monkeypatch.setenv("HERMES_HOME", str(box / "hermes"))
+    monkeypatch.setenv("EIR_HOME", str(box / "eir"))
     monkeypatch.setenv("LOCALAPPDATA", str(box / "local"))
     monkeypatch.setenv("USERPROFILE", str(box / "user"))
 
@@ -108,37 +108,37 @@ def test_sandbox_home_keeps_its_launchers_off_the_user_path(user_path_writes, tm
 
 
 @pytest.mark.platforms("windows")
-@pytest.mark.parametrize("hermes_home", [None, ("hermes",), ("hermes", "profiles", "work")])
-def test_the_home_new_consoles_use_registers_its_bin(user_path_writes, hermes_home, tmp_path, monkeypatch):
+@pytest.mark.parametrize("eir_home", [None, ("eir",), ("eir", "profiles", "work")])
+def test_the_home_new_consoles_use_registers_its_bin(user_path_writes, eir_home, tmp_path, monkeypatch):
     local = tmp_path / "local"
     monkeypatch.setenv("LOCALAPPDATA", str(local))
-    if hermes_home is None:
-        monkeypatch.delenv("HERMES_HOME", raising=False)
+    if eir_home is None:
+        monkeypatch.delenv("EIR_HOME", raising=False)
     else:
-        monkeypatch.setenv("HERMES_HOME", str(local.joinpath(*hermes_home)))
+        monkeypatch.setenv("EIR_HOME", str(local.joinpath(*eir_home)))
     monkeypatch.setattr(_launchers, "_new_console_environment", lambda: {"LOCALAPPDATA": str(local)})
 
     result = _launchers._expose_windows_user_bin(tmp_path / "checkout", create=True)
 
     assert result["path"] == "added"
-    assert user_path_writes == [local / "hermes" / "bin"]
+    assert user_path_writes == [local / "eir" / "bin"]
 
 
 @pytest.mark.platforms("windows")
 @pytest.mark.parametrize("stored_home, override", [
-    ("%LOCALAPPDATA%\\hermes-data", "LOCALAPPDATA"),
-    ("~\\hermes-data", "USERPROFILE"),
+    ("%LOCALAPPDATA%\\eir-data", "LOCALAPPDATA"),
+    ("~\\eir-data", "USERPROFILE"),
 ])
 def test_inherited_home_reference_expands_from_the_console_environment(
         user_path_writes, stored_home, override, tmp_path, monkeypatch):
-    """A sandbox that inherits a stored HERMES_HOME such as %LOCALAPPDATA%\\x and overrides
+    """A sandbox that inherits a stored EIR_HOME such as %LOCALAPPDATA%\\x and overrides
     LOCALAPPDATA resolves a different root from a new console, so it must not match."""
     real = tmp_path / "real"
-    console = {"LOCALAPPDATA": str(real / "local"), "USERPROFILE": str(real / "user"), "HERMES_HOME": stored_home}
+    console = {"LOCALAPPDATA": str(real / "local"), "USERPROFILE": str(real / "user"), "EIR_HOME": stored_home}
     monkeypatch.setattr(_launchers, "_new_console_environment", lambda: dict(console))
     monkeypatch.setenv("LOCALAPPDATA", console["LOCALAPPDATA"])
     monkeypatch.setenv("USERPROFILE", console["USERPROFILE"])
-    monkeypatch.setenv("HERMES_HOME", stored_home)
+    monkeypatch.setenv("EIR_HOME", stored_home)
     monkeypatch.setenv(override, str(tmp_path / "box" / override.lower()))
 
     result = _launchers._expose_windows_user_bin(tmp_path / "checkout", create=True)
@@ -150,7 +150,7 @@ def test_inherited_home_reference_expands_from_the_console_environment(
 @pytest.mark.platforms("windows")
 def test_unknown_console_environment_leaves_the_user_path(user_path_writes, tmp_path, monkeypatch):
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "local"))
-    monkeypatch.delenv("HERMES_HOME", raising=False)
+    monkeypatch.delenv("EIR_HOME", raising=False)
     monkeypatch.setattr(_launchers, "_new_console_environment", lambda: None)
 
     assert _launchers._expose_windows_user_bin(tmp_path / "checkout", create=True)["skipped"]
@@ -161,16 +161,16 @@ def test_unknown_console_environment_leaves_the_user_path(user_path_writes, tmp_
 def test_new_console_environment_ignores_this_process(tmp_path, monkeypatch):
     """The real Win32 read: variables set only in this process are absent from a new console's environment."""
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "local"))
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes"))
-    monkeypatch.setenv("HERMES_TEST_ONLY_IN_THIS_PROCESS", "1")
+    monkeypatch.setenv("EIR_HOME", str(tmp_path / "eir"))
+    monkeypatch.setenv("EIR_TEST_ONLY_IN_THIS_PROCESS", "1")
 
     environ = _launchers._new_console_environment()
 
     assert environ is not None
-    assert "HERMES_TEST_ONLY_IN_THIS_PROCESS" not in environ
+    assert "EIR_TEST_ONLY_IN_THIS_PROCESS" not in environ
     assert environ.get("LOCALAPPDATA")
     assert Path(environ["LOCALAPPDATA"]) != tmp_path / "local"
-    assert environ.get("HERMES_HOME") != str(tmp_path / "hermes")
+    assert environ.get("EIR_HOME") != str(tmp_path / "eir")
 
 
 @pytest.mark.platforms("windows")
@@ -178,10 +178,10 @@ def test_environment_block_reader_counts_utf16_units():
     """An emoji takes two UTF-16 units but one Python character; the variables after it must survive."""
     import ctypes
 
-    block = ctypes.create_unicode_buffer("A=1\0MOOD=\U0001F600\0HERMES_HOME=C:\\h\0=C:=C:\\\0\0")
+    block = ctypes.create_unicode_buffer("A=1\0MOOD=\U0001F600\0EIR_HOME=C:\\h\0=C:=C:\\\0\0")
 
     assert _launchers._read_environment_block(ctypes.addressof(block)) == {
-        "A": "1", "MOOD": "\U0001F600", "HERMES_HOME": "C:\\h"}
+        "A": "1", "MOOD": "\U0001F600", "EIR_HOME": "C:\\h"}
 
 
 def _windows_home(tmp_path, monkeypatch) -> Path:
@@ -190,12 +190,12 @@ def _windows_home(tmp_path, monkeypatch) -> Path:
     distlib is switched off, so publication writes the ``.cmd`` form on every test host."""
     local = tmp_path / "local"
     monkeypatch.setenv("LOCALAPPDATA", str(local))
-    monkeypatch.delenv("HERMES_HOME", raising=False)
-    monkeypatch.delenv("HERMES_RUNTIME_DIR", raising=False)
+    monkeypatch.delenv("EIR_HOME", raising=False)
+    monkeypatch.delenv("EIR_RUNTIME_DIR", raising=False)
     monkeypatch.setattr(_launchers, "_new_console_environment", lambda: {"LOCALAPPDATA": str(local)})
     monkeypatch.setattr(_launchers, "_load_script_maker", lambda: None)
     monkeypatch.setattr(_launchers, "_store_script_maker", lambda python_exe: None)
-    home = local / "hermes"
+    home = local / "eir"
     _store_python(home).parent.mkdir(parents=True)
     _store_python(home).touch()
     (home / "tools" / "facts.json").write_text(
@@ -223,9 +223,9 @@ def _write_exe_launcher(target: Path, python: Path, root: Path) -> None:
 
 
 def _command(home: Path) -> Path:
-    """The ``hermes`` a console runs: PATHEXT resolves .exe before .cmd."""
-    exe = home / "bin" / "hermes.exe"
-    return exe if exe.exists() else home / "bin" / "hermes.cmd"
+    """The ``eir`` a console runs: PATHEXT resolves .exe before .cmd."""
+    exe = home / "bin" / "eir.exe"
+    return exe if exe.exists() else home / "bin" / "eir.cmd"
 
 
 @pytest.fixture
@@ -242,9 +242,9 @@ def test_review_tree_leaves_the_installed_commands_alone(form, path_registration
     """A review tree started against the real home keeps the installed checkout's commands in its bin.
 
     Its boot bootstrap runs expose_cli too; republishing there would point every
-    console's ``hermes`` at the review tree."""
+    console's ``eir`` at the review tree."""
     home = _windows_home(tmp_path, monkeypatch)
-    installed = _checkout(home / "hermes-agent")
+    installed = _checkout(home / "eir-agent")
     review = _checkout(home / "reviews" / "pr-1" / "rebuild-wt")
     if form == "exe":
         (home / "bin").mkdir()
@@ -257,7 +257,7 @@ def test_review_tree_leaves_the_installed_commands_alone(form, path_registration
     result = _launchers._expose_windows_user_bin(review, create=True)
 
     assert {path.name: path.read_bytes() for path in (home / "bin").iterdir()} == before
-    assert result == {"ok": True, "skipped": f"{home / 'bin' / f'hermes.{form}'} starts another checkout"}
+    assert result == {"ok": True, "skipped": f"{home / 'bin' / f'eir.{form}'} starts another checkout"}
     assert _launchers._launcher_checkout(_command(home)) == installed
     assert path_registrations == ([] if form == "exe" else [home / "bin"])
 
@@ -280,7 +280,7 @@ def test_review_tree_publishes_where_no_working_command_exists(path_registration
 @pytest.mark.platforms("windows")
 def test_installed_checkout_takes_its_commands_back(path_registrations, tmp_path, monkeypatch):
     home = _windows_home(tmp_path, monkeypatch)
-    installed = _checkout(home / "hermes-agent")
+    installed = _checkout(home / "eir-agent")
     review = _checkout(home / "reviews" / "pr-1" / "rebuild-wt")
     _launchers._expose_windows_user_bin(review, create=True)
     assert _launchers._launcher_checkout(_command(home)) == review
@@ -295,44 +295,44 @@ def test_registered_as_a_home_step():
 
 class TestExposeCli:
     @posix_only
-    @pytest.mark.parametrize("hermes", ["missing", "foreign"])
-    def test_repair_only_preserves_missing_and_foreign_commands(self, fake_install, monkeypatch, hermes):
+    @pytest.mark.parametrize("eir", ["missing", "foreign"])
+    def test_repair_only_preserves_missing_and_foreign_commands(self, fake_install, monkeypatch, eir):
         home, root = fake_install
-        monkeypatch.setattr("hermes_cli.config.load_config", lambda: pytest.fail("repair read config"))
+        monkeypatch.setattr("eir_cli.config.load_config", lambda: pytest.fail("repair read config"))
         wrapper_dir = home / ".local" / "bin"
         extra = home / "bin"
         assert _launchers.expose_cli(create=False) == {"ok": True, "written": []}
         assert not wrapper_dir.exists()
         assert not extra.exists()
-        assert {p.name for p in (root / ".hermes/bin").iterdir()} == set(_launchers.ENTRY_POINTS)
+        assert {p.name for p in (root / ".eir/bin").iterdir()} == set(_launchers.ENTRY_POINTS)
 
-        # An owned ACP entry must be repaired even without an owned hermes
+        # An owned ACP entry must be repaired even without an owned eir
         # sibling admitting this directory. Its old target is already gone.
         extra.mkdir()
-        dangling = root / "venv/bin/hermes-acp"
-        acp = extra / "hermes-acp"
+        dangling = root / "venv/bin/eir-acp"
+        acp = extra / "eir-acp"
         acp.symlink_to(dangling)
         assert not acp.exists() and acp.is_symlink()
         foreign = b"#!/bin/sh\n# user-owned caf\xc3\xa9 command\nexit 19\n"
-        if hermes == "foreign":
-            (extra / "hermes").write_bytes(foreign)
+        if eir == "foreign":
+            (extra / "eir").write_bytes(foreign)
         wrapper_dir.mkdir(parents=True)
-        (wrapper_dir / "hermes").write_bytes(foreign)
-        foreign_link = wrapper_dir / "hermes-acp"
-        foreign_target = home / "other-install/hermes-acp"
+        (wrapper_dir / "eir").write_bytes(foreign)
+        foreign_link = wrapper_dir / "eir-acp"
+        foreign_target = home / "other-install/eir-acp"
         foreign_link.symlink_to(foreign_target)
-        before = {path: path.lstat().st_mtime_ns for path in (wrapper_dir, wrapper_dir / "hermes", foreign_link)}
+        before = {path: path.lstat().st_mtime_ns for path in (wrapper_dir, wrapper_dir / "eir", foreign_link)}
 
-        assert _launchers.expose_cli(create=False) == {"ok": True, "written": ["hermes-acp"]}
+        assert _launchers.expose_cli(create=False) == {"ok": True, "written": ["eir-acp"]}
         assert acp.is_file() and not acp.is_symlink() and os.access(acp, os.X_OK)
         assert not dangling.exists()
-        assert not (extra / "hermes-agent").exists()
-        assert not (wrapper_dir / "hermes-agent").exists()
-        if hermes == "foreign":
-            assert (extra / "hermes").read_bytes() == foreign
+        assert not (extra / "eir-agent").exists()
+        assert not (wrapper_dir / "eir-agent").exists()
+        if eir == "foreign":
+            assert (extra / "eir").read_bytes() == foreign
         else:
-            assert not (extra / "hermes").exists()
-        assert (wrapper_dir / "hermes").read_bytes() == foreign
+            assert not (extra / "eir").exists()
+        assert (wrapper_dir / "eir").read_bytes() == foreign
         assert foreign_link.is_symlink() and foreign_link.readlink() == foreign_target
         assert before == {path: path.lstat().st_mtime_ns for path in before}
         assert _launchers.expose_cli(create=False) == {"ok": True, "written": []}
@@ -342,12 +342,12 @@ class TestExposeCli:
         home, root = fake_install
         result = _launchers.expose_cli()
         assert result["ok"] is True
-        assert sorted(result["written"]) == ["hermes", "hermes-acp", "hermes-agent"]
-        for name in ("hermes", "hermes-agent", "hermes-acp"):
+        assert sorted(result["written"]) == ["eir", "eir-acp", "eir-agent"]
+        for name in ("eir", "eir-agent", "eir-acp"):
             wrapper = home / ".local" / "bin" / name
             body = wrapper.read_text(encoding="utf-8-sig")
             assert str(root) in body
-            assert str(root / ".hermes" / "bin") in body
+            assert str(root / ".eir" / "bin") in body
             assert os.access(wrapper, os.X_OK)
 
 
@@ -358,18 +358,18 @@ class TestExposeCli:
         other = "/somewhere/else/checkout"
         wrapper_dir = home / ".local" / "bin"
         wrapper_dir.mkdir(parents=True)
-        foreign = f'#!/bin/sh\nexec "{other}/venv/bin/python" "{other}/hermes" "$@"\n'
-        (wrapper_dir / "hermes").write_text(foreign, encoding="utf-8")
+        foreign = f'#!/bin/sh\nexec "{other}/venv/bin/python" "{other}/eir" "$@"\n'
+        (wrapper_dir / "eir").write_text(foreign, encoding="utf-8")
         result = _launchers.expose_cli()
-        assert (wrapper_dir / "hermes").read_text(encoding="utf-8-sig") == foreign
-        assert "hermes" not in result["written"]
+        assert (wrapper_dir / "eir").read_text(encoding="utf-8-sig") == foreign
+        assert "eir" not in result["written"]
         # The other two had no file at all — those ARE written.
-        assert sorted(result["written"]) == ["hermes-acp", "hermes-agent"]
+        assert sorted(result["written"]) == ["eir-acp", "eir-agent"]
 
     @posix_only
     def test_config_gate_disables(self, fake_install, monkeypatch):
         monkeypatch.setattr(
-            "hermes_cli.config.load_config",
+            "eir_cli.config.load_config",
             lambda: {"cli": {"expose_on_path": False}},
         )
         result = _launchers.expose_cli()
@@ -380,7 +380,7 @@ class TestExposeCli:
         (tmp_path / "tools" / "facts.json").unlink()
         bare = tmp_path / "sealed"
         bare.mkdir()
-        monkeypatch.setenv("HERMES_INSTALL_ROOT", str(bare))
+        monkeypatch.setenv("EIR_INSTALL_ROOT", str(bare))
         result = _launchers.expose_cli()
         assert result == {"ok": True, "skipped": "no-store-python"}
 
@@ -397,11 +397,11 @@ class TestExposeCli:
         (payload / "bin").mkdir(parents=True)
         (payload / "repo").mkdir()
         _write_bundled_stamp(payload / "repo")
-        for name in ("hermes", "hermes-agent", "hermes-acp"):
+        for name in ("eir", "eir-agent", "eir-acp"):
             (payload / "bin" / name).write_text("\x7fELF fake shim\n", encoding="utf-8")
-        monkeypatch.setenv("HERMES_INSTALL_ROOT", str(payload / "repo"))
+        monkeypatch.setenv("EIR_INSTALL_ROOT", str(payload / "repo"))
         if not create:
-            monkeypatch.setattr("hermes_cli.config.load_config", lambda: pytest.fail("repair read config"))
+            monkeypatch.setattr("eir_cli.config.load_config", lambda: pytest.fail("repair read config"))
         result = _launchers.expose_cli(create=create)
         assert result == {"ok": True, "skipped": "bundle-owns-launchers"}
         assert not (fake_install[0] / ".local/bin").exists()
@@ -411,16 +411,16 @@ class TestExposeCli:
         self, fake_install, monkeypatch, tmp_path
     ):
         """The stamp is the shape authority. A venv-less checkout whose
-        PARENT happens to carry a bin/hermes (the installers' launcher
-        dir shares ~/.hermes with the checkout) must skip, not enter the
+        PARENT happens to carry a bin/eir (the installers' launcher
+        dir shares ~/.eir with the checkout) must skip, not enter the
         sealed branch — on every platform."""
         (tmp_path / "tools" / "facts.json").unlink()
-        parent = tmp_path / "hermes-home"
+        parent = tmp_path / "eir-home"
         (parent / "bin").mkdir(parents=True)
-        (parent / "bin" / "hermes").write_text("#!/bin/sh\n# installer launcher\n", encoding="utf-8")
-        checkout = parent / "hermes-agent"
+        (parent / "bin" / "eir").write_text("#!/bin/sh\n# installer launcher\n", encoding="utf-8")
+        checkout = parent / "eir-agent"
         checkout.mkdir()
-        monkeypatch.setenv("HERMES_INSTALL_ROOT", str(checkout))
+        monkeypatch.setenv("EIR_INSTALL_ROOT", str(checkout))
         result = _launchers.expose_cli()
         assert result == {"ok": True, "skipped": "no-store-python"}
         assert _launchers._is_bundled_payload(checkout) is False
@@ -432,15 +432,15 @@ class TestExposeCli:
         home, root = fake_install
         wrapper_dir = home / ".local" / "bin"
         wrapper_dir.mkdir(parents=True)
-        console_script = root / "venv" / "bin" / "hermes"
+        console_script = root / "venv" / "bin" / "eir"
         console_script.write_text("# real console script\n", encoding="utf-8")
-        (wrapper_dir / "hermes").symlink_to(console_script)
+        (wrapper_dir / "eir").symlink_to(console_script)
         result = _launchers.expose_cli()
-        assert "hermes" in result["written"]
+        assert "eir" in result["written"]
         # The venv console script survives untouched…
         assert console_script.read_text(encoding="utf-8-sig") == "# real console script\n"
         # …and the link-dir entry is now a real file, not a symlink.
-        assert not (wrapper_dir / "hermes").is_symlink()
+        assert not (wrapper_dir / "eir").is_symlink()
 
 
 @pytest.mark.platforms("macos")
@@ -450,7 +450,7 @@ def test_direct_packaged_cli_exposes_shims_before_electron(tmp_path):
 
     home = tmp_path / "home"
     home.mkdir()
-    payload = tmp_path / "Hermes.app/Contents/Resources/agent-payload"
+    payload = tmp_path / "Eir.app/Contents/Resources/agent-payload"
     repo = payload / "repo"
     _write_bundled_stamp(repo)
     (repo / "install-stamp.json").write_text(json.dumps({
@@ -458,20 +458,20 @@ def test_direct_packaged_cli_exposes_shims_before_electron(tmp_path):
     }), encoding="utf-8")
     bin_dir = payload / "bin"
     bin_dir.mkdir()
-    code = f"import sys; sys.path.insert(0, {str(Path(__file__).resolve().parents[2])!r}); from hermes_cli.main import main; main()"
-    for name in ("hermes", "hermes-agent", "hermes-acp"):
+    code = f"import sys; sys.path.insert(0, {str(Path(__file__).resolve().parents[2])!r}); from eir_cli.main import main; main()"
+    for name in ("eir", "eir-agent", "eir-acp"):
         shim = bin_dir / name
         shim.write_text(f'#!/bin/sh\nexec {shlex.join([sys.executable, "-I", "-c", code])} "$@"\n', encoding="utf-8")
         shim.chmod(0o755)
-    env = dict(os.environ, HOME=str(home), HERMES_HOME=str(home / ".hermes"),
-               HERMES_INSTALL_ROOT=str(repo), HERMES_RUNTIME_DIR=str(tmp_path / "tools"))
+    env = dict(os.environ, HOME=str(home), EIR_HOME=str(home / ".eir"),
+               EIR_INSTALL_ROOT=str(repo), EIR_RUNTIME_DIR=str(tmp_path / "tools"))
     # Execute the package CLI directly. No Electron process or linking helper runs.
     # `--help` reaches main()'s boot bootstrap (which owns expose_cli) before argparse
     # exits; `--version` is answered on the pre-import fast path and never gets there.
-    result = subprocess.run([str(bin_dir / "hermes"), "--help"], env=env,
+    result = subprocess.run([str(bin_dir / "eir"), "--help"], env=env,
                             capture_output=True, text=True, timeout=30, encoding="utf-8", check=False)
     assert result.returncode == 0, result.stderr
-    for name in ("hermes", "hermes-agent", "hermes-acp"):
+    for name in ("eir", "eir-agent", "eir-acp"):
         assert (home / ".local/bin" / name).is_symlink()
         assert (home / ".local/bin" / name).resolve() == bin_dir / name
 
@@ -487,9 +487,9 @@ class TestSymlinkSealedLaunchers:
         home = tmp_path / "home"
         home.mkdir()
         monkeypatch.setattr(Path, "home", staticmethod(lambda: home))
-        payload_bin = tmp_path / "Hermes.app" / "Contents" / "Resources" / "agent-payload" / "bin"
+        payload_bin = tmp_path / "Eir.app" / "Contents" / "Resources" / "agent-payload" / "bin"
         payload_bin.mkdir(parents=True)
-        for name in ("hermes", "hermes-agent", "hermes-acp"):
+        for name in ("eir", "eir-agent", "eir-acp"):
             (payload_bin / name).write_text("fake mach-o shim\n", encoding="utf-8")
         return home, payload_bin
 
@@ -497,8 +497,8 @@ class TestSymlinkSealedLaunchers:
         home, payload_bin = payload
         result = _launchers._symlink_sealed_launchers(payload_bin)
         assert result["ok"] is True
-        assert sorted(result["written"]) == ["hermes", "hermes-acp", "hermes-agent"]
-        for name in ("hermes", "hermes-agent", "hermes-acp"):
+        assert sorted(result["written"]) == ["eir", "eir-acp", "eir-agent"]
+        for name in ("eir", "eir-agent", "eir-acp"):
             link = home / ".local" / "bin" / name
             assert link.is_symlink()
             assert os.readlink(link) == str(payload_bin / name)
@@ -516,22 +516,22 @@ class TestSymlinkSealedLaunchers:
         old = payload_bin.parent / "bin-old"
         link_dir = home / ".local" / "bin"
         link_dir.mkdir(parents=True)
-        (link_dir / "hermes").symlink_to(old / "hermes")  # dangling, old payload path
+        (link_dir / "eir").symlink_to(old / "eir")  # dangling, old payload path
         result = _launchers._symlink_sealed_launchers(payload_bin)
-        assert "hermes" in result["written"]
-        assert os.readlink(link_dir / "hermes") == str(payload_bin / "hermes")
+        assert "eir" in result["written"]
+        assert os.readlink(link_dir / "eir") == str(payload_bin / "eir")
 
     def test_never_touches_a_live_foreign_entry(self, payload, tmp_path):
         home, payload_bin = payload
         link_dir = home / ".local" / "bin"
         link_dir.mkdir(parents=True)
         # A real file (pipx-style launcher)…
-        (link_dir / "hermes").write_text("#!/bin/sh\n# pipx launcher\n", encoding="utf-8")
+        (link_dir / "eir").write_text("#!/bin/sh\n# pipx launcher\n", encoding="utf-8")
         # …and a live symlink to a different tool.
         other = tmp_path / "other-tool"
         other.write_text("other\n", encoding="utf-8")
-        (link_dir / "hermes-agent").symlink_to(other)
+        (link_dir / "eir-agent").symlink_to(other)
         result = _launchers._symlink_sealed_launchers(payload_bin)
-        assert (link_dir / "hermes").read_text(encoding="utf-8-sig") == "#!/bin/sh\n# pipx launcher\n"
-        assert os.readlink(link_dir / "hermes-agent") == str(other)
-        assert sorted(result["written"]) == ["hermes-acp"]
+        assert (link_dir / "eir").read_text(encoding="utf-8-sig") == "#!/bin/sh\n# pipx launcher\n"
+        assert os.readlink(link_dir / "eir-agent") == str(other)
+        assert sorted(result["written"]) == ["eir-acp"]

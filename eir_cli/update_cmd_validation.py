@@ -3,11 +3,11 @@
 import json
 import subprocess
 from pathlib import Path
-from hermes_cli._launchers import runtime_command
+from eir_cli._launchers import runtime_command
 
 # Modules imported on every startup. Unlike _UPDATE_CRITICAL_FILES (only parsed) these are
 # *imported*, catching cross-module breakage (a name pulled from a sibling no longer exists).
-_UPDATE_CRITICAL_MODULES = "hermes_cli.main", "run_agent", "model_tools", "toolsets"
+_UPDATE_CRITICAL_MODULES = "eir_cli.main", "run_agent", "model_tools", "toolsets"
 
 
 def _critical_module_import_failures(
@@ -19,25 +19,25 @@ def _critical_module_import_failures(
     keeps import side effects out of the updater's ``sys.modules``.
     Generic import-time exceptions are tolerated unless ``report_runtime_errors=True``.
     """
-    from hermes_cli.update_cmd import _UPDATE_CRITICAL_MODULES
-    from hermes_constants import FIRST_PARTY_MODULE_ROOTS
+    from eir_cli.update_cmd import _UPDATE_CRITICAL_MODULES
+    from eir_constants import FIRST_PARTY_MODULE_ROOTS
     import secrets
-    marker = f"__HERMES_IMPORT_HEALTH_{secrets.token_hex(16)}__"
+    marker = f"__EIR_IMPORT_HEALTH_{secrets.token_hex(16)}__"
     probe = (
         "import importlib, json, sys\n"
-        # Importing hermes_cli.main runs the startup dotenv load, which pulls external secret
+        # Importing eir_cli.main runs the startup dotenv load, which pulls external secret
         # sources (op/bws/command helpers, up to 120s each) unless argv says ``update``. The
         # probe only checks importability, so it inherits the updater's own argv contract.
-        "sys.argv = ['hermes', 'update']\n"
+        "sys.argv = ['eir', 'update']\n"
         "failures = []\n"
         f"for name in {_UPDATE_CRITICAL_MODULES!r}:\n"
         "    try:\n"
         "        importlib.import_module(name)\n"
         "    except ModuleNotFoundError as exc:\n"
         # A missing *third-party* module means deps aren't installed, not a skewed checkout;
-        # only our own packages count. Roots come from hermes_constants so the user hint can't drift.
+        # only our own packages count. Roots come from eir_constants so the user hint can't drift.
         "        missing = (getattr(exc, 'name', '') or '').split('.')[0]\n"
-        f"        if missing in {tuple(sorted(FIRST_PARTY_MODULE_ROOTS))!r} or missing.startswith('hermes_') or {report_runtime_errors!r}:\n"
+        f"        if missing in {tuple(sorted(FIRST_PARTY_MODULE_ROOTS))!r} or missing.startswith('eir_') or {report_runtime_errors!r}:\n"
         "            failures.append((name, type(exc).__name__, str(exc)))\n"
         "    except ImportError as exc:\n"
         "        failures.append((name, type(exc).__name__, str(exc)))\n"

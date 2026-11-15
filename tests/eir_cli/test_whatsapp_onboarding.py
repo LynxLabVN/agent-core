@@ -2,10 +2,10 @@ import asyncio
 import time
 
 import pytest
-import hermes_cli.config as _cfg_mod
-import hermes_cli.web_models as _web_models
-import hermes_cli.web_routers.messaging as _rt_messaging
-import hermes_cli.web_server_messaging as _web_server_messaging
+import eir_cli.config as _cfg_mod
+import eir_cli.web_models as _web_models
+import eir_cli.web_routers.messaging as _rt_messaging
+import eir_cli.web_server_messaging as _web_server_messaging
 
 
 class _FakeProc:
@@ -36,7 +36,7 @@ class _FakeProc:
 
 
 def test_apply_whatsapp_onboarding_saves_pairing_policy(monkeypatch):
-    from hermes_cli import web_server as ws
+    from eir_cli import web_server as ws
 
     saved = {}
     removed = []
@@ -80,12 +80,12 @@ def test_apply_whatsapp_onboarding_saves_pairing_policy(monkeypatch):
 
 
 def test_start_whatsapp_onboarding_existing_creds_returns_linked_account(monkeypatch, tmp_path):
-    from hermes_cli import web_server as ws
+    from eir_cli import web_server as ws
 
     session_dir = tmp_path / "session"
     session_dir.mkdir()
     (session_dir / "creds.json").write_text(
-        '{"me":{"id":"15551234567:1@s.whatsapp.net","name":"Hermes Bot"}}',
+        '{"me":{"id":"15551234567:1@s.whatsapp.net","name":"Eir Bot"}}',
         encoding="utf-8",
     )
 
@@ -113,7 +113,7 @@ def test_start_whatsapp_onboarding_existing_creds_returns_linked_account(monkeyp
     assert result["status"] == "connected"
     assert result["qr_payload"] is None
     assert result["account_id"] == "15551234567:1@s.whatsapp.net"
-    assert result["account_name"] == "Hermes Bot"
+    assert result["account_name"] == "Eir Bot"
     assert result["account_phone"] == "15551234567"
     assert old_record.status == "cancelled"
     assert old_proc.terminated is True
@@ -123,7 +123,7 @@ def test_start_whatsapp_onboarding_existing_creds_returns_linked_account(monkeyp
 
 @pytest.mark.parametrize("lines,returncode,expected", [
     # The bridge names the cause before exiting 1; the exit code must not replace it.
-    (['{"event":"error","error":"passkey_required"}\n'], 1, "hermes whatsapp --passkey-browser"),
+    (['{"event":"error","error":"passkey_required"}\n'], 1, "eir whatsapp --passkey-browser"),
     (['{"event":"error","error":"logged_out","reason":401}\n'], 1, "logged_out"),
     # No streamed cause: the exit reason is all the dashboard can show.
     (['{"event":"qr","qr":"payload"}\n'], 1, "exited with code 1"),

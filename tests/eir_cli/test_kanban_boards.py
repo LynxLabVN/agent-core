@@ -1,4 +1,4 @@
-"""Tests for the multi-board kanban layer (``hermes kanban boards …``).
+"""Tests for the multi-board kanban layer (``eir kanban boards …``).
 
 Covers the pieces added when boards became a first-class concept:
 
@@ -6,11 +6,11 @@ Covers the pieces added when boards became a first-class concept:
 * Path resolution for ``default`` (legacy ``<root>/kanban.db``) vs
   named boards (``<root>/kanban/boards/<slug>/kanban.db``).
 * Current-board persistence via ``<root>/kanban/current`` and
-  ``HERMES_KANBAN_BOARD`` env var.
+  ``EIR_KANBAN_BOARD`` env var.
 * ``connect(board=)`` isolation — writes on one board don't leak.
 * ``create_board`` / ``list_boards`` / ``remove_board`` round trip.
-* CLI surface: ``hermes kanban boards list/create/switch/rm``.
-* ``_default_spawn`` injects ``HERMES_KANBAN_BOARD`` into worker env.
+* CLI surface: ``eir kanban boards list/create/switch/rm``.
+* ``_default_spawn`` injects ``EIR_KANBAN_BOARD`` into worker env.
 """
 
 from __future__ import annotations
@@ -28,9 +28,9 @@ _WORKTREE = Path(__file__).resolve().parents[2]
 if str(_WORKTREE) not in sys.path:
     sys.path.insert(0, str(_WORKTREE))
 
-from hermes_cli import kanban_db as kb
-from hermes_cli import kanban_db_connect as kbc
-from hermes_cli import kanban_db_dispatch as kbd
+from eir_cli import kanban_db as kb
+from eir_cli import kanban_db_connect as kbc
+from eir_cli import kanban_db_dispatch as kbd
 
 
 # ---------------------------------------------------------------------------
@@ -39,26 +39,26 @@ from hermes_cli import kanban_db_dispatch as kbd
 
 @pytest.fixture
 def fresh_home(tmp_path, monkeypatch):
-    """Isolated HERMES_HOME with no prior kanban state.
+    """Isolated EIR_HOME with no prior kanban state.
 
     The autouse hermetic conftest already nukes credentials + TZ; this
-    fixture layers a per-test HERMES_HOME plus a path-init cache reset
+    fixture layers a per-test EIR_HOME plus a path-init cache reset
     so each test sees a truly empty board set.
     """
-    home = tmp_path / "hermes_home"
+    home = tmp_path / "eir_home"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     for var in (
-        "HERMES_KANBAN_DB",
-        "HERMES_KANBAN_WORKSPACES_ROOT",
-        "HERMES_KANBAN_HOME",
-        "HERMES_KANBAN_BOARD",
+        "EIR_KANBAN_DB",
+        "EIR_KANBAN_WORKSPACES_ROOT",
+        "EIR_KANBAN_HOME",
+        "EIR_KANBAN_BOARD",
     ):
         monkeypatch.delenv(var, raising=False)
-    # Also reset hermes_constants cache so get_default_hermes_root() re-reads.
+    # Also reset eir_constants cache so get_default_eir_root() re-reads.
     try:
-        import hermes_constants
-        hermes_constants._cached_default_hermes_root = None  # type: ignore[attr-defined]
+        import eir_constants
+        eir_constants._cached_default_eir_root = None  # type: ignore[attr-defined]
     except Exception:
         pass
     # Kanban module-level init cache must not leak between tests.
@@ -72,7 +72,7 @@ def fresh_home(tmp_path, monkeypatch):
 
 class TestSlugValidation:
     @pytest.mark.parametrize("good", [
-        "default", "atm10-server", "hermes-agent", "proj_1", "a",
+        "default", "atm10-server", "eir-agent", "proj_1", "a",
         "very-long-but-still-ok-slug-with-hyphens-and-numbers-1234",
     ])
     def test_accepts_valid(self, good):
@@ -101,20 +101,20 @@ class TestPathResolution:
 
 
     def test_env_var_db_override_still_wins(self, fresh_home, tmp_path, monkeypatch):
-        """``HERMES_KANBAN_DB`` pins the file regardless of ``board=`` arg for every
+        """``EIR_KANBAN_DB`` pins the file regardless of ``board=`` arg for every
         execution the dispatcher fences (the 5ec6baa multi-boards isolation: workers
-        physically cannot see other boards): its dispatched workers (``HERMES_KANBAN_TASK``)
-        and delegated children / descendants (``HERMES_DELEGATED_CHILD_CONTEXT``). An
+        physically cannot see other boards): its dispatched workers (``EIR_KANBAN_TASK``)
+        and delegated children / descendants (``EIR_DELEGATED_CHILD_CONTEXT``). An
         explicit board that outranked the pin would also escape
         ``kanban_path_is_fenced``, which checks the pinned path / fenced root. Outside
         those fences an explicit board is the caller's own intent and wins (see
         ``test_explicit_board_trumps_env_var_db_override`` below)."""
         forced = tmp_path / "custom.db"
-        monkeypatch.setenv("HERMES_KANBAN_DB", str(forced))
+        monkeypatch.setenv("EIR_KANBAN_DB", str(forced))
         assert kb.kanban_db_path() == forced
         assert kb.kanban_db_path(board=None) == forced
         # Dispatched worker identity: the pin still fences explicit board intent.
-        monkeypatch.setenv("HERMES_KANBAN_TASK", "t_fence_probe")
+        monkeypatch.setenv("EIR_KANBAN_TASK", "t_fence_probe")
         assert kb.kanban_db_path(board="ignored") == forced
         # Delegated children / spawned descendants are fenced the same way.
         from agent.delegation_context import DELEGATED_CHILD_ENV_MARKER
@@ -122,24 +122,24 @@ class TestPathResolution:
         assert kb.kanban_db_path(board="ignored") == forced
 
     def test_env_var_db_override_wins_when_board_not_passed(self, fresh_home, tmp_path, monkeypatch):
-        """``HERMES_KANBAN_DB`` pins the file when no explicit ``board=`` is given
+        """``EIR_KANBAN_DB`` pins the file when no explicit ``board=`` is given
         (back-compat for dispatcher-spawned workers with no board override)."""
         forced = tmp_path / "custom.db"
-        monkeypatch.setenv("HERMES_KANBAN_DB", str(forced))
+        monkeypatch.setenv("EIR_KANBAN_DB", str(forced))
         assert kb.kanban_db_path() == forced
         assert kb.kanban_db_path(board=None) == forced
 
     def test_explicit_board_trumps_env_var_db_override(self, fresh_home, tmp_path, monkeypatch):
         """Documented priority (module docstring, predates this test): explicit
-        ``board=`` arg > ``HERMES_KANBAN_BOARD`` > ``HERMES_KANBAN_DB`` > current >
+        ``board=`` arg > ``EIR_KANBAN_BOARD`` > ``EIR_KANBAN_DB`` > current >
         default — for UNFENCED callers. An explicit ``board=`` must resolve to that
-        board's own path even when ``HERMES_KANBAN_DB`` pins a different file: this is
+        board's own path even when ``EIR_KANBAN_DB`` pins a different file: this is
         what makes cross-board ``kanban_create(board=...)`` / ``kanban_show(board=...)``
         work from a user-facing session instead of silently landing on the pinned board
         (t_3f1c63a5). Fenced callers (dispatched workers, delegated children) keep the
         pinned path — see ``test_env_var_db_override_still_wins`` above."""
         forced = tmp_path / "custom.db"
-        monkeypatch.setenv("HERMES_KANBAN_DB", str(forced))
+        monkeypatch.setenv("EIR_KANBAN_DB", str(forced))
         p = kb.kanban_db_path(board="atm10-server")
         assert p == fresh_home / "kanban" / "boards" / "atm10-server" / "kanban.db"
         assert p != forced
@@ -261,7 +261,7 @@ class TestConnectionIsolation:
         kb.create_board("persist")
         kb.create_board("envwin")
         kb.set_current_board("persist")
-        monkeypatch.setenv("HERMES_KANBAN_BOARD", "envwin")
+        monkeypatch.setenv("EIR_KANBAN_BOARD", "envwin")
         with kbc.connect() as conn:
             kb.create_task(conn, title="via-env", assignee="x")
         with kbc.connect(board="envwin") as conn:
@@ -275,7 +275,7 @@ class TestConnectionIsolation:
 # ---------------------------------------------------------------------------
 
 class TestWorkerSpawnEnv:
-    """Ensure the dispatcher pins ``HERMES_KANBAN_BOARD`` / DB / workspaces on spawn.
+    """Ensure the dispatcher pins ``EIR_KANBAN_BOARD`` / DB / workspaces on spawn.
 
     We monkey-patch ``subprocess.Popen`` to capture the child env without
     actually spawning anything.
@@ -316,13 +316,13 @@ class TestWorkerSpawnEnv:
         kbd._default_spawn(task, str(fresh_home / "ws"), board="spawntest")
 
         env = captured["env"]
-        assert env["HERMES_KANBAN_BOARD"] == "spawntest"
-        assert env["HERMES_KANBAN_TASK"] == "t_abc"
+        assert env["EIR_KANBAN_BOARD"] == "spawntest"
+        assert env["EIR_KANBAN_TASK"] == "t_abc"
         # DB path should match the per-board DB, not the legacy default.
         expected_db = fresh_home / "kanban" / "boards" / "spawntest" / "kanban.db"
-        assert env["HERMES_KANBAN_DB"] == str(expected_db)
+        assert env["EIR_KANBAN_DB"] == str(expected_db)
         expected_ws = fresh_home / "kanban" / "boards" / "spawntest" / "workspaces"
-        assert env["HERMES_KANBAN_WORKSPACES_ROOT"] == str(expected_ws)
+        assert env["EIR_KANBAN_WORKSPACES_ROOT"] == str(expected_ws)
 
 
 # ---------------------------------------------------------------------------
@@ -330,13 +330,13 @@ class TestWorkerSpawnEnv:
 # ---------------------------------------------------------------------------
 
 def _cli(args: list[str], env_extra: dict | None = None) -> subprocess.CompletedProcess:
-    """Run ``hermes kanban …`` with PYTHONPATH pinned to the worktree."""
+    """Run ``eir kanban …`` with PYTHONPATH pinned to the worktree."""
     env = dict(os.environ)
     env["PYTHONPATH"] = str(_WORKTREE)
     if env_extra:
         env.update(env_extra)
     return subprocess.run(
-        [sys.executable, "-m", "hermes_cli.main", "kanban"] + args,
+        [sys.executable, "-m", "eir_cli.main", "kanban"] + args,
         env=env,
         capture_output=True,
         text=True,
@@ -350,7 +350,7 @@ class TestCLI:
 
 
     def test_per_board_task_isolation_via_cli(self, tmp_path):
-        env = {"HERMES_HOME": str(tmp_path)}
+        env = {"EIR_HOME": str(tmp_path)}
         assert _cli(["boards", "create", "projA"], env_extra=env).returncode == 0
         assert _cli(["boards", "create", "projB"], env_extra=env).returncode == 0
 

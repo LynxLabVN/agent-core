@@ -4,13 +4,13 @@ from types import SimpleNamespace
 
 import pytest
 
-from hermes_cli import gateway, main, update_cmd_fleet as fleet, update_receipt
+from eir_cli import gateway, main, update_cmd_fleet as fleet, update_receipt
 
 
 @pytest.mark.parametrize("failure", ["listing", "restart", "inactive", "unloaded", None])
 def test_pending_launchd_requires_complete_supervision(monkeypatch, tmp_path, failure):
     # Host-independent subprocess-boundary fixture, not native launchd validation.
-    current, sibling = "ai.hermes.gateway", "ai.hermes.gateway-two"
+    current, sibling = "ai.eir.gateway", "ai.eir.gateway-two"
     (tmp_path / f"{sibling}.plist").touch()
     monkeypatch.setattr(gateway, "get_launchd_label", lambda: current)
     monkeypatch.setattr(gateway, "get_launchd_plist_path", lambda: tmp_path / f"{current}.plist")

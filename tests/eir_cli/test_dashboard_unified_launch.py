@@ -8,12 +8,12 @@ launching profile preselected. `--isolated` opts out.
 import sys
 import types
 import pytest
-from hermes_cli import main_dashboard
+from eir_cli import main_dashboard
 
 
 @pytest.fixture
 def main_mod():
-    import hermes_cli.main as main_mod
+    import eir_cli.main as main_mod
     return main_mod
 
 
@@ -31,9 +31,9 @@ class TestUnifiedDashboardRouting:
 
 
     def test_profile_launch_reexecs_machine_dashboard(self, main_mod, monkeypatch):
-        monkeypatch.delenv("HERMES_HOME", raising=False)
+        monkeypatch.delenv("EIR_HOME", raising=False)
         monkeypatch.setattr(
-            "hermes_cli.profiles.get_active_profile_name", lambda: "worker_x"
+            "eir_cli.profiles.get_active_profile_name", lambda: "worker_x"
         )
         monkeypatch.setattr(main_dashboard, "_dashboard_listening", lambda host, port: False)
         execs = []
@@ -78,22 +78,22 @@ class TestUnifiedDashboardRouting:
         assert "--open-profile" in argv
         assert argv[argv.index("--open-profile") + 1] == "worker_x"
         # The child is pinned to the machine ROOT, not the launching profile's
-        # HERMES_HOME.  For a standard install (HERMES_HOME unset) that root is
-        # the platform-native default (~/.hermes), NOT dropped — see the Docker
+        # EIR_HOME.  For a standard install (EIR_HOME unset) that root is
+        # the platform-native default (~/.eir), NOT dropped — see the Docker
         # test below for why we resolve explicitly instead of popping.
-        from hermes_constants import get_default_hermes_root
-        assert env.get("HERMES_HOME") == str(get_default_hermes_root())
+        from eir_constants import get_default_eir_root
+        assert env.get("EIR_HOME") == str(get_default_eir_root())
 
 
     def test_desktop_profile_backend_skips_machine_dashboard_reroute(self, main_mod, monkeypatch):
-        """A desktop-spawned named-profile backend (HERMES_DESKTOP=1) must NOT
+        """A desktop-spawned named-profile backend (EIR_DESKTOP=1) must NOT
         reroute into the machine dashboard. The reroute re-execs as the default
         profile and exits, so the desktop never sees a ready backend → boot
         loop. The guard keeps desktop pool backends per-profile."""
-        monkeypatch.setenv("HERMES_DESKTOP", "1")
-        monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", "desktop-spawn-token")
+        monkeypatch.setenv("EIR_DESKTOP", "1")
+        monkeypatch.setenv("EIR_DASHBOARD_SESSION_TOKEN", "desktop-spawn-token")
         monkeypatch.setattr(
-            "hermes_cli.profiles.get_active_profile_name", lambda: "worker_x"
+            "eir_cli.profiles.get_active_profile_name", lambda: "worker_x"
         )
         listening_calls = []
         monkeypatch.setattr(main_dashboard, "_dashboard_listening",
@@ -115,10 +115,10 @@ class TestInteractiveDashboardAuthSetup:
         self, main_mod, monkeypatch, capsys
     ):
         """A TTY operator is prompted when public_url gates a loopback bind."""
-        from hermes_cli.dashboard_auth import clear_providers
+        from eir_cli.dashboard_auth import clear_providers
 
         monkeypatch.setenv(
-            "HERMES_DASHBOARD_PUBLIC_URL",
+            "EIR_DASHBOARD_PUBLIC_URL",
             "https://dashboard.example.test:9443",
         )
         clear_providers()

@@ -1,12 +1,12 @@
 name: hermes-egm
-title: Hermes EGM
+title: Eir EGM
 repo: https://github.com/willbohn/hermes-egm
 sha: d37006f9ddd940ed196fa07554fe2dd470ce7336
 description: Fresh-context, tool-free design reviews with checked source evidence and EGM workflow skills.
 maintainer: willbohn
 tier: community
 category: tools
-requires_hermes: ">=0.22.7"
+requires_eir: ">=0.22.7"
 version: "0.2.0"
 docs_url: https://github.com/willbohn/hermes-egm#quickstart
 image: https://raw.githubusercontent.com/willbohn/hermes-egm/d37006f9ddd940ed196fa07554fe2dd470ce7336/assets/banner.jpg

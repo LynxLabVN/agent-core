@@ -1,7 +1,7 @@
 """The dashboard SIGTERM→SIGKILL grace must outlast the lifespan teardown (#111912), and a
 descendant that outlives it must not survive the stop (#112631).
 
-``hermes update`` / ``hermes dashboard --stop`` fall back to ``_kill_pids_posix`` for a
+``eir update`` / ``eir dashboard --stop`` fall back to ``_kill_pids_posix`` for a
 manually-started backend. Its lifespan teardown blocks on ``stop_hosted_room_service(timeout=5.0)``
 before ``PTY_REGISTRY.close_all()`` runs; a SIGKILL inside that window orphans the ui-tui /
 tui_gateway.entry children, which keep the deleted ``state.db-wal`` inode open until the next
@@ -22,7 +22,7 @@ import time
 
 import pytest
 
-from hermes_cli import dashboard_procs
+from eir_cli import dashboard_procs
 
 pytestmark = pytest.mark.skipif(sys.platform == "win32", reason="POSIX signal semantics only")
 

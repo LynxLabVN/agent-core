@@ -1,6 +1,6 @@
 """Build and launch plumbing for the browser-hosted Desktop workspace.
 
-The browser surface shares Hermes' hardened dashboard server. This module owns
+The browser surface shares Eir' hardened dashboard server. This module owns
 only the separate renderer artifact and the one-way handoff into that server;
 it never creates a second HTTP/WebSocket stack. The renderer is compiled by the
 shared product builders (``apps/desktop/scripts/build-webapp.mjs``), whose
@@ -17,14 +17,14 @@ import subprocess
 # Serialize renderer publication with Dashboard builds in this checkout.
 _LOCK_NAME = ".web_ui_build.lock"
 _LOCK_WAIT_SECONDS = 30 * 60
-# Written into the bundle when `hermes update` could not rebuild it, so the gateways serving it report
+# Written into the bundle when `eir update` could not rebuild it, so the gateways serving it report
 # the Webapp unavailable instead of serving it against the updated backend. Publishing a build
 # replaces the whole folder, and the receipt's output hash covers this file, so a marked bundle is
 # never reused as current.
-STALE_MARKER = ".hermes-stale"
-# A packaged bundle (the Nix package), like HERMES_WEB_DIST for the dashboard: the packager
-# builds it, so Hermes serves it as it is and never builds or marks it.
-DIST_ENV = "HERMES_WEBAPP_DIST"
+STALE_MARKER = ".eir-stale"
+# A packaged bundle (the Nix package), like EIR_WEB_DIST for the dashboard: the packager
+# builds it, so Eir serves it as it is and never builds or marks it.
+DIST_ENV = "EIR_WEBAPP_DIST"
 
 
 class WebappBuildError(RuntimeError):
@@ -32,7 +32,7 @@ class WebappBuildError(RuntimeError):
 
 
 def packaged_webapp_dist() -> Path | None:
-    """The bundle :data:`DIST_ENV` names, or None when Hermes builds its own."""
+    """The bundle :data:`DIST_ENV` names, or None when Eir builds its own."""
     value = os.environ.get(DIST_ENV)
     return Path(value).expanduser() if value else None
 
@@ -48,7 +48,7 @@ def mark_webapp_stale(project_root: Path) -> bool:
     dist = webapp_dist_dir(project_root)
     if packaged_webapp_dist() is not None or not (dist / "index.html").is_file():
         return False
-    (dist / STALE_MARKER).write_text("hermes update could not rebuild this bundle\n", encoding="utf-8")
+    (dist / STALE_MARKER).write_text("eir update could not rebuild this bundle\n", encoding="utf-8")
     return True
 
 
@@ -78,7 +78,7 @@ def _exclusive_build_lock(path: Path):
     try:
         try:
             if not lock_fd(handle.fileno(), wait=False):
-                print("→ Another Hermes Webapp build is running; waiting for it...")
+                print("→ Another Eir Webapp build is running; waiting for it...")
                 if not lock_fd(handle.fileno(), wait=True, timeout=_LOCK_WAIT_SECONDS):
                     raise WebappBuildError(f"Timed out waiting for another Webapp build ({path})")
         except OSError as exc:
@@ -99,10 +99,10 @@ def prepare_webapp_renderer(
     """Return a verified browser renderer, serializing concurrent builds.
 
     ``explicit`` (a requested build) may install dependencies even when lazy
-    installs are disabled, like ``hermes desktop --build-only``.
+    installs are disabled, like ``eir desktop --build-only``.
     """
-    from hermes_cli.source_build import build_source_webapp, source_build_env, source_product_current
-    from hermes_cli.steward import is_bundled_payload
+    from eir_cli.source_build import build_source_webapp, source_build_env, source_product_current
+    from eir_cli.steward import is_bundled_payload
 
     project_root = project_root.resolve()
     dist = webapp_dist_dir(project_root)
@@ -112,7 +112,7 @@ def prepare_webapp_renderer(
             raise WebappBuildError(f"{DIST_ENV} is set but no Webapp renderer exists at {dist}")
         if force:
             raise WebappBuildError(f"The Webapp renderer at {dist} comes from {DIST_ENV} and cannot be rebuilt here")
-        print(f"→ Using Hermes Webapp renderer from {DIST_ENV}: {dist}")
+        print(f"→ Using Eir Webapp renderer from {DIST_ENV}: {dist}")
         return dist
     if is_bundled_payload(project_root):
         # A desktop app's sealed payload ships the renderer prebuilt, without the sources or scripts to build it.
@@ -123,28 +123,28 @@ def prepare_webapp_renderer(
         print(f"→ Using the desktop app's Webapp renderer: {dist}")
         return dist
     if skip_build:
-        # Reuse takes no build lock, like `hermes dashboard --skip-build`: the
+        # Reuse takes no build lock, like `eir dashboard --skip-build`: the
         # lock lives in the install root, which a read-only install cannot write.
         if not (dist / "index.html").is_file():
             raise WebappBuildError(
                 f"--skip-build was passed but no Webapp renderer exists at {dist}"
             )
-        print(f"→ Reusing Hermes Webapp renderer at {dist} (--skip-build)")
+        print(f"→ Reusing Eir Webapp renderer at {dist} (--skip-build)")
         return dist
     # A current, unmarked bundle needs no lock either, so a read-only install
     # (the Docker image) reuses the one baked at build time.
     if not force and not webapp_bundle_stale(dist) and source_product_current(project_root, "webapp", dist):
-        print(f"✓ Hermes Webapp renderer is up to date: {dist}")
+        print(f"✓ Eir Webapp renderer is up to date: {dist}")
         return dist
     with _exclusive_build_lock(project_root / _LOCK_NAME):
         if not force and source_product_current(project_root, "webapp", dist):
             _clear_stale_mark(dist)
-            print(f"✓ Hermes Webapp renderer is up to date: {dist}")
+            print(f"✓ Eir Webapp renderer is up to date: {dist}")
             return dist
         try:
             build_source_webapp(project_root, env=source_build_env(explicit=explicit), explicit=explicit)
         except (OSError, subprocess.SubprocessError, RuntimeError) as exc:
             raise WebappBuildError(f"Browser-hosted Desktop build failed: {exc}") from exc
         _clear_stale_mark(dist)
-        print(f"✓ Hermes Webapp renderer built: {dist}")
+        print(f"✓ Eir Webapp renderer built: {dist}")
         return dist

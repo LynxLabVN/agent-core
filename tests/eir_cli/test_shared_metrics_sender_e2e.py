@@ -15,8 +15,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pytest
 
-from hermes_cli.observability.shared_metrics import SharedMetricsStore
-from hermes_cli.observability.shared_metrics_sender import SharedMetricsSender
+from eir_cli.observability.shared_metrics import SharedMetricsStore
+from eir_cli.observability.shared_metrics_sender import SharedMetricsSender
 
 INSTALL_ID = "12a73e97-4de9-4766-830d-9ca1192c0420"
 NOW = datetime(2026, 8, 26, 12, 0, tzinfo=UTC)
@@ -84,10 +84,10 @@ def store(tmp_path):
     # fails closed without one, and this file tests transport, not consent.
     from datetime import datetime
 
-    from hermes_cli.observability.shared_metrics_sender import (
+    from eir_cli.observability.shared_metrics_sender import (
         reconcile_send_consent,
     )
-    from hermes_cli.sqlite_util import write_txn
+    from eir_cli.sqlite_util import write_txn
 
     with built._connection() as connection:
         with write_txn(connection):
@@ -107,21 +107,21 @@ def _endpoint(server):
 
 def _add(store, package_id, day="2026-08-26", metrics=1):
     payload = {
-        "schema_version": "hermes.shared_metrics.v2",
+        "schema_version": "eir.shared_metrics.v2",
         "package_id": package_id,
         "install_id": INSTALL_ID,
         "generated_at": f"{day}T01:00:00Z",
         "period_start": f"{day}T00:00:00Z",
         "period_end": f"{day}T23:59:59Z",
         "resource": {
-            "hermes_version": "0.20.5",
+            "eir_version": "0.20.5",
             "os_family": "macos",
             "architecture": "arm64",
             "install_method": "git",
         },
         "metrics": [
             {
-                "name": f"hermes.metric.{i}",
+                "name": f"eir.metric.{i}",
                 "type": "counter",
                 "dimensions": {"outcome": "ok"},
                 "value": i,

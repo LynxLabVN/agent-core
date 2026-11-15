@@ -1,4 +1,4 @@
-import { Button, cn, Codicon, GHOST_ICON_BTN, randomUuid, Tip } from '@hermes/plugin-sdk'
+import { Button, cn, Codicon, GHOST_ICON_BTN, randomUuid, Tip } from '@eir/plugin-sdk'
 import { type Ref, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react'
 
 import { downloadCanonicalAttachment } from './canonical-attachment-download'

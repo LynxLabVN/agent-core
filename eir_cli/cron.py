@@ -1,4 +1,4 @@
-"""Cron subcommand for hermes CLI."""
+"""Cron subcommand for eir CLI."""
 
 import contextlib
 import json
@@ -8,13 +8,13 @@ from datetime import timezone, UTC
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
-from hermes_cli._startup_fast import project_root_str
+from eir_cli._startup_fast import project_root_str
 
 PROJECT_ROOT = Path(project_root_str())
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from hermes_cli.colors import Colors, color
+from eir_cli.colors import Colors, color
 
 
 def _normalize_skills(single_skill=None, skills: Optional[Iterable[str]] = None) -> Optional[list[str]]:
@@ -48,7 +48,7 @@ def _builtin_gateway_liveness() -> Optional[bool]:
 
     A gateway launched from this home proves itself by process liveness. Any other scheduler that
     ticks this home — the host multiplexer for a served profile, or the in-process ticker inside
-    ``hermes serve`` / the Desktop backend (#121881) — proves itself only by the fresh heartbeat it
+    ``eir serve`` / the Desktop backend (#121881) — proves itself only by the fresh heartbeat it
     writes into this home's store. External providers use their own machinery and are exempt.
     """
     try:
@@ -61,7 +61,7 @@ def _builtin_gateway_liveness() -> Optional[bool]:
             from gateway.status import is_gateway_runtime_lock_active
             if is_gateway_runtime_lock_active():
                 return True
-        from hermes_cli.gateway import find_gateway_pids, named_profile_served_by_running_multiplexer
+        from eir_cli.gateway import find_gateway_pids, named_profile_served_by_running_multiplexer
         if find_gateway_pids():
             return True
         from cron.jobs import get_ticker_heartbeat_age, ticker_heartbeat_writer_alive
@@ -80,14 +80,14 @@ def _warn_if_gateway_not_running() -> None:
     """Warn at create/list time when the scheduler is not ready; stay silent on an unknown probe result."""
     if _builtin_gateway_liveness() is not False:
         return
-    from hermes_cli.profiles import get_active_profile_name
+    from eir_cli.profiles import get_active_profile_name
     # Name the inspected profile: the shared gateway may well be running and ticking ANOTHER
     # profile's jobs, so a bare "not running" reads as a system claim it cannot make (#99579).
     print(color(f"  ⚠  Scheduler is not ready for profile '{get_active_profile_name()}': "
                 "no gateway serves it and no fresh ticker heartbeat.", Colors.YELLOW))
-    print(color("     If no gateway is running: hermes gateway install\n"
-                "                    sudo hermes gateway install --system  # Linux servers\n"
-                "     Check status:  hermes cron status", Colors.DIM))
+    print(color("     If no gateway is running: eir gateway install\n"
+                "                    sudo eir gateway install --system  # Linux servers\n"
+                "     Check status:  eir cron status", Colors.DIM))
 
 
 def _format_lateness(seconds: float) -> str:
@@ -117,7 +117,7 @@ def _next_run_overdue_seconds(next_run_at: Any) -> Optional[float]:
     the instant (mixed UTC offsets, DST folds, legacy naive stamps read as system-local).
     """
     from cron.jobs import _parse_aware
-    from hermes_time import now
+    from eir_time import now
     dt = _parse_aware(next_run_at)
     if dt is None:
         return None
@@ -189,10 +189,10 @@ def cron_list(show_all: bool = False):
             if job.get("enabled", True) or effective_job_state(job) == "paused"
         ]
 
-    from hermes_cli.profiles import get_active_profile_name
+    from eir_cli.profiles import get_active_profile_name
     if not jobs:
         print(color(f"No scheduled jobs in profile '{get_active_profile_name()}'.\n"
-                    "Create one with 'hermes cron create ...' or the /cron command in chat.", Colors.DIM))
+                    "Create one with 'eir cron create ...' or the /cron command in chat.", Colors.DIM))
         return
 
     _print_banner(f"Scheduled Jobs (profile: {get_active_profile_name()})")
@@ -275,14 +275,14 @@ def _short_reason(text: Any, limit: int = 120) -> str:
 
 
 def _delivery_fix_hint(job: dict[str, Any]) -> str:
-    return (f"Check the target with `hermes cron status` or change it with "
-            f"`hermes cron edit {job.get('id', '<id>')} --deliver <target>`.")
+    return (f"Check the target with `eir cron status` or change it with "
+            f"`eir cron edit {job.get('id', '<id>')} --deliver <target>`.")
 
 
 def _missed_fire_issue(job: dict[str, Any], fire_err: dict[str, Any]) -> str:
     return (f"missed scheduled fire at {fire_err.get('at', '?')}: {_short_reason(fire_err['detail'])}. "
-            "The messaging gateway was unreachable. Run `hermes gateway restart`, then "
-            f"`hermes cron run {job.get('id', '<id>')}` to run it now.")
+            "The messaging gateway was unreachable. Run `eir gateway restart`, then "
+            f"`eir cron run {job.get('id', '<id>')}` to run it now.")
 
 
 def _job_warnings(job: dict[str, Any]) -> list[str]:
@@ -321,7 +321,7 @@ def cron_tick():
     No gateway runs here by definition, and none is started: agent jobs are skipped with a logged
     reason until the gateway is up (headless surfaces refuse rather than spawn)."""
     from cron.scheduler import CronTickYielded, tick
-    from hermes_cli.observability.shared_metrics_process import begin_process
+    from eir_cli.observability.shared_metrics_process import begin_process
 
     begin_process("cron")
     try:
@@ -337,7 +337,7 @@ def cron_tick():
         # For the one-shot CLI surface, report cleanly instead of dumping a traceback; the gateway ticker
         # loop handles its own retry. See #87644.
         print(color(f"✗ Cron tick failed: {exc}", Colors.RED))
-        print("  Check `hermes cron status` and the gateway log for details.")
+        print("  Check `eir cron status` and the gateway log for details.")
         return 1
     return 0
 
@@ -371,7 +371,7 @@ def cron_incidents(args) -> int:
     if action == "ack":
         incident_id = getattr(args, "incident_id", None)
         if not incident_id:
-            print(color("✗ Incident ID required: hermes cron incidents ack <incident_id>", Colors.RED))
+            print(color("✗ Incident ID required: eir cron incidents ack <incident_id>", Colors.RED))
             return 1
         if ack_incident(incident_id):
             print(color(f"✓ Incident {incident_id} acknowledged (closed).", Colors.GREEN))
@@ -402,13 +402,13 @@ def cron_incidents(args) -> int:
             if label != "Output" or value:
                 print(f"    {label + ':':<12}{value}")
         print()
-    print(color(f"  {len(incidents)} incident(s)  |  ack one with: hermes cron incidents ack <id>",
+    print(color(f"  {len(incidents)} incident(s)  |  ack one with: eir cron incidents ack <id>",
                 Colors.DIM))
     return 0
 
 
 _PERMISSION_HINT = ("  Hint: jobs.json may be owned by another user (e.g. rewritten by a root "
-                    "`docker exec hermes hermes cron ...`). Fix ownership to match the gateway "
+                    "`docker exec eir eir cron ...`). Fix ownership to match the gateway "
                     "user, and prefer `docker exec -u <uid>:<gid>`.")
 _FD_EXHAUSTION_HINT = ("  Hint: the ticker hit file-descriptor exhaustion (EMFILE). The scheduler "
                        "now retries with backoff and attempts fd reclamation, but if the leak "
@@ -447,14 +447,14 @@ def _probe_then_list_jobs(*, include_disabled: bool, brief: bool = False):
 def _print_store_unwritable(report: dict, *, brief: bool = False) -> None:
     if brief:  # `cron list`: one line
         print(color(f"⚠ Cron store {report['store']} is NOT writable ({report['error']}) — scheduled jobs "
-                    f"are being skipped; {report['fix']}. See `hermes cron status`.", Colors.RED))
+                    f"are being skipped; {report['fix']}. See `eir cron status`.", Colors.RED))
         return
     print(color("⚠ Cron store is NOT writable — scheduled jobs are being skipped", Colors.RED))
     print(color(f"  {report['store']}: {report['error']} (last successful write {report['since']})", Colors.RED))
     print(color(f"  Fix: {report['fix']}. Each due job then fires once on the next tick.", Colors.YELLOW))
 
 
-def _print_ticker_health(pids: list, restart_command: str = "hermes gateway restart") -> None:
+def _print_ticker_health(pids: list, restart_command: str = "eir gateway restart") -> None:
     """Report builtin-ticker liveness for a gateway process known to be alive.
 
     The ticker THREAD can die silently or stay alive while every tick fails, so check both
@@ -479,14 +479,14 @@ def _print_ticker_health(pids: list, restart_command: str = "hermes gateway rest
         # Ticker never started (non-cron profile, gateway just started, or a config issue).
         _warn("⚠ Gateway is running but the cron ticker has not reported a heartbeat.")
         print("  Cron jobs will NOT fire until the ticker writes its first heartbeat.\n"
-              "  If the gateway just started, wait ~60s and re-run `hermes cron status`.\n"
+              "  If the gateway just started, wait ~60s and re-run `eir cron status`.\n"
               f"  If heartbeat never appears, restart: {restart_command}")
     elif not _ticker_age_is_fresh(hb_age):  # ticker thread is gone
         _warn("⚠ Gateway is running but the cron ticker looks STALLED — "
               f"no heartbeat for {int(hb_age)}s (expected every ~60s).")
         print(f"  Cron jobs may NOT be firing. Restart: {restart_command}")
     elif (skew := stale_code_yield_labels(last_error)) is not None:
-        # `hermes update` moved the checkout under a running gateway: its ticker yields every
+        # `eir update` moved the checkout under a running gateway: its ticker yields every
         # tick (heartbeat stays fresh, nothing dispatches) until the process is restarted (#117275).
         _warn("⚠ Gateway is running STALE code — its cron ticker yields every tick and "
               "fires NOTHING.")
@@ -519,8 +519,8 @@ def _print_ticker_health(pids: list, restart_command: str = "hermes gateway rest
 
 def cron_status():
     """Show cron execution status."""
-    from hermes_cli.gateway import find_gateway_pids, named_profile_served_by_running_multiplexer
-    from hermes_cli.profiles import get_active_profile_name
+    from eir_cli.gateway import find_gateway_pids, named_profile_served_by_running_multiplexer
+    from eir_cli.profiles import get_active_profile_name
     print()
 
     store_report, active_jobs = _probe_then_list_jobs(include_disabled=False)
@@ -567,7 +567,7 @@ def cron_status():
             if not gateway_alive_via_lock:
                 served_by_multiplexer = named_profile_served_by_running_multiplexer()
             if not gateway_alive_via_lock and not served_by_multiplexer:
-                # `hermes serve` / the Desktop backend ticks every local profile in-process: no
+                # `eir serve` / the Desktop backend ticks every local profile in-process: no
                 # gateway argv, lock or host record — only the heartbeat it writes here (#121881).
                 with contextlib.suppress(Exception):
                     from cron.jobs import get_ticker_heartbeat_age, ticker_heartbeat_writer_alive
@@ -575,22 +575,22 @@ def cron_status():
                                          and ticker_heartbeat_writer_alive())
         if host is not None:
             print(f"  Scheduler host: {host.describe()}")
-            # `hermes gateway restart` exits 78 for a served NAMED profile
+            # `eir gateway restart` exits 78 for a served NAMED profile
             # (_guard_named_profile_under_multiplexer): name the profile that LAUNCHED the host
             # process. On a standalone fleet that is this profile itself, not default (#120871).
             owner = None
             with contextlib.suppress(Exception):
-                from hermes_cli.gateway import host_multiplexer_serving
+                from eir_cli.gateway import host_multiplexer_serving
                 owner = host_multiplexer_serving(active)
             host_profile = owner.profile_label if owner is not None else "default"
-            _print_ticker_health([host.pid], restart_command=f"hermes --profile {host_profile} gateway restart")
+            _print_ticker_health([host.pid], restart_command=f"eir --profile {host_profile} gateway restart")
         elif pids or gateway_alive_via_lock or served_by_multiplexer or in_process_ticker:
             if served_by_multiplexer:
                 print("  Scheduler host: the host gateway (multiplexing this profile)")
-                _print_ticker_health([], restart_command="hermes --profile default gateway restart")
+                _print_ticker_health([], restart_command="eir --profile default gateway restart")
             elif in_process_ticker:
-                print(f"  Scheduler host: an in-process ticker (hermes serve / Desktop backend) ticking profile '{active}'")
-                _print_ticker_health([], restart_command="restart the Hermes Desktop app (or its serve backend)")
+                print(f"  Scheduler host: an in-process ticker (eir serve / Desktop backend) ticking profile '{active}'")
+                _print_ticker_health([], restart_command="restart the Eir Desktop app (or its serve backend)")
             else:
                 _print_ticker_health(pids)
         else:
@@ -607,15 +607,15 @@ def cron_status():
                                 f"{_format_lateness(hb_age)} ago — jobs that came due "
                                 "since then have not fired.", Colors.YELLOW))
             print("\n  Start the ONE host gateway (it multiplexes every profile, this one included):\n"
-                  "    hermes --profile default gateway install   # user service\n"
-                  "    sudo hermes --profile default gateway install --system  # Linux servers: boot-time service\n"
-                  "    hermes --profile default gateway run       # Or run in foreground")
+                  "    eir --profile default gateway install   # user service\n"
+                  "    sudo eir --profile default gateway install --system  # Linux servers: boot-time service\n"
+                  "    eir --profile default gateway run       # Or run in foreground")
             if active not in ("default", "custom"):
                 print("\n  It serves this profile automatically. If a per-profile service or gateway\n"
                       "  from an older release is still installed, fold it in (preflight + dry run):\n"
-                      "      hermes --profile default gateway migrate --multiplex --dry-run\n"
-                      "      hermes --profile default gateway migrate --multiplex\n"
-                      "  Check: hermes cron status from this profile should show its ticker heartbeat.\n")
+                      "      eir --profile default gateway migrate --multiplex --dry-run\n"
+                      "      eir --profile default gateway migrate --multiplex\n"
+                      "  Check: eir cron status from this profile should show its ticker heartbeat.\n")
 
     print()
     _print_active_jobs_summary(active_jobs)
@@ -772,7 +772,7 @@ def cron_doctor() -> int:
         for issue in issues:
             print(f"    - {issue}")
     print()
-    print(color("Review the findings above, then run `hermes cron doctor` again.", Colors.DIM))
+    print(color("Review the findings above, then run `eir cron doctor` again.", Colors.DIM))
     return 1
 
 
@@ -881,12 +881,12 @@ def _job_action(action: str, job_id: str, success_verb: str) -> int:
     _stateless_token = None
     if action == "run":
         # One-shot CLI: a background-dispatched run (daemon thread, triggered when the CLI
-        # inherits HERMES_SESSION_KEY) would be orphaned mid-LLM-call, leaving the execution row
+        # inherits EIR_SESSION_KEY) would be orphaned mid-LLM-call, leaving the execution row
         # stuck 'claimed'. Declaring the channel stateless forces a synchronous run; scoped to
         # this call so in-process callers (tests, embedding apps) are not tainted.
         with contextlib.suppress(Exception):
             # The background path in ``_try_dispatch_background_run`` triggers when the CLI inherits a
-            # gateway/desktop session env (HERMES_SESSION_KEY); declare the channel stateless so
+            # gateway/desktop session env (EIR_SESSION_KEY); declare the channel stateless so
             # ``async_delivery_supported()`` gates it off and the run executes synchronously to completion
             # instead. See #86721.
             from gateway.session_context import _SESSION_ASYNC_DELIVERY
@@ -938,9 +938,9 @@ def cron_resume(args) -> int:
         return 1
     if not run_at and not run_now:
         return _job_action("resume", args.job_id, "Resumed")
-    from cron.jobs import AmbiguousJobReference, _hermes_now, rearm_oneshot
+    from cron.jobs import AmbiguousJobReference, _eir_now, rearm_oneshot
     try:
-        job = rearm_oneshot(args.job_id, _hermes_now().isoformat() if run_now else run_at)
+        job = rearm_oneshot(args.job_id, _eir_now().isoformat() if run_now else run_at)
     except (AmbiguousJobReference, ValueError) as exc:
         print(color(f"Failed to re-arm job: {exc}", Colors.RED))
         return 1
@@ -953,7 +953,7 @@ def cron_resume(args) -> int:
 
 
 def cron_notepad(args) -> int:
-    """Handle ``hermes cron notepad <job_id> [get|set|delete|list]`` (per-job durable KV).
+    """Handle ``eir cron notepad <job_id> [get|set|delete|list]`` (per-job durable KV).
 
     A running cron agent updates its own notepad via its terminal tool; the scheduler injects
     non-empty notepads into the job prompt on each run.
@@ -977,7 +977,7 @@ def cron_notepad(args) -> int:
             return 0
         usage_args = "set <key> <value>" if action == "set" else f"{action} <key>"
         if key is None or (action == "set" and value is None):
-            print(color(f"Usage: hermes cron notepad <job_id> {usage_args}", Colors.RED))
+            print(color(f"Usage: eir cron notepad <job_id> {usage_args}", Colors.RED))
             return 1
         if action == "set":
             notepad.set_note(job_id, key, value)
@@ -1045,5 +1045,5 @@ def cron_command(args):
     if handler is not None:
         return handler(args)
     print(f"Unknown cron command: {subcmd}\n"
-          "Usage: hermes cron [list|create|edit|pause|resume|run|cancel|remove|status|runs|doctor|tick]")
+          "Usage: eir cron [list|create|edit|pause|resume|run|cancel|remove|status|runs|doctor|tick]")
     sys.exit(1)

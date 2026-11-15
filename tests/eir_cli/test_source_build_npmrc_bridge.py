@@ -3,7 +3,7 @@
 pnpm reads an npmrc only for its registry and auth; npm also exported every other key to
 install scripts as ``npm_config_<key>``, which is how node-pre-gyp finds a binary mirror.
 ``source_build_env`` keeps that bridge. It must read the npmrc npm would read (an explicit
-``NPM_CONFIG_USERCONFIG``, else Hermes's own, else ``~/.npmrc``), and decode quoted values as
+``NPM_CONFIG_USERCONFIG``, else Eir's own, else ``~/.npmrc``), and decode quoted values as
 npm does: a quoted ``registry=`` exported with its quotes is a malformed URL that breaks every
 install.
 """
@@ -24,7 +24,7 @@ from pm.package import Runner
 def bridge(tmp_path, monkeypatch):
     home = tmp_path / "home"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     for name in list(os.environ):
         if name.upper().startswith("NPM_CONFIG_"):
             monkeypatch.delenv(name)
@@ -36,7 +36,7 @@ def bridge(tmp_path, monkeypatch):
 
 
 def test_an_explicit_userconfig_is_the_file_bridged(bridge, tmp_path, monkeypatch):
-    from hermes_cli.source_build import source_build_env
+    from eir_cli.source_build import source_build_env
 
     (bridge / "npmrc").write_text("registry=https://hermes-file.invalid/\nhermes-only=1\n", encoding="utf-8")
     selected = tmp_path / "selected-npmrc"
@@ -47,11 +47,11 @@ def test_an_explicit_userconfig_is_the_file_bridged(bridge, tmp_path, monkeypatc
 
     assert env["NPM_CONFIG_USERCONFIG"] == str(selected)
     assert env["npm_config_electron_mirror"] == "https://selected.invalid/electron/"
-    assert "npm_config_registry" not in env and "npm_config_hermes_only" not in env
+    assert "npm_config_registry" not in env and "npm_config_eir_only" not in env
 
 
 def test_quoted_values_are_exported_without_their_quotes(bridge):
-    from hermes_cli.source_build import source_build_env
+    from eir_cli.source_build import source_build_env
 
     (bridge / "npmrc").write_text(
         "registry=\"https://mirror.invalid/\"\nelectron-mirror='https://mirror.invalid/electron/'\n", encoding="utf-8")
@@ -64,7 +64,7 @@ def test_quoted_values_are_exported_without_their_quotes(bridge):
 
 
 def test_without_a_userconfig_the_home_npmrc_is_bridged(bridge, tmp_path):
-    from hermes_cli.source_build import source_build_env
+    from eir_cli.source_build import source_build_env
 
     (tmp_path / "user" / ".npmrc").write_text("disturl=https://mirror.invalid/node\n", encoding="utf-8")
 
@@ -80,7 +80,7 @@ def test_without_a_userconfig_the_home_npmrc_is_bridged(bridge, tmp_path):
 def test_a_utf16_npmrc_reads_as_npm_reads_it_instead_of_failing_the_build(bridge):
     """Windows PowerShell 5.1's ``>`` writes UTF-16. npm decodes the file as UTF-8 and finds no
     usable setting in it; it never fails, and neither may a source build."""
-    from hermes_cli.source_build import source_build_env
+    from eir_cli.source_build import source_build_env
     from pm.index_config import NPM_PUBLIC_REGISTRY, npm_registry
 
     npmrc = bridge / "npmrc"
@@ -94,7 +94,7 @@ def test_a_utf16_npmrc_reads_as_npm_reads_it_instead_of_failing_the_build(bridge
 
 def test_a_utf8_bom_does_not_hide_the_first_setting(bridge):
     """Windows PowerShell 5.1's ``Set-Content -Encoding UTF8`` starts the file with a BOM."""
-    from hermes_cli.source_build import source_build_env
+    from eir_cli.source_build import source_build_env
     from pm.index_config import npm_registry
 
     npmrc = bridge / "npmrc"
@@ -107,7 +107,7 @@ def test_a_utf8_bom_does_not_hide_the_first_setting(bridge):
 
 
 def test_a_mixed_case_key_is_exported_lowercased_as_npm_exports_it(bridge):
-    from hermes_cli.source_build import source_build_env
+    from eir_cli.source_build import source_build_env
 
     (bridge / "npmrc").write_text("Electron_Mirror=https://mirror.invalid/electron/\n", encoding="utf-8")
 
@@ -119,8 +119,8 @@ def test_a_mixed_case_key_is_exported_lowercased_as_npm_exports_it(bridge):
 @pytest.mark.platforms("posix")
 def test_a_lowercase_userconfig_gets_no_uppercase_twin(bridge, tmp_path, monkeypatch):
     """npm 12 reads ``NPM_CONFIG_USERCONFIG`` and pnpm 12 the lowercase name, so a twin naming
-    ``$HERMES_HOME/npmrc`` beside the user's choice splits the two installers."""
-    from hermes_cli.source_build import source_build_env
+    ``$EIR_HOME/npmrc`` beside the user's choice splits the two installers."""
+    from eir_cli.source_build import source_build_env
 
     (bridge / "npmrc").write_text("registry=https://hermes-file.invalid/\n", encoding="utf-8")
     selected = tmp_path / "selected-npmrc"
@@ -134,7 +134,7 @@ def test_a_lowercase_userconfig_gets_no_uppercase_twin(bridge, tmp_path, monkeyp
 
 
 def test_inline_comments_are_not_part_of_the_value(bridge):
-    from hermes_cli.source_build import source_build_env
+    from eir_cli.source_build import source_build_env
     from pm.index_config import npm_registry
 
     npmrc = bridge / "npmrc"
@@ -149,7 +149,7 @@ def test_inline_comments_are_not_part_of_the_value(bridge):
 
 
 def test_keys_under_an_ini_section_are_not_settings(bridge):
-    from hermes_cli.source_build import source_build_env
+    from eir_cli.source_build import source_build_env
     from pm.index_config import npm_registry
 
     npmrc = bridge / "npmrc"
@@ -163,7 +163,7 @@ def test_keys_under_an_ini_section_are_not_settings(bridge):
 
 
 def test_an_optional_variable_reference_expands_to_empty(bridge, monkeypatch):
-    from hermes_cli.source_build import source_build_env
+    from eir_cli.source_build import source_build_env
     from pm.index_config import npm_registry
 
     monkeypatch.delenv("UNSET_NPMRC_VAR", raising=False)
@@ -178,7 +178,7 @@ def test_an_optional_variable_reference_expands_to_empty(bridge, monkeypatch):
 
 
 def test_one_time_passwords_and_inline_tls_keys_never_reach_install_scripts(bridge):
-    from hermes_cli.source_build import source_build_env
+    from eir_cli.source_build import source_build_env
 
     (bridge / "npmrc").write_text("otp=123456\nkey=-----BEGIN PRIVATE KEY-----\ncert=CLIENT-CERT\n"
                                   "OTP=654321\nfund=false\n", encoding="utf-8")
@@ -192,7 +192,7 @@ def test_one_time_passwords_and_inline_tls_keys_never_reach_install_scripts(brid
 def test_values_no_child_environment_can_carry_are_skipped(bridge):
     """A JSON-unquoted ``\\ud800`` (lone surrogate), ``\\u0000`` or a raw NUL byte would make
     every install spawn fail; npm survives them, and so must a source build."""
-    from hermes_cli.source_build import source_build_env
+    from eir_cli.source_build import source_build_env
     from pm.index_config import npm_registry
 
     npmrc = bridge / "npmrc"
@@ -207,8 +207,8 @@ def test_values_no_child_environment_can_carry_are_skipped(bridge):
     subprocess.run([sys.executable, "-c", ""], env=env, check=True)
 
 
-def test_hermes_home_npmrc_steers_pm_downloads_as_it_steers_builds(bridge, monkeypatch):
-    """The npm keys documented for ``$HERMES_HOME/npmrc`` reach the source build, so PM's own
+def test_eir_home_npmrc_steers_pm_downloads_as_it_steers_builds(bridge, monkeypatch):
+    """The npm keys documented for ``$EIR_HOME/npmrc`` reach the source build, so PM's own
     npm downloads (pinned artifacts, dist-tags) must resolve against the same file."""
     from pm.artifact_mirror import pinned_source
     from pm.index_config import npm_registry
@@ -229,7 +229,7 @@ def test_hermes_home_npmrc_steers_pm_downloads_as_it_steers_builds(bridge, monke
 def test_an_empty_userconfig_reads_as_unset_for_install_children_too(bridge, monkeypatch, name):
     """npm and pnpm read an empty userconfig as unset and fall back to ``~/.npmrc``; the children
     must get the file the bridge and PM's downloads read instead."""
-    from hermes_cli.source_build import source_build_env
+    from eir_cli.source_build import source_build_env
 
     (bridge / "npmrc").write_text("disturl=https://hermes-file.invalid/node\n", encoding="utf-8")
     (bridge.parent / "user" / ".npmrc").write_text("disturl=https://home-dir.invalid/node\n", encoding="utf-8")
@@ -247,7 +247,7 @@ def test_conflicting_userconfig_twins_reach_children_as_the_one_file_bridged(bri
     """npm 12 reads the last non-empty twin in environ order and pnpm 12 only the lowercase one;
     the children must get one variable, naming the file the bridge and PM's downloads read: the
     user's non-empty lowercase choice, as pnpm and the desktop read it."""
-    from hermes_cli.source_build import source_build_env
+    from eir_cli.source_build import source_build_env
     from pm.index_config import npm_registry
 
     (bridge / "npmrc").write_text("registry=https://hermes-file.invalid/\n", encoding="utf-8")
@@ -267,7 +267,7 @@ def test_conflicting_userconfig_twins_reach_children_as_the_one_file_bridged(bri
 @pytest.mark.platforms("posix")
 def test_an_empty_lowercase_twin_does_not_hide_a_non_empty_uppercase_one(bridge, tmp_path, monkeypatch):
     """pnpm 12 reads a set lowercase name even when it is empty, falling back to ``~/.npmrc``."""
-    from hermes_cli.source_build import source_build_env
+    from eir_cli.source_build import source_build_env
     from pm.index_config import npm_registry
 
     (bridge / "npmrc").write_text("registry=https://hermes-file.invalid/\n", encoding="utf-8")
@@ -286,7 +286,7 @@ def test_an_empty_lowercase_twin_does_not_hide_a_non_empty_uppercase_one(bridge,
 @pytest.mark.platforms("posix")
 def test_a_mixed_case_userconfig_reaches_children_under_the_name_pnpm_reads(bridge, tmp_path, monkeypatch):
     """npm reads ``npm_config_*`` names in any case; pnpm 12 ignores a mixed-case one."""
-    from hermes_cli.source_build import source_build_env
+    from eir_cli.source_build import source_build_env
 
     (bridge / "npmrc").write_text("registry=https://hermes-file.invalid/\n", encoding="utf-8")
     selected = tmp_path / "selected-npmrc"

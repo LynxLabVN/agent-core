@@ -1,10 +1,10 @@
 """``transcript_revision`` keeps moving on a reaction, a display rewrite and checkpoint pruning after an older
-Hermes opened the store (#150102 review). Every writable open runs its build's ``DEFERRED_INDEX_SQL`` through
+Eir opened the store (#150102 review). Every writable open runs its build's ``DEFERRED_INDEX_SQL`` through
 ``_execute_ddl_skipping_settled_triggers``, which recreates a trigger whose stored body differs from the
 build's own. Every build since 1fc1999769 defines ``messages_transcript_revision_update`` with the content
 columns only, so the display columns live in a trigger of their own name that an older build never touches.
 """
-from hermes_state import SessionDB
+from eir_state import SessionDB
 
 # Verbatim from an older build's DEFERRED_INDEX_SQL (6b21d0564d): the pair its open runs for the shared name.
 OLDER_BUILD_DDL = """DROP TRIGGER IF EXISTS messages_transcript_revision_update;

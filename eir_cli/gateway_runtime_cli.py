@@ -23,8 +23,8 @@ def _verdict_payload(result) -> dict:
         payload["endpoint"]["capabilities"] = sorted(result.endpoint.capabilities)
     # The code THIS client (and any gateway it starts) runs, resolved exactly like the owner's
     # ``endpoint.code_sha``: a client that sees them differ is attached to a gateway that
-    # outlived ``hermes update`` and must restart it rather than re-attach.
-    from hermes_cli.version_info import get_code_identity
+    # outlived ``eir update`` and must restart it rather than re-attach.
+    from eir_cli.version_info import get_code_identity
     payload["client_code_sha"] = get_code_identity().get("sha")
     return payload
 
@@ -35,13 +35,13 @@ def _emit(payload, code) -> None:
 
 
 def cmd_gateway_ensure(args) -> None:
-    from hermes_constants import get_hermes_home
-    from hermes_cli.gateway_runtime import ensure_gateway_runtime
+    from eir_constants import get_eir_home
+    from eir_cli.gateway_runtime import ensure_gateway_runtime
 
     try:
         # Legacy imported utilities can print; protocol stdout belongs only to us.
         with redirect_stdout(sys.stderr):
-            result = ensure_gateway_runtime(get_hermes_home(), timeout=float(args.timeout))
+            result = ensure_gateway_runtime(get_eir_home(), timeout=float(args.timeout))
         payload, code = _verdict_payload(result), ensure_exit_code(result)
     except (ValueError, TypeError):
         payload, code = INVALID_INVOCATION, 2
@@ -53,10 +53,10 @@ def cmd_gateway_attach(args) -> None:
     the dial ``protocols`` and one single-use ``ticket`` for this profile. A refusal adds the
     ``message`` Ink's bootstrap shows (``gateway <state>: <reason>`` lines) and exits like ensure.
     Every reply carries ``start_context.windows_service_session``."""
-    from hermes_constants import get_hermes_home
-    from hermes_cli.gateway_client import GATEWAY_WS_PROTOCOL, gateway_ws_target
-    from hermes_cli.gateway_runtime import GatewayDiscovery
-    from hermes_cli.gateway_runtime_attach import (SERVICE_SESSION_START_WARNING, GatewayAttach, TicketUnavailable,
+    from eir_constants import get_eir_home
+    from eir_cli.gateway_client import GATEWAY_WS_PROTOCOL, gateway_ws_target
+    from eir_cli.gateway_runtime import GatewayDiscovery
+    from eir_cli.gateway_runtime_attach import (SERVICE_SESSION_START_WARNING, GatewayAttach, TicketUnavailable,
                                                    attach_gateway, failure_message, scrub_client_launch_env,
                                                    windows_service_session)
 
@@ -74,7 +74,7 @@ def cmd_gateway_attach(args) -> None:
     scrub_client_launch_env()
     with redirect_stdout(sys.stderr):
         try:
-            attached = attach_gateway(get_hermes_home(), start=args.start, recover=args.recover, timeout=timeout)
+            attached = attach_gateway(get_eir_home(), start=args.start, recover=args.recover, timeout=timeout)
         except TicketUnavailable as exc:
             # Attachable at discovery, then no ticket (the owner went away or refused the grant).
             attached = GatewayAttach(GatewayDiscovery("inaccessible", reason_code="ticket_unavailable",

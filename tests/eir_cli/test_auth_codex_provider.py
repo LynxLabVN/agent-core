@@ -1,4 +1,4 @@
-"""Tests for Codex auth — tokens stored in Hermes auth store (~/.hermes/auth.json)."""
+"""Tests for Codex auth — tokens stored in Eir auth store (~/.eir/auth.json)."""
 
 import json
 from pathlib import Path
@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from hermes_cli.auth import (
+from eir_cli.auth import (
     AuthError,
     DEFAULT_CODEX_BASE_URL,
     _read_codex_tokens,
@@ -16,9 +16,9 @@ from hermes_cli.auth import (
 )
 
 
-def _setup_hermes_auth(hermes_home: Path, *, access_token: str = "access", refresh_token: str = "refresh"):
-    """Write Codex tokens into the Hermes auth store."""
-    hermes_home.mkdir(parents=True, exist_ok=True)
+def _setup_eir_auth(eir_home: Path, *, access_token: str = "access", refresh_token: str = "refresh"):
+    """Write Codex tokens into the Eir auth store."""
+    eir_home.mkdir(parents=True, exist_ok=True)
     auth_store = {
         "version": 1,
         "active_provider": "openai-codex",
@@ -33,15 +33,15 @@ def _setup_hermes_auth(hermes_home: Path, *, access_token: str = "access", refre
             },
         },
     }
-    auth_file = hermes_home / "auth.json"
+    auth_file = eir_home / "auth.json"
     auth_file.write_text(json.dumps(auth_store, indent=2))
     return auth_file
 
 
 def test_resolve_codex_runtime_credentials_missing_access_token(tmp_path, monkeypatch):
-    hermes_home = tmp_path / "hermes"
-    _setup_hermes_auth(hermes_home, access_token="")
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    eir_home = tmp_path / "eir"
+    _setup_eir_auth(eir_home, access_token="")
+    monkeypatch.setenv("EIR_HOME", str(eir_home))
     monkeypatch.setenv("CODEX_HOME", str(tmp_path / "missing-codex"))
 
     with pytest.raises(AuthError) as exc:
@@ -60,8 +60,8 @@ def test_resolve_codex_runtime_credentials_falls_back_to_pool_when_singleton_emp
     re-auth, restore from backup) hit a bare HTTP 401 on chat but worked fine on
     auxiliary calls.  The fallback closes that divergence.
     """
-    hermes_home = tmp_path / "hermes"
-    hermes_home.mkdir(parents=True, exist_ok=True)
+    eir_home = tmp_path / "eir"
+    eir_home.mkdir(parents=True, exist_ok=True)
     # Singleton: empty tokens (would normally raise AuthError).
     # Pool: valid access_token.
     auth_store = {
@@ -79,8 +79,8 @@ def test_resolve_codex_runtime_credentials_falls_back_to_pool_when_singleton_emp
             ],
         },
     }
-    (hermes_home / "auth.json").write_text(json.dumps(auth_store))
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    (eir_home / "auth.json").write_text(json.dumps(auth_store))
+    monkeypatch.setenv("EIR_HOME", str(eir_home))
 
     resolved = resolve_codex_runtime_credentials()
     assert resolved["api_key"] == "pool-fallback-token"
@@ -96,9 +96,9 @@ def test_save_codex_tokens_syncs_credential_pool(tmp_path, monkeypatch):
     holding a consumed refresh token and stale error markers, causing an
     immediate 401 token_invalidated on the next request.
     """
-    hermes_home = tmp_path / "hermes"
-    hermes_home.mkdir(parents=True, exist_ok=True)
-    (hermes_home / "auth.json").write_text(json.dumps({
+    eir_home = tmp_path / "eir"
+    eir_home.mkdir(parents=True, exist_ok=True)
+    (eir_home / "auth.json").write_text(json.dumps({
         "version": 1,
         "providers": {
             "openai-codex": {
@@ -130,12 +130,12 @@ def test_save_codex_tokens_syncs_credential_pool(tmp_path, monkeypatch):
             ],
         },
     }))
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("EIR_HOME", str(eir_home))
 
     _save_codex_tokens({"access_token": "new-at", "refresh_token": "new-rt"},
                        last_refresh="2026-05-27T00:00:00Z")
 
-    auth = json.loads((hermes_home / "auth.json").read_text())
+    auth = json.loads((eir_home / "auth.json").read_text())
     pool = auth["credential_pool"]["openai-codex"]
     seeded = next(e for e in pool if e["source"] == "device_code")
     assert seeded["access_token"] == "new-at"
@@ -160,7 +160,7 @@ def test_save_codex_tokens_syncs_manual_device_code_entries(tmp_path, monkeypatc
     aliases of the singleton, while leaving INDEPENDENT entries alone.
 
     Original regression for #33538: a user who hit #33000 before the #33164
-    fix landed would have run ``hermes auth add openai-codex`` as a
+    fix landed would have run ``eir auth add openai-codex`` as a
     workaround, leaving a pool entry with ``source="manual:device_code"``.
     On every subsequent re-auth via setup/model picker, the singleton-seeded
     ``device_code`` entry got refreshed but the ``manual:device_code`` entry
@@ -169,14 +169,14 @@ def test_save_codex_tokens_syncs_manual_device_code_entries(tmp_path, monkeypatc
 
     Narrowed for #39236: the original fix treated every ``manual:device_code``
     entry as a singleton-alias and refreshed them all, which silently
-    clobbered independent accounts added via ``hermes auth add openai-codex``.
+    clobbered independent accounts added via ``eir auth add openai-codex``.
     The current behavior refreshes only entries whose access_token matches
     the *previous* singleton access_token (true legacy aliases), and leaves
     distinct-token entries alone (independent accounts).
     """
-    hermes_home = tmp_path / "hermes"
-    hermes_home.mkdir(parents=True, exist_ok=True)
-    (hermes_home / "auth.json").write_text(json.dumps({
+    eir_home = tmp_path / "eir"
+    eir_home.mkdir(parents=True, exist_ok=True)
+    (eir_home / "auth.json").write_text(json.dumps({
         "version": 1,
         "providers": {
             "openai-codex": {
@@ -207,7 +207,7 @@ def test_save_codex_tokens_syncs_manual_device_code_entries(tmp_path, monkeypatc
                     "last_error_code": 401,
                     "last_error_reason": "token_invalidated",
                 },
-                # Independent account from `hermes auth add openai-codex` —
+                # Independent account from `eir auth add openai-codex` —
                 # its tokens are distinct from the singleton.  Must NOT be
                 # overwritten by a re-auth that targeted a different account
                 # (#39236).
@@ -227,12 +227,12 @@ def test_save_codex_tokens_syncs_manual_device_code_entries(tmp_path, monkeypatc
             ],
         },
     }))
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("EIR_HOME", str(eir_home))
 
     _save_codex_tokens({"access_token": "fresh-at", "refresh_token": "fresh-rt"},
                        last_refresh="2026-05-28T00:00:00Z")
 
-    auth = json.loads((hermes_home / "auth.json").read_text())
+    auth = json.loads((eir_home / "auth.json").read_text())
     pool = auth["credential_pool"]["openai-codex"]
 
     # Singleton-seeded device_code entry: refreshed and error markers cleared.
@@ -266,9 +266,9 @@ def test_save_codex_tokens_clears_error_markers_only_on_refreshed_entries(tmp_pa
     with their own stale-error markers must be left alone (their stale state
     is not the current re-auth's business).
     """
-    hermes_home = tmp_path / "hermes"
-    hermes_home.mkdir(parents=True, exist_ok=True)
-    (hermes_home / "auth.json").write_text(json.dumps({
+    eir_home = tmp_path / "eir"
+    eir_home.mkdir(parents=True, exist_ok=True)
+    (eir_home / "auth.json").write_text(json.dumps({
         "version": 1,
         "providers": {
             "openai-codex": {
@@ -300,14 +300,14 @@ def test_save_codex_tokens_clears_error_markers_only_on_refreshed_entries(tmp_pa
             ],
         },
     }))
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("EIR_HOME", str(eir_home))
 
     _save_codex_tokens(
         {"access_token": "fresh-at", "refresh_token": "fresh-rt"},
         last_refresh="2026-06-05T00:00:00Z",
     )
 
-    auth = json.loads((hermes_home / "auth.json").read_text())
+    auth = json.loads((eir_home / "auth.json").read_text())
     pool = auth["credential_pool"]["openai-codex"]
 
     # Singleton: refreshed AND error markers cleared.
@@ -326,33 +326,33 @@ def test_save_codex_tokens_clears_error_markers_only_on_refreshed_entries(tmp_pa
 
 
 def test_codex_tokens_not_written_to_shared_file(tmp_path, monkeypatch):
-    """Verify _save_codex_tokens writes only to Hermes auth store, not ~/.codex/."""
-    hermes_home = tmp_path / "hermes"
+    """Verify _save_codex_tokens writes only to Eir auth store, not ~/.codex/."""
+    eir_home = tmp_path / "eir"
     codex_home = tmp_path / "codex-cli"
-    hermes_home.mkdir(parents=True, exist_ok=True)
+    eir_home.mkdir(parents=True, exist_ok=True)
     codex_home.mkdir(parents=True, exist_ok=True)
 
-    (hermes_home / "auth.json").write_text(json.dumps({"version": 1, "providers": {}}))
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    (eir_home / "auth.json").write_text(json.dumps({"version": 1, "providers": {}}))
+    monkeypatch.setenv("EIR_HOME", str(eir_home))
     monkeypatch.setenv("CODEX_HOME", str(codex_home))
 
-    _save_codex_tokens({"access_token": "hermes-at", "refresh_token": "hermes-rt"})
+    _save_codex_tokens({"access_token": "eir-at", "refresh_token": "eir-rt"})
 
-    # ~/.codex/auth.json should NOT exist — _save_codex_tokens only touches Hermes store
+    # ~/.codex/auth.json should NOT exist — _save_codex_tokens only touches Eir store
     assert not (codex_home / "auth.json").exists()
 
-    # Hermes auth store should have the tokens
+    # Eir auth store should have the tokens
     data = _read_codex_tokens()
-    assert data["tokens"]["access_token"] == "hermes-at"
+    assert data["tokens"]["access_token"] == "eir-at"
 
 
-def test_resolve_returns_hermes_auth_store_source(tmp_path, monkeypatch):
-    hermes_home = tmp_path / "hermes"
-    _setup_hermes_auth(hermes_home)
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+def test_resolve_returns_eir_auth_store_source(tmp_path, monkeypatch):
+    eir_home = tmp_path / "eir"
+    _setup_eir_auth(eir_home)
+    monkeypatch.setenv("EIR_HOME", str(eir_home))
 
     creds = resolve_codex_runtime_credentials()
-    assert creds["source"] == "hermes-auth-store"
+    assert creds["source"] == "eir-auth-store"
     assert creds["provider"] == "openai-codex"
     assert creds["base_url"] == DEFAULT_CODEX_BASE_URL
 
@@ -388,7 +388,7 @@ def _patch_httpx(monkeypatch, response):
     def _factory(*args, **kwargs):
         return _StubHTTPClient(response)
 
-    monkeypatch.setattr("hermes_cli.auth.httpx.Client", _factory)
+    monkeypatch.setattr("eir_cli.auth.httpx.Client", _factory)
 
 
 def test_refresh_429_classified_as_quota_not_auth_failure(monkeypatch):
@@ -396,9 +396,9 @@ def test_refresh_429_classified_as_quota_not_auth_failure(monkeypatch):
 
     Regression test for #32790: must NOT force relogin and must carry the
     dedicated rate-limit code so callers surface a "retry later" notice rather
-    than a misleading "run hermes auth".
+    than a misleading "run eir auth".
     """
-    from hermes_cli.auth import (
+    from eir_cli.auth import (
         CODEX_RATE_LIMITED_CODE,
         format_auth_error,
         is_rate_limited_auth_error,
@@ -421,12 +421,12 @@ def test_refresh_429_classified_as_quota_not_auth_failure(monkeypatch):
     # User-facing copy must not tell the operator to re-authenticate.
     rendered = format_auth_error(err)
     assert "re-authenticate" not in rendered
-    assert "hermes auth" not in rendered
+    assert "eir auth" not in rendered
 
 
 def test_refresh_429_without_retry_after_header(monkeypatch):
     """429 without a Retry-After header still classifies as quota, no relogin."""
-    from hermes_cli.auth import CODEX_RATE_LIMITED_CODE
+    from eir_cli.auth import CODEX_RATE_LIMITED_CODE
 
     response = _StubHTTPResponse(429, {"error": "rate_limited"})
     _patch_httpx(monkeypatch, response)
@@ -442,15 +442,15 @@ def test_refresh_429_without_retry_after_header(monkeypatch):
 def test_pool_only_force_refresh_rotates_the_pool_entry(tmp_path, monkeypatch):
     """Pool-only setup (empty singleton): ``force_refresh`` must refresh the pool credential
     instead of handing back the same token the caller just got a 401 for."""
-    hermes_home = tmp_path / "hermes"
-    hermes_home.mkdir(parents=True, exist_ok=True)
-    (hermes_home / "auth.json").write_text(json.dumps({
+    eir_home = tmp_path / "eir"
+    eir_home.mkdir(parents=True, exist_ok=True)
+    (eir_home / "auth.json").write_text(json.dumps({
         "version": 1, "providers": {},
         "credential_pool": {"openai-codex": [{
             "source": "device_code", "access_token": "pool-revoked", "refresh_token": "pool-refresh",
             "last_status": "ok", "auth_type": "oauth"}]},
     }))
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("EIR_HOME", str(eir_home))
     hints = []
 
     class Pool:

@@ -11,8 +11,8 @@ from __future__ import annotations
 import argparse
 
 
-from hermes_cli.subcommands.acp import build_acp_parser
-from hermes_cli.subcommands.mcp import build_mcp_parser
+from eir_cli.subcommands.acp import build_acp_parser
+from eir_cli.subcommands.mcp import build_mcp_parser
 
 
 def _h(name):
@@ -28,7 +28,7 @@ def _h(name):
 
 def test_mcp_and_acp_accept_hooks_flag():
     # mcp/acp parser blocks use the shared add_accept_hooks_flag helper.
-    parser = argparse.ArgumentParser(prog="hermes")
+    parser = argparse.ArgumentParser(prog="eir")
     sub = parser.add_subparsers(dest="command")
     build_mcp_parser(sub, cmd_mcp=_h("mcp"))
     build_acp_parser(sub, cmd_acp=_h("acp"))

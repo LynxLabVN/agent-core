@@ -10,7 +10,7 @@ import pytest
 @pytest.mark.parametrize("surface", ["serve", "version", "gateway"])
 def test_each_start_checks_pm_once_before_dispatch(surface, tmp_path, monkeypatch, capsys, caplog):
     import pm
-    from hermes_cli import boot_bootstrap
+    from eir_cli import boot_bootstrap
 
     home = tmp_path / "home"
     home.mkdir()
@@ -24,11 +24,11 @@ def test_each_start_checks_pm_once_before_dispatch(surface, tmp_path, monkeypatc
         "commit": "abcdef012345", "payload": "bundled", "updateMechanism": "electron-updater",
     }))
     monkeypatch.setattr(Path, "home", lambda: home)
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.setenv("HERMES_RUNTIME_DIR", str(runtime))
-    monkeypatch.setenv("HERMES_INSTALL_ROOT", str(root))
-    monkeypatch.setenv("HERMES_DISABLE_LAZY_INSTALLS", "1")
-    monkeypatch.delenv("HERMES_DISABLE_FAST_SERVE_LAUNCH", raising=False)
+    monkeypatch.setenv("EIR_HOME", str(home))
+    monkeypatch.setenv("EIR_RUNTIME_DIR", str(runtime))
+    monkeypatch.setenv("EIR_INSTALL_ROOT", str(root))
+    monkeypatch.setenv("EIR_DISABLE_LAZY_INSTALLS", "1")
+    monkeypatch.delenv("EIR_DISABLE_FAST_SERVE_LAUNCH", raising=False)
     checked = []
     real_check = pm.check
 
@@ -57,11 +57,11 @@ def test_each_start_checks_pm_once_before_dispatch(surface, tmp_path, monkeypatc
         monkeypatch.setattr(sys, "argv", ["gateway"])
         run = gr.main
     else:
-        from hermes_cli import main
+        from eir_cli import main
 
         monkeypatch.setattr(main, "cmd_dashboard", lambda args: dispatched.append(len(checked)))
         monkeypatch.setattr(main, "cmd_version", lambda args: dispatched.append(len(checked)))
-        monkeypatch.setattr(sys, "argv", ["hermes", "serve" if surface == "serve" else "--version"])
+        monkeypatch.setattr(sys, "argv", ["eir", "serve" if surface == "serve" else "--version"])
         run = main.main
     for _ in range(2):
         checked.clear()
@@ -87,7 +87,7 @@ def test_concurrent_boots_bound_real_home_migration(tmp_path, monkeypatch, sibli
     import subprocess
     import sqlite3
     import time
-    from hermes_cli.config import DEFAULT_CONFIG
+    from eir_cli.config import DEFAULT_CONFIG
 
     root = tmp_path / "payload"
     root.mkdir()
@@ -108,7 +108,7 @@ def test_concurrent_boots_bound_real_home_migration(tmp_path, monkeypatch, sibli
     script = tmp_path / "boot.py"
     script.write_text('''import json, sys, time
 from pathlib import Path
-from hermes_cli import boot_bootstrap, post_update
+from eir_cli import boot_bootstrap, post_update
 root, entered, release = map(Path, sys.argv[1:4])
 def migrate():
     if sys.argv[4] == 'hold':
@@ -121,8 +121,8 @@ def migrate():
 post_update.BOOT_HOME_STEPS = (('migrate', migrate), ('db', post_update.step_state_db_guard))
 print(json.dumps(boot_bootstrap.run_boot_bootstrap(root)))
 ''')
-    env = dict(os.environ, HOME=str(tmp_path), HERMES_HOME=str(home),
-               HERMES_RUNTIME_DIR=str(tmp_path / "tools"),
+    env = dict(os.environ, HOME=str(tmp_path), EIR_HOME=str(home),
+               EIR_RUNTIME_DIR=str(tmp_path / "tools"),
                PYTHONPATH=str(Path(__file__).resolve().parents[2]))
     command = [sys.executable, str(script), str(root), str(entered), str(release)]
     first = subprocess.Popen([*command, "hold"], env=env, stdout=subprocess.PIPE,
@@ -133,7 +133,7 @@ print(json.dumps(boot_bootstrap.run_boot_bootstrap(root)))
             assert first.poll() is None
             assert time.monotonic() < deadline
             time.sleep(0.02)
-        second = subprocess.run([*command, "go"], env=dict(env, HERMES_HOME=str(other)),
+        second = subprocess.run([*command, "go"], env=dict(env, EIR_HOME=str(other)),
                                 capture_output=True, text=True, timeout=30, check=False)
         assert second.returncode == 0, second.stderr
         result = json.loads(second.stdout.splitlines()[-1])
@@ -166,8 +166,8 @@ print(json.dumps(boot_bootstrap.run_boot_bootstrap(root)))
             changed = subprocess.run([*command, 'go'], env=env, capture_output=True, text=True, timeout=30, check=False)
             assert changed.returncode == 0, changed.stderr
             assert json.loads(changed.stdout.splitlines()[-1])['home']['migrate']['ok']
-            import hermes_yaml
-            assert hermes_yaml.safe_load((home / 'config.yaml').read_text())['_config_version'] == DEFAULT_CONFIG['_config_version']
+            import eir_yaml
+            assert eir_yaml.safe_load((home / 'config.yaml').read_text())['_config_version'] == DEFAULT_CONFIG['_config_version']
     finally:
         release.touch()
         if first.poll() is None:
@@ -176,12 +176,12 @@ print(json.dumps(boot_bootstrap.run_boot_bootstrap(root)))
 
 
 def test_failed_migration_is_restored_and_not_retried(tmp_path, monkeypatch):
-    from hermes_cli import boot_bootstrap, config, post_update
+    from eir_cli import boot_bootstrap, config, post_update
 
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     root = tmp_path / "payload"
     root.mkdir()
     (root / "install-stamp.json").write_text(json.dumps({

@@ -1,6 +1,6 @@
 """Config writers store credentials in ``.env`` and only a reference in ``config.yaml`` (#77471).
 
-Each test runs a real writer against a temp ``HERMES_HOME``, then checks the contract: the secret
+Each test runs a real writer against a temp ``EIR_HOME``, then checks the contract: the secret
 is not in ``config.yaml``, it is in the profile's ``.env``, and the runtime reader still resolves it.
 """
 
@@ -13,14 +13,14 @@ SECRET = "sk-77471-synthetic-secret-value"
 
 @pytest.fixture()
 def home(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     home.mkdir()
     (home / ".env").touch()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     import os
     for name in list(os.environ):
-        if name in {"HERMES_MODEL_API_KEY", "HERMES_DELEGATION_API_KEY", "AUXILIARY_VISION_API_KEY"} or (
-                name.startswith(("HERMES_CUSTOM_", "HERMES_PROVIDER_"))):
+        if name in {"EIR_MODEL_API_KEY", "EIR_DELEGATION_API_KEY", "AUXILIARY_VISION_API_KEY"} or (
+                name.startswith(("EIR_CUSTOM_", "EIR_PROVIDER_"))):
             monkeypatch.delenv(name, raising=False)
     return home
 
@@ -35,8 +35,8 @@ def _assert_secret_only_in_env(home) -> None:
 
 
 def test_config_set_model_api_key_stores_a_reference(home, capsys):
-    from hermes_cli.config import load_config, set_config_value
-    from hermes_cli.runtime_provider import resolve_runtime_provider
+    from eir_cli.config import load_config, set_config_value
+    from eir_cli.runtime_provider import resolve_runtime_provider
 
     set_config_value("model.provider", "custom")
     set_config_value("model.base_url", "https://llm.example.com/v1")
@@ -44,7 +44,7 @@ def test_config_set_model_api_key_stores_a_reference(home, capsys):
     set_config_value("model.api_key", SECRET)
 
     _assert_secret_only_in_env(home)
-    assert "${HERMES_MODEL_API_KEY}" in _config_text(home)
+    assert "${EIR_MODEL_API_KEY}" in _config_text(home)
     assert SECRET not in capsys.readouterr().out
     assert load_config()["model"]["api_key"] == SECRET
     assert resolve_runtime_provider(requested="custom")["api_key"] == SECRET
@@ -52,10 +52,10 @@ def test_config_set_model_api_key_stores_a_reference(home, capsys):
 
 @pytest.mark.parametrize("key,env_name", [
     ("auxiliary.vision.api_key", "AUXILIARY_VISION_API_KEY"),
-    ("delegation.api_key", "HERMES_DELEGATION_API_KEY"),
+    ("delegation.api_key", "EIR_DELEGATION_API_KEY"),
 ])
 def test_config_set_aux_and_delegation_keys_store_a_reference(home, key, env_name):
-    from hermes_cli.config import load_config, set_config_value
+    from eir_cli.config import load_config, set_config_value
 
     set_config_value(key, SECRET)
 
@@ -71,7 +71,7 @@ def test_config_set_aux_and_delegation_keys_store_a_reference(home, key, env_nam
 def test_config_set_keeps_an_explicit_reference_and_inline_values_still_resolve(home):
     """A ``${VAR}`` the user types is stored verbatim; an inline value written by hand (no migration)
     keeps resolving."""
-    from hermes_cli.config import load_config, set_config_value
+    from eir_cli.config import load_config, set_config_value
 
     set_config_value("model.api_key", "${MY_OWN_KEY}")
     assert "${MY_OWN_KEY}" in _config_text(home)
@@ -82,12 +82,12 @@ def test_config_set_keeps_an_explicit_reference_and_inline_values_still_resolve(
 
 
 def test_dashboard_main_custom_endpoint_stores_a_reference(home, monkeypatch):
-    from hermes_cli.config import load_config
-    from hermes_cli.runtime_provider import resolve_runtime_provider
-    from hermes_cli.web_server_config import _apply_model_assignment_sync
+    from eir_cli.config import load_config
+    from eir_cli.runtime_provider import resolve_runtime_provider
+    from eir_cli.web_server_config import _apply_model_assignment_sync
 
     monkeypatch.setattr(
-        "hermes_cli.models_validate.validate_requested_model",
+        "eir_cli.models_validate.validate_requested_model",
         lambda *a, **k: {"accepted": True, "persist": True, "recognized": True, "message": None})
     (home / "config.yaml").write_text("model:\n  provider: openrouter\n  default: x\n", encoding="utf-8")
 
@@ -97,15 +97,15 @@ def test_dashboard_main_custom_endpoint_stores_a_reference(home, monkeypatch):
     cfg = load_config()
     assert cfg["model"]["api_key"] == SECRET
     row = next(e for e in cfg["custom_providers"] if e["base_url"] == "https://llm.example.com:8443/v1")
-    assert row["key_env"].startswith("HERMES_CUSTOM_LLM_EXAMPLE_COM_8443_") and "api_key" not in row
+    assert row["key_env"].startswith("EIR_CUSTOM_LLM_EXAMPLE_COM_8443_") and "api_key" not in row
     assert cfg["model"]["api_key"] == SECRET and f"${{{row['key_env']}}}" in _config_text(home)
     assert resolve_runtime_provider(requested="custom")["api_key"] == SECRET
 
 
 def test_dashboard_aux_slot_stores_a_reference(home):
     from agent.auxiliary_client import _resolve_task_provider_model
-    from hermes_cli.config import load_config
-    from hermes_cli.web_server_config import _apply_model_assignment_sync
+    from eir_cli.config import load_config
+    from eir_cli.web_server_config import _apply_model_assignment_sync
 
     (home / "config.yaml").write_text("model:\n  provider: openrouter\n  default: x\n", encoding="utf-8")
 
@@ -116,9 +116,9 @@ def test_dashboard_aux_slot_stores_a_reference(home):
     assert _resolve_task_provider_model("vision")[3] == SECRET
 
 
-def test_hermes_model_aux_flow_stores_a_reference(home):
+def test_eir_model_aux_flow_stores_a_reference(home):
     from agent.auxiliary_client import _resolve_task_provider_model
-    from hermes_cli.main_provider_setup import _save_aux_choice
+    from eir_cli.main_provider_setup import _save_aux_choice
 
     _save_aux_choice("vision", provider="custom", model="m", base_url="https://llm.example.com/v1", api_key=SECRET)
 
@@ -127,22 +127,22 @@ def test_hermes_model_aux_flow_stores_a_reference(home):
 
 
 def test_new_custom_provider_entry_stores_key_env(home):
-    from hermes_cli.config import load_config
-    from hermes_cli.runtime_provider import resolve_runtime_provider
-    from hermes_cli.main_provider_setup import _save_custom_provider
+    from eir_cli.config import load_config
+    from eir_cli.runtime_provider import resolve_runtime_provider
+    from eir_cli.main_provider_setup import _save_custom_provider
 
     _save_custom_provider("https://llm.example.com/v1", SECRET, "m", name="Example")
 
     _assert_secret_only_in_env(home)
     entry = load_config()["custom_providers"][0]
-    assert entry["key_env"].startswith("HERMES_CUSTOM_LLM_EXAMPLE_COM_") and "api_key" not in entry
+    assert entry["key_env"].startswith("EIR_CUSTOM_LLM_EXAMPLE_COM_") and "api_key" not in entry
     assert resolve_runtime_provider(requested="custom:example")["api_key"] == SECRET
 
 
 def test_plugin_aux_task_keys_with_distinct_underscores_keep_distinct_credentials(home):
     """Two valid plugin task keys must not share the env variable after either is saved."""
-    from hermes_cli.config import load_config, read_raw_config
-    from hermes_cli.main_provider_setup import _save_aux_choice
+    from eir_cli.config import load_config, read_raw_config
+    from eir_cli.main_provider_setup import _save_aux_choice
 
     tasks = (("my_task", "KEY-ONE"), ("my__task", "KEY-TWO"), ("my_task_", "KEY-THREE"), ("_my_task", "KEY-FOUR"),
              ("My_Task", "KEY-FIVE"))
@@ -157,9 +157,9 @@ def test_plugin_aux_task_keys_with_distinct_underscores_keep_distinct_credential
 
 
 def test_endpoint_names_separate_gateways_behind_one_host():
-    from hermes_cli.config_secret_refs import endpoint_api_key_env
+    from eir_cli.config_secret_refs import endpoint_api_key_env
 
-    assert endpoint_api_key_env("http://localhost:11434/v1").startswith("HERMES_CUSTOM_LOCALHOST_11434_")
+    assert endpoint_api_key_env("http://localhost:11434/v1").startswith("EIR_CUSTOM_LOCALHOST_11434_")
     assert endpoint_api_key_env("http://h:9/old/v1") != endpoint_api_key_env("http://h:9/new/v1")
 
 
@@ -171,9 +171,9 @@ def test_endpoint_names_separate_gateways_behind_one_host():
 def test_endpoints_whose_slugs_coincide_each_resolve_their_own_key(home, first, second):
     """Two endpoints that differ only in punctuation (or port vs path) must not share a variable,
     or the second save overwrites the first and the first host is sent the second host's key."""
-    from hermes_cli.config import load_config
-    from hermes_cli.main_provider_setup import _save_custom_provider
-    from hermes_cli.runtime_provider import resolve_runtime_provider
+    from eir_cli.config import load_config
+    from eir_cli.main_provider_setup import _save_custom_provider
+    from eir_cli.runtime_provider import resolve_runtime_provider
 
     _save_custom_provider(first, "KEY-FIRST", "m1", name="First")
     _save_custom_provider(second, "KEY-SECOND", "m2", name="Second")
@@ -187,9 +187,9 @@ def test_endpoints_whose_slugs_coincide_each_resolve_their_own_key(home, first, 
 def test_provider_name_never_shares_an_endpoint_variable(home):
     """``providers.<name>`` names and endpoint hosts live in separate namespaces: setting
     ``providers.my.host.com``-style names must not overwrite the key of the ``my.host.com`` row."""
-    from hermes_cli.config import load_config, set_config_value
-    from hermes_cli.main_provider_setup import _save_custom_provider
-    from hermes_cli.runtime_provider import resolve_runtime_provider
+    from eir_cli.config import load_config, set_config_value
+    from eir_cli.main_provider_setup import _save_custom_provider
+    from eir_cli.runtime_provider import resolve_runtime_provider
 
     _save_custom_provider("https://my.host.com/v1", "KEY-HOST", "m", name="Host")
     (home / "config.yaml").write_text(
@@ -210,7 +210,7 @@ def test_provider_name_never_shares_an_endpoint_variable(home):
 def test_config_set_rows_that_share_a_name_keep_their_own_keys(home, config_text, second_key):
     """Row names are not unique: two blocks named ``work`` for different hosts must not share a
     variable, or the second ``config set`` sends its key to the first host."""
-    from hermes_cli.config import load_config, set_config_value
+    from eir_cli.config import load_config, set_config_value
 
     (home / "config.yaml").write_text(config_text, encoding="utf-8")
     set_config_value("custom_providers.0.api_key", "KEY-ONE")
@@ -225,13 +225,13 @@ def test_config_set_rows_that_share_a_name_keep_their_own_keys(home, config_text
 def test_config_set_refuses_a_provider_key_another_endpoint_reads(home, monkeypatch):
     """model.api_key shares a known row's variable; once ``config set`` moves that row to another
     URL, setting its key must not re-key the main model's endpoint."""
-    from hermes_cli.config import load_config, set_config_value
-    from hermes_cli.web_models import CustomEndpointUpdate
-    from hermes_cli.web_routers.config_env import upsert_custom_endpoint
-    from hermes_cli.web_server_config import _apply_model_assignment_sync
+    from eir_cli.config import load_config, set_config_value
+    from eir_cli.web_models import CustomEndpointUpdate
+    from eir_cli.web_routers.config_env import upsert_custom_endpoint
+    from eir_cli.web_server_config import _apply_model_assignment_sync
 
     monkeypatch.setattr(
-        "hermes_cli.models_validate.validate_requested_model",
+        "eir_cli.models_validate.validate_requested_model",
         lambda *a, **k: {"accepted": True, "persist": True, "recognized": True, "message": None})
     (home / "config.yaml").write_text("model:\n  provider: openrouter\n  default: x\n", encoding="utf-8")
     upsert_custom_endpoint(CustomEndpointUpdate(
@@ -247,7 +247,7 @@ def test_config_set_refuses_a_provider_key_another_endpoint_reads(home, monkeypa
 def test_store_refuses_to_overwrite_a_variable_another_endpoint_reads(home):
     """Defence in depth: a key for endpoint B is never written over a variable an endpoint-A row
     already reads with a different value."""
-    from hermes_cli.config_secret_refs import store_secret
+    from eir_cli.config_secret_refs import store_secret
 
     (home / ".env").write_text("SHARED_KEY=key-a\n", encoding="utf-8")
     (home / "config.yaml").write_text(
@@ -262,19 +262,19 @@ def test_store_refuses_to_overwrite_a_variable_another_endpoint_reads(home):
 def test_dashboard_main_save_for_a_known_endpoint_reuses_the_row_variable(home, monkeypatch):
     """model.api_key and the endpoint's existing row read one variable, so rotating the key from the
     dashboard updates what both resolve."""
-    from hermes_cli.config import load_config
-    from hermes_cli.main_provider_setup import _save_custom_provider
-    from hermes_cli.web_server_config import _apply_model_assignment_sync
+    from eir_cli.config import load_config
+    from eir_cli.main_provider_setup import _save_custom_provider
+    from eir_cli.web_server_config import _apply_model_assignment_sync
 
     monkeypatch.setattr(
-        "hermes_cli.models_validate.validate_requested_model",
+        "eir_cli.models_validate.validate_requested_model",
         lambda *a, **k: {"accepted": True, "persist": True, "recognized": True, "message": None})
     _save_custom_provider("https://llm.example.com/v1", "old-key", "m", name="Example")
     row_env = load_config()["custom_providers"][0]["key_env"]
 
     _apply_model_assignment_sync("main", "custom", "m", "", "https://llm.example.com/v1", "new-key")
 
-    from hermes_cli.config import get_env_value, read_raw_config
+    from eir_cli.config import get_env_value, read_raw_config
     assert read_raw_config()["model"]["api_key"] == f"${{{row_env}}}"
     assert load_config()["model"]["api_key"] == "new-key" == get_env_value(row_env)
 
@@ -283,7 +283,7 @@ def test_webhook_env_secret_is_never_persisted_to_config_yaml(home, monkeypatch)
     """The issue's webhook claim: ``WEBHOOK_SECRET`` from the environment is folded into the
     in-memory gateway config only; config saves (home channel, ``config set``) never write it."""
     from gateway.config import HomeChannel, Platform, load_gateway_config, persist_home_channel
-    from hermes_cli.config import set_config_value
+    from eir_cli.config import set_config_value
 
     (home / "config.yaml").write_text("platforms:\n  webhook:\n    enabled: true\n", encoding="utf-8")
     monkeypatch.setenv("WEBHOOK_SECRET", SECRET)
@@ -298,10 +298,10 @@ def test_webhook_env_secret_is_never_persisted_to_config_yaml(home, monkeypatch)
 def test_dashboard_endpoint_ids_that_slug_alike_each_keep_their_own_key(home):
     """Dashboard ids ``my-host`` and ``my_host`` are two endpoints; saving the second must neither
     overwrite the first's variable nor leave either row resolving the other's key."""
-    from hermes_cli.config import get_env_value, load_config
-    from hermes_cli.runtime_provider import resolve_runtime_provider
-    from hermes_cli.web_models import CustomEndpointUpdate
-    from hermes_cli.web_routers.config_env import upsert_custom_endpoint
+    from eir_cli.config import get_env_value, load_config
+    from eir_cli.runtime_provider import resolve_runtime_provider
+    from eir_cli.web_models import CustomEndpointUpdate
+    from eir_cli.web_routers.config_env import upsert_custom_endpoint
 
     for endpoint_id, host, key in (("my-host", "a.example", "KEY-DASH"), ("my_host", "b.example", "KEY-UNDER")):
         upsert_custom_endpoint(CustomEndpointUpdate(
@@ -315,15 +315,15 @@ def test_dashboard_endpoint_ids_that_slug_alike_each_keep_their_own_key(home):
 
 
 def test_dashboard_save_keeps_a_legacy_variable_and_never_overwrites_it(home):
-    """A row an older release wrote keeps its ``HERMES_CUSTOM_<ID>_API_KEY``; a new ``my_host`` save
+    """A row an older release wrote keeps its ``EIR_CUSTOM_<ID>_API_KEY``; a new ``my_host`` save
     gets its own variable, and a save into a name another endpoint still reads is refused."""
     from fastapi import HTTPException
-    from hermes_cli.config import get_env_value, load_config
-    from hermes_cli.runtime_provider import resolve_runtime_provider
-    from hermes_cli.web_models import CustomEndpointUpdate
-    from hermes_cli.web_routers.config_env import upsert_custom_endpoint
+    from eir_cli.config import get_env_value, load_config
+    from eir_cli.runtime_provider import resolve_runtime_provider
+    from eir_cli.web_models import CustomEndpointUpdate
+    from eir_cli.web_routers.config_env import upsert_custom_endpoint
 
-    legacy = "HERMES_CUSTOM_MY_HOST_API_KEY"
+    legacy = "EIR_CUSTOM_MY_HOST_API_KEY"
     (home / ".env").write_text(f"{legacy}=KEY-OLD\n", encoding="utf-8")
     row = "    base_url: https://{}/v1\n    model: m\n    key_env: " + legacy + "\n"
     (home / "config.yaml").write_text("providers:\n  my-host:\n    name: my-host\n" + row.format("a.example"),
@@ -351,7 +351,7 @@ def test_dashboard_save_keeps_a_legacy_variable_and_never_overwrites_it(home):
     "fallback_providers:\n- provider: custom\n  base_url: https://a.example/v1\n  key_env: SHARED_KEY\n",
 ])
 def test_store_refuses_a_variable_a_fallback_block_reads(home, block):
-    from hermes_cli.config_secret_refs import store_secret
+    from eir_cli.config_secret_refs import store_secret
 
     (home / ".env").write_text("SHARED_KEY=key-a\n", encoding="utf-8")
     (home / "config.yaml").write_text(block, encoding="utf-8")
@@ -362,13 +362,13 @@ def test_store_refuses_a_variable_a_fallback_block_reads(home, block):
 def test_clearing_an_endpoint_key_keeps_the_variable_the_main_model_reads(home, monkeypatch):
     """The main picker points model.api_key at a known row's variable; a blank-key save of that row
     must not delete it, or model.api_key resolves to the literal ``${VAR}``."""
-    from hermes_cli.config import load_config
-    from hermes_cli.web_models import CustomEndpointUpdate
-    from hermes_cli.web_routers.config_env import upsert_custom_endpoint
-    from hermes_cli.web_server_config import _apply_model_assignment_sync
+    from eir_cli.config import load_config
+    from eir_cli.web_models import CustomEndpointUpdate
+    from eir_cli.web_routers.config_env import upsert_custom_endpoint
+    from eir_cli.web_server_config import _apply_model_assignment_sync
 
     monkeypatch.setattr(
-        "hermes_cli.models_validate.validate_requested_model",
+        "eir_cli.models_validate.validate_requested_model",
         lambda *a, **k: {"accepted": True, "persist": True, "recognized": True, "message": None})
     (home / "config.yaml").write_text("model:\n  provider: openrouter\n  default: x\n", encoding="utf-8")
     endpoint = {"id": "lab", "name": "lab", "base_url": "https://lab.example/v1", "model": "m"}
@@ -386,13 +386,13 @@ def test_clearing_an_endpoint_key_keeps_the_variable_the_main_model_reads(home, 
     assert "KEY-SOLO" not in (home / ".env").read_text(encoding="utf-8")
 
 
-def test_hermes_model_custom_flow_rotates_the_known_row_variable(home, monkeypatch):
-    """``hermes model`` for an endpoint that already has a Hermes-written row writes the new key
+def test_eir_model_custom_flow_rotates_the_known_row_variable(home, monkeypatch):
+    """``eir model`` for an endpoint that already has a Eir-written row writes the new key
     under that row's variable, so every block reading it (here an aux slot) gets the rotation."""
-    from hermes_cli import model_setup_flows_custom as flow
-    from hermes_cli.config import load_config, read_raw_config
+    from eir_cli import model_setup_flows_custom as flow
+    from eir_cli.config import load_config, read_raw_config
 
-    row_env = "HERMES_PROVIDER_LAB_0000ABCD_API_KEY"
+    row_env = "EIR_PROVIDER_LAB_0000ABCD_API_KEY"
     (home / ".env").write_text(f"{row_env}=KEY-OLD\n", encoding="utf-8")
     (home / "config.yaml").write_text(
         "model:\n  provider: openrouter\n  default: x\n"
@@ -401,10 +401,10 @@ def test_hermes_model_custom_flow_rotates_the_known_row_variable(home, monkeypat
         f"    api_key: ${{{row_env}}}\n", encoding="utf-8")
     answers = iter(["https://lab.example/v1", "", "lab"])
     monkeypatch.setattr(flow, "line_input", lambda _prompt="": next(answers))
-    monkeypatch.setattr("hermes_cli.secret_prompt.masked_secret_prompt", lambda _prompt="": "KEY-NEW")
+    monkeypatch.setattr("eir_cli.secret_prompt.masked_secret_prompt", lambda _prompt="": "KEY-NEW")
     monkeypatch.setattr("builtins.input", lambda _prompt="": "")
-    monkeypatch.setattr("hermes_cli.models.probe_api_models", lambda *a, **k: {"models": ["m"]})
-    monkeypatch.setattr("hermes_cli.main_provider_setup._prompt_custom_api_mode_selection",
+    monkeypatch.setattr("eir_cli.models.probe_api_models", lambda *a, **k: {"models": ["m"]})
+    monkeypatch.setattr("eir_cli.main_provider_setup._prompt_custom_api_mode_selection",
                         lambda *a, **k: None)
 
     flow._model_flow_custom({})
@@ -416,7 +416,7 @@ def test_hermes_model_custom_flow_rotates_the_known_row_variable(home, monkeypat
 def test_config_set_on_a_dotted_provider_name_stores_a_reference(home):
     """``config set`` writes ``providers.lab.example.api_key`` into the existing
     ``providers["lab.example"]`` block, so the credential routing must classify it the same way."""
-    from hermes_cli.config import load_config, set_config_value
+    from eir_cli.config import load_config, set_config_value
 
     (home / "config.yaml").write_text(
         "providers:\n  lab.example:\n    base_url: https://lab.example/v1\n", encoding="utf-8")
@@ -428,7 +428,7 @@ def test_config_set_on_a_dotted_provider_name_stores_a_reference(home):
 
 def test_config_set_on_hostless_rows_keeps_each_row_its_own_key(home):
     """Rows without a URL yet fall back to their name, so two named rows still get two variables."""
-    from hermes_cli.config import load_config, set_config_value
+    from eir_cli.config import load_config, set_config_value
 
     (home / "config.yaml").write_text("custom_providers:\n- name: one\n- name: two\n", encoding="utf-8")
     set_config_value("custom_providers.0.api_key", "KEY-ONE")
@@ -438,7 +438,7 @@ def test_config_set_on_hostless_rows_keeps_each_row_its_own_key(home):
     assert "KEY-ONE" not in _config_text(home)
 
 
-_LEGACY_SHARED = "HERMES_CUSTOM_GW_EXAMPLE_8443_API_KEY"  # an older release keyed rows by host:port
+_LEGACY_SHARED = "EIR_CUSTOM_GW_EXAMPLE_8443_API_KEY"  # an older release keyed rows by host:port
 
 
 def _two_rows_on_one_legacy_variable(home, section="custom_providers"):
@@ -456,8 +456,8 @@ def _two_rows_on_one_legacy_variable(home, section="custom_providers"):
 def _assert_each_endpoint_resolves_its_own_key(home, monkeypatch, provider_a, provider_b):
     """The saved endpoint resolves KEY-A now (main) and when re-selected later; only ``b`` stays on
     the shared variable, which still holds ``KEY-B``."""
-    from hermes_cli.config import load_env, read_raw_config
-    from hermes_cli.runtime_provider import resolve_runtime_provider
+    from eir_cli.config import load_env, read_raw_config
+    from eir_cli.runtime_provider import resolve_runtime_provider
 
     for name, value in load_env().items():
         monkeypatch.setenv(name, value)
@@ -472,21 +472,21 @@ def _assert_each_endpoint_resolves_its_own_key(home, monkeypatch, provider_a, pr
 
 @pytest.mark.parametrize("section,providers", [
     ("custom_providers", ("custom:a", "custom:b")), ("providers", ("a", "b"))])
-def test_hermes_model_custom_flow_moves_an_endpoint_off_a_shared_legacy_variable(home, monkeypatch, section,
+def test_eir_model_custom_flow_moves_an_endpoint_off_a_shared_legacy_variable(home, monkeypatch, section,
                                                                                  providers):
-    """Re-running ``hermes model`` for one of two endpoints an older release put on one variable
+    """Re-running ``eir model`` for one of two endpoints an older release put on one variable
     gives it its own variable instead of refusing (or re-keying the other endpoint)."""
-    from hermes_cli import model_setup_flows_custom as flow
-    from hermes_cli.config import load_config
+    from eir_cli import model_setup_flows_custom as flow
+    from eir_cli.config import load_config
 
     _two_rows_on_one_legacy_variable(home, section)
     # A display name other than "a": a new custom_providers row named "a" would shadow providers.a.
     answers = iter(["https://gw.example:8443/a/v1", "", "gw"])
     monkeypatch.setattr(flow, "line_input", lambda _prompt="": next(answers))
-    monkeypatch.setattr("hermes_cli.secret_prompt.masked_secret_prompt", lambda _prompt="": "KEY-A")
+    monkeypatch.setattr("eir_cli.secret_prompt.masked_secret_prompt", lambda _prompt="": "KEY-A")
     monkeypatch.setattr("builtins.input", lambda _prompt="": "")
-    monkeypatch.setattr("hermes_cli.models.probe_api_models", lambda *a, **k: {"models": ["m"]})
-    monkeypatch.setattr("hermes_cli.main_provider_setup._prompt_custom_api_mode_selection",
+    monkeypatch.setattr("eir_cli.models.probe_api_models", lambda *a, **k: {"models": ["m"]})
+    monkeypatch.setattr("eir_cli.main_provider_setup._prompt_custom_api_mode_selection",
                         lambda *a, **k: None)
 
     flow._model_flow_custom({})
@@ -502,11 +502,11 @@ def test_dashboard_main_save_moves_an_endpoint_off_a_shared_legacy_variable(home
                                                                             providers):
     """The dashboard saves KEY-A for endpoint ``a`` under a new variable AND points ``a``'s own row
     (and a ``providers.a`` key_env the save copies onto ``model``) at it."""
-    from hermes_cli.config import load_config
-    from hermes_cli.web_server_config import _apply_model_assignment_sync
+    from eir_cli.config import load_config
+    from eir_cli.web_server_config import _apply_model_assignment_sync
 
     monkeypatch.setattr(
-        "hermes_cli.models_validate.validate_requested_model",
+        "eir_cli.models_validate.validate_requested_model",
         lambda *a, **k: {"accepted": True, "persist": True, "recognized": True, "message": None})
     _two_rows_on_one_legacy_variable(home, section)
     provider, base_url = submitted
@@ -518,16 +518,16 @@ def test_dashboard_main_save_moves_an_endpoint_off_a_shared_legacy_variable(home
 
 
 def test_write_locked_env_refuses_an_aux_endpoint_key_without_a_traceback_or_a_500(home, monkeypatch, capsys):
-    """A managed ``.env`` that forbids the aux variable: ``hermes model`` prints the refusal and saves
+    """A managed ``.env`` that forbids the aux variable: ``eir model`` prints the refusal and saves
     nothing, and the dashboard answers 400 with it, never an opaque 500 or a dangling reference."""
     import asyncio
 
     from fastapi import HTTPException
 
-    import hermes_cli.main_provider_setup as mps
-    from hermes_cli import config
-    from hermes_cli.web_models import ModelAssignment
-    from hermes_cli.web_routers.models import set_model_assignment
+    import eir_cli.main_provider_setup as mps
+    from eir_cli import config
+    from eir_cli.web_models import ModelAssignment
+    from eir_cli.web_routers.models import set_model_assignment
 
     (home / "config.yaml").write_text("model:\n  provider: openrouter\n  default: x/y\n", encoding="utf-8")
     monkeypatch.setattr(config, "env_write_refusal", lambda key, action: f"Cannot {action} {key}: managed")
@@ -549,9 +549,9 @@ def test_write_locked_env_refuses_an_aux_endpoint_key_without_a_traceback_or_a_5
 def test_aux_save_of_a_reference_is_not_refused_by_the_key_lock(home, monkeypatch):
     """A ``${VAR}`` the user types writes nothing to ``.env``, so the lock that forbids the slot's
     variable must not refuse it: a reference is the way around that lock."""
-    from hermes_cli import config
-    from hermes_cli.config import read_raw_config
-    from hermes_cli.web_server_config import _apply_aux_assignment_sync
+    from eir_cli import config
+    from eir_cli.config import read_raw_config
+    from eir_cli.web_server_config import _apply_aux_assignment_sync
 
     monkeypatch.setattr(config, "env_write_refusal", lambda key, action: f"Cannot {action} {key}: managed")
     (home / "config.yaml").write_text("model:\n  provider: openrouter\n  default: x/y\n", encoding="utf-8")
@@ -567,9 +567,9 @@ def test_all_tasks_aux_save_under_a_per_key_lock_writes_no_slot_key(home, monkey
     slot's key reaches ``.env``: no orphaned AUXILIARY_<TASK>_API_KEY line for an unsaved config."""
     from fastapi import HTTPException
 
-    from hermes_cli import config
-    from hermes_cli.config_secret_refs import aux_api_key_env
-    from hermes_cli.web_server_config import _apply_aux_assignment_sync, _aux_task_slots
+    from eir_cli import config
+    from eir_cli.config_secret_refs import aux_api_key_env
+    from eir_cli.web_server_config import _apply_aux_assignment_sync, _aux_task_slots
 
     locked = aux_api_key_env(_aux_task_slots()[-1])  # the LAST slot: every earlier one would write first
     real = config.env_write_refusal
@@ -588,14 +588,14 @@ def test_all_tasks_aux_save_under_a_per_key_lock_writes_no_slot_key(home, monkey
 def test_dashboard_save_moves_every_shared_legacy_name_of_the_endpoint(home, monkeypatch):
     """Rows spelling the default port both ways carry two legacy host:port names (``GW_EXAMPLE``,
     ``GW_EXAMPLE_443``), each shared with endpoint ``b``: a save for ``a`` moves both of ``a``'s rows."""
-    from hermes_cli.config import load_env
-    from hermes_cli.runtime_provider import resolve_runtime_provider
-    from hermes_cli.web_server_config import _apply_model_assignment_sync
+    from eir_cli.config import load_env
+    from eir_cli.runtime_provider import resolve_runtime_provider
+    from eir_cli.web_server_config import _apply_model_assignment_sync
 
     monkeypatch.setattr(
-        "hermes_cli.models_validate.validate_requested_model",
+        "eir_cli.models_validate.validate_requested_model",
         lambda *a, **k: {"accepted": True, "persist": True, "recognized": True, "message": None})
-    names = ("HERMES_CUSTOM_GW_EXAMPLE_API_KEY", "HERMES_CUSTOM_GW_EXAMPLE_443_API_KEY")
+    names = ("EIR_CUSTOM_GW_EXAMPLE_API_KEY", "EIR_CUSTOM_GW_EXAMPLE_443_API_KEY")
     (home / ".env").write_text("".join(f"{n}=KEY-B\n" for n in names), encoding="utf-8")
     rows = "".join(f"- name: {e}{i}\n  base_url: https://gw.example{port}/{e}/v1\n  key_env: {n}\n"
                    for e in "ab" for i, (port, n) in enumerate(zip(("", ":443"), names), 1))
@@ -610,14 +610,14 @@ def test_dashboard_save_moves_every_shared_legacy_name_of_the_endpoint(home, mon
     assert keys == {"a1": "KEY-A", "a2": "KEY-A", "b1": "KEY-B", "b2": "KEY-B"}
 
 
-def test_hermes_model_custom_flow_moves_every_shared_legacy_name_of_the_endpoint(home, monkeypatch):
+def test_eir_model_custom_flow_moves_every_shared_legacy_name_of_the_endpoint(home, monkeypatch):
     """The CLI twin of the dashboard case: ``providers`` rows for ``a`` spelling the default port both
-    ways sit on two legacy names, each shared with ``b``; ``hermes model`` for ``a`` moves both."""
-    from hermes_cli import model_setup_flows_custom as flow
-    from hermes_cli.config import load_env
-    from hermes_cli.runtime_provider import resolve_runtime_provider
+    ways sit on two legacy names, each shared with ``b``; ``eir model`` for ``a`` moves both."""
+    from eir_cli import model_setup_flows_custom as flow
+    from eir_cli.config import load_env
+    from eir_cli.runtime_provider import resolve_runtime_provider
 
-    names = ("HERMES_CUSTOM_GW_EXAMPLE_API_KEY", "HERMES_CUSTOM_GW_EXAMPLE_443_API_KEY")
+    names = ("EIR_CUSTOM_GW_EXAMPLE_API_KEY", "EIR_CUSTOM_GW_EXAMPLE_443_API_KEY")
     (home / ".env").write_text("".join(f"{n}=KEY-B\n" for n in names), encoding="utf-8")
     rows = "".join(f"  {e}{i}:\n    base_url: https://gw.example{port}/{e}/v1\n    key_env: {n}\n"
                    for e in "ab" for i, (port, n) in enumerate(zip(("", ":443"), names), 1))
@@ -625,10 +625,10 @@ def test_hermes_model_custom_flow_moves_every_shared_legacy_name_of_the_endpoint
                                       encoding="utf-8")
     answers = iter(["https://gw.example/a/v1", "", "gw"])
     monkeypatch.setattr(flow, "line_input", lambda _prompt="": next(answers))
-    monkeypatch.setattr("hermes_cli.secret_prompt.masked_secret_prompt", lambda _prompt="": "KEY-A")
+    monkeypatch.setattr("eir_cli.secret_prompt.masked_secret_prompt", lambda _prompt="": "KEY-A")
     monkeypatch.setattr("builtins.input", lambda _prompt="": "")
-    monkeypatch.setattr("hermes_cli.models.probe_api_models", lambda *a, **k: {"models": ["m"]})
-    monkeypatch.setattr("hermes_cli.main_provider_setup._prompt_custom_api_mode_selection",
+    monkeypatch.setattr("eir_cli.models.probe_api_models", lambda *a, **k: {"models": ["m"]})
+    monkeypatch.setattr("eir_cli.main_provider_setup._prompt_custom_api_mode_selection",
                         lambda *a, **k: None)
 
     flow._model_flow_custom({})

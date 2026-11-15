@@ -1,6 +1,6 @@
 """Tests for doctor's per-database journal-mode report.
 
-`hermes doctor` lists each Hermes-managed database with its journal mode and
+`eir doctor` lists each Eir-managed database with its journal mode and
 flags databases that are in WAL while the linked SQLite carries the WAL-reset
 bug (https://sqlite.org/wal.html#walresetbug). The probe reads the file header
 only — it never opens the database through the SQLite engine, because even a
@@ -15,11 +15,11 @@ import sys
 
 import pytest
 
-from hermes_cli.sqlite_safe_read import (
+from eir_cli.sqlite_safe_read import (
     connect_tracked,
     has_live_connection,
 )
-from hermes_cli import doctor_platform
+from eir_cli import doctor_platform
 
 VULNERABLE = (3, 50, 4)
 FIXED_VERSIONS = [(3, 51, 3), (3, 52, 0), (3, 50, 7), (3, 44, 6)]
@@ -53,7 +53,7 @@ def clean_registry():
     fixture) would otherwise leave the registry dirty and make the *next*
     test's refusal assertion pass for the wrong reason.
     """
-    import hermes_cli.sqlite_safe_read as mod
+    import eir_cli.sqlite_safe_read as mod
 
     def _clear():
         with mod._live_lock:
@@ -291,26 +291,26 @@ class TestReportDatabaseJournalModes:
         # #110848: startup only refuses WAL for fresh databases on virtiofs/9p; doctor must surface an existing WAL
         # file there (with a non-vulnerable SQLite, where it used to print a plain info line).
         _make_db(tmp_path / "state.db", journal_mode="WAL")
-        monkeypatch.setattr("hermes_state_wal._path_on_cross_vm_fs", lambda p: True)
+        monkeypatch.setattr("eir_state_wal._path_on_cross_vm_fs", lambda p: True)
 
         doctor_platform._report_database_journal_modes(tmp_path, (3, 51, 3))
 
         out = capsys.readouterr().out
         assert "state.db is in WAL mode on a cross-VM filesystem" in out
-        assert "hermes sessions set-journal-mode delete" in out
+        assert "eir sessions set-journal-mode delete" in out
 
     def test_wal_db_on_network_fs_is_flagged_with_concurrent_writer_remedy(self, tmp_path, capsys, monkeypatch):
         # #110848 remainder: network filesystems never refuse WAL for fresh databases (single-writer NFS homes are
         # legitimate), so doctor is the surface that must flag an existing WAL file there, with the offline remedy.
         _make_db(tmp_path / "state.db", journal_mode="WAL")
-        monkeypatch.setattr("hermes_state_wal._path_on_cross_vm_fs", lambda p: False)
-        monkeypatch.setattr("hermes_state_wal._path_on_network_fs", lambda p: True)
+        monkeypatch.setattr("eir_state_wal._path_on_cross_vm_fs", lambda p: False)
+        monkeypatch.setattr("eir_state_wal._path_on_network_fs", lambda p: True)
 
         doctor_platform._report_database_journal_modes(tmp_path, (3, 51, 3))
 
         out = capsys.readouterr().out
         assert "state.db is in WAL mode on a network filesystem" in out
-        assert "hermes sessions set-journal-mode delete" in out
+        assert "eir sessions set-journal-mode delete" in out
 
     def test_vulnerable_runtime_wal_db_is_exposed(self, tmp_path, capsys):
         _make_db(tmp_path / "state.db", journal_mode="WAL")
@@ -431,13 +431,13 @@ class TestConfiguredDeleteNeverApplied:
     @pytest.mark.parametrize("version, exposed", [((3, 51, 3), False), (VULNERABLE, True)])
     def test_wal_db_under_configured_delete_warns(self, tmp_path, capsys, monkeypatch, version, exposed):
         _make_db(tmp_path / "state.db", journal_mode="WAL")
-        monkeypatch.setattr("hermes_state_wal.resolve_journal_mode", lambda: "delete")
+        monkeypatch.setattr("eir_state_wal.resolve_journal_mode", lambda: "delete")
 
         doctor_platform._report_database_journal_modes(tmp_path, version)
 
         out = capsys.readouterr().out
         assert "state.db is in WAL mode" in out and "despite database.journal_mode=delete" in out
-        assert "never live-downgraded" in out and "hermes sessions set-journal-mode delete" in out
+        assert "never live-downgraded" in out and "eir sessions set-journal-mode delete" in out
         assert "state.db: WAL journal mode" not in out
         assert ("To clear the exposure:" in out) is exposed
 
@@ -446,7 +446,7 @@ class TestConfiguredDeleteNeverApplied:
         # subprocess holding a real connection is named by PID; the doctor process itself is not a holder.
         db = tmp_path / "state.db"
         _make_db(db, journal_mode="WAL")
-        monkeypatch.setattr("hermes_state_wal.resolve_journal_mode", lambda: "delete")
+        monkeypatch.setattr("eir_state_wal.resolve_journal_mode", lambda: "delete")
         holder = subprocess.Popen(
             [sys.executable, "-c",
              "import os, sqlite3, sys; c = sqlite3.connect(sys.argv[1]); c.execute('SELECT count(*) FROM t'); "
@@ -468,8 +468,8 @@ class TestConfiguredDeleteNeverApplied:
 
     def test_partial_holder_scan_is_never_an_all_clear(self, tmp_path, capsys, monkeypatch):
         _make_db(tmp_path / "state.db", journal_mode="WAL")
-        monkeypatch.setattr("hermes_state_wal.resolve_journal_mode", lambda: "delete")
-        monkeypatch.setattr("hermes_state_holders.foreign_state_db_holders",
+        monkeypatch.setattr("eir_state_wal.resolve_journal_mode", lambda: "delete")
+        monkeypatch.setattr("eir_state_holders.foreign_state_db_holders",
                             lambda path: [(-1, "open-file scan unavailable")])
 
         doctor_platform._report_database_journal_modes(tmp_path, (3, 51, 3))
@@ -480,7 +480,7 @@ class TestConfiguredDeleteNeverApplied:
 
     def test_configured_wal_keeps_the_informational_line(self, tmp_path, capsys, monkeypatch):
         _make_db(tmp_path / "state.db", journal_mode="WAL")
-        monkeypatch.setattr("hermes_state_wal.resolve_journal_mode", lambda: "wal")
+        monkeypatch.setattr("eir_state_wal.resolve_journal_mode", lambda: "wal")
 
         doctor_platform._report_database_journal_modes(tmp_path, (3, 51, 3))
 

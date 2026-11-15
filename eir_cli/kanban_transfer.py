@@ -1,6 +1,6 @@
 """Kanban board export / import — move a whole board between machines.
 
-Backs ``hermes kanban export|import``, the ``/boards/{slug}/export`` and
+Backs ``eir kanban export|import``, the ``/boards/{slug}/export`` and
 ``/boards/import`` REST endpoints, and the desktop board switcher. Archive
 layout (``<slug>.tar.gz``, one top-level dir named for the source slug):
 ``manifest.json`` (format/version/provenance/counts), ``board.json`` (display
@@ -31,16 +31,16 @@ import time
 from pathlib import Path
 from typing import Any, Optional
 
-from hermes_cli import kanban_db as kb
-from hermes_cli import kanban_db_connect as kbc
-from hermes_cli.archive_safe import (
+from eir_cli import kanban_db as kb
+from eir_cli import kanban_db_connect as kbc
+from eir_cli.archive_safe import (
     archive_root_dirs,
     copy_regular_files,
     make_targz,
     safe_extract_targz,
 )
 
-ARCHIVE_FORMAT = "hermes-kanban-board"
+ARCHIVE_FORMAT = "eir-kanban-board"
 ARCHIVE_FORMAT_VERSION = 1
 
 # Statuses from which the dispatcher can still act on a task. A task whose
@@ -155,7 +155,7 @@ def export_board(
         attachments = copy_regular_files(kb.attachments_root(slug), staged / "attachments") if include_attachments else 0
         logs = copy_regular_files(kb.worker_logs_dir(slug), staged / "logs") if include_logs else 0
 
-        from hermes_cli.version_info import get_version_info
+        from eir_cli.version_info import get_version_info
 
         manifest = {
             "format": ARCHIVE_FORMAT,
@@ -163,7 +163,7 @@ def export_board(
             "board": slug,
             "board_name": meta.get("name") or slug,
             "exported_at": int(time.time()),
-            "hermes_version": get_version_info().base_version,
+            "eir_version": get_version_info().base_version,
             "includes": {"attachments": bool(include_attachments), "logs": bool(include_logs)},
             "counts": {**counts, "attachment_files": attachments, "log_files": logs},
         }
@@ -199,21 +199,21 @@ def _available_slug(preferred: str) -> str:
 def _read_manifest(root: Path) -> dict[str, Any]:
     path = root / "manifest.json"
     if not path.exists():
-        raise ValueError("archive is not a Hermes kanban board export (no manifest.json)")
+        raise ValueError("archive is not a Eir kanban board export (no manifest.json)")
     try:
         manifest = json.loads(path.read_text(encoding="utf-8-sig"))
     except json.JSONDecodeError as exc:
         raise ValueError(f"archive manifest is not valid JSON: {exc}") from exc
     if not isinstance(manifest, dict) or manifest.get("format") != ARCHIVE_FORMAT:
         raise ValueError(
-            "archive is not a Hermes kanban board export "
+            "archive is not a Eir kanban board export "
             f"(format={manifest.get('format') if isinstance(manifest, dict) else None!r})"
         )
     version = manifest.get("format_version")
     if not isinstance(version, int) or version > ARCHIVE_FORMAT_VERSION:
         raise ValueError(
-            f"archive format version {version!r} is newer than this Hermes "
-            f"understands (max {ARCHIVE_FORMAT_VERSION}) — update Hermes and retry"
+            f"archive format version {version!r} is newer than this Eir "
+            f"understands (max {ARCHIVE_FORMAT_VERSION}) — update Eir and retry"
         )
     return manifest
 
@@ -361,7 +361,7 @@ def import_board(
         "source": {
             "board": manifest.get("board"),
             "exported_at": manifest.get("exported_at"),
-            "hermes_version": manifest.get("hermes_version"),
+            "eir_version": manifest.get("eir_version"),
         },
         "counts": counts,
         "attachments_restored": stats["attachments"],

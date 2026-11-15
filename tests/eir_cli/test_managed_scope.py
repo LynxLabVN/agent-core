@@ -1,4 +1,4 @@
-"""Unit tests for hermes_cli.managed_scope (resolver + loaders + key helpers)."""
+"""Unit tests for eir_cli.managed_scope (resolver + loaders + key helpers)."""
 import textwrap
 
 # ── Directory resolver ───────────────────────────────────────────────────────
@@ -6,7 +6,7 @@ import textwrap
 # ── Loaders + key helpers ────────────────────────────────────────────────────
 
 def _write_managed(tmp_path, monkeypatch, *, config=None, env=None):
-    from hermes_cli import managed_scope
+    from eir_cli import managed_scope
 
     managed = tmp_path / "managed"
     managed.mkdir(exist_ok=True)
@@ -14,12 +14,12 @@ def _write_managed(tmp_path, monkeypatch, *, config=None, env=None):
         (managed / "config.yaml").write_text(textwrap.dedent(config), encoding="utf-8")
     if env is not None:
         (managed / ".env").write_text(textwrap.dedent(env), encoding="utf-8")
-    monkeypatch.setenv("HERMES_MANAGED_DIR", str(managed))
+    monkeypatch.setenv("EIR_MANAGED_DIR", str(managed))
     managed_scope.invalidate_managed_cache()
     return managed
 
 def test_load_managed_env_and_is_env_managed(tmp_path, monkeypatch):
-    from hermes_cli import managed_scope
+    from eir_cli import managed_scope
 
     _write_managed(
         tmp_path, monkeypatch, env="OPENAI_API_BASE=https://org.example/v1\n"

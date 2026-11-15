@@ -5,7 +5,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 const request = vi.hoisted(() => vi.fn())
 
 // A native <select> stands in for the Radix one: same value/onValueChange contract.
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@eir/plugin-sdk', async () => {
   const { en } = await import('@/i18n/en')
 
   return { ...await (await import('./group-test-utils')).pluginSdkMock({}), atom: (await import('nanostores')).atom,

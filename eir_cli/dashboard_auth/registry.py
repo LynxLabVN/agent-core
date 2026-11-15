@@ -12,8 +12,8 @@ import logging
 from typing import List, Optional
 
 from agent.provider_registry import ProviderRegistry, exact_key
-from hermes_constants import hermes_home_key, normalize_scope
-from hermes_cli.dashboard_auth.base import DashboardAuthProvider, assert_protocol_compliance
+from eir_constants import eir_home_key, normalize_scope
+from eir_cli.dashboard_auth.base import DashboardAuthProvider, assert_protocol_compliance
 
 _log = logging.getLogger(__name__)
 _registry: ProviderRegistry[DashboardAuthProvider] = ProviderRegistry(
@@ -32,7 +32,7 @@ restore_registration = _registry.restore_registration
 def _merged(scope: Optional[str] = None) -> dict[str, DashboardAuthProvider]:
     """Lock-free merge for callers already holding ``_lock``."""
     providers = dict(_providers)
-    providers.update(_scoped_providers.get(hermes_home_key(scope), {}))
+    providers.update(_scoped_providers.get(eir_home_key(scope), {}))
     return providers
 
 

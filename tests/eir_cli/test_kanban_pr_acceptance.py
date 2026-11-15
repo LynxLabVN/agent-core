@@ -7,8 +7,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 
-from hermes_cli import kanban_db as kb
-from hermes_cli.kanban_db_connect import connect
+from eir_cli import kanban_db as kb
+from eir_cli.kanban_db_connect import connect
 
 
 @pytest.fixture
@@ -65,7 +65,7 @@ def github(tmp_path, monkeypatch):
                   "print(urllib.request.urlopen(u).read().decode())\n")
     gh.chmod(0o755)
     monkeypatch.setenv("PATH", str(shim) + os.pathsep + os.environ["PATH"])
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path / "home"))
     kb.init_db()
     try:
         yield state
@@ -142,7 +142,7 @@ def test_acceptance_runs_gh_as_the_assignee_profile(tmp_path, monkeypatch):
 
     launch_home = tmp_path / "home"
     launch_home.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(launch_home))
+    monkeypatch.setenv("EIR_HOME", str(launch_home))
     assignee_home = launch_home / "profiles" / "b"
     assignee_home.mkdir(parents=True)
     (assignee_home / ".env").write_text("GH_TOKEN=b-token\nBWS_ACCESS_TOKEN=b-vault\n"
@@ -185,7 +185,7 @@ def test_assignee_without_own_gh_login_never_falls_through_to_ambient_login(tmp_
     to a profile-owned config dir, its 'not logged in' exit is classified `auth` naming the profile."""
     launch_home = tmp_path / "home"
     launch_home.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(launch_home))
+    monkeypatch.setenv("EIR_HOME", str(launch_home))
     assignee_home = launch_home / "profiles" / "b"
     assignee_home.mkdir(parents=True)
     (assignee_home / ".env").write_text("", encoding="utf-8")
@@ -224,11 +224,11 @@ def test_gh_env_carries_only_gh_credentials_not_the_whole_profile_scope(tmp_path
     """#134669: gh needs only its own login, so the child env must not overlay the assignee
     profile's entire secret scope — provider keys and adapter secrets stay out — while the
     #122689 identity guarantees still hold (the assignee's own GH_TOKEN wins over ambient)."""
-    from hermes_cli.kanban_pr_acceptance import _gh_env
+    from eir_cli.kanban_pr_acceptance import _gh_env
 
     launch_home = tmp_path / "home"
     launch_home.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(launch_home))
+    monkeypatch.setenv("EIR_HOME", str(launch_home))
     assignee_home = launch_home / "profiles" / "b"
     assignee_home.mkdir(parents=True)
     (assignee_home / ".env").write_text(
@@ -252,11 +252,11 @@ def test_enterprise_only_profile_still_gets_the_fail_closed_pin(tmp_path, monkey
     """Every acceptance call targets github.com, where gh ignores the enterprise token vars and
     GH_HOST. A profile holding only an enterprise login therefore has no github.com login: it
     must get the pin, not fall through to the launcher's ~/.config/gh/hosts.yml (#134669)."""
-    from hermes_cli.kanban_pr_acceptance import _gh_env
+    from eir_cli.kanban_pr_acceptance import _gh_env
 
     launch_home = tmp_path / "home"
     launch_home.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(launch_home))
+    monkeypatch.setenv("EIR_HOME", str(launch_home))
     assignee_home = launch_home / "profiles" / "b"
     assignee_home.mkdir(parents=True)
     (assignee_home / ".env").write_text(f"GH_HOST=ghe.corp\n{token_key}=ghe-token\n", encoding="utf-8")
@@ -274,11 +274,11 @@ def test_gh_env_drops_ambient_enterprise_login_on_loginless_profile(tmp_path, mo
     GHE token (the launcher's) surviving into a routed profile with no gh login of its
     own would satisfy the fail-closed check and run gh as the launcher — the #122689
     identity leak for GitHub Enterprise. The trio must be dropped, and the pin must fire."""
-    from hermes_cli.kanban_pr_acceptance import _gh_env
+    from eir_cli.kanban_pr_acceptance import _gh_env
 
     launch_home = tmp_path / "home"
     launch_home.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(launch_home))
+    monkeypatch.setenv("EIR_HOME", str(launch_home))
     assignee_home = launch_home / "profiles" / "b"
     assignee_home.mkdir(parents=True)
     (assignee_home / ".env").write_text("OPENAI_API_KEY=sk-aaa\n", encoding="utf-8")
@@ -298,11 +298,11 @@ def test_gh_env_drops_ambient_enterprise_login_on_loginless_profile(tmp_path, mo
 def test_gh_env_keeps_the_assignee_profiles_own_proxy(tmp_path, monkeypatch):
     """A routed child loses the launcher's .env, so a proxy in the assignee's own .env must still
     reach gh or it cannot reach github.com; a proxy is not a login, so the pin still fires."""
-    from hermes_cli.kanban_pr_acceptance import _gh_env
+    from eir_cli.kanban_pr_acceptance import _gh_env
 
     launch_home = tmp_path / "home"
     launch_home.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(launch_home))
+    monkeypatch.setenv("EIR_HOME", str(launch_home))
     assignee_home = launch_home / "profiles" / "b"
     assignee_home.mkdir(parents=True)
     (assignee_home / ".env").write_text("HTTPS_PROXY=http://corp-proxy:3128\nNO_PROXY=localhost\n",
@@ -317,11 +317,11 @@ def test_gh_env_keeps_the_assignee_profiles_own_proxy(tmp_path, monkeypatch):
 def test_gh_env_empty_transport_var_in_assignee_env_clears_the_inherited_one(tmp_path, monkeypatch):
     """``NO_PROXY=`` in the assignee's .env clears a shell-wide ``NO_PROXY=*`` (else gh would bypass
     the assignee's proxy); an empty login key still is no login, so the pin fires."""
-    from hermes_cli.kanban_pr_acceptance import _gh_env
+    from eir_cli.kanban_pr_acceptance import _gh_env
 
     launch_home = tmp_path / "home"
     launch_home.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(launch_home))
+    monkeypatch.setenv("EIR_HOME", str(launch_home))
     monkeypatch.setenv("NO_PROXY", "*")
     assignee_home = launch_home / "profiles" / "b"
     assignee_home.mkdir(parents=True)
@@ -336,7 +336,7 @@ def test_gh_env_empty_transport_var_in_assignee_env_clears_the_inherited_one(tmp
 def test_assigned_card_with_unresolvable_profile_is_auth_not_ambient(tmp_path, monkeypatch):
     """A card assigned to a profile that no longer exists must not run gh as the completing
     process's ambient login: classification `auth` naming the profile, gh never invoked."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path / "home"))
     monkeypatch.setenv("PATH", str(tmp_path / "empty-bin"))  # any gh spawn would fail as infra
     kb.init_db()
     with connect() as conn:

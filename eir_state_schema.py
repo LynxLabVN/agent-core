@@ -1,7 +1,7 @@
 """Schema creation, column reconciliation, and FTS DDL management for SessionDB.
 
-Plain mixin for ``hermes_state.SessionDB`` (no ``__init__``/state of its own).
-Must never import hermes_state (cycle); shared constants live in hermes_state_common.
+Plain mixin for ``eir_state.SessionDB`` (no ``__init__``/state of its own).
+Must never import eir_state (cycle); shared constants live in eir_state_common.
 """
 
 import contextlib
@@ -17,31 +17,31 @@ import uuid
 from typing import Dict, List, Optional, Sequence
 
 
-from hermes_constants import get_hermes_home
-from hermes_state_legacy_refusal import LEGACY_REFUSAL_REPAIR_DONE, advance_legacy_refusal_repair
-from hermes_startup_watchdog import report_startup_progress
+from eir_constants import get_eir_home
+from eir_state_legacy_refusal import LEGACY_REFUSAL_REPAIR_DONE, advance_legacy_refusal_repair
+from eir_startup_watchdog import report_startup_progress
 from utils import safe_json_loads
-from hermes_state_common import (
+from eir_state_common import (
     DEFERRED_INDEX_SQL, FTS_REBUILD_DEFERRAL_KEY, FTS_STALE_KEY, FTS_SQL,
     FTS_STORAGE_VERSION, FTS_TOOL_CONTENT_PREFIX_CHARS, FTS_TRIGRAM_SQL, LEGACY_FTS_SQL,
     LEGACY_FTS_TRIGRAM_SQL, SCHEMA_SQL,
     SCHEMA_VERSION, _FTS_TRIGGERS, _ephemeral_child_sql, _sql_json_extract, fts_rebuild_admission,
     fts_trigram_session_sql,
 )
-from hermes_state_fts import (_drop_orphan_fts_shadow_tables, base_index_recognised, base_source_view_is_stale,
+from eir_state_fts import (_drop_orphan_fts_shadow_tables, base_index_recognised, base_source_view_is_stale,
                               drop_retired_cjk_index, fts_layout_current)
-from hermes_state_holders import _read_proc_argv
-from hermes_state_search import _delete_meta, _meta_row
-from hermes_state_errors import is_sqlite_lock_error
-from hermes_state_titles import next_title_in_lineage
+from eir_state_holders import _read_proc_argv
+from eir_state_search import _delete_meta, _meta_row
+from eir_state_errors import is_sqlite_lock_error
+from eir_state_titles import next_title_in_lineage
 
 # Pre-split logger identity so log filtering/capture is unchanged.
-logger = logging.getLogger("hermes_state")
+logger = logging.getLogger("eir_state")
 
 _FTS_HOLDER_ESCALATE_ATTEMPTS = 3
 _FTS_HOLDER_ESCALATE_SECONDS = 60.0
 # The same holder PID set blocking this many deferrals over this long is a structurally resident
-# peer (a supervised service on the same HERMES_HOME), not a transient one worth waiting out (#106393).
+# peer (a supervised service on the same EIR_HOME), not a transient one worth waiting out (#106393).
 _FTS_HOLDER_FUTILE_ATTEMPTS = 10
 _FTS_HOLDER_FUTILE_SECONDS = 1800.0
 # retry_deferred_fts_recovery cadence: startup paid the full admission wait once; later
@@ -214,8 +214,8 @@ class SessionSchemaMixin:
 
     def _sqlite_supports_fts5(self, cursor: sqlite3.Cursor) -> bool:
         try:
-            cursor.execute("CREATE VIRTUAL TABLE temp._hermes_fts5_probe USING fts5(x)")
-            cursor.execute("DROP TABLE temp._hermes_fts5_probe")
+            cursor.execute("CREATE VIRTUAL TABLE temp._eir_fts5_probe USING fts5(x)")
+            cursor.execute("DROP TABLE temp._eir_fts5_probe")
             return True
         except sqlite3.OperationalError as exc:
             if not self._is_fts5_unavailable_error(exc):
@@ -523,15 +523,15 @@ class SessionSchemaMixin:
             logger.error(
                 "state.db FTS repair has been blocked by the same holder(s) for %d deferrals over %.0f min "
                 "(%s); waiting is futile. Stop ONLY the other holder(s) — this process keeps running and its "
-                "own retry admits the rebuild within %.0fs of the holder leaving. `hermes doctor` shows this.",
+                "own retry admits the rebuild within %.0fs of the holder leaving. `eir doctor` shows this.",
                 holders_attempts, (now - holders_since) / 60.0,
                 ", ".join(f"pid {pid}: {_holder_cmdline(pid)}" for pid in holder_pids), _FTS_STALE_RETRY_SECONDS,
             )
         elif attempts >= _FTS_HOLDER_ESCALATE_ATTEMPTS and now - first_seen >= _FTS_HOLDER_ESCALATE_SECONDS:
             logger.error(
                 "state.db FTS repair remains blocked after %d deferrals by holder(s) %s. Stop the listed "
-                "processes (this process's own retry then rebuilds), or run `hermes sessions optimize-storage` "
-                "with every holder stopped. `hermes doctor` reports this degraded state.", attempts, foreign_holders,
+                "processes (this process's own retry then rebuilds), or run `eir sessions optimize-storage` "
+                "with every holder stopped. `eir doctor` reports this degraded state.", attempts, foreign_holders,
             )
         logger.warning(
             "Deferred stale state.db FTS rebuild while foreign processes "
@@ -665,7 +665,7 @@ class SessionSchemaMixin:
 
     def _trigram_tokenizer_available(self, cursor: sqlite3.Cursor) -> bool:
         """Probe trigram support without publishing a persistent FTS object."""
-        probe = "temp.hermes_fts5_trigram_probe"
+        probe = "temp.eir_fts5_trigram_probe"
         cursor.execute(f"DROP TABLE IF EXISTS {probe}")
         try:
             cursor.execute(f"CREATE VIRTUAL TABLE {probe} USING fts5(content, tokenize='trigram')")
@@ -689,8 +689,8 @@ class SessionSchemaMixin:
         cache_path = None
         schema_hash = hashlib.sha256(schema_sql.encode("utf-8")).hexdigest()
         with contextlib.suppress(Exception):  # missing/corrupt cache → recompute below
-            # Late import: resolves a test-patched hermes_constants.get_hermes_home.
-            from hermes_constants import get_hermes_home as _home
+            # Late import: resolves a test-patched eir_constants.get_eir_home.
+            from eir_constants import get_eir_home as _home
             cache_path = _home() / "cache" / "schema_columns.json"
             blob = json.loads(cache_path.read_text(encoding="utf-8"))
             tables = blob.get("tables") if isinstance(blob, dict) and blob.get("schema_hash") == schema_hash else None
@@ -965,8 +965,8 @@ class SessionSchemaMixin:
         if drop_retired_cjk_index(cursor):
             logger.warning(
                 "Removed the retired messages_fts_cjk index; CJK search now uses the trigram index. "
-                "`hermes sessions optimize-storage` reclaims its disk space. "
-                "%s is no longer loaded and can be deleted.", get_hermes_home() / "lib" / "libfts5_cjk.so",
+                "`eir sessions optimize-storage` reclaims its disk space. "
+                "%s is no longer loaded and can be deleted.", get_eir_home() / "lib" / "libfts5_cjk.so",
             )
 
         # Column reconciliation, then the two table-shape repairs ADD COLUMN cannot express.
@@ -1112,7 +1112,7 @@ class SessionSchemaMixin:
             self._migrate_v22_session_model_usage(cursor)
         # v23: FTS storage redesign (external-content tables). OPT-IN, NOT AUTOMATIC: the
         # transition is disk-heavy (~2x transient) and long (hours on 25 GB), so an existing
-        # install only gets a flag; `hermes sessions optimize-storage` performs it. The FTS
+        # install only gets a flag; `eir sessions optimize-storage` performs it. The FTS
         # layout is tracked by the independent `fts_storage_version` marker, so
         # schema_version still advances for legacy-FTS users.
         if current_version < 23 and fts5_available and self._db_needs_fts_storage_upgrade(cursor):
@@ -1156,7 +1156,7 @@ class SessionSchemaMixin:
         # and long (~1-2h background on a 25 GB DB). Doing it silently on every big user's next open — with
         # a completeness guarantee that depends on the process staying alive long enough — is the wrong
         # default. So on an EXISTING install we touch nothing here: the v22 inline FTS keeps working exactly
-        # as before, and we only record a flag advertising that the optimization is available. `hermes
+        # as before, and we only record a flag advertising that the optimization is available. `eir
         # sessions optimize-storage` performs the whole transition as one deliberate, disk-checked,
         # progress-reported foreground operation. DECOUPLED VERSIONING. Crucially, this does NOT hold back
         # the main schema_version. The FTS storage LAYOUT is tracked by an independent `fts_storage_version`
@@ -1367,7 +1367,7 @@ class SessionSchemaMixin:
     def _backfill_gateway_metadata_from_sessions_json(self, cursor: sqlite3.Cursor) -> None:
         """One-time v18 backfill of gateway metadata from sessions.json. Only fills NULL
         columns — never overwrites data written by newer code."""
-        sessions_file = get_hermes_home() / "sessions" / "sessions.json"
+        sessions_file = get_eir_home() / "sessions" / "sessions.json"
         if not sessions_file.exists():
             return
         with open(sessions_file, "r", encoding="utf-8") as f:

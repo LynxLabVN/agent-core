@@ -6,7 +6,7 @@ import sys
 
 import pytest
 
-from hermes_platform.resolver import ABSENT, LookupContext, locate_command
+from eir_platform.resolver import ABSENT, LookupContext, locate_command
 
 
 def _make_exe(path):
@@ -99,10 +99,10 @@ def test_one_candidate_per_known_dir_regardless_of_pathext(tmp_path):
 
 
 def test_known_dir_tables_match_the_host_os():
-    from hermes_platform.resolver import known_dirs as kd
+    from eir_platform.resolver import known_dirs as kd
 
     every = (*kd.homebrew_dirs(), *kd.user_local_bin(), *kd.rust_tool_dirs(),
-             *kd.node_tool_dirs(), *kd.hermes_vendored_dirs(), *kd.windows_user_program_dirs())
+             *kd.node_tool_dirs(), *kd.eir_vendored_dirs(), *kd.windows_user_program_dirs())
     assert every, "at least one table applies on every host"
     if sys.platform == "win32":
         assert not any(d.startswith("/") for d in every)

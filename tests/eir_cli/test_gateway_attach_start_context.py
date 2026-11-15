@@ -1,4 +1,4 @@
-"""`hermes gateway attach` tells a remote client where a gateway it starts would run.
+"""`eir gateway attach` tells a remote client where a gateway it starts would run.
 
 An administrator's OpenSSH login on Windows is elevated and in session 0; a gateway started there
 refuses the user's desktop apps (``gateway_other_session``). The attach reply names that case and
@@ -9,8 +9,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from hermes_cli.gateway_runtime import GatewayDiscovery, GatewayEndpoint
-from hermes_cli.gateway_runtime_cli import cmd_gateway_attach
+from eir_cli.gateway_runtime import GatewayDiscovery, GatewayEndpoint
+from eir_cli.gateway_runtime_cli import cmd_gateway_attach
 
 READY = GatewayDiscovery("ready", endpoint=GatewayEndpoint(
     profile_id="p", instance_id="owner", authority_epoch=1, runtime_protocol=1,
@@ -23,14 +23,14 @@ def _attach(monkeypatch, capsys, *flags, session=None, elevated=None, verdict=RE
     the gateway faked at ensure/discover. Returns (exit code, payload, stderr lines, what ran)."""
     ran = []
     if session is not None:
-        monkeypatch.setattr("hermes_platform.host.windows_session_id", lambda: session)
+        monkeypatch.setattr("eir_platform.host.windows_session_id", lambda: session)
     if elevated is not None:
-        monkeypatch.setattr("hermes_dir_acl.process_is_elevated", lambda: elevated)
-    monkeypatch.setattr("hermes_cli.gateway_runtime.ensure_gateway_runtime",
+        monkeypatch.setattr("eir_dir_acl.process_is_elevated", lambda: elevated)
+    monkeypatch.setattr("eir_cli.gateway_runtime.ensure_gateway_runtime",
                         lambda home, **kw: ran.append("start") or verdict)
-    monkeypatch.setattr("hermes_cli.gateway_runtime.discover_gateway_endpoint",
+    monkeypatch.setattr("eir_cli.gateway_runtime.discover_gateway_endpoint",
                         lambda home, **kw: ran.append("discover") or verdict)
-    monkeypatch.setattr("hermes_cli.gateway_client._session_ticket", lambda home, endpoint: "one-ticket")
+    monkeypatch.setattr("eir_cli.gateway_client._session_ticket", lambda home, endpoint: "one-ticket")
     args = SimpleNamespace(start="--start" in flags, recover=False, timeout=timeout)
     with pytest.raises(SystemExit) as exit_:
         cmd_gateway_attach(args)
@@ -82,7 +82,7 @@ def test_a_plain_attach_from_that_login_reports_the_flag_without_a_warning(monke
 ])
 def test_only_elevated_and_session_0_together_count(monkeypatch, capsys, session, elevated):
     if session is None:
-        monkeypatch.setattr("hermes_platform.host.windows_session_id", lambda: None)
+        monkeypatch.setattr("eir_platform.host.windows_session_id", lambda: None)
     code, payload, stderr, ran = _attach(monkeypatch, capsys, "--start", session=session, elevated=elevated)
     assert payload["start_context"] == {"windows_service_session": False}
     assert not _warnings(stderr) and ran == ["start"] and code == 0
@@ -90,7 +90,7 @@ def test_only_elevated_and_session_0_together_count(monkeypatch, capsys, session
 
 @pytest.mark.platforms("linux", "macos")
 def test_off_windows_the_flag_is_present_and_false(monkeypatch, capsys):
-    from hermes_platform.host import windows_session_id
+    from eir_platform.host import windows_session_id
 
     assert windows_session_id() is None
     for flags in ((), ("--start",)):

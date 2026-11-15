@@ -14,13 +14,13 @@ from unittest.mock import MagicMock
 import pytest
 
 import cli as cli_mod
-from cli import HermesCLI
+from cli import EirCLI
 
 
 @pytest.fixture
 def bare_cli():
-    """A HermesCLI with no __init__ — we only exercise the redraw helper."""
-    cli = object.__new__(HermesCLI)
+    """A EirCLI with no __init__ — we only exercise the redraw helper."""
+    cli = object.__new__(EirCLI)
     return cli
 
 
@@ -104,7 +104,7 @@ class TestForceFullRedraw:
         app.renderer._last_size = Size(rows=30, columns=200)  # the paint: at the old width
         out.get_size.return_value = Size(rows=30, columns=new_width if paint == "clipped" else 200)
         bare_cli._note_chrome_paint(app, True)
-        from hermes_cli.cli_terminal_mixin import _RESIZE_PAINT_MARGIN
+        from eir_cli.cli_terminal_mixin import _RESIZE_PAINT_MARGIN
         bare_cli._resize_seen_at = time.monotonic() + (_RESIZE_PAINT_MARGIN / 2 if paint == "late" else 1.0)
         out.get_size.return_value = Size(rows=30, columns=new_width)
 
@@ -184,7 +184,7 @@ class TestForceFullRedraw:
         """Same-width SIGWINCH (tmux attach, benign focus/tab signals) must not
         clear the viewport or replay: a 2J without replay erases the visible
         transcript, and a replay duplicates it (#65293). The tmux-attach
-        stale-paint crash is handled by _hermes_call_output_screen_diff's
+        stale-paint crash is handled by _eir_call_output_screen_diff's
         retry instead (#83874)."""
         app = MagicMock()
         events = []
@@ -232,7 +232,7 @@ class TestForceFullRedraw:
         previous = MagicMock()
         previous.height = 8
 
-        result = cli_mod._hermes_call_output_screen_diff(
+        result = cli_mod._eir_call_output_screen_diff(
             fake_osd,
             app=None,
             output=None,

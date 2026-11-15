@@ -33,10 +33,10 @@ from unittest.mock import MagicMock
 
 
 def _make_cli():
-    """Bare HermesCLI (no __init__) with just the two queues the drain touches."""
-    from cli import HermesCLI
+    """Bare EirCLI (no __init__) with just the two queues the drain touches."""
+    from cli import EirCLI
 
-    cli = HermesCLI.__new__(HermesCLI)
+    cli = EirCLI.__new__(EirCLI)
     cli._interrupt_queue = queue.Queue()
     cli._pending_input = queue.Queue()
     return cli

@@ -32,15 +32,15 @@ class OwnProv(MemoryProvider):
     def get_tool_schemas(self):
         return []
 
-    def read_config_fields(self, hermes_home):
-        _path, cfg = _read(hermes_home)
-        block = (cfg.get("hosts") or {}).get("hermes") or {}
+    def read_config_fields(self, eir_home):
+        _path, cfg = _read(eir_home)
+        block = (cfg.get("hosts") or {}).get("eir") or {}
         values = {**{k: v for k, v in cfg.items() if k in _ROOT_KEYS}, **block}
-        return {"values": values, "placeholders": {"workspace": "hermes", "aiPeer": "hermes"}}
+        return {"values": values, "placeholders": {"workspace": "eir", "aiPeer": "eir"}}
 
-    def write_config_fields(self, values, hermes_home):
-        path, cfg = _read(hermes_home)  # a file that does not parse raises JSONDecodeError: no write
-        block = cfg.setdefault("hosts", {}).setdefault("hermes", {})
+    def write_config_fields(self, values, eir_home):
+        path, cfg = _read(eir_home)  # a file that does not parse raises JSONDecodeError: no write
+        block = cfg.setdefault("hosts", {}).setdefault("eir", {})
         for key, value in values.items():
             target = cfg if key in _ROOT_KEYS else block
             if value is None:
@@ -76,17 +76,17 @@ _URL = "/api/memory/providers/ownprov/config?surface=declared"
 
 
 @pytest.fixture
-def client(monkeypatch, _isolate_hermes_home):
+def client(monkeypatch, _isolate_eir_home):
     try:
         from starlette.testclient import TestClient
     except ImportError:
         pytest.skip("fastapi/starlette not installed")
-    import hermes_state
-    from hermes_constants import get_hermes_home
-    from hermes_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
+    import eir_state
+    from eir_constants import get_eir_home
+    from eir_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
 
-    monkeypatch.setattr(hermes_state, "DEFAULT_DB_PATH", get_hermes_home() / "state.db")
-    plugin_dir = get_hermes_home() / "plugins" / "ownprov"
+    monkeypatch.setattr(eir_state, "DEFAULT_DB_PATH", get_eir_home() / "state.db")
+    plugin_dir = get_eir_home() / "plugins" / "ownprov"
     plugin_dir.mkdir(parents=True)
     (plugin_dir / "__init__.py").write_text(_INIT, encoding="utf-8")
     (plugin_dir / "config_schema.py").write_text(_SCHEMA, encoding="utf-8")
@@ -96,12 +96,12 @@ def client(monkeypatch, _isolate_hermes_home):
 
 
 def _config_path():
-    from hermes_constants import get_hermes_home
-    return get_hermes_home() / "ownprov.json"
+    from eir_constants import get_eir_home
+    return get_eir_home() / "ownprov.json"
 
 
 def test_put_writes_through_the_provider_with_natives_and_saves_the_secret(client):
-    from hermes_cli.config import load_config, load_env
+    from eir_cli.config import load_config, load_env
 
     resp = client.put(_URL, json={"values": {
         "apiKey": "own-test-key", "baseUrl": "https://own.example.dev", "workspace": "myws", "saveMessages": "false",
@@ -112,7 +112,7 @@ def test_put_writes_through_the_provider_with_natives_and_saves_the_secret(clien
     assert load_env()["OWNPROV_API_KEY"] == "own-test-key"
     cfg = json.loads(_config_path().read_text(encoding="utf-8"))
     assert cfg["baseUrl"] == "https://own.example.dev"
-    assert cfg["hosts"]["hermes"] == {"apiKey": "own-test-key", "workspace": "myws", "saveMessages": False}
+    assert cfg["hosts"]["eir"] == {"apiKey": "own-test-key", "workspace": "myws", "saveMessages": False}
 
 
 def test_get_keeps_secrets_write_only_and_shows_placeholders_and_presence(client):
@@ -124,7 +124,7 @@ def test_get_keeps_secrets_write_only_and_shows_placeholders_and_presence(client
     assert "secret-value" not in json.dumps(resp.json())
     fields = {field["key"]: field for field in resp.json()["fields"]}
     assert fields["apiKey"]["is_set"] is True and fields["apiKey"]["value"] == ""
-    assert fields["workspace"]["placeholder"] == "hermes" and fields["workspace"]["is_set"] is False
+    assert fields["workspace"]["placeholder"] == "eir" and fields["workspace"]["is_set"] is False
     assert fields["saveMessages"]["is_set"] is True  # a stored False is still set
     assert fields["saveMessages"]["value"] == "false"
 
@@ -132,7 +132,7 @@ def test_get_keeps_secrets_write_only_and_shows_placeholders_and_presence(client
 def test_a_blank_field_clears_the_key(client):
     client.put(_URL, json={"values": {"workspace": "myws"}})
     client.put(_URL, json={"values": {"workspace": ""}})
-    assert "workspace" not in json.loads(_config_path().read_text(encoding="utf-8"))["hosts"]["hermes"]
+    assert "workspace" not in json.loads(_config_path().read_text(encoding="utf-8"))["hosts"]["eir"]
 
 
 def test_a_config_the_provider_cannot_read_is_a_400(client):
@@ -145,7 +145,7 @@ def test_a_config_the_provider_cannot_read_is_a_400(client):
 
 
 def test_a_refused_write_is_a_400_with_no_secret_saved_and_no_switch(client):
-    from hermes_cli.config import load_config, load_env
+    from eir_cli.config import load_config, load_env
 
     _config_path().write_text("{not json", encoding="utf-8")
 
@@ -158,15 +158,15 @@ def test_a_refused_write_is_a_400_with_no_secret_saved_and_no_switch(client):
 
 
 def _install(name, init, schema):
-    from hermes_constants import get_hermes_home
-    plugin_dir = get_hermes_home() / "plugins" / name
+    from eir_constants import get_eir_home
+    plugin_dir = get_eir_home() / "plugins" / name
     plugin_dir.mkdir(parents=True)
     (plugin_dir / "__init__.py").write_text(init, encoding="utf-8")
     (plugin_dir / "config_schema.py").write_text(schema, encoding="utf-8")
 
 
 def test_storage_provider_without_a_writer_is_a_501_with_no_secret_saved(client):
-    from hermes_cli.config import load_env
+    from eir_cli.config import load_env
 
     init = _INIT.replace("class OwnProv", "class _Unused").replace("def write_config_fields", "def _unused_write")
     init = init.replace("ctx.register_memory_provider(OwnProv())", "ctx.register_memory_provider(_Unused())")
@@ -187,7 +187,7 @@ def test_a_provider_that_fails_to_load_is_a_503_not_unknown(client):
 
 
 def test_an_unknown_storage_kind_shows_no_panel_and_writes_no_stray_file(client):
-    from hermes_constants import get_hermes_home
+    from eir_constants import get_eir_home
 
     _install("oddstore", _INIT.replace('name = "ownprov"', 'name = "oddstore"'),
              _SCHEMA.replace('name="ownprov"', 'name="oddstore"').replace("storage=STORAGE_PROVIDER", 'storage="retired_kind"'))
@@ -195,7 +195,7 @@ def test_an_unknown_storage_kind_shows_no_panel_and_writes_no_stray_file(client)
 
     assert client.get(url).json()["fields"] == []
     assert client.put(url, json={"values": {"workspace": "x"}}).status_code == 400
-    assert not (get_hermes_home() / "oddstore").exists()
+    assert not (get_eir_home() / "oddstore").exists()
 
 
 def test_a_schema_that_fails_to_load_logs_its_traceback_once(client, caplog):

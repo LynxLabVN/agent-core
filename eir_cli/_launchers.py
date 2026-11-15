@@ -1,7 +1,7 @@
 """Source-install launchers shared by setup, installers, and Windows repair.
 
 Launchers execute store Python in isolated mode. They set the install's
-default home and load hermes_bootstrap before the entry point. Bootstrap
+default home and load eir_bootstrap before the entry point. Bootstrap
 reads the selected dependency generation at each start.
 
 Windows uses distlib executables or a command-file fallback. POSIX uses
@@ -23,9 +23,9 @@ if __name__ == "__main__":
 
 from pm.environments import owning_home_root, payload_command_dir, store_root
 
-# ``sys`` attribute a launcher sets before ``import hermes_bootstrap``: pin HERMES_HOME to the
-# install's default root once the launch-time repair ran (``hermes_bootstrap._pin_launcher_home``).
-PIN_DEFAULT_HOME_FLAG = "_hermes_pin_default_home"
+# ``sys`` attribute a launcher sets before ``import eir_bootstrap``: pin EIR_HOME to the
+# install's default root once the launch-time repair ran (``eir_bootstrap._pin_launcher_home``).
+PIN_DEFAULT_HOME_FLAG = "_eir_pin_default_home"
 
 
 def _inline_string_literal(value: str) -> str:
@@ -36,7 +36,7 @@ def _inline_string_literal(value: str) -> str:
     return "'" + escaped.replace("'", "\\x27").replace('"', "\\x22") + "'"
 
 
-def runtime_command(repo_root: Path, args=(), *, module: str = "hermes_cli.main",
+def runtime_command(repo_root: Path, args=(), *, module: str = "eir_cli.main",
                     code: str | None = None, python: str | Path | None = None,
                     home: str | Path | None = None) -> list[str]:
     """An installation-bound command, safe to persist across dependency GC.
@@ -49,23 +49,23 @@ def runtime_command(repo_root: Path, args=(), *, module: str = "hermes_cli.main"
     python = python or resolve_store_python(root) or Path(sys.executable)
     entry = f"exec({_inline_string_literal(code)})" if code is not None else (
         f"runpy.run_module({_inline_string_literal(module)}, run_name='__main__', alter_sys=True)")
-    # A literal home is pinned up front; the default one needs ``hermes_constants`` from the
-    # checkout, so it is pinned only after ``hermes_bootstrap``'s launch-time repair (see
+    # A literal home is pinned up front; the default one needs ``eir_constants`` from the
+    # checkout, so it is pinned only after ``eir_bootstrap``'s launch-time repair (see
     # ``_launcher_script``), here again for a bootstrap that predates that hook.
     if home is not None:
-        pin, settle = (f"os.environ['HERMES_HOME'] = os.environ.get('HERMES_HOME') or "
+        pin, settle = (f"os.environ['EIR_HOME'] = os.environ.get('EIR_HOME') or "
                        f"{_inline_string_literal(str(home))}; "), ""
     else:
         pin = f"sys.{PIN_DEFAULT_HOME_FLAG} = True; "
-        settle = ("os.environ.get('HERMES_HOME') or os.environ.__setitem__('HERMES_HOME', "
-                  "str(__import__('hermes_constants').get_default_hermes_root())); ")
+        settle = ("os.environ.get('EIR_HOME') or os.environ.__setitem__('EIR_HOME', "
+                  "str(__import__('eir_constants').get_default_eir_root())); ")
     bootstrap = (
         "import os, sys, runpy; "
         "os.environ.pop('PYTHONHOME', None); os.environ.pop('PYTHONPATH', None); "
         "os.environ.pop('VIRTUAL_ENV', None); "
         f"sys.path.insert(0, {_inline_string_literal(str(root))}); "
         + pin
-        + "import hermes_bootstrap; "
+        + "import eir_bootstrap; "
         + settle
         + entry
     )
@@ -77,14 +77,14 @@ def print_runtime_command(repo_root: Path, argv: list[str]) -> None:
     import argparse
 
     parser = argparse.ArgumentParser(description="Resolve this installation's launch command.")
-    parser.add_argument("--module", default="hermes_cli.main")
+    parser.add_argument("--module", default="eir_cli.main")
     parser.add_argument("args", nargs=argparse.REMAINDER)
     options = parser.parse_args(argv)
     args = options.args[1:] if options.args[:1] == ["--"] else options.args
     print(json.dumps(runtime_command(repo_root, args, module=options.module)))
 
 
-def installation_command(repo_root: Path, args=(), *, module: str = "hermes_cli.main",
+def installation_command(repo_root: Path, args=(), *, module: str = "eir_cli.main",
                          python: str | Path | None = None, home: str | Path | None = None) -> list[str]:
     """Persist a source launcher, never the versioned tool it currently uses.
 
@@ -93,27 +93,27 @@ def installation_command(repo_root: Path, args=(), *, module: str = "hermes_cli.
     the managed Python pin changes.
     """
     root = Path(repo_root)
-    prefix = [] if module == "hermes_cli.main" else ["--run-module", module]
+    prefix = [] if module == "eir_cli.main" else ["--run-module", module]
     if (sealed := sealed_service_launcher(root)) is not None:
         return [str(sealed), *prefix, *args]
     if resolve_store_python(root) is None:
         return runtime_command(root, args, module=module, python=python, home=home)
-    return [str(root / ".hermes" / "bin" / "hermes"), *prefix, *args]
+    return [str(root / ".eir" / "bin" / "eir"), *prefix, *args]
 
 
 def sealed_service_launcher(repo_root: Path) -> Path | None:
-    """A macOS bundle's own signed ``bin/hermes``, which its services run; None for other installs.
+    """A macOS bundle's own signed ``bin/eir``, which its services run; None for other installs.
 
     Publishing a launcher into the app breaks its code signature, and the next app update deletes
     it. The app's own launcher keeps its path across updates and caches bytecode outside the app.
-    The canonical name, never a channel's qualified alias: gateway identity checks match ``hermes``.
+    The canonical name, never a channel's qualified alias: gateway identity checks match ``eir``.
     Only macOS: a Linux bundle is an AppImage that mounts at a new path on every launch.
     """
     root = Path(repo_root).resolve()
     if sys.platform != "darwin" or not _is_bundled_payload(root):
         return None
     commands = payload_command_dir(root)
-    launcher = commands / "hermes" if commands is not None else None
+    launcher = commands / "eir" if commands is not None else None
     return launcher if launcher is not None and launcher.is_file() else None
 
 
@@ -124,14 +124,14 @@ def publishes_service_launcher(repo_root: Path) -> bool:
 
 
 #: Launcher command names — keep in lockstep with scripts/install.ps1
-#: Publish-UserCommand and hermes_cli/_install_repair.py.
-WINDOWS_BIN_LAUNCHERS = ("hermes", "hermes-acp")
+#: Publish-UserCommand and eir_cli/_install_repair.py.
+WINDOWS_BIN_LAUNCHERS = ("eir", "eir-acp")
 
 #: command name -> (entry module, callable) — mirrors pyproject.toml
 #: [project.scripts].
 ENTRY_POINTS = {
-    "hermes": ("hermes_cli.main", "main"),
-    "hermes-acp": ("acp_adapter.entry", "main"),
+    "eir": ("eir_cli.main", "main"),
+    "eir-acp": ("acp_adapter.entry", "main"),
 }
 
 
@@ -144,7 +144,7 @@ def resolve_store_python(repo_root: Path, *, publication: bool = False) -> Path 
 
     Callers that PERSIST the result in a launcher (``stage_launcher`` and the
     publication gates below) pass ``publication=True``: the tree's own store
-    wins over an inherited ``HERMES_RUNTIME_DIR``. The override names a store
+    wins over an inherited ``EIR_RUNTIME_DIR``. The override names a store
     for the running process (an e2e fixture, a desktop toolchain) that a later
     scratch cleanup may delete, leaving the launcher to exit 127 forever
     (#131745). It still supplies the store when the tree records none.
@@ -197,9 +197,9 @@ def _store_script_maker(python_exe: Path):
 
     A launch activates only the dependency environment, which carries no
     distlib and drops the store's site-packages, so the update that repins
-    Python could only publish a .cmd and retire hermes.exe -- which Desktop's
+    Python could only publish a .cmd and retire eir.exe -- which Desktop's
     backend sweep, shortcuts and terminal profiles name. python-build-standalone
-    ships pip (the installer mints the first hermes.exe through it), and its
+    ships pip (the installer mints the first eir.exe through it), and its
     vendored distlib is self-contained. It loads under a private name so the
     store's pip never answers an ``import pip`` in this process."""
     package = Path(python_exe).parent / "Lib" / "site-packages" / "pip" / "_vendor" / "distlib"
@@ -210,7 +210,7 @@ def _store_script_maker(python_exe: Path):
     import importlib.util
 
     # One private package per store copy: a later repin's pip never reuses the first one's.
-    name = f"_hermes_store_distlib_{hashlib.sha256(str(package).encode()).hexdigest()[:12]}"
+    name = f"_eir_store_distlib_{hashlib.sha256(str(package).encode()).hexdigest()[:12]}"
     try:
         if name not in sys.modules:
             spec = importlib.util.spec_from_file_location(
@@ -235,12 +235,12 @@ def exe_is_venv_bound(exe: Path, venv_dir: Path | None) -> bool:
         return False
     needles = set()
     for interpreter in (
-        venv_dir / "Scripts" / "hermes.exe",
-        venv_dir / "Scripts" / "hermes-acp.exe",
+        venv_dir / "Scripts" / "eir.exe",
+        venv_dir / "Scripts" / "eir-acp.exe",
         venv_dir / "Scripts" / "python.exe",
         venv_dir / "bin" / "python3",
-        venv_dir / "bin" / "hermes",
-        venv_dir / "bin" / "hermes-acp",
+        venv_dir / "bin" / "eir",
+        venv_dir / "bin" / "eir-acp",
     ):
         for enc in ("utf-8", "utf-16-le"):
             try:
@@ -364,7 +364,7 @@ def mint_launcher(
     return _write_atomic(out_dir / f"{name}.cmd", lambda p: p.write_text(body, encoding="utf-8"))
 
 
-# A killed move can tear the repair's own code (``hermes_bootstrap``, ``hermes_cli``). With the
+# A killed move can tear the repair's own code (``eir_bootstrap``, ``eir_cli``). With the
 # marker still there, a launcher whose checkout import failed runs the copy of the repair that the
 # updater published beside the marker (``update_cmd_commit.publish_recovery_closure``) once every
 # file hashes to the blob id its manifest names; a missing, torn or foreign closure (or none, from
@@ -373,7 +373,7 @@ def mint_launcher(
 # Stdlib plus that copy only, under the same claim and checkout lock (a live writer still refuses,
 # which exits 1 with the repair's own reason), then a relaunch from the restored tree.
 _CLOSURE_REPAIR = """\
-def _hermes_closure_repair():
+def _eir_closure_repair():
     import contextlib, hashlib, io, shutil, subprocess
     from pathlib import Path
     root = Path(__ROOT__)
@@ -442,7 +442,7 @@ def _hermes_closure_repair():
             shutil.rmtree(staging, ignore_errors=True)
         if not verified():
             return
-    for name in [n for n in sys.modules if n.split('.')[0] in ('hermes_cli', 'hermes_bootstrap', 'hermes_constants', 'pm')]:
+    for name in [n for n in sys.modules if n.split('.')[0] in ('eir_cli', 'eir_bootstrap', 'eir_constants', 'pm')]:
         del sys.modules[name]
     tree = os.path.normcase(os.path.realpath(root))
     sys.path[:] = [str(closure)] + [p for p in sys.path if p and os.path.normcase(os.path.realpath(p)) != tree
@@ -452,16 +452,16 @@ def _hermes_closure_repair():
     restored = False
     try:
         with contextlib.redirect_stderr(said):
-            from hermes_cli import _early_recovery
+            from eir_cli import _early_recovery
             restored = _early_recovery.restore_interrupted_pull(root)
     except Exception as exc:
-        said.write('hermes: the checkout cannot start after an interrupted `hermes update`, and it was not '
+        said.write('eir: the checkout cannot start after an interrupted `eir update`, and it was not '
                    'repaired: %s\\n' % (exc,))
     if restored:
-        sys.stderr.write('hermes: the checkout could not start after an interrupted `hermes update`; '
+        sys.stderr.write('eir: the checkout could not start after an interrupted `eir update`; '
                          'repaired it with the recovery code saved before the update.\\n' + said.getvalue())
         _early_recovery.relaunch_after_restore()
-    sys.stderr.write(said.getvalue() or 'hermes: the checkout cannot start after an interrupted `hermes update`; '
+    sys.stderr.write(said.getvalue() or 'eir: the checkout cannot start after an interrupted `eir update`; '
                      'launch again once the update that owns it finishes.\\n')
     raise SystemExit(1)
 """
@@ -472,14 +472,14 @@ def _launcher_script(name: str, repo_root: Path, dependencies: Path | None) -> s
     # Profile boot repairs shared launchers: their default must stay at the
     # install's dependency root, not whichever profile triggered publication.
     #
-    # The launch-time repair of a checkout a killed update left torn (``hermes_bootstrap`` ->
+    # The launch-time repair of a checkout a killed update left torn (``eir_bootstrap`` ->
     # ``_early_recovery.restore_interrupted_pull``) runs before ANY other checkout module is
-    # imported: a merge killed while writing ``hermes_constants.py`` must not stop every launch
-    # before the repair. The default-home pin (which needs ``hermes_constants``) happens inside
-    # ``hermes_bootstrap`` right after the repair (``_PIN_DEFAULT_HOME``), and here again for a
+    # imported: a merge killed while writing ``eir_constants.py`` must not stop every launch
+    # before the repair. The default-home pin (which needs ``eir_constants``) happens inside
+    # ``eir_bootstrap`` right after the repair (``_PIN_DEFAULT_HOME``), and here again for a
     # bootstrap that predates that hook.
     root = str(repo_root.resolve())
-    from hermes_cli._early_recovery import (
+    from eir_cli._early_recovery import (
         INTERRUPTED_PULL_MARKER,
         RECOVERY_CLOSURE,
         RECOVERY_CLOSURE_DIR,
@@ -507,30 +507,30 @@ def _launcher_script(name: str, repo_root: Path, dependencies: Path | None) -> s
         "    sys.dont_write_bytecode = True\n"
         "    from pathlib import Path\n"
         "    try:\n"
-        "        from hermes_cli import _early_recovery\n"
+        "        from eir_cli import _early_recovery\n"
         "    except Exception as exc:\n"
-        "        if _hermes_closure_repair() or not isinstance(exc, ImportError):\n"
+        "        if _eir_closure_repair() or not isinstance(exc, ImportError):\n"
         "            raise\n"
         "        _early_recovery = None  # a tree without the repair: the imports below report real damage\n"
         f"    if _early_recovery is not None and _early_recovery.restore_interrupted_pull(Path({root!r})):\n"
         "        _early_recovery.relaunch_after_restore()\n"
-        "    from hermes_constants import get_default_hermes_root\n"
-        "    os.environ['HERMES_HOME'] = os.environ.get('HERMES_HOME') or str(get_default_hermes_root())\n"
-        "    from hermes_cli._launchers import print_runtime_command\n"
+        "    from eir_constants import get_default_eir_root\n"
+        "    os.environ['EIR_HOME'] = os.environ.get('EIR_HOME') or str(get_default_eir_root())\n"
+        "    from eir_cli._launchers import print_runtime_command\n"
         f"    print_runtime_command(Path({root!r}), sys.argv[2:])\n"
         "    sys.exit(0)\n"
         f"sys.{PIN_DEFAULT_HOME_FLAG} = True\n"
         "try:\n"
-        "    import hermes_bootstrap\n"
+        "    import eir_bootstrap\n"
         "except Exception:\n"
-        "    _hermes_closure_repair()\n"
+        "    _eir_closure_repair()\n"
         "    raise\n"
-        "if not os.environ.get('HERMES_HOME'):\n"
-        "    from hermes_constants import get_default_hermes_root\n"
-        "    os.environ['HERMES_HOME'] = str(get_default_hermes_root())\n"
+        "if not os.environ.get('EIR_HOME'):\n"
+        "    from eir_constants import get_default_eir_root\n"
+        "    os.environ['EIR_HOME'] = str(get_default_eir_root())\n"
         "if sys.argv[1:2] == ['--run-module']:\n"
         "    import runpy\n"
-        "    if len(sys.argv) < 3: sys.exit('hermes: --run-module needs a module')\n"
+        "    if len(sys.argv) < 3: sys.exit('eir: --run-module needs a module')\n"
         "    module = sys.argv.pop(2)\n"
         "    del sys.argv[1]\n"
         "    runpy.run_module(module, run_name='__main__', alter_sys=True)\n"
@@ -570,18 +570,18 @@ def _owns_launcher(target: Path, root: Path) -> bool:
     except (OSError, UnicodeError, ValueError):
         return False
     paths = {str(root / p) for p in (
-        "hermes", "run_agent.py", "venv/bin/python", "venv/bin/python3",
-        "venv/bin/hermes",
-        ".hermes/bin/hermes", ".hermes/bin/hermes-acp",
+        "eir", "run_agent.py", "venv/bin/python", "venv/bin/python3",
+        "venv/bin/eir",
+        ".eir/bin/eir", ".eir/bin/eir-acp",
     )}
     # Current store launchers pass this Python bootstrap as one shell argument.
     bootstrap = f"sys.path.insert(0, {str(root)!r})"
     if paths.intersection(tokens) or any(bootstrap in token for token in tokens):
         return True
-    # The historical updater wrote ACP as a sibling-hermes forwarder. Adopt
+    # The historical updater wrote ACP as a sibling-eir forwarder. Adopt
     # it only when that sibling demonstrably belongs to this installation.
-    if target.name == "hermes-acp":
-        sibling = target.with_name("hermes")
+    if target.name == "eir-acp":
+        sibling = target.with_name("eir")
         return (tokens == ["exec", str(sibling), "acp", "$@"]
                 and _owns_launcher(sibling, root))
     return False
@@ -599,8 +599,8 @@ def _publish_conveniences(root: Path, out_dir: Path, names, *, create: bool = Tr
         if (not create or target.exists() or target.is_symlink()) and not _owns_launcher(target, root):
             continue
         before = target.lstat().st_mtime_ns if target.exists() or target.is_symlink() else None
-        command = ([str(root / ".hermes/bin/hermes"), "--run-module", "run_agent"]
-                   if name == "hermes-agent" else [str(root / ".hermes/bin" / name)])
+        command = ([str(root / ".eir/bin/eir"), "--run-module", "run_agent"]
+                   if name == "eir-agent" else [str(root / ".eir/bin" / name)])
         if _write_shell(target, command) is None:
             raise OSError(f"could not publish launcher {target}")
         published[target] = before != target.lstat().st_mtime_ns
@@ -642,7 +642,7 @@ def _retire_exe(exe: Path) -> bool:
 
     Windows refuses to delete a mapped image but allows renaming it, and the
     launcher a Python repin has to retire is usually the one running
-    ``hermes update`` (or the launch retrying its owed launcher step), so a
+    ``eir update`` (or the launch retrying its owed launcher step), so a
     plain unlink left every repinned update owing launchers -- and the install
     stamp -- forever. The aside copy goes on the next publication once its
     process has exited."""
@@ -798,10 +798,10 @@ def _is_home_checkout(root: Path, store: Path) -> bool:
 
     That checkout sits at ``<home>/<checkout>`` and runs ``<home>/tools``. The
     layout alone is not proof: a root that only borrows the checkout can match
-    it through HERMES_RUNTIME_DIR=<home>/tools, so the home must also own it.
+    it through EIR_RUNTIME_DIR=<home>/tools, so the home must also own it.
     """
-    from hermes_constants import get_default_hermes_root
-    home = get_default_hermes_root().resolve()
+    from eir_constants import get_default_eir_root
+    home = get_default_eir_root().resolve()
     return (root.parent == home and store.resolve() == (home / "tools").resolve()
             and owning_home_root(root) is None)
 
@@ -809,9 +809,9 @@ def _is_home_checkout(root: Path, store: Path) -> bool:
 def _kept_shared_launcher(name: str, local: Path, store: Path, own: Path | None) -> Path | None:
     """Existing checkout launcher already bound outside this root's store.
 
-    Checkout launchers are shared by every HERMES_HOME; a launch under one
+    Checkout launchers are shared by every EIR_HOME; a launch under one
     data root must never repoint them at another root's interpreter (#123238):
-    once that root is deleted, every hermes breaks. Keep the file when it
+    once that root is deleted, every eir breaks. Keep the file when it
     execs a live interpreter outside *store*. Missing launchers, dead
     interpreters and same-store repins still publish. A launcher whose
     interpreter is gone is never left in front of a kept one: PATHEXT resolves
@@ -859,7 +859,7 @@ def _kept_shared_launcher(name: str, local: Path, store: Path, own: Path | None)
 def ensure_install_launchers(repo_root: Path, out_dir: Path) -> list[str]:
     """Publish exact-install commands; conveniences follow them across Python repins."""
     root = Path(repo_root).resolve()
-    local = root / ".hermes" / "bin"
+    local = root / ".eir" / "bin"
     local.mkdir(parents=True, exist_ok=True)
     store = store_root(root)
     own = resolve_store_python(root)
@@ -904,7 +904,7 @@ def expose_cli(project_root: Path | None = None, *, create: bool = True) -> dict
 
     root = Path(project_root or install_root()).resolve()
     if _is_windows():
-        # The installer stages the user-facing commands into $HERMES_HOME\bin
+        # The installer stages the user-facing commands into $EIR_HOME\bin
         # and registers that directory in the User PATH. An update skipped both
         # (this used to answer "windows-installer-owned"), so a machine updated
         # from a release predating that convention kept the old
@@ -912,14 +912,14 @@ def expose_cli(project_root: Path | None = None, *, create: bool = True) -> dict
         return _expose_windows_user_bin(root, create=create)
     if create:
         try:
-            from hermes_cli.config import load_config
+            from eir_cli.config import load_config
         except ImportError:
             # Installers expose after sync; never invent a config reader here.
             return {"ok": True, "skipped": "config-unavailable"}
         cli_cfg = (load_config() or {}).get("cli", {})
         if isinstance(cli_cfg, dict) and not cli_cfg.get("expose_on_path", True):
             return {"ok": True, "skipped": "config-disabled"}
-    from hermes_cli.steward import read_install_stamp
+    from eir_cli.steward import read_install_stamp
 
     if _is_bundled_payload(root):
         if create and sys.platform == "darwin":
@@ -930,19 +930,19 @@ def expose_cli(project_root: Path | None = None, *, create: bool = True) -> dict
     if resolve_store_python(root, publication=True) is None:
         return {"ok": True, "skipped": "no-store-python"}
     try:
-        local = root / ".hermes" / "bin"
+        local = root / ".eir" / "bin"
         if len(ensure_install_launchers(root, local)) != len(WINDOWS_BIN_LAUNCHERS):
             return {"ok": False, "error": "source launcher publication failed"}
         dirs = [Path.home() / ".local" / "bin"]
         # Repair existing FHS/custom-home exposure, but never create new global
         # entries or reclaim a convenience that was repointed to another root.
-        from hermes_constants import get_default_hermes_root
-        for directory in (get_default_hermes_root() / "bin", Path("/usr/local/bin")):
-            if directory not in dirs and (not create or _owns_launcher(directory / "hermes", root)):
+        from eir_constants import get_default_eir_root
+        for directory in (get_default_eir_root() / "bin", Path("/usr/local/bin")):
+            if directory not in dirs and (not create or _owns_launcher(directory / "eir", root)):
                 dirs.append(directory)
         written = []
         for directory in dirs:
-            published = _publish_conveniences(root, directory, (*WINDOWS_BIN_LAUNCHERS, "hermes-agent"), create=create)
+            published = _publish_conveniences(root, directory, (*WINDOWS_BIN_LAUNCHERS, "eir-agent"), create=create)
             written.extend(path.name for path, changed in published.items() if changed)
         return {"ok": True, "written": written}
     except OSError as exc:
@@ -958,7 +958,7 @@ def _new_console_environment() -> dict[str, str] | None:
 
     CreateEnvironmentBlock builds it from the user's stored variables
     (HKCU\\Environment, the profile folders, the system variables) and ignores
-    this process's environment. A sandbox that overrides HERMES_HOME or
+    this process's environment. A sandbox that overrides EIR_HOME or
     LOCALAPPDATA for its own processes does not change the result. Names are
     upper-cased because Windows compares them case-insensitively.
     """
@@ -1008,12 +1008,12 @@ def _read_environment_block(address: int) -> dict[str, str]:
     return environ
 
 
-def new_console_hermes_root() -> Path | None:
-    """The Hermes root that a newly opened console resolves, or None when Windows cannot say."""
-    from hermes_constants import hermes_root_for_environment
+def new_console_eir_root() -> Path | None:
+    """The Eir root that a newly opened console resolves, or None when Windows cannot say."""
+    from eir_constants import eir_root_for_environment
 
     environ = _new_console_environment()
-    return None if environ is None else hermes_root_for_environment(environ)
+    return None if environ is None else eir_root_for_environment(environ)
 
 
 def owns_user_path(root: Path) -> bool:
@@ -1021,12 +1021,12 @@ def owns_user_path(root: Path) -> bool:
 
     Every console the user opens reads the User PATH, so only the root that
     new consoles resolve may register there. A custom root qualifies only when
-    HERMES_HOME is stored as a user variable. A process whose own HERMES_HOME,
+    EIR_HOME is stored as a user variable. A process whose own EIR_HOME,
     LOCALAPPDATA or USERPROFILE override selects a different root (a review
     sandbox, a test home, a suffixed data directory) gets False. So does any
     root when Windows cannot report the console environment.
     """
-    console_root = new_console_hermes_root()
+    console_root = new_console_eir_root()
     if console_root is not None and (
         os.path.normcase(os.path.realpath(root)) == os.path.normcase(os.path.realpath(console_root))
     ):
@@ -1035,7 +1035,7 @@ def owns_user_path(root: Path) -> bool:
 
     logging.getLogger(__name__).info(
         "User PATH left unchanged: new consoles use %s, not %s",
-        console_root or "an unknown Hermes home", root)
+        console_root or "an unknown Eir home", root)
     return False
 
 
@@ -1090,7 +1090,7 @@ def _broadcast_environment_change() -> None:
 def _expose_windows_user_bin(root: Path, *, create: bool) -> dict:
     """Windows twin of expose_cli's POSIX half.
 
-    Stage the user-facing commands into ``$HERMES_HOME\\bin`` and register that
+    Stage the user-facing commands into ``$EIR_HOME\\bin`` and register that
     directory in the User PATH -- the same two things scripts/install.ps1 does --
     so an update converges a machine installed under the older venv\\Scripts
     convention instead of leaving it there forever. The registration happens
@@ -1098,11 +1098,11 @@ def _expose_windows_user_bin(root: Path, *, create: bool) -> dict:
 
     Commands there that start another checkout which still exists stay in
     place unless *root* is the home's own checkout: a review tree or worktree
-    started against the home leaves the installed ``hermes`` alone.
+    started against the home leaves the installed ``eir`` alone.
     """
-    from hermes_constants import get_default_hermes_root
+    from eir_constants import get_default_eir_root
 
-    directory = get_default_hermes_root() / "bin"
+    directory = get_default_eir_root() / "bin"
     try:
         if not create:
             # Bootstrap: repair only commands we already own, enable nothing new.
@@ -1130,7 +1130,7 @@ def _is_bundled_payload(root: Path) -> bool:
     sibling-directory sniff; a .git tree is a dev checkout regardless."""
     if (root / ".git").exists():
         return False
-    from hermes_cli.steward import STEWARD_DESKTOP, read_install_stamp
+    from eir_cli.steward import STEWARD_DESKTOP, read_install_stamp
 
     stamp = read_install_stamp(root)
     if not stamp:
@@ -1139,7 +1139,7 @@ def _is_bundled_payload(root: Path) -> bool:
 
 
 def _symlink_sealed_launchers(payload_bin) -> dict:
-    """Link ~/.local/bin/{hermes,hermes-agent,hermes-acp} at a sealed
+    """Link ~/.local/bin/{eir,eir-agent,eir-acp} at a sealed
     bundle's own prebuilt shims (macOS only).
 
     Symlinks, not copies: the shims are signed as part of the app bundle,
@@ -1149,7 +1149,7 @@ def _symlink_sealed_launchers(payload_bin) -> dict:
 
     Ownership guard mirrors expose_cli's wrapper logic: an existing
     entry is replaced only when it is ours — a symlink into THIS app
-    bundle's payload — or missing/broken. A user's own `hermes` (pipx,
+    bundle's payload — or missing/broken. A user's own `eir` (pipx,
     another checkout's wrapper) is never touched.
     """
     link_dir = Path.home() / ".local" / "bin"
@@ -1157,7 +1157,7 @@ def _symlink_sealed_launchers(payload_bin) -> dict:
     written: list[str] = []
     try:
         link_dir.mkdir(parents=True, exist_ok=True)
-        for name in ("hermes", "hermes-agent", "hermes-acp"):
+        for name in ("eir", "eir-agent", "eir-acp"):
             source = payload_bin / name
             if not source.is_file():
                 continue
@@ -1194,9 +1194,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
     repo_root = Path(__file__).resolve().parents[1]
     if resolve_store_python(repo_root, publication=True) is None:
-        parser.exit(1, "hermes: store interpreter is missing; finish pm install before publishing launchers\n")
+        parser.exit(1, "eir: store interpreter is missing; finish pm install before publishing launchers\n")
     args.out_dir.mkdir(parents=True, exist_ok=True)
     written = ensure_install_launchers(repo_root, args.out_dir)
     if len(written) != len(ENTRY_POINTS):
-        parser.exit(1, "hermes: launcher publication failed\n")
+        parser.exit(1, "eir: launcher publication failed\n")
     print("\n".join(written))

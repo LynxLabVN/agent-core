@@ -1,4 +1,4 @@
-"""``hermes doctor`` — diagnose (and with --fix, repair) a Hermes install.
+"""``eir doctor`` — diagnose (and with --fix, repair) a Eir install.
 
 ``run_doctor`` walks ``DOCTOR_CHECKS`` in order; each check prints its own rows and returns a ``Finding``.
 Check bodies live in the ``doctor_*`` siblings.
@@ -7,24 +7,24 @@ Check bodies live in the ``doctor_*`` siblings.
 import os
 import sys
 
-from hermes_cli.config import get_env_path, get_hermes_home, get_project_root
-from hermes_cli.env_loader import load_hermes_dotenv
-from hermes_constants import display_hermes_home
+from eir_cli.config import get_env_path, get_eir_home, get_project_root
+from eir_cli.env_loader import load_eir_dotenv
+from eir_constants import display_eir_home
 
 PROJECT_ROOT = get_project_root()
-HERMES_HOME = get_hermes_home()
-_DHH = display_hermes_home()  # user-facing display path (e.g. ~/.hermes or ~/.hermes/profiles/coder)
+EIR_HOME = get_eir_home()
+_DHH = display_eir_home()  # user-facing display path (e.g. ~/.eir or ~/.eir/profiles/coder)
 
-# Load environment variables from ~/.hermes/.env so API key checks work
+# Load environment variables from ~/.eir/.env so API key checks work
 _env_path = get_env_path()
-load_hermes_dotenv(hermes_home=_env_path.parent, project_env=PROJECT_ROOT / ".env")
+load_eir_dotenv(eir_home=_env_path.parent, project_env=PROJECT_ROOT / ".env")
 
-from hermes_cli.colors import Colors, color
-from hermes_cli.doctor_report import Finding, _section, check_bool, check_info, doctor_check, warn_on_error
-from hermes_cli.doctor_connectivity import _has_healthy_oauth_fallback_for_apikey_provider, build_probes, run_probes
-from hermes_cli.doctor_tools import _safe_which
+from eir_cli.colors import Colors, color
+from eir_cli.doctor_report import Finding, _section, check_bool, check_info, doctor_check, warn_on_error
+from eir_cli.doctor_connectivity import _has_healthy_oauth_fallback_for_apikey_provider, build_probes, run_probes
+from eir_cli.doctor_tools import _safe_which
 
-from hermes_cli.doctor_config import (
+from eir_cli.doctor_config import (
     _check_config_drift,
     _check_config_file,
     _check_env_file,
@@ -33,7 +33,7 @@ from hermes_cli.doctor_config import (
     _check_xai_retirement,
     _check_retired_session_reset,
 )
-from hermes_cli.doctor_platform import (
+from eir_cli.doctor_platform import (
     _check_certificates,
     _check_command_installation,
     _check_gateway_supervision,
@@ -42,14 +42,14 @@ from hermes_cli.doctor_platform import (
     _check_security_advisories,
     _check_web_dashboard_import,
 )
-from hermes_cli.doctor_tools import (
+from eir_cli.doctor_tools import (
     _check_git_and_rg,
     _check_node_and_browser,
     _check_npm_audit,
     _check_terminal_backend,
     _check_tool_availability,
 )
-from hermes_cli.doctor_state import (
+from eir_cli.doctor_state import (
     _check_checkpoint_store,
     _check_cron_store,
     _check_directory_structure,
@@ -74,16 +74,16 @@ _PROVIDER_ENV_HINTS = (
 def _check_auth_providers(should_fix: bool, f: Finding) -> None:
     """Refresh-free OAuth status snapshot (doctor must never trigger a token refresh)."""
     with warn_on_error("Auth provider status", "(could not check: {e})"):
-        from hermes_cli.auth import get_nous_auth_status_local, get_codex_auth_status, get_minimax_oauth_auth_status
+        from eir_cli.auth import get_nous_auth_status_local, get_codex_auth_status, get_minimax_oauth_auth_status
         _login_row("Nous Portal auth", get_nous_auth_status_local())
-        # Native OAuth is Hermes' own device-code flow; the Codex CLI only imports existing ~/.codex/auth.json
+        # Native OAuth is Eir' own device-code flow; the Codex CLI only imports existing ~/.codex/auth.json
         # tokens, so the hint sits under the Codex row (not as another provider's remedy).
         if not _login_row("OpenAI Codex auth", get_codex_auth_status(), show_error=True) and not _safe_which("codex"):
             check_info("codex CLI not installed (optional — only required to import tokens from an existing Codex CLI login)")
         minimax_status = get_minimax_oauth_auth_status()
         _login_row("MiniMax OAuth", minimax_status, f"(logged in, region={minimax_status.get('region', 'global')})")
     with warn_on_error(""):  # xAI OAuth separately, so an import failure cannot disrupt the rows already printed
-        from hermes_cli.auth import get_xai_oauth_auth_status
+        from eir_cli.auth import get_xai_oauth_auth_status
         _login_row("xAI OAuth", get_xai_oauth_auth_status() or {}, show_error=True)
 
 
@@ -134,8 +134,8 @@ DOCTOR_CHECKS = (
 
 
 def _ack_advisory(ack_target: str) -> None:
-    """`hermes doctor --ack <id>`: persist the ack and return without running diagnostics."""
-    from hermes_cli.security_advisories import ADVISORIES, ack_advisory
+    """`eir doctor --ack <id>`: persist the ack and return without running diagnostics."""
+    from eir_cli.security_advisories import ADVISORIES, ack_advisory
     valid_ids = {a.id for a in ADVISORIES}
     if ack_target not in valid_ids:
         print(color(f"Unknown advisory ID: {ack_target!r}. Known IDs: {', '.join(sorted(valid_ids)) or '(none)'}", Colors.RED))
@@ -144,8 +144,8 @@ def _ack_advisory(ack_target: str) -> None:
         print(color(f"  ✓ Acknowledged advisory {ack_target}. It will no longer trigger startup banners.", Colors.GREEN))
     else:
         print(color(f"  ✗ Could not save the acknowledgement for {ack_target}. Make sure {_DHH}/config.yaml is "
-                    f"writable (`hermes config path` prints the exact file), then re-run "
-                    f"`hermes doctor --ack {ack_target}`.", Colors.RED))
+                    f"writable (`eir config path` prints the exact file), then re-run "
+                    f"`eir doctor --ack {ack_target}`.", Colors.RED))
         sys.exit(1)
 
 
@@ -166,7 +166,7 @@ def _print_summary(should_fix: bool, total: Finding) -> None:
         print()
         print(numbered)
         if not should_fix and total.issues:
-            print(color("  Tip: run 'hermes doctor --fix' to auto-fix what's possible.", Colors.DIM))
+            print(color("  Tip: run 'eir doctor --fix' to auto-fix what's possible.", Colors.DIM))
     else:
         print(color("─" * 60, Colors.GREEN))
         print(color("  All checks passed! 🎉", Colors.GREEN, Colors.BOLD))
@@ -177,16 +177,16 @@ def run_doctor(args):
     """Run diagnostic checks."""
     should_fix = getattr(args, 'fix', False)
     # Doctor runs from the interactive CLI, so CLI-gated tool checks (e.g. cronjob) see the same context.
-    os.environ.setdefault("HERMES_INTERACTIVE", "1")
+    os.environ.setdefault("EIR_INTERACTIVE", "1")
     if getattr(args, 'ack', None):
         return _ack_advisory(args.ack)
     print()
     for line in ("┌─────────────────────────────────────────────────────────┐",
-                 "│                 🩺 Hermes Doctor                        │",
+                 "│                 🩺 Eir Doctor                        │",
                  "└─────────────────────────────────────────────────────────┘"):
         print(color(line, Colors.CYAN))
     total = Finding()
-    from hermes_cli.left_core_migration import installs_held
+    from eir_cli.left_core_migration import installs_held
     with installs_held():  # a diagnostic: provider checks resolve through the runtime, which would install
         for title, check in DOCTOR_CHECKS:
             if title:
@@ -194,7 +194,7 @@ def run_doctor(args):
             total.merge(check(should_fix))
         # Opt-in live probes run AFTER all static checks (`--live`: real network calls; bounded + read-only).
         with warn_on_error(""):
-            from hermes_cli.doctor_live import maybe_run_live_checks
+            from eir_cli.doctor_live import maybe_run_live_checks
             maybe_run_live_checks(args, total.manual_issues)
     _print_summary(should_fix, total)
     return int(bool(total.issues or total.manual_issues))

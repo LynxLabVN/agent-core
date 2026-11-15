@@ -1,6 +1,6 @@
 """Azure Foundry wizard (OpenAI-style or Anthropic-style transport, API-key or Entra ID auth).
 
-Imports of hermes_cli.config / azure_detect stay lazy (tests patch them at call time).
+Imports of eir_cli.config / azure_detect stay lazy (tests patch them at call time).
 Prompt strings and config write order are behavior.
 """
 
@@ -9,8 +9,8 @@ from __future__ import annotations
 from pm import install_hint
 from dataclasses import dataclass, field
 
-from hermes_cli.config import clear_model_endpoint_credentials
-from hermes_cli.model_setup_flows_common import _HTTP, _ask, _commit_model_config, _load_config_model_section, _say
+from eir_cli.config import clear_model_endpoint_credentials
+from eir_cli.model_setup_flows_common import _HTTP, _ask, _commit_model_config, _load_config_model_section, _say
 
 
 def _azure_mode_label(mode: str) -> str:
@@ -28,7 +28,7 @@ class _AzureCurrent:
 
 
 def _azure_current(config) -> _AzureCurrent:
-    from hermes_cli.config import get_env_value
+    from eir_cli.config import get_env_value
 
     cur = _AzureCurrent(api_key=get_env_value("AZURE_FOUNDRY_API_KEY") or "")
     model_cfg = config.get("model", {})
@@ -56,9 +56,9 @@ def _azure_entra_preflight(current_entra: dict):
     if not has_azure_identity_installed():
         _say("◐ The 'azure-identity' package is not installed yet.",
              "  The preflight requests it through PM if lazy installs are enabled.",
-             "  To install explicitly, run from the Hermes environment:",
+             "  To install explicitly, run from the Eir environment:",
              f"    {install_hint('azure-identity')}",
-             "  Then restart Hermes.")
+             "  Then restart Eir.")
 
     # Only the optional scope override is persisted; identity selection (tenant,
     # user-assigned MI, workload identity, SP) stays in AZURE_* SDK env vars.
@@ -122,7 +122,7 @@ def _azure_pick_model(discovered_models: list, current_model: str):
 def _azure_detect_transport(effective_url: str, effective_key: str, token_provider, current_api_mode: str):
     """Probe the endpoint; returns ``(api_mode, discovered_models)`` (manual pick of the API
     format when detection is incomplete) or None when cancelled."""
-    from hermes_cli import azure_detect
+    from eir_cli import azure_detect
 
     _say("", "◐ Probing endpoint to auto-detect transport and models...")
     detection = azure_detect.detect(effective_url, api_key=effective_key, token_provider=token_provider)
@@ -154,13 +154,13 @@ def _model_flow_azure_foundry(config, current_model=""):
     (``AZURE_FOUNDRY_API_KEY``) or Microsoft Entra ID (keyless RBAC via ``azure-identity``; the
     ``Azure AI User`` role covers both transports). Detection: ``/anthropic`` URL suffix → Anthropic;
     ``GET <base>/models`` → OpenAI-style + picker; Anthropic Messages probe; manual entry."""
-    from hermes_cli.config import get_env_value, save_env_value
-    from hermes_cli import azure_detect
+    from eir_cli.config import get_env_value, save_env_value
+    from eir_cli import azure_detect
 
     cur = _azure_current(config)
     _say("", "Azure Foundry Configuration", "=" * 50, "",
          "Azure Foundry can host models with either OpenAI-style or",
-         "Anthropic-style API endpoints.  Hermes will probe your",
+         "Anthropic-style API endpoints.  Eir will probe your",
          "endpoint to auto-detect the transport and the deployed",
          "models when possible.", "")
     if cur.base_url:

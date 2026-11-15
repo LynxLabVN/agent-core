@@ -1,13 +1,13 @@
 """``/model <name> --reasoning <level>`` — one request carries a model pick AND its effort.
 
-The parser is the single owner (hermes_cli.model_switch.parse_model_switch_args); the CLI and
+The parser is the single owner (eir_cli.model_switch.parse_model_switch_args); the CLI and
 TUI-gateway commit steps apply the effort AFTER the agent swap, because ``agent.switch_model``
 re-resolves ``reasoning_config`` from config.yaml and would clobber an earlier write.
 """
 
 from types import SimpleNamespace
 
-from hermes_cli.model_switch import (
+from eir_cli.model_switch import (
     MODEL_SWITCH_ERR_BAD_REASONING,
     ModelSwitchResult,
     parse_model_switch_args,
@@ -32,7 +32,7 @@ def test_cli_commit_applies_effort_after_the_agent_swap(monkeypatch):
     """The agent's switch_model resets reasoning_config from config; the ride-along effort must
     win over that reset, on both the CLI and the live agent."""
     import cli as cli_mod
-    from hermes_cli import cli_model_switch_mixin as mixin
+    from eir_cli import cli_model_switch_mixin as mixin
 
     class _Agent:
         reasoning_config = {"enabled": True, "effort": "medium"}
@@ -47,9 +47,9 @@ def test_cli_commit_applies_effort_after_the_agent_swap(monkeypatch):
         api_key="", base_url="", api_mode="", agent=agent, reasoning_config=None,
         _pending_one_turn_model_restore=None, _pending_model_switch_note="",
         _snapshot_model_runtime=dict, _persist_model_switch_to_session=lambda *_a: None)
-    cli._stage_and_swap_model = lambda result, old: cli_mod.HermesCLI._stage_and_swap_model(cli, result, old)
+    cli._stage_and_swap_model = lambda result, old: cli_mod.EirCLI._stage_and_swap_model(cli, result, old)
     monkeypatch.setattr(mixin, "_print_switch_summary", lambda *_a, **_k: None)
-    monkeypatch.setattr(cli_mod.HermesCLI, "_persist_model_switch_to_session", lambda *_a: None)
+    monkeypatch.setattr(cli_mod.EirCLI, "_persist_model_switch_to_session", lambda *_a: None)
     saved = {}
     monkeypatch.setattr(cli_mod, "save_config_value", lambda k, v: saved.setdefault(k, v) or True)
 

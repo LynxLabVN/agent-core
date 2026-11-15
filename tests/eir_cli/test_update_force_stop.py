@@ -1,4 +1,4 @@
-"""``hermes update --force`` stops the update's gateways at once instead of draining them."""
+"""``eir update --force`` stops the update's gateways at once instead of draining them."""
 
 import json
 import signal
@@ -8,8 +8,8 @@ import time
 
 import pytest
 
-from hermes_cli import update_cmd_force_stop as force_stop
-from hermes_cli import update_cmd_posix_pause as posix_pause
+from eir_cli import update_cmd_force_stop as force_stop
+from eir_cli import update_cmd_posix_pause as posix_pause
 
 pytestmark = pytest.mark.platforms("posix")
 
@@ -26,7 +26,7 @@ def _child(ignore_term: bool) -> subprocess.Popen:
 
 @pytest.fixture
 def no_record(monkeypatch):
-    from hermes_cli import update_pause_record
+    from eir_cli import update_pause_record
     monkeypatch.setattr(update_pause_record, "mark_stop_sent", lambda token, pid: None)
 
 
@@ -75,9 +75,9 @@ def test_force_kills_the_unit_when_its_stop_job_outlives_the_gateway(monkeypatch
     monkeypatch.setattr(posix_pause, "_stop_at_once", lambda entry: released.wait(10))
     monkeypatch.setattr(force_stop, "_kill", lambda entry: (kills.append(entry["unit"]), released.set()))
     gone = {"pid": 2 ** 22 + 7, "home": str(tmp_path), "ct": None, "kind": "systemd", "scope": "user",
-            "unit": "hermes-gateway.service"}
+            "unit": "eir-gateway.service"}
     force_stop.force_stop_gateways({}, [gone])
-    assert kills == ["hermes-gateway.service"]
+    assert kills == ["eir-gateway.service"]
 
 
 def _sleeper() -> subprocess.Popen:
@@ -122,10 +122,10 @@ def test_an_unsettled_force_stop_aborts_before_the_checkout_moves(monkeypatch, t
     """The unit's stop job outlives the force deadline and its kill: nothing may be started behind
     it, so the commit point refuses (no swap), nothing is resumed now, and the record stays owed."""
     import threading
-    from hermes_cli import update_pause_record as pause_record
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    from eir_cli import update_pause_record as pause_record
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     released = threading.Event()
-    unit = {"kind": "systemd", "scope": "user", "unit": "hermes-gateway.service", "pid": 2 ** 22 + 9,
+    unit = {"kind": "systemd", "scope": "user", "unit": "eir-gateway.service", "pid": 2 ** 22 + 9,
             "home": str(tmp_path), "cgroup": None}
     monkeypatch.setattr(posix_pause, "_discover_systemd", lambda: [dict(unit)])
     monkeypatch.setattr(posix_pause, "_discover_launchd", list)
@@ -144,11 +144,11 @@ def test_an_unsettled_force_stop_aborts_before_the_checkout_moves(monkeypatch, t
         refused = posix_pause.pause_at_commit_point()
     finally:
         released.set()
-    assert refused and "hermes-gateway.service" in refused, f"no refusal naming the unit: {refused!r}"
+    assert refused and "eir-gateway.service" in refused, f"no refusal naming the unit: {refused!r}"
     assert not token["resume_needed"], "this process would start the unit behind its stop job at exit"
     owed = pause_record.read()
     assert owed and owed["token"]["resume_needed"], "the stopped unit is no longer owed a restart"
-    assert [u["unit"] for u in owed["token"]["posix_units"]] == ["hermes-gateway.service"]
+    assert [u["unit"] for u in owed["token"]["posix_units"]] == ["eir-gateway.service"]
 
 
 def test_the_sweep_never_touches_a_process_another_interpreter_recorded(monkeypatch, tmp_path, no_record):
@@ -184,14 +184,14 @@ def test_a_worker_scope_that_will_not_stop_aborts_the_update(monkeypatch, tmp_pa
     try:
         (tmp_path / "processes.json").write_text(json.dumps([
             {"session_id": "proc_w", "pid": None, "pid_scope": "host", "host_start_time": None,
-             "systemd_unit": "hermes-worker-proc_w.scope", "owner_pid": gateway.pid, "command": "x"}]))
+             "systemd_unit": "eir-worker-proc_w.scope", "owner_pid": gateway.pid, "command": "x"}]))
         monkeypatch.setattr(process_registry, "_stop_systemd_unit", lambda unit: False)
         monkeypatch.setattr(force_stop, "_kill_scope", killed.append, raising=False)
         monkeypatch.setattr(force_stop, "FORCE_KILL_AFTER_S", 0.5)
         monkeypatch.setattr(force_stop, "_live_work", lambda entry: [])
-        with pytest.raises(posix_pause.StopUnsettled, match="hermes-worker-proc_w.scope"):
+        with pytest.raises(posix_pause.StopUnsettled, match="eir-worker-proc_w.scope"):
             force_stop.force_stop_gateways({}, [{"pid": gateway.pid, "home": str(tmp_path), "ct": None}])
-        assert killed == ["hermes-worker-proc_w.scope"], "the scope was not SIGKILLed before giving up"
+        assert killed == ["eir-worker-proc_w.scope"], "the scope was not SIGKILLed before giving up"
     finally:
         if gateway.poll() is None:
             gateway.kill()
@@ -201,14 +201,14 @@ def test_a_worker_scope_that_will_not_stop_aborts_the_update(monkeypatch, tmp_pa
 def test_recovery_never_starts_a_unit_whose_force_stop_is_still_running(monkeypatch, tmp_path):
     """An aborted ``--force`` left the unit's stop job running after its gateway PID exited: the
     next launch's recovery holds the unit (still owed) instead of queueing a start behind it."""
-    from hermes_cli import update_cmd_fleet_unit_budget as budget
-    from hermes_cli import update_pause_record as pause_record
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-    unit = {"kind": "systemd", "scope": "user", "unit": "hermes-gateway.service", "pid": 2 ** 22 + 11,
+    from eir_cli import update_cmd_fleet_unit_budget as budget
+    from eir_cli import update_pause_record as pause_record
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
+    unit = {"kind": "systemd", "scope": "user", "unit": "eir-gateway.service", "pid": 2 ** 22 + 11,
             "home": str(tmp_path), "ct": None}
     token = pause_record.record_pause({**posix_pause._empty_token(), "resume_needed": True,
                                        "posix_units": [unit], "identities": {}}, None, [])
-    posix_pause._abort_unsettled(token, "systemd's stop job for hermes-gateway.service is still stopping")
+    posix_pause._abort_unsettled(token, "systemd's stop job for eir-gateway.service is still stopping")
     body = pause_record.read()
     pause_record._atomic_write(pause_record.record_path(), {**body, "owner": pause_record.UNOWNED})  # updater exited
     monkeypatch.setattr(budget, "unit_job_state",
@@ -217,4 +217,4 @@ def test_recovery_never_starts_a_unit_whose_force_stop_is_still_running(monkeypa
     pause_record.recover(["status"])
     [claim] = pause_record._claims(pause_record.record_path())
     owed = pause_record.read(claim)["token"]
-    assert [u["unit"] for u in owed["posix_units"]] == ["hermes-gateway.service"], "the unit's restart was dropped"
+    assert [u["unit"] for u in owed["posix_units"]] == ["eir-gateway.service"], "the unit's restart was dropped"

@@ -5,7 +5,7 @@ import type { ComponentProps } from 'react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 const request = vi.hoisted(() => vi.fn())
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@eir/plugin-sdk', async () => {
   const { pluginSdkMock, createGroupGateway } = await import('./group-test-utils')
   const gateway = createGroupGateway()
   const { en } = await import('@/i18n/en')
@@ -25,9 +25,9 @@ import { $canonicalRoomLive, canonicalRoomLiveKey } from './canonical-group-deta
 import { prepareCanonicalGroupSend, readCanonicalGroupSend } from './canonical-group-send'
 import { CanonicalGroupWorkspace } from './canonical-group-workspace'
 
-const originalDesktop = window.hermesDesktop
-beforeEach(() => { Object.defineProperty(window, 'hermesDesktop', { configurable: true, writable: true, value: undefined }) })
-afterEach(() => { cleanup(); request.mockReset(); localStorage.clear(); window.hermesDesktop = originalDesktop; vi.unstubAllGlobals() })
+const originalDesktop = window.eirDesktop
+beforeEach(() => { Object.defineProperty(window, 'eirDesktop', { configurable: true, writable: true, value: undefined }) })
+afterEach(() => { cleanup(); request.mockReset(); localStorage.clear(); window.eirDesktop = originalDesktop; vi.unstubAllGlobals() })
 
 const members = [{ member_id: 'ops', profile: 'ops', handle: 'ops', display_name: 'Ops' }]
 

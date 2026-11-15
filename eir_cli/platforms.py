@@ -1,4 +1,4 @@
-"""Shared platform registry for Hermes Agent."""
+"""Shared platform registry for Eir Agent."""
 
 from collections import OrderedDict
 from typing import NamedTuple
@@ -12,26 +12,26 @@ class PlatformInfo(NamedTuple):
 
 # Ordered so that TUI menus are deterministic.
 PLATFORMS: OrderedDict[str, PlatformInfo] = OrderedDict([
-    ("cli",            PlatformInfo(label="🖥️  CLI",            default_toolset="hermes-cli")),
-    ("telegram",       PlatformInfo(label="📱 Telegram",        default_toolset="hermes-telegram")),
-    ("discord",        PlatformInfo(label="💬 Discord",         default_toolset="hermes-discord")),
-    ("slack",          PlatformInfo(label="💼 Slack",           default_toolset="hermes-slack")),
-    ("whatsapp",       PlatformInfo(label="📱 WhatsApp",        default_toolset="hermes-whatsapp")),
-    ("whatsapp_cloud", PlatformInfo(label="📱 WhatsApp Business (Cloud)", default_toolset="hermes-whatsapp")),
-    ("signal",         PlatformInfo(label="📡 Signal",          default_toolset="hermes-signal")),
-    ("bluebubbles",    PlatformInfo(label="💙 BlueBubbles",     default_toolset="hermes-bluebubbles")),
-    ("email",          PlatformInfo(label="📧 Email",           default_toolset="hermes-email")),
-    ("mattermost",     PlatformInfo(label="💬 Mattermost",      default_toolset="hermes-mattermost")),
-    ("matrix",         PlatformInfo(label="💬 Matrix",          default_toolset="hermes-matrix")),
-    ("dingtalk",       PlatformInfo(label="💬 DingTalk",        default_toolset="hermes-dingtalk")),
-    ("feishu",         PlatformInfo(label="🪽 Feishu",          default_toolset="hermes-feishu")),
-    ("wecom",          PlatformInfo(label="💬 WeCom",           default_toolset="hermes-wecom")),
-    ("wecom_callback", PlatformInfo(label="💬 WeCom Callback",  default_toolset="hermes-wecom-callback")),
-    ("weixin",         PlatformInfo(label="💬 Weixin",          default_toolset="hermes-weixin")),
-    ("qqbot",          PlatformInfo(label="💬 QQBot",           default_toolset="hermes-qqbot")),
-    ("webhook",        PlatformInfo(label="🔗 Webhook",         default_toolset="hermes-webhook")),
-    ("api_server",     PlatformInfo(label="🌐 API Server",      default_toolset="hermes-api-server")),
-    ("cron",           PlatformInfo(label="⏰ Cron",            default_toolset="hermes-cron")),
+    ("cli",            PlatformInfo(label="🖥️  CLI",            default_toolset="eir-cli")),
+    ("telegram",       PlatformInfo(label="📱 Telegram",        default_toolset="eir-telegram")),
+    ("discord",        PlatformInfo(label="💬 Discord",         default_toolset="eir-discord")),
+    ("slack",          PlatformInfo(label="💼 Slack",           default_toolset="eir-slack")),
+    ("whatsapp",       PlatformInfo(label="📱 WhatsApp",        default_toolset="eir-whatsapp")),
+    ("whatsapp_cloud", PlatformInfo(label="📱 WhatsApp Business (Cloud)", default_toolset="eir-whatsapp")),
+    ("signal",         PlatformInfo(label="📡 Signal",          default_toolset="eir-signal")),
+    ("bluebubbles",    PlatformInfo(label="💙 BlueBubbles",     default_toolset="eir-bluebubbles")),
+    ("email",          PlatformInfo(label="📧 Email",           default_toolset="eir-email")),
+    ("mattermost",     PlatformInfo(label="💬 Mattermost",      default_toolset="eir-mattermost")),
+    ("matrix",         PlatformInfo(label="💬 Matrix",          default_toolset="eir-matrix")),
+    ("dingtalk",       PlatformInfo(label="💬 DingTalk",        default_toolset="eir-dingtalk")),
+    ("feishu",         PlatformInfo(label="🪽 Feishu",          default_toolset="eir-feishu")),
+    ("wecom",          PlatformInfo(label="💬 WeCom",           default_toolset="eir-wecom")),
+    ("wecom_callback", PlatformInfo(label="💬 WeCom Callback",  default_toolset="eir-wecom-callback")),
+    ("weixin",         PlatformInfo(label="💬 Weixin",          default_toolset="eir-weixin")),
+    ("qqbot",          PlatformInfo(label="💬 QQBot",           default_toolset="eir-qqbot")),
+    ("webhook",        PlatformInfo(label="🔗 Webhook",         default_toolset="eir-webhook")),
+    ("api_server",     PlatformInfo(label="🌐 API Server",      default_toolset="eir-api-server")),
+    ("cron",           PlatformInfo(label="⏰ Cron",            default_toolset="eir-cron")),
 ])
 
 
@@ -61,7 +61,7 @@ def get_all_platforms() -> OrderedDict[str, PlatformInfo]:
         from gateway.platform_registry import platform_registry
         for entry in platform_registry.plugin_entries():
             if entry.name not in merged:
-                merged[entry.name] = PlatformInfo(_plugin_label(entry), f"hermes-{entry.name}")
+                merged[entry.name] = PlatformInfo(_plugin_label(entry), f"eir-{entry.name}")
     except Exception:
         pass
     return merged

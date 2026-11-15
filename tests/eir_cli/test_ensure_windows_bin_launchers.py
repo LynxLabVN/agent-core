@@ -1,10 +1,10 @@
-"""``hermes`` must survive git operations on the checkout (launcher layout).
+"""``eir`` must survive git operations on the checkout (launcher layout).
 
-The Windows ``hermes`` command is a staged launcher whose canonical home is
-the managed binary dir ``HERMES_HOME\\bin`` — OUTSIDE the git checkout —
-because the earlier in-checkout home (``hermes-agent\\bin``) was swept by
-``hermes update``'s autostash (``git stash push --include-untracked``) and,
-with the desktop updater's ``--keep-stash``, never restored: ``hermes``
+The Windows ``eir`` command is a staged launcher whose canonical home is
+the managed binary dir ``EIR_HOME\\bin`` — OUTSIDE the git checkout —
+because the earlier in-checkout home (``eir-agent\\bin``) was swept by
+``eir update``'s autostash (``git stash push --include-untracked``) and,
+with the desktop updater's ``--keep-stash``, never restored: ``eir``
 stopped resolving in every new terminal (``venv\\Scripts`` itself must stay
 off PATH — it shadows the user's ``python``, #83797).
 
@@ -13,12 +13,12 @@ launchers that boot the pm STORE python with ``PYTHONPATH=repo;site-packages``
 — never ``venv\\Scripts\\python.exe`` (``pyvenv.cfg`` is inert dead config).
 When the store interpreter has not materialized yet, a runtime-resolving
 ``.cmd`` delegator is staged that finds the store python at boot and fails
-with a clear message until ``hermes pm install`` lands it; legacy copied
+with a clear message until ``eir pm install`` lands it; legacy copied
 venv trampolines (detected by their embedded interpreter path) are replaced.
 ``migrate_windows_bin_path`` moves an existing install's PATH to the
-canonical layout from the ``hermes update`` tail. Platform verdict, PATH
+canonical layout from the ``eir update`` tail. Platform verdict, PATH
 values, and registry I/O are injected parameters (same pattern as
-``hermes_constants.venv_bin_dir``), so these tests are host-independent
+``eir_constants.venv_bin_dir``), so these tests are host-independent
 input→output checks, not host fakes.
 """
 
@@ -31,8 +31,8 @@ import pytest
 # Real launcher serialization is host-dependent, despite injectable registry I/O.
 pytestmark = pytest.mark.platforms("windows")
 
-from hermes_cli import _launchers
-from hermes_cli._install_repair import (
+from eir_cli import _launchers
+from eir_cli._install_repair import (
     _WINDOWS_BIN_LAUNCHERS,
     _normalize_windows_path,
     ensure_windows_bin_launchers,
@@ -41,16 +41,16 @@ from hermes_cli._install_repair import (
 
 
 def _make_managed(tmp_path, monkeypatch):
-    """Fake managed layout: HERMES_HOME/hermes-agent/venv (+ a fake venv
+    """Fake managed layout: EIR_HOME/eir-agent/venv (+ a fake venv
     python whose path legacy trampolines would embed). New consoles resolve
     this home, so the PATH migration may edit the (injected) User PATH."""
-    home = tmp_path / "hermes"
-    root = home / "hermes-agent"
+    home = tmp_path / "eir"
+    root = home / "eir-agent"
     (root / "venv" / "Scripts").mkdir(parents=True)
     (root / "venv" / "Scripts" / "python.exe").write_bytes(b"MZ fake venv python")
     (root / "venv" / "pyvenv.cfg").write_text("home = X\n", encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.setattr(_launchers, "new_console_hermes_root", lambda: home)
+    monkeypatch.setenv("EIR_HOME", str(home))
+    monkeypatch.setattr(_launchers, "new_console_eir_root", lambda: home)
     return home, root
 
 
@@ -58,7 +58,7 @@ def _make_store(tmp_path, monkeypatch, *, version="3.11.15+x20260807"):
     """A fake pm store with a materialized python package. The interpreter
     file's bytes don't matter — the heal stages launchers, it never runs
     them — but the LAYOUT must match what pm/paths.py + facts.json
-    describe (HERMES_RUNTIME_DIR override keeps tests off the real store)."""
+    describe (EIR_RUNTIME_DIR override keeps tests off the real store)."""
     store = tmp_path / "store"
     entry = store / f"python-{version}-win32-arm64"
     (entry / "bin").mkdir(parents=True)
@@ -76,7 +76,7 @@ def _make_store(tmp_path, monkeypatch, *, version="3.11.15+x20260807"):
         ),
         encoding="utf-8",
     )
-    monkeypatch.setenv("HERMES_RUNTIME_DIR", str(store))
+    monkeypatch.setenv("EIR_RUNTIME_DIR", str(store))
     return store, entry
 
 
@@ -112,12 +112,12 @@ def managed_install(tmp_path, monkeypatch):
 def test_no_store_python_refuses_publication(managed_install, tmp_path, monkeypatch):
     """Repair cannot publish a usable launcher before PM commits Python."""
     home, root = managed_install
-    monkeypatch.setenv("HERMES_RUNTIME_DIR", str(tmp_path / "empty-store"))
+    monkeypatch.setenv("EIR_RUNTIME_DIR", str(tmp_path / "empty-store"))
 
     restored = ensure_windows_bin_launchers(root, windows=True, user_path_entries=[])
 
     assert restored == []
-    assert not list((home / "bin").glob("hermes*"))
+    assert not list((home / "bin").glob("eir*"))
 
 
 def test_store_python_launcher_boot_the_store_not_the_venv(tmp_path, monkeypatch):
@@ -164,7 +164,7 @@ def test_healthy_store_launcher_is_a_noop(tmp_path, monkeypatch):
     _store, _entry = _make_store(tmp_path, monkeypatch)
     bin_dir = home / "bin"
     bin_dir.mkdir()
-    local = root / ".hermes" / "bin"
+    local = root / ".eir" / "bin"
     local.mkdir(parents=True)
     for name in _WINDOWS_BIN_LAUNCHERS:
         # A launcher that does NOT embed the venv interpreter counts as
@@ -181,11 +181,11 @@ def test_healthy_canonical_layout_with_placeholder_cmds_gets_upgraded(
     tmp_path, monkeypatch
 ):
     """Placeholder .cmd delegators from the fresh install are upgraded to
-    store-python launchers once `hermes pm install` materialized the store."""
+    store-python launchers once `eir pm install` materialized the store."""
     home, root = _make_managed(tmp_path, monkeypatch)
     bin_dir = home / "bin"
     bin_dir.mkdir()
-    monkeypatch.setenv("HERMES_RUNTIME_DIR", str(tmp_path / "empty-store"))
+    monkeypatch.setenv("EIR_RUNTIME_DIR", str(tmp_path / "empty-store"))
     ensure_windows_bin_launchers(root, windows=True, user_path_entries=[])
     store, _entry = _make_store(tmp_path, monkeypatch)
 
@@ -221,12 +221,12 @@ def test_legacy_bin_not_restaged_without_path_consent(managed_install):
 
 
 def test_source_checkout_untouched(tmp_path, monkeypatch):
-    """A checkout NOT under HERMES_HOME gains nothing anywhere."""
-    home = tmp_path / "hermes-home"
+    """A checkout NOT under EIR_HOME gains nothing anywhere."""
+    home = tmp_path / "eir-home"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.setenv("HERMES_RUNTIME_DIR", str(tmp_path / "empty-store"))
-    root = tmp_path / "src" / "hermes-agent"
+    monkeypatch.setenv("EIR_HOME", str(home))
+    monkeypatch.setenv("EIR_RUNTIME_DIR", str(tmp_path / "empty-store"))
+    root = tmp_path / "src" / "eir-agent"
     (root / "venv" / "Scripts").mkdir(parents=True)
 
     assert ensure_windows_bin_launchers(root, windows=True, user_path_entries=[]) == []
@@ -242,13 +242,13 @@ def test_noop_on_posix(managed_install):
 
 
 def test_profile_session_still_heals_the_shared_bin(tmp_path, monkeypatch):
-    """Under ``hermes -p <name>`` HERMES_HOME points inside profiles/<name>;
+    """Under ``eir -p <name>`` EIR_HOME points inside profiles/<name>;
     the launcher dir is per-machine, so the heal must anchor on the default
     root and fire anyway — a habitual profile user gets the same repair."""
-    home = tmp_path / "hermes"
-    root = home / "hermes-agent"
+    home = tmp_path / "eir"
+    root = home / "eir-agent"
     (root / "venv" / "Scripts").mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(home / "profiles" / "work"))
+    monkeypatch.setenv("EIR_HOME", str(home / "profiles" / "work"))
     _make_store(tmp_path, monkeypatch)
 
     restored = ensure_windows_bin_launchers(root, windows=True, user_path_entries=[])
@@ -271,7 +271,7 @@ def test_no_staging_litter_left_behind(managed_install):
 
 
 # ---------------------------------------------------------------------------
-# migrate_windows_bin_path — the `hermes update` tail migration
+# migrate_windows_bin_path — the `eir update` tail migration
 # ---------------------------------------------------------------------------
 
 
@@ -298,7 +298,7 @@ def test_migration_moves_path_to_home_bin_and_strips_legacy(managed_install):
         [legacy_bin, legacy_scripts, r"C:\Windows\system32"]
     )
     (root / "bin").mkdir()
-    (root / "bin" / "hermes.cmd").write_text("@echo off\r\n", encoding="ascii")
+    (root / "bin" / "eir.cmd").write_text("@echo off\r\n", encoding="ascii")
 
     ok = migrate_windows_bin_path(
         root, windows=True, read_user_path=read, write_user_path=write
@@ -314,7 +314,7 @@ def test_migration_moves_path_to_home_bin_and_strips_legacy(managed_install):
         assert _launcher_files(home / "bin", name)
     # Legacy FILES stay: editor/ACP configs holding absolute launcher paths
     # keep working. Only the PATH entry (the sweepable resolution route) goes.
-    assert (root / "bin" / "hermes.cmd").exists()
+    assert (root / "bin" / "eir.cmd").exists()
 
 
 def test_migration_works_when_only_legacy_copy_exists(tmp_path, monkeypatch):
@@ -352,12 +352,12 @@ def test_migration_is_idempotent(managed_install):
 
 def test_migration_refuses_empty_store_without_changing_path(tmp_path, monkeypatch):
     """Never point PATH at commands that cannot start."""
-    home = tmp_path / "hermes"
-    root = home / "hermes-agent"
+    home = tmp_path / "eir"
+    root = home / "eir-agent"
     (root / "venv" / "Scripts").mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     (tmp_path / "empty-store").mkdir()
-    monkeypatch.setenv("HERMES_RUNTIME_DIR", str(tmp_path / "empty-store"))
+    monkeypatch.setenv("EIR_RUNTIME_DIR", str(tmp_path / "empty-store"))
     state, read, write = _fake_registry([str(root / "bin"), r"C:\Windows\system32"])
 
     ok = migrate_windows_bin_path(
@@ -371,7 +371,7 @@ def test_migration_refuses_empty_store_without_changing_path(tmp_path, monkeypat
 def test_migration_leaves_path_when_new_consoles_use_another_home(managed_install, tmp_path, monkeypatch):
     """A sandbox's managed clone stages its own launchers but never edits the User PATH."""
     home, root = managed_install
-    monkeypatch.setattr(_launchers, "new_console_hermes_root", lambda: tmp_path / "real-home")
+    monkeypatch.setattr(_launchers, "new_console_eir_root", lambda: tmp_path / "real-home")
     state, read, write = _fake_registry([str(root / "bin"), r"C:\Windows\system32"])
 
     ok = migrate_windows_bin_path(
@@ -391,7 +391,7 @@ def test_migration_fails_closed_when_the_console_check_raises(managed_install, m
     def broken():
         raise OSError("CreateEnvironmentBlock failed")
 
-    monkeypatch.setattr(_launchers, "new_console_hermes_root", broken)
+    monkeypatch.setattr(_launchers, "new_console_eir_root", broken)
     state, read, write = _fake_registry([str(root / "bin")])
 
     assert not migrate_windows_bin_path(root, windows=True, read_user_path=read, write_user_path=write)
@@ -399,11 +399,11 @@ def test_migration_fails_closed_when_the_console_check_raises(managed_install, m
 
 
 def test_migration_skips_source_checkouts(tmp_path, monkeypatch):
-    home = tmp_path / "hermes-home"
+    home = tmp_path / "eir-home"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.setenv("HERMES_RUNTIME_DIR", str(tmp_path / "empty-store"))
-    root = tmp_path / "src" / "hermes-agent"
+    monkeypatch.setenv("EIR_HOME", str(home))
+    monkeypatch.setenv("EIR_RUNTIME_DIR", str(tmp_path / "empty-store"))
+    root = tmp_path / "src" / "eir-agent"
     (root / "venv" / "Scripts").mkdir(parents=True)
     state, read, write = _fake_registry([r"C:\Windows\system32"])
 
@@ -421,8 +421,8 @@ def test_migration_noop_on_posix(managed_install):
 
 def test_normalize_windows_path_equivalences():
     assert (
-        _normalize_windows_path(r"C:\Users\Me\AppData\Local\hermes\bin")
-        == _normalize_windows_path("c:/users/me/appdata/local/HERMES/BIN/")
+        _normalize_windows_path(r"C:\Users\Me\AppData\Local\eir\bin")
+        == _normalize_windows_path("c:/users/me/appdata/local/EIR/BIN/")
     )
 
 
@@ -430,7 +430,7 @@ def test_repo_gitignores_the_legacy_bin_dir():
     """Transition safety: legacy in-checkout launchers must not be stash-swept.
 
     Until every install has migrated, pre-migration checkouts still carry
-    launchers at ``<checkout>/bin``. ``hermes update`` autostashes with
+    launchers at ``<checkout>/bin``. ``eir update`` autostashes with
     ``git stash push --include-untracked``; anything untracked and NOT
     ignored inside the checkout gets swept off disk. Exercises git's real
     ignore machinery rather than reading .gitignore text.
@@ -462,11 +462,11 @@ def test_repo_gitignores_the_legacy_bin_dir():
         env.setdefault("ComSpec", r"C:\Windows\system32\cmd.exe")
 
     result = subprocess.run(
-        [git, "-C", str(repo_root), "check-ignore", "-q", "bin/hermes.exe"],
+        [git, "-C", str(repo_root), "check-ignore", "-q", "bin/eir.exe"],
         capture_output=True, env=env,
         check=False,
     )
     assert result.returncode == 0, (
-        "bin/hermes.exe is not gitignored — hermes update's autostash "
+        "bin/eir.exe is not gitignored — eir update's autostash "
         "(--include-untracked) would sweep pre-migration launchers off disk"
     )

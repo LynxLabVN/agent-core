@@ -4,7 +4,7 @@
 leaves ``pending``; ``GET /api/providers/oauth/nous/handoff?since=&wait=`` holds it until the free
 tier's handoff record changes. Both carry the handoff as fields (``guest_handoff.wire_status``) so
 the desktop can name the apps that moved and the ones to reconnect. Driven through the real FastAPI
-routes against the fake portal ``hermes auth upgrade`` is tested with.
+routes against the fake portal ``eir auth upgrade`` is tested with.
 """
 
 from __future__ import annotations
@@ -12,12 +12,12 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from hermes_cli import anon_auth, guest_handoff
-from hermes_cli.web_server import _SESSION_TOKEN, app
-from tests.hermes_cli.test_anon_upgrade import EMAIL, free_account, portal
+from eir_cli import anon_auth, guest_handoff
+from eir_cli.web_server import _SESSION_TOKEN, app
+from tests.eir_cli.test_anon_upgrade import EMAIL, free_account, portal
 
 client = TestClient(app)
-HEADERS = {"X-Hermes-Session-Token": _SESSION_TOKEN}
+HEADERS = {"X-Eir-Session-Token": _SESSION_TOKEN}
 
 __all__ = ["free_account", "portal"]  # fixtures imported from the CLI test module
 

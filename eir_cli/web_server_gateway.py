@@ -13,11 +13,11 @@ import time
 import urllib.request
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
-from hermes_cli._subprocess_compat import windows_detach_flags, windows_detach_flags_without_breakaway
-from hermes_cli.config import get_hermes_home
+from eir_cli._subprocess_compat import windows_detach_flags, windows_detach_flags_without_breakaway
+from eir_cli.config import get_eir_home
 
 # Same logger the code used before extraction (record parity).
-_log = logging.getLogger("hermes_cli.web_server")
+_log = logging.getLogger("eir_cli.web_server")
 
 
 # Defense against a hostile/compromised upstream serving an unbounded body to
@@ -43,7 +43,7 @@ def _probe_gateway_health() -> tuple[bool, dict | None]:
     to be replaced by a dashboard config key; do not add callers. Accepts a base URL or an
     explicit ``/health`` / ``/health/detailed`` path; tries ``/health/detailed`` first.
     """
-    from hermes_cli.web_server import _GATEWAY_HEALTH_TIMEOUT, _GATEWAY_HEALTH_URL
+    from eir_cli.web_server import _GATEWAY_HEALTH_TIMEOUT, _GATEWAY_HEALTH_URL
     if not _GATEWAY_HEALTH_URL:
         return False, None
     base = re.sub(r"/health(/detailed)?$", "", _GATEWAY_HEALTH_URL.rstrip("/"))
@@ -97,7 +97,7 @@ def _profile_platform_ports(profile_home: Path, runtime: Optional[dict]) -> dict
     blocks: dict[str, dict] = {}
     try:
         # load_config() targets the ACTIVE profile's home; read the probed profile's file raw.
-        from hermes_cli.config import read_user_config_raw
+        from eir_cli.config import read_user_config_raw
         cfg = read_user_config_raw(profile_home / "config.yaml")
         gateway_cfg = cfg.get("gateway") if isinstance(cfg.get("gateway"), dict) else {}
         for src in ((gateway_cfg or {}).get("platforms"), cfg.get("platforms")):
@@ -168,7 +168,7 @@ def _collect_profile_gateway_topology() -> dict[str, Any]:
     platform maps per live gateway, an internal aggregation input never exposed directly.
     """
     try:
-        from hermes_cli.profiles import _check_gateway_running, profiles_to_serve, profile_is_parked
+        from eir_cli.profiles import _check_gateway_running, profiles_to_serve, profile_is_parked
         from gateway.status import read_runtime_status
         homes = profiles_to_serve(True, include_standalone=True, include_parked=True)
     except Exception:
@@ -215,7 +215,7 @@ def _collect_profile_gateway_topology() -> dict[str, Any]:
         mode = {0: "none", 1: "single"}.get(len(gateways), "multiple")
     # A guard refusal on a multi-profile host is what the dashboard banner shows; a single-profile
     # install has nothing unserved and gets no banner.
-    from hermes_cli.gateway_multiplex_mode import SINGLE_PROFILE_REASON
+    from eir_cli.gateway_multiplex_mode import SINGLE_PROFILE_REASON
     if standalone_reason == SINGLE_PROFILE_REASON or len(homes) < 2:
         standalone_reason = None
     return {
@@ -290,9 +290,9 @@ def _display_system_platform(*, system: str, release: str, version: str, platfor
 
 # Gateway + update actions (invoked from the Status page). Spawned detached so the request
 # returns immediately; stdin is DEVNULL so stray input() fails fast; stdout/stderr stream to
-# ~/.hermes/logs/<action>.log which the dashboard tails.
+# ~/.eir/logs/<action>.log which the dashboard tails.
 
-_ACTION_LOG_DIR: Path = get_hermes_home() / "logs"
+_ACTION_LOG_DIR: Path = get_eir_home() / "logs"
 
 # Short ``name`` (from the URL) → log file name under _ACTION_LOG_DIR.
 _ACTION_LOG_FILES: dict[str, str] = {
@@ -300,7 +300,7 @@ _ACTION_LOG_FILES: dict[str, str] = {
     "gateway-start": "gateway-start.log",
     "gateway-stop": "gateway-stop.log",
     "gateway-migrate": "gateway-migrate.log",
-    "hermes-update": "hermes-update.log",
+    "eir-update": "eir-update.log",
     **{name: f"action-{name}.log" for name in (
         "doctor", "security-audit", "backup", "import", "checkpoints-prune", "skills-install",
         "skills-uninstall", "skills-update", "curator-run", "prompt-size", "dump", "config-migrate",
@@ -347,8 +347,8 @@ def _named_profile_from_action(subcommand: list[str]) -> Optional[str]:
 def _is_host_gateway_spawn(subcommand: list[str]) -> bool:
     """True when *subcommand* starts the host multiplexer, not a named profile's own gateway.
 
-    ``hermes gateway restart`` and ``hermes -p default gateway restart`` are the host.
-    ``hermes -p coder gateway stop`` is not.
+    ``eir gateway restart`` and ``eir -p default gateway restart`` are the host.
+    ``eir -p coder gateway stop`` is not.
     """
     profile = _named_profile_from_action(subcommand)
     if profile not in (None, "default"):
@@ -365,17 +365,17 @@ def _is_host_gateway_spawn(subcommand: list[str]) -> bool:
 def _profile_action_environment(
     subcommand: list[str], env_overrides: Optional[dict[str, str]] = None,
 ) -> dict[str, str]:
-    """Environment for a detached ``hermes <subcommand>`` action.
+    """Environment for a detached ``eir <subcommand>`` action.
 
     The dashboard loads its own profile's ``.env`` into process-global ``os.environ``. Copying
-    that mapping verbatim into ``hermes -p <other> ...`` lets the named child see the dashboard
-    profile's platform credentials and ports *before* its own dotenv loads (``load_hermes_dotenv``
+    that mapping verbatim into ``eir -p <other> ...`` lets the named child see the dashboard
+    profile's platform credentials and ports *before* its own dotenv loads (``load_eir_dotenv``
     does not override keys already present): a supposedly A2A-only profile then claims the default
     Discord token and binds the default API/BlueBubbles ports.
 
-    Named-profile actions therefore start from Hermes' standard scrubbed subprocess env, then drop
+    Named-profile actions therefore start from Eir' standard scrubbed subprocess env, then drop
     the profile-managed keys plus every key declared by the dashboard/default profile dotenv files
-    and their hydrated secret sources, and pin ``HERMES_HOME`` to the target profile. The child's
+    and their hydrated secret sources, and pin ``EIR_HOME`` to the target profile. The child's
     normal startup then loads that profile's own ``.env``. A host-gateway verb (bare ``gateway``
     or ``-p default gateway``) starts from ``host_gateway_child_env`` so a named-profile dashboard
     cannot donate its dotenv to the multiplexer. Other actions without a profile selector keep
@@ -388,11 +388,11 @@ def _profile_action_environment(
     elif profile is None:
         action_env = dict(os.environ)
     else:
-        from hermes_cli.env_loader import (
+        from eir_cli.env_loader import (
             _PROFILE_MANAGED_ENV_KEYS, _env_keys_defined_in_dotenv, get_secret_source_values,
         )
-        from hermes_cli.web_server_profiles import _resolve_profile_dir
-        from hermes_constants import apply_subprocess_home_env, get_default_hermes_root, is_launch_only_env_key
+        from eir_cli.web_server_profiles import _resolve_profile_dir
+        from eir_constants import apply_subprocess_home_env, get_default_eir_root, is_launch_only_env_key
         from tools.environments.local import build_subprocess_env, strip_launch_profile_env
 
         target_home = _resolve_profile_dir(profile)
@@ -400,7 +400,7 @@ def _profile_action_environment(
 
         profile_keys = set(_PROFILE_MANAGED_ENV_KEYS)
         try:
-            source_homes = {str(get_default_hermes_root()), str(get_hermes_home())}
+            source_homes = {str(get_default_eir_root()), str(get_eir_home())}
         except Exception:
             source_homes = set()
         for source_home in source_homes:
@@ -420,18 +420,18 @@ def _profile_action_environment(
 
         # Pin the child before import-time startup runs; the explicit -p flag stays authoritative
         # and resolves to the same validated directory.
-        action_env["HERMES_HOME"] = str(target_home)
+        action_env["EIR_HOME"] = str(target_home)
         apply_subprocess_home_env(action_env)
 
-    action_env["HERMES_NONINTERACTIVE"] = "1"
+    action_env["EIR_NONINTERACTIVE"] = "1"
     # A config.yaml allow_all_users grant bridged into os.environ must not outlive the config that
     # produced it: drop it so the restarted child re-derives the posture from its own config.yaml.
     from gateway.config_loader import drop_bridged_env
     drop_bridged_env(action_env)
-    # The dashboard runs inside the gateway process, so os.environ carries _HERMES_GATEWAY=1;
+    # The dashboard runs inside the gateway process, so os.environ carries _EIR_GATEWAY=1;
     # inheriting it trips the child's in-process restart-loop guard (exit 1). Drop it, like
     # the gateway's own restart watcher does (gateway/run.py, #52470).
-    action_env.pop("_HERMES_GATEWAY", None)
+    action_env.pop("_EIR_GATEWAY", None)
     if env_overrides:
         action_env.update(env_overrides)
     return action_env
@@ -448,9 +448,9 @@ def _action_targets_system_gateway(subcommand: list[str]) -> bool:
     Scope is decided by the CLI's own picker (``_select_systemd_scope``) evaluated for the profile
     the action addresses, not by "a system unit exists": a host carrying both units resolves to the
     user unit, which the dashboard user operates unelevated. Same root/sudo posture as the
-    ``hermes update`` fleet restart (``update_cmd_fleet._needs_sudo`` / ``_sudo_noninteractive_ok``).
+    ``eir update`` fleet restart (``update_cmd_fleet._needs_sudo`` / ``_sudo_noninteractive_ok``).
     """
-    from hermes_cli.update_cmd_fleet import _needs_sudo
+    from eir_cli.update_cmd_fleet import _needs_sudo
 
     if not _needs_sudo("system"):
         return False
@@ -461,67 +461,67 @@ def _action_targets_system_gateway(subcommand: list[str]) -> bool:
     if verb not in _ROOT_REQUIRING_GATEWAY_VERBS:
         return False
 
-    from hermes_cli.gateway import _select_systemd_scope
-    from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+    from eir_cli.gateway import _select_systemd_scope
+    from eir_constants import reset_eir_home_override, set_eir_home_override
 
     profile = _named_profile_from_action(subcommand)
     if profile is None:
         return _select_systemd_scope(False)
-    # Unit names are derived from HERMES_HOME, so a selector-bearing action must be resolved
+    # Unit names are derived from EIR_HOME, so a selector-bearing action must be resolved
     # against the TARGET profile's home (``-p default gateway restart`` from a pooled named
     # dashboard asks about the default unit, not about its own).
-    from hermes_cli.web_server_profiles import _resolve_profile_dir
-    token = set_hermes_home_override(_resolve_profile_dir(profile))
+    from eir_cli.web_server_profiles import _resolve_profile_dir
+    token = set_eir_home_override(_resolve_profile_dir(profile))
     try:
         return _select_systemd_scope(False)
     finally:
-        reset_hermes_home_override(token)
+        reset_eir_home_override(token)
 
 
-def _spawn_hermes_action(
+def _spawn_eir_action(
     subcommand: list[str], name: str, *, env_overrides: Optional[dict[str, str]] = None
 ) -> subprocess.Popen:
-    """Spawn ``hermes <subcommand>`` detached (via ``hermes_cli.main``) and record the handle."""
-    from hermes_cli.web_server import PROJECT_ROOT
+    """Spawn ``eir <subcommand>`` detached (via ``eir_cli.main``) and record the handle."""
+    from eir_cli.web_server import PROJECT_ROOT
     _ACTION_LOG_DIR.mkdir(parents=True, exist_ok=True)
     log_file = open(_ACTION_LOG_DIR / _ACTION_LOG_FILES[name], "ab", buffering=0)
     section_start = os.fstat(log_file.fileno()).st_size
     # The header carries the action id durably: the update's completion marker lands in the ROOT
     # update.log every profile shares, and only this id ties one to the action THIS log started.
-    action_id = (env_overrides or {}).get("HERMES_ACTION_ID")
+    action_id = (env_overrides or {}).get("EIR_ACTION_ID")
     stamp = time.strftime('%Y-%m-%d %H:%M:%S') + (f" {action_id}" if action_id else "")
     log_file.write(f"\n=== {name} started {stamp} ===\n".encode())
     if action_id:
         # ...and a sidecar keeps it once build output pushes the header past the status route's
         # bounded tail, or the log rotates: a restarted dashboard still knows which action it ran.
-        from hermes_cli.runtime_state import _atomic_bytes
+        from eir_cli.runtime_state import _atomic_bytes
         _atomic_bytes(_ACTION_LOG_DIR / f"{name}.action_id", action_id.encode("ascii"))
 
-    from hermes_cli._launchers import runtime_command
+    from eir_cli._launchers import runtime_command
     cmd = runtime_command(PROJECT_ROOT, subcommand)
     if _action_targets_system_gateway(subcommand):
         # A system-scope lifecycle verb spawned as the dashboard's own user can only ever write
         # "System gateway <verb> requires root" into this log, so the button never worked on a
         # system install (#110820). Elevate — the CLI is sudo-aware: it adopts the unit's
-        # HERMES_HOME past sudo's env_reset and reads SUDO_USER for the service identity.
+        # EIR_HOME past sudo's env_reset and reads SUDO_USER for the service identity.
         # ``-n`` never prompts (stdin is DEVNULL anyway); without a passwordless path the
         # REQUEST fails instead of reporting a started action whose child refuses. Same
-        # two-step gate as the ``hermes update`` fleet restart: a refused blanket probe falls
+        # two-step gate as the ``eir update`` fleet restart: a refused blanket probe falls
         # back to ``sudo -l`` on the exact argv, so a command-scoped NOPASSWD entry qualifies.
-        from hermes_cli.update_cmd_fleet import _sudo_noninteractive_ok
+        from eir_cli.update_cmd_fleet import _sudo_noninteractive_ok
 
         if not _sudo_noninteractive_ok(["-l", "--", *cmd]):
             message = (
                 f"{name} targets the system-scope gateway service, which requires root, and "
                 "passwordless sudo is unavailable for the dashboard user. Run "
-                f"'sudo hermes {' '.join(subcommand)}' on the host, or grant that user NOPASSWD sudo."
+                f"'sudo eir {' '.join(subcommand)}' on the host, or grant that user NOPASSWD sudo."
             )
             log_file.write(f"{message}\n".encode())
             log_file.close()
             raise RuntimeError(message)
         cmd = ["sudo", "-n", *cmd]
     # Named-profile actions get a scrubbed, pinned environment so the child cannot inherit the
-    # dashboard profile's credentials; see _profile_action_environment (also drops _HERMES_GATEWAY).
+    # dashboard profile's credentials; see _profile_action_environment (also drops _EIR_GATEWAY).
     action_env = _profile_action_environment(subcommand, env_overrides)
 
     def _popen(**detach: Any) -> subprocess.Popen:
@@ -568,7 +568,7 @@ def _spawn_hermes_action(
 
 def _own_profile_selector(profile: Optional[str]) -> Optional[str]:
     """The profile a lifecycle verb addresses: the explicit selector, else the process's own
-    profile (a pooled Desktop ``hermes --profile X serve`` answers ``/api/gateway/*`` without
+    profile (a pooled Desktop ``eir --profile X serve`` answers ``/api/gateway/*`` without
     ``?profile=``; an unscoped verb there is about X). The default home resolves to the literal
     ``"default"`` selector, never to a bare argv: a selector-less child re-reads the sticky
     ``active_profile`` and would act on another profile's gateway (and skips the named-target
@@ -576,20 +576,20 @@ def _own_profile_selector(profile: Optional[str]) -> Optional[str]:
     requested = (profile or "").strip()
     if requested:
         return requested
-    from hermes_constants import get_process_hermes_home, profile_name_for_home
-    return profile_name_for_home(get_process_hermes_home()) or None
+    from eir_constants import get_process_eir_home, profile_name_for_home
+    return profile_name_for_home(get_process_eir_home()) or None
 
 
 def _gateway_subcommand(profile: Optional[str], verb: str) -> list[str]:
-    """``hermes [-p X] gateway <verb>`` argv for a dashboard lifecycle action. A profile served by the
+    """``eir [-p X] gateway <verb>`` argv for a dashboard lifecycle action. A profile served by the
     live default multiplexer has no gateway of its own: ``restart`` targets the multiplexer (the process
     that actually serves X — a ``-p X gateway restart`` child only exits 78 into the action log while the
     UI reports "restarted"); ``start``/``stop`` are refused by the caller (``multiplexed_profile_refusal``).
     The multiplexer is addressed as ``-p default`` explicitly: a bare ``gateway restart`` spawned from a
-    pooled ``--profile X serve`` would inherit X's ``HERMES_HOME`` and hit the same exit-78 refusal. The
+    pooled ``--profile X serve`` would inherit X's ``EIR_HOME`` and hit the same exit-78 refusal. The
     selector is explicit for the default home too: a bare child re-reads the sticky ``active_profile``
     and would restart another profile's gateway."""
-    from hermes_cli.web_server_profiles import _profile_cli_args
+    from eir_cli.web_server_profiles import _profile_cli_args
     profile = _own_profile_selector(profile)
     args = _profile_cli_args(profile)
     if profile and verb == "restart" and multiplexed_profile_refusal(profile, verb) is not None:
@@ -599,7 +599,7 @@ def _gateway_subcommand(profile: Optional[str], verb: str) -> list[str]:
 
 
 def _profile_is_multiplexed(profile: str) -> bool:
-    from hermes_cli.gateway import named_profile_served_by_running_multiplexer
+    from eir_cli.gateway import named_profile_served_by_running_multiplexer
     return named_profile_served_by_running_multiplexer(profile)
 
 
@@ -609,7 +609,7 @@ def _has_own_gateway(profile_dir: Path) -> bool:
     so reading liveness alone made every served profile look self-hosted and the refusal below never
     fired while a multiplexer was live, which is the only time it is needed."""
     from gateway.status import get_running_pid, multiplexer_liveness_for_profile, resolve_gateway_liveness
-    from hermes_cli.profiles import _check_gateway_running
+    from eir_cli.profiles import _check_gateway_running
     if not _check_gateway_running(profile_dir):
         return False
     served = multiplexer_liveness_for_profile(profile_dir)
@@ -625,7 +625,7 @@ def multiplexed_profile_refusal(profile: Optional[str], verb: str) -> Optional[s
     """Refusal text for ``gateway start``/``stop`` on a named profile with no gateway of its own (a
     ``--force``-started separate one is managed normally), else None. A profile the live host
     multiplexer serves is parked by ``stop`` and a parked one is unparked by ``start`` (the spawned
-    ``hermes -p X gateway <verb>`` runs ``gateway_profile_lifecycle``), so neither is refused;
+    ``eir -p X gateway <verb>`` runs ``gateway_profile_lifecycle``), so neither is refused;
     ``start`` on an unparked named profile is — one host gateway serves every profile, so a new
     per-profile gateway is never the answer (the CLI twin ``_named_profile_refused_under_multiplexer``
     exits 78 into an action log nobody reads while the UI shows the verb as done)."""
@@ -633,8 +633,8 @@ def multiplexed_profile_refusal(profile: Optional[str], verb: str) -> Optional[s
     if not requested or requested.lower() in {"current", "default"}:
         return None
     served = _profile_is_multiplexed(requested)
-    from hermes_cli.profiles import profile_is_parked, profile_is_standalone
-    from hermes_cli.web_server_profiles import _resolve_profile_dir
+    from eir_cli.profiles import profile_is_parked, profile_is_standalone
+    from eir_cli.web_server_profiles import _resolve_profile_dir
     profile_dir = _resolve_profile_dir(requested)
     standalone = profile_is_standalone(profile_dir)
     if standalone:
@@ -657,20 +657,20 @@ def multiplexed_profile_refusal(profile: Optional[str], verb: str) -> Optional[s
             return None  # parks the profile inside the host
         return (f"The default gateway already serves profile '{requested}' as a multiplexer; "
                 f"{verb} it from the default profile instead of a separate gateway for this profile.")
-    from hermes_cli.gateway_migrate import _installed_services
+    from eir_cli.gateway_migrate import _installed_services
     if _installed_services(profile_dir):
         return None  # a --force-installed fleet member is not NEW; its own service is started normally
     return (f"Profile '{requested}' does not get a gateway of its own: one host gateway serves every "
-            f"profile. Install or start it from the default profile (hermes gateway install), or fold an "
-            f"existing per-profile fleet with `hermes gateway migrate --multiplex`; "
-            f"`hermes -p {requested} gateway install --force` starts a separate one anyway.")
+            f"profile. Install or start it from the default profile (eir gateway install), or fold an "
+            f"existing per-profile fleet with `eir gateway migrate --multiplex`; "
+            f"`eir -p {requested} gateway install --force` starts a separate one anyway.")
 
 
 def live_session_refusal(profile: Optional[str], verb: str) -> Optional[str]:
     """Refusal text when the gateway ``verb`` would act on has live sessions, else None. Asked before
     spawning: the child refuses the same way, but into an action log the UI never reads."""
-    from hermes_cli.gateway_lifecycle_guards import refusal_lines
-    from hermes_cli.web_server_profiles import _resolve_profile_dir
+    from eir_cli.gateway_lifecycle_guards import refusal_lines
+    from eir_cli.web_server_profiles import _resolve_profile_dir
     homes = [_resolve_profile_dir(_own_profile_selector(profile) or "default")]
     from gateway.host_attach import host_gateway
     owner = host_gateway()
@@ -685,7 +685,7 @@ def _restart_gateway_after(profile: Optional[str], *, what: str, label: str) -> 
     spawn is reported (``restart_started: False`` + ``restart_error``) so the UI can fall back to
     its manual restart banner instead of failing the request. Live sessions refuse it the same way,
     with ``restart_busy`` set so a UI can say so in its own words."""
-    from hermes_cli.web_server import _spawn_gateway_restart
+    from eir_cli.web_server import _spawn_gateway_restart
     refusal = live_session_refusal(profile, "restart")
     if refusal:
         return {"restart_started": False, "restart_error": refusal, "restart_busy": True}
@@ -705,7 +705,7 @@ _RESTART_REASON_MAX = 300
 
 def _restart_log_last_line(pid: int) -> str:
     """The last line the ``gateway-restart`` child *pid* wrote to its log, or ``""``: its section
-    runs from the offset ``_spawn_hermes_action`` recorded to the next spawn's header."""
+    runs from the offset ``_spawn_eir_action`` recorded to the next spawn's header."""
     start = _ACTION_LOG_STARTS.get("gateway-restart")
     if start is None or start[0] != pid:
         return ""
@@ -730,7 +730,7 @@ def gateway_restart_failure(profile: Optional[str]) -> Optional[dict[str, Any]]:
     succeeded, or when this process started none. A child that exits nonzero leaves the old
     gateway serving the old config, so a UI waiting for the new one learns here that none is coming.
     ``pid`` is the ``restart_pid`` the restart answered, so the UI ignores an older restart."""
-    from hermes_cli import web_server
+    from eir_cli import web_server
     recent = web_server._LAST_GATEWAY_RESTART
     if recent is None:
         return None

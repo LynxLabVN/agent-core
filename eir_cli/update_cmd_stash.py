@@ -1,6 +1,6 @@
-"""Autostash handling for ``hermes update``: stash before the pull, restore/park/discard afterwards, warn about orphans.
+"""Autostash handling for ``eir update``: stash before the pull, restore/park/discard afterwards, warn about orphans.
 
-Split out of ``update_cmd.py``; names are re-imported there so ``hermes_cli.update_cmd.<name>`` still resolves/monkeypatches.
+Split out of ``update_cmd.py``; names are re-imported there so ``eir_cli.update_cmd.<name>`` still resolves/monkeypatches.
 Origin helpers are imported lazily per function (no cycle; test patches on the origin stay effective).
 """
 
@@ -12,14 +12,14 @@ from datetime import datetime, timedelta, timezone, UTC
 from pathlib import Path
 from typing import Optional
 
-from hermes_cli.update_cmd_common import _record_stop
+from eir_cli.update_cmd_common import _record_stop
 
 # Log-record parity with the origin module.
-logger = logging.getLogger("hermes_cli.update_cmd")
+logger = logging.getLogger("eir_cli.update_cmd")
 
 #: Autostash subject contract: this prefix + UTC YYYYMMDD-HHMMSS stamp
 #: (producer _stash_local_changes_if_needed, consumer _warn_orphaned_update_autostashes).
-_AUTOSTASH_NAME_PREFIX = "hermes-update-autostash-"
+_AUTOSTASH_NAME_PREFIX = "eir-update-autostash-"
 
 #: Age past which a leftover autostash is called out. Younger entries are normal
 #: (recent --keep-stash park); older ones are almost always forgotten.
@@ -38,7 +38,7 @@ _pending_autostash: Optional[tuple[str, int]] = None
 
 def _git_quiet(git_cmd: list[str], args: list[str], cwd: Path, **kwargs):
     """``subprocess.run`` of a git command with captured output; None when git cannot run."""
-    from hermes_cli.update_custody import run_git
+    from eir_cli.update_custody import run_git
 
     try:
         return run_git(git_cmd, args, cwd=cwd, capture_output=True, **kwargs)
@@ -71,7 +71,7 @@ def _git_paths_z(git_cmd: list[str], args: list[str], cwd: Path):
 
 
 def _reset_hard(git_cmd: list[str], cwd: Path) -> None:
-    from hermes_cli.update_custody import run_git
+    from eir_cli.update_custody import run_git
 
     run_git(git_cmd, ["reset", "--hard", "HEAD"], cwd=cwd, capture_output=True)
 
@@ -149,7 +149,7 @@ def _scan_local_changes(git_cmd: list[str], cwd: Path, untracked_targets=()) -> 
     """Local changes, or None when the tree is clean. An untracked file the update cannot write over
     blocks no pull or checkout, so with *untracked_targets* (every ref the update may land on) only the
     colliding ones are moved; without targets, or when a target tree is unreadable, all of them are."""
-    from hermes_cli.update_cmd_git import _git_run
+    from eir_cli.update_cmd_git import _git_run
     # Explicit mode: status.showUntrackedFiles=no would hide every untracked entry, and an empty
     # leave-set means the stash takes them all.
     status = _git_run(git_cmd, ["status", "--porcelain", "-z", "--untracked-files=normal"], cwd, check=True)
@@ -197,8 +197,8 @@ def _ask_keep_local_changes(changes: _LocalChanges) -> bool:
 def _discard_local_changes_before_update(
         git_cmd: list[str], cwd: Path, changes: _LocalChanges, *, checkout_move=None) -> None:
     """Delete exactly what would have been stashed: tracked edits and the colliding untracked entries."""
-    from hermes_cli.update_cmd_git import _git_run, _no_move
-    from hermes_cli.update_receipt import record_step
+    from eir_cli.update_cmd_git import _git_run, _no_move
+    from eir_cli.update_receipt import record_step
     with (checkout_move or _no_move)(revert=True):  # every tracked change goes back to HEAD
         if changes.tracked:
             _git_run(git_cmd, ["reset", "--hard", "HEAD"], cwd, check=True)
@@ -217,7 +217,7 @@ def _stash_local_changes_if_needed(
     gateways' tree gate; ``untracked_targets`` scopes untracked files (``_scan_local_changes``).
     ``ask_first`` asks whether to keep them; a "no" discards them instead of stashing (None)."""
     global _pending_autostash
-    from hermes_cli.update_cmd_git import _git_run, _no_move
+    from eir_cli.update_cmd_git import _git_run, _no_move
     _pending_autostash = None
     changes = _scan_local_changes(git_cmd, cwd, untracked_targets)
     if changes is None:
@@ -262,7 +262,7 @@ def _push_stash(git_cmd: list[str], cwd: Path, stash_name: str, prev_stash: str,
     """``git stash push``; the stash commit. Raises when nothing was saved; resets tracked leftovers
     when a push saved everything but could not clean up. Untracked entries in *leave* stay on disk
     (an exclude pathspec: git never hashes them, which is what made a 55 GB stray dir take minutes)."""
-    from hermes_cli.update_cmd_git import _git_run
+    from eir_cli.update_cmd_git import _git_run
     scope = ["--", ".", *(_literal(p, "exclude") for p in leave)] if leave else []
     push = _git_run(git_cmd, ["stash", "push", "--include-untracked", "-m", stash_name, *scope], cwd)
     _print_nonempty(push.stdout)
@@ -274,7 +274,7 @@ def _push_stash(git_cmd: list[str], cwd: Path, stash_name: str, prev_stash: str,
             # No entry created: changes NOT saved — bail before touching HEAD.
             print("✗ Could not stash local changes — update aborted.")
             _print_first_line(push.stderr)
-            print("  Commit, stash, or clean up your local changes manually, then re-run `hermes update`.")
+            print("  Commit, stash, or clean up your local changes manually, then re-run `eir update`.")
             print("  (An index entry from `git add -N` is the usual cause of this error; `git add` the")
             print("   paths it names, or `git reset` them, and the update will proceed.)")
             raise subprocess.CalledProcessError(push.returncode, push.args, output=push.stdout, stderr=push.stderr)
@@ -294,7 +294,7 @@ def _resolve_stash_selector(git_cmd: list[str], cwd: Path, stash_ref: str) -> Op
     (git accepts it wherever ``stash@{N}`` is valid). Never ``stash@{N}`` itself: on native
     Windows the MSYS runtime strips the braces from git.exe's argv, so ``stash@{0}`` reaches git
     as ``stash@0`` and the drop fails (#87542)."""
-    from hermes_cli.update_cmd_git import _git_run
+    from eir_cli.update_cmd_git import _git_run
     stash_list = _git_run(git_cmd, ["stash", "list", "--format=%gd %H"], cwd, check=True)
     for line in stash_list.stdout.splitlines():
         selector, _, commit = line.partition(" ")
@@ -319,7 +319,7 @@ def _unrestored_autostash_notice() -> Optional[str]:
     if _pending_autostash is None:
         return None
     stash_ref, file_count = _pending_autostash
-    return (f"⚠ hermes update stashed {file_count} local modification(s) and did NOT restore them.\n"
+    return (f"⚠ eir update stashed {file_count} local modification(s) and did NOT restore them.\n"
             f"  Stash ref: {stash_ref}\n"
             f"  Review with: git stash show --stat {stash_ref}\n"
             f"  Re-apply with: git stash show -p {stash_ref} | git apply --3way")
@@ -329,14 +329,14 @@ def _warn_orphaned_update_autostashes(git_cmd: list[str], cwd: Path) -> int:
     """Print a notice for update autostashes older than the warn threshold; return the count (0 on any git failure).
 
     Autostashes legitimately outlive a run (--keep-stash, failed restore) but nothing re-surfaces them.
-    Deliberately NOT a GC: a stash may be the only copy of the user's work, so Hermes never drops one.
+    Deliberately NOT a GC: a stash may be the only copy of the user's work, so Eir never drops one.
 
     Autostash entries legitimately outlive an update run (``--keep-stash`` parks them; a conflicted or
     failed restore preserves them for safety), but nothing ever re-surfaces them afterwards — they sit in
     ``git stash`` invisibly for weeks (#63717 problem 6). This prints a short notice naming the stale
     entries with recovery/cleanup guidance.
     """
-    from hermes_cli.update_cmd_git import _git_run
+    from eir_cli.update_cmd_git import _git_run
     try:
         stash_list = _git_run(git_cmd, ["stash", "list", "--format=%gd %s"], cwd)
         if stash_list.returncode != 0:
@@ -382,7 +382,7 @@ def _record_stash_disposition(outcome: str, stash_ref: str, detail: str = "", *,
     global _pending_autostash
     if outcome != "parked" or chosen:
         _pending_autostash = None
-    from hermes_cli.update_receipt import record_step
+    from eir_cli.update_receipt import record_step
     record_step(
         "local_changes_stash",
         outcome != "parked",
@@ -420,7 +420,7 @@ def _untracked_files_replaced_by_update(git_cmd: list[str], cwd: Path, stash_ref
     now tracks its own file there (``HEAD:<path>``) and the tree does not hold the stash's untracked
     copy (``<stash>^3``). An untracked occupant HEAD does not track is the #70127 file that could
     not be deleted at stash time, whatever its content now; it is never the update's."""
-    from hermes_cli.update_custody import run_git
+    from eir_cli.update_custody import run_git
 
     replaced = []
     suffix = " already exists, no checkout"
@@ -462,7 +462,7 @@ def _git_untracked_paths(git_cmd: list[str], cwd: Path) -> set[str] | None:
 
 def _restored_python_paths(git_cmd: list[str], cwd: Path) -> tuple[str, ...] | None:
     """Restored ``.py`` paths changed from ``HEAD``; deliberately Python-only (entry scripts stay outside the health check)."""
-    from hermes_cli.update_cmd import _git_untracked_paths
+    from eir_cli.update_cmd import _git_untracked_paths
     paths = _git_paths_z(git_cmd, ["diff", "--name-only", "-z", "HEAD", "--", "*.py"], cwd)
     if paths is None:
         print("  ⚠ Could not enumerate tracked Python files restored from the stash.")
@@ -526,10 +526,10 @@ def _reject_unsafe_stash_restore(
     detail: str | None, *, checkout_move=None,
 ) -> None:
     """Restore the clean updated tree, preserve the stash, and abort the update."""
-    from hermes_cli.update_cmd import _git_untracked_paths
-    from hermes_cli.update_cmd_git import _no_move
+    from eir_cli.update_cmd import _git_untracked_paths
+    from eir_cli.update_cmd_git import _no_move
     print()
-    print("✗ Restored local changes made the Hermes agent unexecutable.")
+    print("✗ Restored local changes made the Eir agent unexecutable.")
     print(f"  Health check failed: {failing_target}")
     if detail:
         for line in str(detail).splitlines()[:6]:
@@ -567,7 +567,7 @@ def _confirm_restore(stash_ref: str, input_fn) -> bool:
     print()
     print("⚠ Local changes were stashed before updating.")
     print("  Restoring them may reapply local customizations onto the updated codebase.")
-    print("  Review the result afterward if Hermes behaves unexpectedly.")
+    print("  Review the result afterward if Eir behaves unexpectedly.")
     print(f"Restore local changes now? {prompt_suffix}")
     if remote_prompt:
         response = input_fn(f"Restore local changes now? {prompt_suffix}", "n")
@@ -588,7 +588,7 @@ def _apply_stash(git_cmd: list[str], cwd: Path, stash_ref: str, checkout_move=No
     """``git stash apply``; the untracked paths the update replaced (empty on a full restore), or
     None (tree reset, stash kept) on conflicts or any failure other than the already-exists class.
     ``checkout_move`` binds the apply (and a conflict's reset) to the paused gateways' tree gate."""
-    from hermes_cli.update_cmd_git import _no_move
+    from eir_cli.update_cmd_git import _no_move
     print("→ Restoring local changes...")
     with (checkout_move or _no_move)(stash_ref) as step:
         restore, conflicted_files = _apply_stash_step(git_cmd, cwd, stash_ref)
@@ -623,9 +623,9 @@ def _apply_stash(git_cmd: list[str], cwd: Path, stash_ref: str, checkout_move=No
 
 def _apply_stash_step(git_cmd: list[str], cwd: Path, stash_ref: str):
     """``git stash apply`` and its conflicted paths. Any failure but the already-exists class is
-    reset to the clean tree here, inside the bound step: conflict markers make hermes unrunnable,
+    reset to the clean tree here, inside the bound step: conflict markers make eir unrunnable,
     and the changes stay in the stash."""
-    from hermes_cli.update_cmd_git import _git_run
+    from eir_cli.update_cmd_git import _git_run
     restore = _git_run(git_cmd, ["stash", "apply", stash_ref], cwd)
     unmerged = _git_run(git_cmd, ["diff", "--name-only", "--diff-filter=U"], cwd)  # conflicts can exist even on rc 0
     conflicted_files = unmerged.stdout.strip()
@@ -636,16 +636,16 @@ def _apply_stash_step(git_cmd: list[str], cwd: Path, stash_ref: str):
 
 
 def _drop_restored_stash(git_cmd: list[str], cwd: Path, stash_ref: str) -> None:
-    from hermes_cli.update_cmd_git import _git_run
+    from eir_cli.update_cmd_git import _git_run
     stash_selector = _resolve_stash_selector(git_cmd, cwd, stash_ref)
     if stash_selector is None:
-        print("⚠ Local changes were restored, but Hermes couldn't find the stash entry to drop.")
+        print("⚠ Local changes were restored, but Eir couldn't find the stash entry to drop.")
         print(_STASH_LEFT_IN_PLACE)
         _print_stash_cleanup_guidance(stash_ref)
         return
     drop = _git_run(git_cmd, ["stash", "drop", stash_selector], cwd)
     if drop.returncode != 0:
-        print("⚠ Local changes were restored, but Hermes couldn't drop the saved stash entry.")
+        print("⚠ Local changes were restored, but Eir couldn't drop the saved stash entry.")
         _print_nonempty(drop.stdout)
         _print_nonempty(drop.stderr)
         print(_STASH_LEFT_IN_PLACE)
@@ -656,7 +656,7 @@ def _restore_stashed_changes(
     git_cmd: list[str], cwd: Path, stash_ref: str, prompt_user: bool = False, input_fn=None, *,
     checkout_move=None,
 ) -> bool:
-    from hermes_cli.update_cmd import _critical_module_import_failures, _git_untracked_paths, _restored_python_paths, _validate_python_files_syntax
+    from eir_cli.update_cmd import _critical_module_import_failures, _git_untracked_paths, _restored_python_paths, _validate_python_files_syntax
     if prompt_user and not _confirm_restore(stash_ref, input_fn):
         _record_stash_disposition("parked", stash_ref, "restore declined", chosen=True)
         return False
@@ -704,7 +704,7 @@ def _restore_stashed_changes(
     _drop_restored_stash(git_cmd, cwd, stash_ref)
     _record_stash_disposition("restored", stash_ref)
     print("⚠ Local changes were restored on top of the updated codebase.")
-    print("  Review `git diff` / `git status` if Hermes behaves unexpectedly.")
+    print("  Review `git diff` / `git status` if Eir behaves unexpectedly.")
     return True
 
 
@@ -714,18 +714,18 @@ def _discard_stashed_changes(git_cmd: list[str], cwd: Path, stash_ref: str) -> b
     Unlike reset --hard + clean -fd this touches only what was stashed; ignored paths are never affected.
     Returns True if dropped, False on git failure (stash left in place).
     """
-    from hermes_cli.update_cmd_git import _git_run
+    from eir_cli.update_cmd_git import _git_run
     stash_selector = _resolve_stash_selector(git_cmd, cwd, stash_ref)
     if stash_selector is None:
         print(
             "⚠ Configured to discard local changes on non-interactive update, "
-            "but Hermes couldn't find the stash entry to drop."
+            "but Eir couldn't find the stash entry to drop."
         )
         _print_stash_cleanup_guidance(stash_ref)
         return False
     drop = _git_run(git_cmd, ["stash", "drop", stash_selector], cwd)
     if drop.returncode != 0:
-        print("⚠ Configured to discard local changes, but Hermes couldn't drop the saved stash entry.")
+        print("⚠ Configured to discard local changes, but Eir couldn't drop the saved stash entry.")
         _print_first_line(drop.stderr)
         _print_stash_cleanup_guidance(stash_ref, stash_selector)
         _record_stash_disposition("parked", stash_ref, "configured discard failed")

@@ -20,8 +20,8 @@ from pathlib import Path
 
 import pytest
 
-import hermes_cli.sqlite_safe_read as sr
-from hermes_cli.sqlite_safe_read import (
+import eir_cli.sqlite_safe_read as sr
+from eir_cli.sqlite_safe_read import (
     LiveConnectionError,
     connect_tracked,
     has_live_connection,
@@ -339,7 +339,7 @@ def test_exit_with_a_leaked_connection_is_clean(tmp_path):
     sqlite3.connect(db).close()
     script = textwrap.dedent("""
         import gc, sqlite3, sys, threading, time
-        import hermes_cli.sqlite_safe_read as sr
+        import eir_cli.sqlite_safe_read as sr
         gc.disable()
         db, other = sys.argv[1], sys.argv[2]
         class Holder: pass

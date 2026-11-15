@@ -11,7 +11,7 @@ from agent.secret_sources.base import (
     FetchResult,
     SecretSource,
 )
-from hermes_cli.plugins import PluginManager
+from eir_cli.plugins import PluginManager
 
 
 class _StubSource(SecretSource):
@@ -43,11 +43,11 @@ def test_refresh_secret_sources_noop_without_plugin_sources(monkeypatch):
 
     monkeypatch.setattr(reg, "list_plugin_sources", list)
     monkeypatch.setattr(
-        "hermes_cli.env_loader.reset_secret_source_cache",
+        "eir_cli.env_loader.reset_secret_source_cache",
         lambda *a, **kw: called.__setitem__("reset", called["reset"] + 1),
     )
     monkeypatch.setattr(
-        "hermes_cli.env_loader.load_hermes_dotenv",
+        "eir_cli.env_loader.load_eir_dotenv",
         lambda **kw: called.__setitem__("load", called["load"] + 1),
     )
 
@@ -65,15 +65,15 @@ def test_refresh_secret_sources_noop_when_only_builtins(monkeypatch):
     reg._reset_registry_for_tests()
     assert reg.list_plugin_sources() == []
     monkeypatch.setattr(
-        "hermes_cli.config.load_config",
+        "eir_cli.config.load_config",
         lambda: {"secrets": {"bitwarden": {"enabled": True}}},
     )
     monkeypatch.setattr(
-        "hermes_cli.env_loader.reset_secret_source_cache",
+        "eir_cli.env_loader.reset_secret_source_cache",
         lambda *a, **kw: called.__setitem__("reset", called["reset"] + 1),
     )
     monkeypatch.setattr(
-        "hermes_cli.env_loader.load_hermes_dotenv",
+        "eir_cli.env_loader.load_eir_dotenv",
         lambda **kw: called.__setitem__("load", called["load"] + 1),
     )
 
@@ -89,15 +89,15 @@ def test_refresh_secret_sources_repulls_when_plugin_enabled(monkeypatch):
 
     monkeypatch.setattr(reg, "list_plugin_sources", lambda: [_StubSource()])
     monkeypatch.setattr(
-        "hermes_cli.config.load_config",
+        "eir_cli.config.load_config",
         lambda: {"secrets": {"myvault": {"enabled": True}}},
     )
     monkeypatch.setattr(
-        "hermes_cli.env_loader.reset_secret_source_cache",
+        "eir_cli.env_loader.reset_secret_source_cache",
         lambda *a, **kw: called.__setitem__("reset", called["reset"] + 1),
     )
     monkeypatch.setattr(
-        "hermes_cli.env_loader.load_hermes_dotenv",
+        "eir_cli.env_loader.load_eir_dotenv",
         lambda **kw: called.__setitem__("load", called["load"] + 1),
     )
 
@@ -117,15 +117,15 @@ def test_refresh_respects_custom_is_enabled(monkeypatch):
     )
     # No `enabled` key at all — only the source's custom contract decides.
     monkeypatch.setattr(
-        "hermes_cli.config.load_config",
+        "eir_cli.config.load_config",
         lambda: {"secrets": {"myvault": {"vault_id": "abc123"}}},
     )
     monkeypatch.setattr(
-        "hermes_cli.env_loader.reset_secret_source_cache",
+        "eir_cli.env_loader.reset_secret_source_cache",
         lambda *a, **kw: called.__setitem__("reset", called["reset"] + 1),
     )
     monkeypatch.setattr(
-        "hermes_cli.env_loader.load_hermes_dotenv",
+        "eir_cli.env_loader.load_eir_dotenv",
         lambda **kw: called.__setitem__("load", called["load"] + 1),
     )
 
@@ -144,15 +144,15 @@ def test_refresh_skips_custom_source_when_not_activated(monkeypatch):
     )
     # `enabled: true` but the custom contract ignores it and requires vault_id.
     monkeypatch.setattr(
-        "hermes_cli.config.load_config",
+        "eir_cli.config.load_config",
         lambda: {"secrets": {"myvault": {"enabled": True}}},
     )
     monkeypatch.setattr(
-        "hermes_cli.env_loader.reset_secret_source_cache",
+        "eir_cli.env_loader.reset_secret_source_cache",
         lambda *a, **kw: called.__setitem__("reset", called["reset"] + 1),
     )
     monkeypatch.setattr(
-        "hermes_cli.env_loader.load_hermes_dotenv",
+        "eir_cli.env_loader.load_eir_dotenv",
         lambda **kw: called.__setitem__("load", called["load"] + 1),
     )
 
@@ -172,15 +172,15 @@ def test_refresh_skips_source_whose_is_enabled_raises(monkeypatch):
 
     monkeypatch.setattr(reg, "list_plugin_sources", lambda: [_Boom()])
     monkeypatch.setattr(
-        "hermes_cli.config.load_config",
+        "eir_cli.config.load_config",
         lambda: {"secrets": {"myvault": {"enabled": True}}},
     )
     monkeypatch.setattr(
-        "hermes_cli.env_loader.reset_secret_source_cache",
+        "eir_cli.env_loader.reset_secret_source_cache",
         lambda *a, **kw: called.__setitem__("reset", called["reset"] + 1),
     )
     monkeypatch.setattr(
-        "hermes_cli.env_loader.load_hermes_dotenv",
+        "eir_cli.env_loader.load_eir_dotenv",
         lambda **kw: called.__setitem__("load", called["load"] + 1),
     )
 
@@ -193,11 +193,11 @@ def test_refresh_skips_source_whose_is_enabled_raises(monkeypatch):
 def test_real_plugin_source_discovery_applies_dotenv(monkeypatch, tmp_path):
     """A cold process discovers a real plugin and applies its credential."""
     import agent.secret_sources.registry as reg
-    from hermes_cli import env_loader
+    from eir_cli import env_loader
 
     reg._reset_registry_for_tests()
     env_loader.reset_secret_source_cache()
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     plugin_dir = home / "plugins" / "fixture-secret-source"
     plugin_dir.mkdir(parents=True)
     (home / "config.yaml").write_text(
@@ -224,25 +224,25 @@ def test_real_plugin_source_discovery_applies_dotenv(monkeypatch, tmp_path):
         "    shape = 'bulk'\n\n"
         "    def fetch(self, cfg: dict, home_path: Path) -> FetchResult:\n"
         "        return FetchResult(secrets={\n"
-        "            'HERMES_TEST_PLUGIN_BOOTSTRAP': 'from-plugin',\n"
+        "            'EIR_TEST_PLUGIN_BOOTSTRAP': 'from-plugin',\n"
         "        })\n\n"
         "def register(ctx):\n"
         "    ctx.register_secret_source(FixtureVault())\n",
         encoding="utf-8",
     )
 
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.delenv("HERMES_TEST_PLUGIN_BOOTSTRAP", raising=False)
+    monkeypatch.setenv("EIR_HOME", str(home))
+    monkeypatch.delenv("EIR_TEST_PLUGIN_BOOTSTRAP", raising=False)
 
     try:
         PluginManager().discover_and_load()
 
-        assert os.environ["HERMES_TEST_PLUGIN_BOOTSTRAP"] == "from-plugin"
+        assert os.environ["EIR_TEST_PLUGIN_BOOTSTRAP"] == "from-plugin"
         assert [source.name for source in reg.list_plugin_sources()] == [
             "fixturevault"
         ]
     finally:
-        os.environ.pop("HERMES_TEST_PLUGIN_BOOTSTRAP", None)
+        os.environ.pop("EIR_TEST_PLUGIN_BOOTSTRAP", None)
         reg._reset_registry_for_tests()
         env_loader.reset_secret_source_cache()
 
@@ -284,17 +284,17 @@ def test_removing_the_last_plugin_source_revokes_its_process_env_value(
     has its own view disturbed by the revocation."""
     import agent.secret_sources.registry as reg
     from agent.secret_scope import get_secret
-    from hermes_cli import env_loader
-    from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+    from eir_cli import env_loader
+    from eir_constants import reset_eir_home_override, set_eir_home_override
 
     reg._reset_registry_for_tests()
     env_loader.reset_secret_source_cache()
-    home_a = tmp_path / "a" / ".hermes"
-    home_b = tmp_path / "b" / ".hermes"
+    home_a = tmp_path / "a" / ".eir"
+    home_b = tmp_path / "b" / ".eir"
     _write_plugin_home(home_a, plugin_enabled=True)
     home_b.mkdir(parents=True)
     (home_b / ".env").write_text("SIBLING_ONLY=sibling\n", encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(home_a))
+    monkeypatch.setenv("EIR_HOME", str(home_a))
     monkeypatch.delenv("REVIEW_PLUGIN_SECRET", raising=False)
 
     try:
@@ -304,11 +304,11 @@ def test_removing_the_last_plugin_source_revokes_its_process_env_value(
         assert get_secret("REVIEW_PLUGIN_SECRET") == "from-plugin"
 
         # B: a sibling profile's activity in between does not touch A's record or value.
-        token = set_hermes_home_override(str(home_b))
+        token = set_eir_home_override(str(home_b))
         try:
             env_loader.hydrate_profile_secret_sources(home_b)
         finally:
-            reset_hermes_home_override(token)
+            reset_eir_home_override(token)
         assert os.environ["REVIEW_PLUGIN_SECRET"] == "from-plugin"
 
         if replaced_by_other_owner:

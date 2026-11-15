@@ -14,7 +14,7 @@ from __future__ import annotations
 import html
 from urllib.parse import quote, urlencode
 
-from hermes_cli.dashboard_auth import list_interactive_providers, list_session_providers
+from eir_cli.dashboard_auth import list_interactive_providers, list_session_providers
 
 # Single curly braces are ``str.format`` placeholders; CSS curlies are doubled.
 _LOGIN_HTML_TEMPLATE = """\
@@ -23,7 +23,7 @@ _LOGIN_HTML_TEMPLATE = """\
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sign in — Hermes Agent</title>
+<title>Sign in — Eir Agent</title>
 <style>
   /* Brand fonts shipped by @nous-research/ui — same files the SPA loads. */
   @font-face {{
@@ -290,7 +290,7 @@ _LOGIN_HTML_TEMPLATE = """\
   <div class="brand">Nous<span class="dot"></span>Research</div>
   <div class="card">
     <h1>Sign in</h1>
-    <p class="subtitle">Choose a sign-in method to continue to the Hermes Agent dashboard.</p>
+    <p class="subtitle">Choose a sign-in method to continue to the Eir Agent dashboard.</p>
     <div class="provider-list">
 {provider_buttons}
     </div>
@@ -310,7 +310,7 @@ _EMPTY_HTML = """\
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sign-in unavailable — Hermes Agent</title>
+<title>Sign-in unavailable — Eir Agent</title>
 <style>
   @font-face {
     font-family: 'Collapse';
@@ -397,7 +397,7 @@ _TOKEN_MODE_HTML = """\
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Token-gated dashboard — Hermes Agent</title>
+<title>Token-gated dashboard — Eir Agent</title>
 <style>
   :root {
     --background-base: #170d02;
@@ -522,7 +522,7 @@ def render_login_html(*, next_path: str = "", prefix: str = "") -> str:
     HTML-escaped here as defence in depth.
 
     ``prefix`` — when set, the path prefix from ``X-Forwarded-Prefix``
-    (e.g. ``"/hermes"``). Prepended to all auth URLs so the login page
+    (e.g. ``"/eir"``). Prepended to all auth URLs so the login page
     works behind a reverse proxy that mounts the dashboard at a
     sub-path. Empty string (default) means no prefix — bare-root
     deploys are unaffected.
@@ -545,7 +545,7 @@ def render_login_html(*, next_path: str = "", prefix: str = "") -> str:
                 .replace("{note}",
                          "Clients authenticate with the deployment&rsquo;s provisioned "
                          "credential (<code>Authorization: Bearer</code>, or "
-                         "<code>?token=</code> on the /api/ws upgrade) &mdash; e.g. Hermes "
+                         "<code>?token=</code> on the /api/ws upgrade) &mdash; e.g. Eir "
                          "Desktop&rsquo;s &ldquo;Session token&rdquo; remote-gateway field. "
                          "There is no browser sign-in flow."))
     buttons = [
@@ -622,7 +622,7 @@ def _render_password_form(provider, next_path: str, *, prefix: str = "") -> str:
     HTML-escaped here). The provider name is a ``data-`` attribute so the
     script does not depend on field ordering.
 
-    ``prefix`` — reverse-proxy path prefix (e.g. ``"/hermes"``); kept for
+    ``prefix`` — reverse-proxy path prefix (e.g. ``"/eir"``); kept for
     interface parity with the other renderers (the submit handler reads
     the prefix from ``<main data-prefix>``).
     """

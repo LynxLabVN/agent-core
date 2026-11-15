@@ -8,14 +8,14 @@ from pathlib import Path
 
 import pytest
 
-from hermes_cli import kanban_db as kb
-from hermes_cli import kanban_db_connect as kbc
-from hermes_cli import kanban_ops
+from eir_cli import kanban_db as kb
+from eir_cli import kanban_db_connect as kbc
+from eir_cli import kanban_ops
 
 @pytest.fixture
 def board(tmp_path, monkeypatch):
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes"))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path / "eir"))
     return tmp_path
 
 def _done_task_with_old_event(conn):
@@ -102,7 +102,7 @@ def test_slash_kanban_gc_retention_bounds(board, days, expected):
     shell command: ``-1`` is rejected by the parser type before ``_cmd_gc``
     runs (usage error); ``0`` parses, reaches ``_cmd_gc``, and disables the
     sweep."""
-    from hermes_cli import kanban
+    from eir_cli import kanban
     with kbc.connect_closing() as conn:
         tid = _done_task_with_old_event(conn)
     log = _old_log_file()
@@ -161,7 +161,7 @@ def _deferred_reasons(conn, task_id: str) -> list:
 
 
 def test_cmd_gc_keeps_a_scratch_dir_a_live_task_still_uses(board):
-    from hermes_cli import kanban_db_workspace as kbw
+    from eir_cli import kanban_db_workspace as kbw
 
     with kbc.connect_closing() as conn:
         archived, _live, shared = _shared_scratch(conn)
@@ -178,7 +178,7 @@ def test_cmd_gc_keeps_a_scratch_dir_a_live_task_still_uses(board):
 
 def test_cleanup_workspace_keeps_scratch_when_other_boards_cannot_be_listed(board, monkeypatch):
     """A named board's live task uses the dir; if boards cannot be listed, refuse the delete."""
-    from hermes_cli import kanban_db_workspace as kbw
+    from eir_cli import kanban_db_workspace as kbw
 
     kb.create_board("other")
     shared = kb.workspaces_root() / "cross-board"

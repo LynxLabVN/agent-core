@@ -10,11 +10,11 @@ import re
 from fastapi import HTTPException
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
-from hermes_cli.config import cfg_get
-from hermes_cli.web_models import CronJobCreate
+from eir_cli.config import cfg_get
+from eir_cli.web_models import CronJobCreate
 
 # Same logger the code used before extraction (record parity).
-_log = logging.getLogger("hermes_cli.web_server")
+_log = logging.getLogger("eir_cli.web_server")
 
 
 def _cron_optional_text(value: Any, *, strip_trailing_slash: bool = False) -> Optional[str]:
@@ -102,7 +102,7 @@ def _validate_dashboard_cron_security(
     OWNING profile's config+secret scope: the launch profile's same-named provider
     must not vouch for an endpoint that would receive another profile's key.
     """
-    from hermes_cli.web_server_profiles import _config_profile_scope
+    from eir_cli.web_server_profiles import _config_profile_scope
     from tools.cronjob_job_args import (
         _normalize_deliver_param, _validate_bot_chat_deliver, _validate_cron_base_url)
     from tools.cronjob_prompt_scan import _scan_cron_prompt
@@ -145,8 +145,8 @@ def _validate_dashboard_cron_context_from(refs: Optional[list[str]], profile_nam
 def _cron_profile_dicts() -> list[dict[str, Any]]:
     """Minimal profile records (callers only consume ``name``); avoids ``list_profiles()``,
     whose config parsing, gateway probes and skill counts are GIL pressure on large pools."""
-    from hermes_cli.web_server_profiles import _fallback_profile_dicts
-    from hermes_cli import profiles as profiles_mod
+    from eir_cli.web_server_profiles import _fallback_profile_dicts
+    from eir_cli import profiles as profiles_mod
     try:
         return [
             {"name": name, "path": str(home), "is_default": name == "default"}
@@ -161,11 +161,11 @@ def _cron_default_profile() -> str:
 
     A desktop pool backend runs one process per profile, but these endpoints route storage through
     the profiles tree via ``_cron_profile_home`` — a hardcoded "default" would write a non-default
-    profile's job into ~/.hermes. ``custom`` (HERMES_HOME outside the profiles tree) has no
+    profile's job into ~/.eir. ``custom`` (EIR_HOME outside the profiles tree) has no
     profile-dir equivalent, so it keeps the legacy "default" fallback.
     """
     try:
-        from hermes_cli.profiles import get_active_profile_name
+        from eir_cli.profiles import get_active_profile_name
         name = get_active_profile_name()
     except Exception:
         return "default"
@@ -173,8 +173,8 @@ def _cron_default_profile() -> str:
 
 
 def _cron_profile_home(profile: Optional[str]) -> tuple[str, Path]:
-    """Resolve a profile query value to (profile_name, HERMES_HOME)."""
-    from hermes_cli import profiles as profiles_mod
+    """Resolve a profile query value to (profile_name, EIR_HOME)."""
+    from eir_cli import profiles as profiles_mod
     raw = (profile or _cron_default_profile()).strip() or "default"
     try:
         canon = profiles_mod.normalize_profile_name(raw)
@@ -193,7 +193,7 @@ def _annotate_cron_job(
         **job,
         "profile": profile,
         "profile_name": profile,
-        "hermes_home": str(home),
+        "eir_home": str(home),
         "is_default_profile": profile == "default",
         # Seconds since this profile's ticker last iterated (None = never/unknown): a
         # `next_run_at` parked in the past is only explained by a scheduler that stopped
@@ -203,19 +203,19 @@ def _annotate_cron_job(
 
 @contextlib.contextmanager
 def _cron_store_scope(home: Path):
-    """Point HERMES_HOME and the cron.jobs store at one profile's home for the block.
+    """Point EIR_HOME and the cron.jobs store at one profile's home for the block.
 
     The dashboard is a single process inspecting many profiles; cron.jobs' execution-context
     override keeps these calls from retargeting a concurrent desktop ticker's load/save.
     """
     from cron import jobs as cron_jobs
-    from hermes_constants import reset_hermes_home_override, set_hermes_home_override
-    token = set_hermes_home_override(str(home))
+    from eir_constants import reset_eir_home_override, set_eir_home_override
+    token = set_eir_home_override(str(home))
     try:
         with cron_jobs.use_cron_store(home):
             yield cron_jobs
     finally:
-        reset_hermes_home_override(token)
+        reset_eir_home_override(token)
 
 
 def _call_cron_for_profile(target_profile: Optional[str], func_name: str, *args, **kwargs):
@@ -408,31 +408,31 @@ def _gateway_listener(profile: str, home: Path) -> tuple[bool, str, Path]:
     try:
         # The live default gateway's own record, else the explicit flag — never the merged default:
         # an unset gateway.multiplex_profiles is settled by the gateway at boot, not by this process.
-        from hermes_cli.gateway_multiplex_mode import default_gateway_multiplexes
+        from eir_cli.gateway_multiplex_mode import default_gateway_multiplexes
         multiplex = default_gateway_multiplexes()
     except Exception:  # health: allow BLE001 -- moved from _gateway_fire_endpoint; detection must never fail a request
         _log.debug("gateway api_server: multiplex detection failed; assuming single-profile", exc_info=True)
     if multiplex and profile != "default":
-        from hermes_constants import get_default_hermes_root
+        from eir_constants import get_default_eir_root
         _log.info(
             "gateway api_server: multiplex gateway; %s is served by the default profile's "
             "listener", profile)
-        return True, "default", get_default_hermes_root()
+        return True, "default", get_default_eir_root()
     return multiplex, profile, home
 
 
 def _listener_api_server_extra(listener_home: Path) -> dict:
     """``platforms.api_server.extra`` of the listener profile's config ({} when unreadable)."""
-    from hermes_cli.config import load_config
+    from eir_cli.config import load_config
     try:
         # Profile-scoped read through the CANONICAL loader (managed-scope overlay, ${ENV_VAR}
-        # expansion) — never a raw yaml.safe_load (tests/hermes_cli/test_config_read_guard.py).
-        from hermes_constants import reset_hermes_home_override, set_hermes_home_override
-        token = set_hermes_home_override(str(listener_home))
+        # expansion) — never a raw yaml.safe_load (tests/eir_cli/test_config_read_guard.py).
+        from eir_constants import reset_eir_home_override, set_eir_home_override
+        token = set_eir_home_override(str(listener_home))
         try:
             profile_cfg = load_config()
         finally:
-            reset_hermes_home_override(token)
+            reset_eir_home_override(token)
         extra = cfg_get(profile_cfg, "platforms", "api_server", "extra", default=None)
         return extra if isinstance(extra, dict) else {}
     except Exception:  # health: allow BLE001 -- moved from _gateway_fire_endpoint; unreadable config falls back to env
@@ -461,7 +461,7 @@ def _gateway_api_target(profile: str, home: Path) -> tuple[str, str]:
     multiplex, listener_profile, listener_home = listener
     extra = _listener_api_server_extra(listener_home)
     base = _listener_base(profile, listener, extra)
-    from hermes_cli.auth import has_usable_secret
+    from eir_cli.auth import has_usable_secret
     if multiplex and profile != "default":
         # The secret mapping the gateway binds for this profile's requests (its .env plus external
         # secret sources and managed env), which ``_expected_api_key`` reads through get_secret.
@@ -485,7 +485,7 @@ def _listener_base(profile: str, listener: tuple[bool, str, Path], extra: dict) 
     (the adapter's own fallback), then 8642. Loopback is safe: dashboard and gateway share a
     network namespace in every supported deployment.
     """
-    from hermes_cli.auth import has_usable_secret
+    from eir_cli.auth import has_usable_secret
     multiplex, listener_profile, listener_home = listener
     try:
         configured = int(extra.get("port") or 0)

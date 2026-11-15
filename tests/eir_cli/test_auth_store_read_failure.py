@@ -15,7 +15,7 @@ import json
 
 import pytest
 
-from hermes_cli import auth
+from eir_cli import auth
 
 @pytest.fixture
 def store_file(tmp_path):

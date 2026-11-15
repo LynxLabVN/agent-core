@@ -1,6 +1,6 @@
-"""Helpers shared by the Bitwarden and 1Password ``hermes secrets`` CLIs.
+"""Helpers shared by the Bitwarden and 1Password ``eir secrets`` CLIs.
 
-Import-light on purpose: ``hermes_cli.secrets_cli`` must stay free of the Bitwarden backend
+Import-light on purpose: ``eir_cli.secrets_cli`` must stay free of the Bitwarden backend
 (``cryptography``) at import time, so nothing here touches a secret-source backend.
 """
 
@@ -19,8 +19,8 @@ from rich.markup import escape as _escape_markup
 from rich.panel import Panel
 from rich.table import Table
 
-from hermes_cli.config import load_config, save_config
-from hermes_cli.secret_prompt import masked_secret_prompt
+from eir_cli.config import load_config, save_config
+from eir_cli.secret_prompt import masked_secret_prompt
 
 
 _CONTROL_CHARS_RE = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
@@ -75,7 +75,7 @@ def require_enabled(console: Console, cfg: dict, product: str, command: str) -> 
     if cfg.get("enabled"):
         return True
     console.print(f"[yellow]{product} integration is disabled.  Run "
-                  f"`hermes secrets {command} setup` first.[/yellow]")
+                  f"`eir secrets {command} setup` first.[/yellow]")
     return False
 
 
@@ -157,7 +157,7 @@ def rotate_token(
     os.environ[token_env] = token
     clear_caches()
     console.print(f"[green]✓[/green] stored in {env_path()} as {token_env}.  "
-                  "Takes effect on the next Hermes invocation.")
+                  "Takes effect on the next Eir invocation.")
     if disabled_note:
         console.print(disabled_note)
     return 0

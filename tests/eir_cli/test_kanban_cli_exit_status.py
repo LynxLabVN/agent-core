@@ -12,23 +12,23 @@ from pathlib import Path
 ROOT = Path(__file__).parents[2]
 
 
-def _run_hermes(home: Path, *args: str, marker: bool = False) -> subprocess.CompletedProcess[str]:
+def _run_eir(home: Path, *args: str, marker: bool = False) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
-    env["HERMES_HOME"] = str(home)
-    env["HERMES_KANBAN_HOME"] = str(home)
+    env["EIR_HOME"] = str(home)
+    env["EIR_KANBAN_HOME"] = str(home)
     for name in (
-        "HERMES_KANBAN_BOARD",
-        "HERMES_KANBAN_DB",
-        "HERMES_KANBAN_WORKSPACES_ROOT",
+        "EIR_KANBAN_BOARD",
+        "EIR_KANBAN_DB",
+        "EIR_KANBAN_WORKSPACES_ROOT",
     ):
         env.pop(name, None)
     env["PYTHONPATH"] = str(ROOT) + os.pathsep + env.get("PYTHONPATH", "")
     if marker:
-        env["HERMES_DELEGATED_CHILD_CONTEXT"] = "1"
+        env["EIR_DELEGATED_CHILD_CONTEXT"] = "1"
     else:
-        env.pop("HERMES_DELEGATED_CHILD_CONTEXT", None)
+        env.pop("EIR_DELEGATED_CHILD_CONTEXT", None)
     return subprocess.run(
-        [sys.executable, "-m", "hermes_cli.main", *args],
+        [sys.executable, "-m", "eir_cli.main", *args],
         cwd=ROOT,
         env=env,
         capture_output=True,
@@ -40,14 +40,14 @@ def _run_hermes(home: Path, *args: str, marker: bool = False) -> subprocess.Comp
 
 def test_delegated_child_kanban_cli_refusal_returns_nonzero_exit_status(tmp_path):
     """A printed Kanban mutation refusal must not look like CLI success."""
-    home = tmp_path / "hermes"
+    home = tmp_path / "eir"
     home.mkdir()
 
-    created = _run_hermes(home, "kanban", "create", "exit status probe", "--json")
+    created = _run_eir(home, "kanban", "create", "exit status probe", "--json")
     assert created.returncode == 0, created.stderr
     task_id = json.loads(created.stdout)["id"]
 
-    refused = _run_hermes(
+    refused = _run_eir(
         home,
         "kanban",
         "comment",

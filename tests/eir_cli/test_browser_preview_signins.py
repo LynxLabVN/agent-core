@@ -1,4 +1,4 @@
-"""``hermes browser export-signins``: the pipe Desktop reads the real-profile browser's cookies from."""
+"""``eir browser export-signins``: the pipe Desktop reads the real-profile browser's cookies from."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import threading
 
 import pytest
 
-from hermes_cli import browser_preview_signins as signins
+from eir_cli import browser_preview_signins as signins
 
 COOKIES = [
     {"name": "sid", "value": "s3cret", "domain": "app.test", "path": "/", "httpOnly": True, "secure": True,
@@ -87,4 +87,4 @@ def test_refuses_to_print_cookie_values_to_a_terminal(monkeypatch, capsys):
     code, out = _run(monkeypatch, tty=True)
 
     assert code == 2 and out == ""
-    assert "Hermes Desktop" in capsys.readouterr().err
+    assert "Eir Desktop" in capsys.readouterr().err

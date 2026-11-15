@@ -7,10 +7,10 @@ Port of ``apps/desktop/electron/remote-update-marker-programs.ts`` (``REMOTE_MAR
 malformed => UNCERTAIN. Only the remote's system ``python3`` runs it, so nothing imports the
 checkout an updater may be replacing.
 
-Usage on the remote: ``python3 -c GATE <marker> [payload] [hermes...]`` (or the program on stdin
+Usage on the remote: ``python3 -c GATE <marker> [payload] [eir...]`` (or the program on stdin
 after ``python3 -``). It holds ``<marker>.lock`` for a bounded 10 s, judges the marker, unlinks a
 dead claim only while the install's checkout lock is free (HELD otherwise), then prints the verdict
-(no payload) or runs the payload as ``sh -c payload hermes-update-mutex <fd>`` still holding the
+(no payload) or runs the payload as ``sh -c payload eir-update-mutex <fd>`` still holding the
 lock; a refused payload exits 75 with the verdict on stderr.
 """
 
@@ -126,8 +126,8 @@ def read_marker():
     except FileNotFoundError:return None
 
 def checkout_lock(root):
-    # hermes_cli/update_lock.py::checkout_lock_path: <git common dir>/hermes-update.lock, else <root>/.hermes-update.lock.
-    plain=os.path.join(root,'.hermes-update.lock');dot=os.path.join(root,'.git')
+    # eir_cli/update_lock.py::checkout_lock_path: <git common dir>/eir-update.lock, else <root>/.eir-update.lock.
+    plain=os.path.join(root,'.eir-update.lock');dot=os.path.join(root,'.git')
     try:
         if os.path.isdir(dot):gitdir=dot
         elif os.path.isfile(dot):
@@ -139,12 +139,12 @@ def checkout_lock(root):
         if os.path.isfile(common):
             with open(common,encoding='utf-8-sig') as stream:gitdir=os.path.join(gitdir,stream.read().strip())
     except (OSError,ValueError):return plain
-    return os.path.join(os.path.normpath(gitdir),'hermes-update.lock')
+    return os.path.join(os.path.normpath(gitdir),'eir-update.lock')
 
 def checkout_held():
     # update_lock.checkout_lock_held: take the flock for one try and drop it. A lock file that
     # exists but cannot be opened or probed counts as held: reclaim needs a provably free checkout.
-    roots=[os.path.join(os.path.dirname(marker),'hermes-agent')]
+    roots=[os.path.join(os.path.dirname(marker),'eir-agent')]
     roots+=[os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(os.path.expanduser(exe))))) for exe in sys.argv[3:] if exe]
     for root in roots:
         try:lock=os.open(checkout_lock(root),os.O_RDONLY|os.O_CLOEXEC)
@@ -168,5 +168,5 @@ if hold(fd):
             except FileNotFoundError:pass
 if payload is None or verdict!='CLEAR':
     print(verdict,file=sys.stderr if payload else sys.stdout);sys.exit(75 if payload else 0)
-sys.exit(subprocess.run(['sh','-c',payload,'hermes-update-mutex',str(fd)],pass_fds=(fd,)).returncode)
+sys.exit(subprocess.run(['sh','-c',payload,'eir-update-mutex',str(fd)],pass_fds=(fd,)).returncode)
 '''

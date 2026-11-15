@@ -1,6 +1,6 @@
 """The ``api_content`` sidecar backfill writers for SessionDB (#124102 FILE_LINES split).
 
-Split out of :mod:`hermes_state_messages`: the two row-addressed sidecar UPDATEs the turn prologue
+Split out of :mod:`eir_state_messages`: the two row-addressed sidecar UPDATEs the turn prologue
 uses when the current turn's user row was materialized before the sidecar could be composed. Bound
 into ``SessionDB`` via this mixin, so every existing ``session_db.set_message_api_content(...)``
 call site and test patch seam keeps working unchanged.
@@ -31,7 +31,7 @@ class SessionApiContentMixin:
         :meth:`_insert_message_rows`), use :meth:`set_message_api_content`
         instead — it addresses the exact row and cannot land on a neighbour.
         """
-        from hermes_state_messages import _scrub_surrogates
+        from eir_state_messages import _scrub_surrogates
         return self._write_rowcount(
             "UPDATE messages SET api_content = ? WHERE id = (SELECT id FROM messages "
             "WHERE session_id = ? AND role = 'user' AND active = 1 ORDER BY id DESC LIMIT 1"
@@ -58,7 +58,7 @@ class SessionApiContentMixin:
         row the compaction archived, or one a racing rewrite changed, is left
         untouched.
         """
-        from hermes_state_messages import _scrub_surrogates
+        from eir_state_messages import _scrub_surrogates
         if not session_id or isinstance(row_id, bool) or not isinstance(row_id, int) or row_id <= 0:
             return 0
         return self._write_rowcount(

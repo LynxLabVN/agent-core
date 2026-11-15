@@ -12,10 +12,10 @@ import pytest
 
 
 @pytest.fixture
-def hermes_home(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+def eir_home(tmp_path, monkeypatch):
+    home = tmp_path / ".eir"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     return home
 
 
@@ -32,53 +32,53 @@ def _write_presets(home, *model_ids):
     (pdir / "presets.ini").write_text(body, encoding="utf-8")
 
 
-def test_presets_stale_when_a_staged_model_has_no_section(hermes_home):
-    from hermes_cli.local_runtime.bootstrap import _presets_stale
+def test_presets_stale_when_a_staged_model_has_no_section(eir_home):
+    from eir_cli.local_runtime.bootstrap import _presets_stale
 
-    _stage(hermes_home, "model-a")
-    _stage(hermes_home, "model-b")
-    _write_presets(hermes_home, "model-a")
+    _stage(eir_home, "model-a")
+    _stage(eir_home, "model-b")
+    _write_presets(eir_home, "model-a")
     assert _presets_stale() is True
 
 
-def test_presets_current_when_every_staged_model_is_covered(hermes_home):
-    from hermes_cli.local_runtime.bootstrap import _presets_stale
+def test_presets_current_when_every_staged_model_is_covered(eir_home):
+    from eir_cli.local_runtime.bootstrap import _presets_stale
 
-    _stage(hermes_home, "model-a")
-    _write_presets(hermes_home, "model-a")
+    _stage(eir_home, "model-a")
+    _write_presets(eir_home, "model-a")
     assert _presets_stale() is False
 
 
-def test_legacy_presets_without_model_paths_are_regenerated(hermes_home):
-    from hermes_cli.local_runtime.bootstrap import _presets_stale
+def test_legacy_presets_without_model_paths_are_regenerated(eir_home):
+    from eir_cli.local_runtime.bootstrap import _presets_stale
 
-    _stage(hermes_home, "model-a")
-    _write_presets(hermes_home, "model-a")
-    ini = hermes_home / "runtimes/llamacpp/presets.ini"
+    _stage(eir_home, "model-a")
+    _write_presets(eir_home, "model-a")
+    ini = eir_home / "runtimes/llamacpp/presets.ini"
     ini.write_text("[model-a]\nctx-size = 65536\n")
     assert _presets_stale()
 
 
-def test_no_models_is_never_stale(hermes_home):
-    from hermes_cli.local_runtime.bootstrap import _presets_stale
+def test_no_models_is_never_stale(eir_home):
+    from eir_cli.local_runtime.bootstrap import _presets_stale
 
-    _write_presets(hermes_home, "model-a")
+    _write_presets(eir_home, "model-a")
     assert _presets_stale() is False
 
 
-def test_boot_replaces_incumbent_with_stale_presets(hermes_home, monkeypatch):
+def test_boot_replaces_incumbent_with_stale_presets(eir_home, monkeypatch):
     """ensure_local_runtime must not adopt a running server whose presets
     miss a staged model — it stops it and boots fresh (boot itself is
     stubbed; the contract under test is the adopt/replace decision)."""
-    import hermes_cli.local_runtime.bootstrap as boot
+    import eir_cli.local_runtime.bootstrap as boot
 
-    _stage(hermes_home, "model-a")
-    _stage(hermes_home, "model-b")
-    _write_presets(hermes_home, "model-a")
+    _stage(eir_home, "model-a")
+    _stage(eir_home, "model-b")
+    _write_presets(eir_home, "model-a")
 
     stopped = {}
     monkeypatch.setattr(
-        "hermes_cli.local_runtime.endpoint._state_endpoint",
+        "eir_cli.local_runtime.endpoint._state_endpoint",
         lambda: {"base_url": "http://127.0.0.1:18434/v1", "api_key": "k"})
     monkeypatch.setattr(boot, "_stop_state_server", lambda: stopped.setdefault("stopped", True))
 
@@ -92,7 +92,7 @@ def test_boot_replaces_incumbent_with_stale_presets(hermes_home, monkeypatch):
 
     # Fail fast once boot proper begins — reaching it IS the assertion.
     monkeypatch.setattr(
-        "hermes_cli.local_runtime.binaries.installed_engine", fake_boot)
+        "eir_cli.local_runtime.binaries.installed_engine", fake_boot)
 
     result = boot.ensure_local_runtime({"local_runtime": {"enabled": True}})
     assert stopped.get("stopped"), "stale incumbent was not stopped"
@@ -101,19 +101,19 @@ def test_boot_replaces_incumbent_with_stale_presets(hermes_home, monkeypatch):
     assert result is None or result is sentinel
 
 
-def test_refresh_bounces_an_adopted_server(hermes_home, monkeypatch):
+def test_refresh_bounces_an_adopted_server(eir_home, monkeypatch):
     """refresh_local_runtime with no in-process supervisor but a running
     state-file server (the post-restart shape) must stop that server and
     boot fresh — NOT silently no-op. Regression: the no-op meant every
     download/delete after a backend restart left the router serving a
     stale model catalog, and picking the new model failed with
     'not found in this provider's model listing'."""
-    import hermes_cli.local_runtime.bootstrap as boot
+    import eir_cli.local_runtime.bootstrap as boot
 
     stopped = {}
     monkeypatch.setattr(boot, "_SUPERVISOR", None)
     monkeypatch.setattr(
-        "hermes_cli.local_runtime.endpoint._state_endpoint",
+        "eir_cli.local_runtime.endpoint._state_endpoint",
         lambda: {"base_url": "http://127.0.0.1:18434/v1", "api_key": "k"})
     monkeypatch.setattr(boot, "_stop_state_server", lambda: stopped.setdefault("stopped", True))
     booted = {}
@@ -125,10 +125,10 @@ def test_refresh_bounces_an_adopted_server(hermes_home, monkeypatch):
     assert booted.get("force") is True, "fresh boot did not follow the stop"
 
 
-def test_refresh_no_server_anywhere_is_a_noop(hermes_home, monkeypatch):
-    import hermes_cli.local_runtime.bootstrap as boot
+def test_refresh_no_server_anywhere_is_a_noop(eir_home, monkeypatch):
+    import eir_cli.local_runtime.bootstrap as boot
 
     monkeypatch.setattr(boot, "_SUPERVISOR", None)
     monkeypatch.setattr(
-        "hermes_cli.local_runtime.endpoint._state_endpoint", lambda: None)
+        "eir_cli.local_runtime.endpoint._state_endpoint", lambda: None)
     assert boot.refresh_local_runtime() is False

@@ -1,13 +1,13 @@
 """Classic CLI commands whose state lives in the gateway session are answered there (tracker #134889
 CLI-8, CLI-17, CLI-21): ``/diff session`` (the gateway tools' checkpoint baseline), ``/reload``
 (the gateway's ``.env``) and ``/handoff`` (the owner's ``handoff.*`` verbs, #143608). Driven
-through ``HermesCLI.process_command`` with a scripted gateway connection."""
+through ``EirCLI.process_command`` with a scripted gateway connection."""
 from datetime import datetime
 from types import SimpleNamespace
 
 import pytest
 
-from cli import HermesCLI
+from cli import EirCLI
 
 
 class _Conn:
@@ -34,8 +34,8 @@ def _observed(name, arg):
 def gateway_cli(monkeypatch):
     def make(**replies):
         conn = _Conn(replies)
-        monkeypatch.setattr("hermes_cli.gateway_side.connection_for", lambda cli: conn)
-        cli = HermesCLI.__new__(HermesCLI)
+        monkeypatch.setattr("eir_cli.gateway_side.connection_for", lambda cli: conn)
+        cli = EirCLI.__new__(EirCLI)
         cli.session_id = "local-s"
         # The gateway-backed agent has no checkpoint manager of its own (GatewayAgent._checkpoint_mgr).
         cli.agent = SimpleNamespace(_checkpoint_mgr=None)
@@ -91,7 +91,7 @@ def test_diff_of_the_working_tree_stays_a_local_git_read(gateway_cli, monkeypatc
 
 def test_reload_rereads_env_in_the_gateway_and_reports_its_count(gateway_cli, monkeypatch, capsys):
     cli, conn = gateway_cli(**{"reload.env": {"updated": 3}})
-    monkeypatch.setattr("hermes_cli.config.reload_env", lambda: 0)
+    monkeypatch.setattr("eir_cli.config.reload_env", lambda: 0)
     assert cli.process_command("/reload") is True
     assert conn.calls == [_observed("reload", ""), ("reload.env", {"session_id": "local-s"})]
     assert "3" in capsys.readouterr().out
@@ -116,9 +116,9 @@ def handoff_cli(monkeypatch):
     def make(states, **replies):
         conn = _HandoffConn(states, **{"handoff.request": {"queued": True, "session_key": "local-s",
                                                           "platform": "telegram", "home_name": "Phone"}, **replies})
-        monkeypatch.setattr("hermes_cli.gateway_side.connection_for", lambda cli: conn)
+        monkeypatch.setattr("eir_cli.gateway_side.connection_for", lambda cli: conn)
         monkeypatch.setattr("time.sleep", lambda _s: None)
-        cli = HermesCLI.__new__(HermesCLI)
+        cli = EirCLI.__new__(EirCLI)
         cli.session_id, cli._agent_running, cli._should_exit = "local-s", False, False
         cli._pending_agent_seed = None
         cli._app = SimpleNamespace(is_running=True, exited=[], exit=lambda: cli._app.exited.append(True))
@@ -150,7 +150,7 @@ def test_handoff_failure_keeps_the_cli_session(handoff_cli, capsys):
 
 
 def test_handoff_refusal_from_the_gateway_is_shown_and_nothing_waits(handoff_cli, capsys):
-    from hermes_cli.gateway_client import GatewayClientError
+    from eir_cli.gateway_client import GatewayClientError
     cli, conn = handoff_cli([], **{"handoff.request": GatewayClientError("no home channel configured for telegram")})
     assert cli.process_command("/handoff telegram") is True
     assert "no home channel configured for telegram" in capsys.readouterr().out
@@ -159,7 +159,7 @@ def test_handoff_refusal_from_the_gateway_is_shown_and_nothing_waits(handoff_cli
 
 def test_a_handoff_refusal_names_what_to_fix_not_its_code(handoff_cli, capsys):
     """The owner's refusal code (``invalid_params``) is printed with its detail, the actionable part."""
-    from hermes_cli.gateway_client import GatewayRPCError
+    from eir_cli.gateway_client import GatewayRPCError
     detail = "no home channel configured for telegram; set one with /sethome on the destination chat first"
     cli, _conn = handoff_cli([], **{"handoff.request": GatewayRPCError(
         "invalid_params", code=4001, data={"reason": "invalid_params", "field": "platform", "detail": detail})})
@@ -169,8 +169,8 @@ def test_a_handoff_refusal_names_what_to_fix_not_its_code(handoff_cli, capsys):
 
 def _save_cli(conn, tmp_path, monkeypatch):
     """A gateway-backed CLI with one said line in its mirror, run from ``tmp_path/work``."""
-    from hermes_cli.gateway_session_store import GatewaySessionStore
-    cli = HermesCLI.__new__(HermesCLI)
+    from eir_cli.gateway_session_store import GatewaySessionStore
+    cli = EirCLI.__new__(EirCLI)
     cli.session_id, cli.conversation_history = "local-s", [{"role": "user", "content": "in-memory only"}]
     cli.model, cli.session_start = "fake-model", datetime(2026, 10, 18)
     cli._session_db = GatewaySessionStore(conn)
@@ -183,8 +183,8 @@ def test_save_writes_the_gateway_owners_export_on_this_machine(tmp_path, monkeyp
     """CLI-19: ``/save`` asks the owner (``session.export``) for its canonical export, never writes the
     in-memory fallback (no title, no metadata, no archived rows) that ``import_sessions`` can't restore.
     The CLI writes the content itself, so a remote owner's disk is never taken for this one."""
-    from hermes_constants import get_hermes_home
-    conn = _Conn({"session.export": {"format": "md", "filename": "hermes_session_s.md", "content": "# owner export"}})
+    from eir_constants import get_eir_home
+    conn = _Conn({"session.export": {"format": "md", "filename": "eir_session_s.md", "content": "# owner export"}})
     cli = _save_cli(conn, tmp_path, monkeypatch)
     work = tmp_path / "work"
     cli.save_conversation("/save markdown notes.md redact")
@@ -192,7 +192,7 @@ def test_save_writes_the_gateway_owners_export_on_this_machine(tmp_path, monkeyp
     assert (work / "notes.md").read_text(encoding="utf-8") == "# owner export"
     assert str(work / "notes.md") in capsys.readouterr().out
     cli.save_conversation("/save md")  # no name: main's local folder and name, under this CLI's home
-    [default] = (get_hermes_home() / "sessions" / "saved").glob("hermes_conversation_*.md")
+    [default] = (get_eir_home() / "sessions" / "saved").glob("eir_conversation_*.md")
     assert default.read_text(encoding="utf-8") == "# owner export" and str(default) in capsys.readouterr().out
     conn.replies["session.export"] = {}  # an owner answer without content is reported, nothing written
     cli.save_conversation("/save json x.json")
@@ -207,9 +207,9 @@ def test_save_on_an_older_gateway_falls_back_only_for_a_plain_json_save(tmp_path
     """An owner without ``session.export`` (-32601): its ``session.save`` writes default-named, unredacted
     JSON on the gateway host, so only ``/save json`` uses it, reported as on the gateway host; a
     format, name or ``redact`` is refused with a message, never silently dropped."""
-    from hermes_cli.gateway_client import GatewayRPCError
+    from eir_cli.gateway_client import GatewayRPCError
     conn = _Conn({"session.export": GatewayRPCError("unknown_method", code=-32601),
-                  "session.save": {"file": "/srv/gw/sessions/saved/hermes_conversation_x.json"}})
+                  "session.save": {"file": "/srv/gw/sessions/saved/eir_conversation_x.json"}})
     cli = _save_cli(conn, tmp_path, monkeypatch)
     for cmd in ("/save md", "/save json mine.json", "/save json redact"):
         cli.save_conversation(cmd)
@@ -217,7 +217,7 @@ def test_save_on_an_older_gateway_falls_back_only_for_a_plain_json_save(tmp_path
     assert [m for m, _ in conn.calls] == ["session.export"] * 3
     cli.save_conversation("/save json")
     assert conn.calls[-1] == ("session.save", {"session_id": "local-s"})
-    assert "saved on the gateway host: /srv/gw/sessions/saved/hermes_conversation_x.json" in capsys.readouterr().out
+    assert "saved on the gateway host: /srv/gw/sessions/saved/eir_conversation_x.json" in capsys.readouterr().out
     assert not any((tmp_path / "work").iterdir())
 
 
@@ -246,7 +246,7 @@ def test_a_handoff_claimed_as_the_pending_timeout_fires_still_completes(handoff_
 def test_a_handoff_claimed_at_the_timeout_then_unreadable_still_ends(handoff_cli, monkeypatch, capsys):
     """The read after the pending timeout's CAS-fail sees ``running``, then the gateway goes away: the
     wait still ends (an unreadable row is the timeout), never polls forever."""
-    from hermes_cli.gateway_client import GatewayClientError
+    from eir_cli.gateway_client import GatewayClientError
     cli, conn = handoff_cli(["pending", "running"], **{"handoff.fail": {"failed": False, "state": "running"}})
     clock = iter([0.0, 100.0])
     monkeypatch.setattr("time.time", lambda: next(clock, 100.0))

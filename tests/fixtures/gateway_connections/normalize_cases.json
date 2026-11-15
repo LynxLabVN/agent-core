@@ -83,7 +83,7 @@
           "label": "Box",
           "host": "ssh alice@box.lan:2222",
           "keyPath": " ~/.ssh/id ",
-          "remoteHermesPath": "/opt/hermes",
+          "remoteEirPath": "/opt/eir",
           "remoteProfile": "coder",
           "token": {
             "encoding": "plain",
@@ -488,7 +488,7 @@
           "user": "alice",
           "port": 2222,
           "keyPath": "~/.ssh/id",
-          "remoteHermesPath": "/opt/hermes",
+          "remoteEirPath": "/opt/eir",
           "remoteProfile": "coder",
           "token": {
             "encoding": "plain",

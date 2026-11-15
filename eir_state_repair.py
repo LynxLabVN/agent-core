@@ -1,6 +1,6 @@
-"""state.db repair, backup and writability preflight (split from hermes_state).
+"""state.db repair, backup and writability preflight (split from eir_state).
 
-Patchable helpers are looked up as module globals at call time, so tests patch ``hermes_state_repair.<name>``.
+Patchable helpers are looked up as module globals at call time, so tests patch ``eir_state_repair.<name>``.
 """
 
 from __future__ import annotations
@@ -21,17 +21,17 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from hermes_constants import get_hermes_home
-from hermes_startup_watchdog import report_startup_progress
-from hermes_state_errors import is_disk_full_error
-from hermes_state_holders import read_only_db_uri
-from hermes_state_common import (
+from eir_constants import get_eir_home
+from eir_startup_watchdog import report_startup_progress
+from eir_state_errors import is_disk_full_error
+from eir_state_holders import read_only_db_uri
+from eir_state_common import (
     _acquire_db_flock, _clear_lock_holder_record, _describe_lock_holder, _read_lock_holder_record,
     is_advisory_lock_contention,
 )
 
-# Log-record parity with the origin module (caplog tests pin "hermes_state").
-logger = logging.getLogger("hermes_state")
+# Log-record parity with the origin module (caplog tests pin "eir_state").
+logger = logging.getLogger("eir_state")
 
 _REPAIR_LOCK_POLL_SECONDS = 0.1
 # Snapshot copies are data transfer, not locking: bounded separately at 10 MiB/s (historical two-minute floor).
@@ -68,7 +68,7 @@ _REPAIR_BACKUP_MIN_FREE_BYTES = 256 * 1024 * 1024  # 256 MiB absolute floor
 _REPAIR_BACKUP_FREE_FRACTION = 0.02  # plus 2% of the volume
 _FTS_TABLES = ("messages_fts", "messages_fts_trigram")
 _MANUAL_RECOVER_HINT = ("Free disk space, then retry (or recover manually with "
-                        "`hermes sessions recover --source {db_path} --inspect-only` first).")
+                        "`eir sessions recover --source {db_path} --inspect-only` first).")
 
 
 def _sidecars(db_path: Path):
@@ -77,14 +77,14 @@ def _sidecars(db_path: Path):
 
 
 def _read_offline(db_path: Path, what: str, reader) -> Optional[str]:
-    """Run *reader()* under ``hermes_cli.sqlite_safe_read.offline_file_access``.
+    """Run *reader()* under ``eir_cli.sqlite_safe_read.offline_file_access``.
 
     ``close()`` on ANY raw descriptor cancels every POSIX advisory lock this process holds on the file,
     including a peer connection's RESERVED lock (``sqlite_safe_read`` rule 1), so a raw read is only safe with
     no live connection; ``None`` when that makes it unsafe or the file is unreadable. Scaffold/embed installs
-    without hermes_cli have no tracked connections."""
+    without eir_cli have no tracked connections."""
     try:
-        from hermes_cli.sqlite_safe_read import LiveConnectionError, offline_file_access
+        from eir_cli.sqlite_safe_read import LiveConnectionError, offline_file_access
     except ImportError:
         offline_file_access, LiveConnectionError = (lambda _p, **_k: contextlib.nullcontext()), OSError
     try:
@@ -97,7 +97,7 @@ def _read_offline(db_path: Path, what: str, reader) -> Optional[str]:
 def _claim_repair_attempt(db_path: Path) -> bool:
     """Claim the one-shot per-process repair attempt for *db_path*: True for the first caller, False
     afterwards (bounds the repair/reopen loop and stops concurrent callers racing surgery on one file)."""
-    from hermes_state import _repair_attempt_lock, _repair_attempted_paths
+    from eir_state import _repair_attempt_lock, _repair_attempted_paths
     with _repair_attempt_lock:
         if str(db_path) in _repair_attempted_paths:
             return False
@@ -124,7 +124,7 @@ def _msvcrt_lock(handle, flag_name: str) -> None:
 
 def _try_lock_nonblocking(handle) -> None:
     """Take the advisory lock on *handle* without waiting (raises on contention)."""
-    from hermes_state import _IS_WINDOWS
+    from eir_state import _IS_WINDOWS
     if _IS_WINDOWS:
         _msvcrt_lock(handle, "LK_NBLCK")
     else:
@@ -134,7 +134,7 @@ def _try_lock_nonblocking(handle) -> None:
 
 def _release_lock_handle(handle, *, clear_record: bool = False) -> None:
     """Drop the advisory lock on *handle* (best effort) and close it."""
-    from hermes_state import _IS_WINDOWS
+    from eir_state import _IS_WINDOWS
     with contextlib.closing(handle), contextlib.suppress(OSError):  # best-effort release; always close
         if _IS_WINDOWS:
             _msvcrt_lock(handle, "LK_UNLCK")
@@ -178,7 +178,7 @@ def _cross_process_repair_lock(db_path: Path):
     a large DB, and an unbounded wait would hang the caller's open with no traceback (the failure shape of
     #36644).
     """
-    from hermes_state import _IS_WINDOWS, _REPAIR_LOCK_TIMEOUT_SECONDS
+    from eir_state import _IS_WINDOWS, _REPAIR_LOCK_TIMEOUT_SECONDS
     lock_path, handle = _open_lock_file(
         db_path, ".repair.lock", "repair", "skipping schema surgery rather than running it without cross-process authority.")
     if handle is None:
@@ -294,7 +294,7 @@ def _backup_free_space_error(db_path: Path) -> Optional[str]:
 def _repair_snapshot_timeout_seconds(source_path: Path) -> float:
     """Bound one SQLite snapshot by source size incl. sidecars (a WAL can hold committed rows not yet in the
     main file), so a healthy large-database copy is not cut off by the repair-lock timeout."""
-    from hermes_state import _REPAIR_LOCK_TIMEOUT_SECONDS
+    from eir_state import _REPAIR_LOCK_TIMEOUT_SECONDS
     source_bytes = 0
     for candidate in (source_path, *_sidecars(source_path)):
         with contextlib.suppress(FileNotFoundError):  # a sidecar may vanish mid-walk
@@ -394,14 +394,14 @@ def _persistent_repair_attempts_exhausted(db_path: Path) -> bool:
 
 
 def _persistent_repair_exhausted_error(db_path: Path) -> str:
-    """The stable operator-facing diagnostic for an exhausted repair budget. The ``hermes`` commands
-    carry the profile selector: a bare ``hermes`` follows ``active_profile`` (#105887)."""
-    from hermes_constants import profile_cli_selector
+    """The stable operator-facing diagnostic for an exhausted repair budget. The ``eir`` commands
+    carry the profile selector: a bare ``eir`` follows ``active_profile`` (#105887)."""
+    from eir_constants import profile_cli_selector
     profile_arg = profile_cli_selector()
     return (f"automatic repair has already failed {_MAX_PERSISTENT_REPAIR_ATTEMPTS} times on this exact file — the "
             f"corruption is beyond the schema/FTS repair strategies (likely b-tree page damage). Manual recovery "
-            f"required: restore a backup, or salvage with `hermes {profile_arg}sessions recover --source {db_path} "
-            f"--inspect-only`, then (if it reports recoverable) `hermes {profile_arg}sessions recover --source {db_path} "
+            f"required: restore a backup, or salvage with `eir {profile_arg}sessions recover --source {db_path} "
+            f"--inspect-only`, then (if it reports recoverable) `eir {profile_arg}sessions recover --source {db_path} "
             f"--output recovered-state.db` (recovery snapshots the damaged file first, then runs the page-level "
             f"`.recover` lane on the copy; do NOT point a raw `sqlite3` shell at the live database). "
             f"Delete {_repair_ledger_path(db_path).name} to force another automatic attempt.")
@@ -483,7 +483,7 @@ def _backup_db_file(db_path: Path) -> tuple[Optional[Path], Optional[str]]:
     Raw bytes on purpose: the DB won't open cleanly, so preserve them exactly for forensics. Returns ``(backup_path,
     None)`` or ``(None, reason)``; repair treats a refused backup as a HARD STOP because the bundle is the recovery
     path when every strategy fails. Refuses while a connection to this DB is live in the process: the raw read would
-    ``close()`` a descriptor and cancel that connection's POSIX advisory locks (``hermes_cli.sqlite_safe_read``) —
+    ``close()`` a descriptor and cancel that connection's POSIX advisory locks (``eir_cli.sqlite_safe_read``) —
     real case: one SessionDB enters repair while the gateway holds others.
 
     Dedupe: reuse the newest backup when byte-identical to the current recovery image (``_backup_content_identity``
@@ -492,12 +492,12 @@ def _backup_db_file(db_path: Path) -> tuple[Optional[Path], Optional[str]]:
     partials, deleted intact copies) and dedupe could return one with no real forensic copy on disk.
 
     Refusal reasons (``_backup_free_space_error`` / ``_MANUAL_RECOVER_HINT``) point operators at the safe lane,
-    `hermes sessions recover --source <db> --inspect-only`, never at a raw sqlite3 shell on the live file.
+    `eir sessions recover --source <db> --inspect-only`, never at a raw sqlite3 shell on the live file.
 
     See #69603.
     """
-    with contextlib.suppress(ImportError):  # scaffold/embed installs without hermes_cli track no connections
-        from hermes_cli.sqlite_safe_read import has_live_connection
+    with contextlib.suppress(ImportError):  # scaffold/embed installs without eir_cli track no connections
+        from eir_cli.sqlite_safe_read import has_live_connection
         if has_live_connection(db_path):
             reason = (f"a connection to {db_path} is still open in this process; raw-copying it would cancel that "
                       "connection's POSIX advisory locks. Close all SessionDB handles first.")
@@ -553,8 +553,8 @@ def preflight_db_writability(db_path: Path, *, db_label: str = "state.db", direc
 
     A stray read-only ``state.db`` / ``-wal`` / ``-shm`` (sudo run, restored backup, copied dotfiles) otherwise
     surfaces as an opaque "attempt to write a readonly database" inside ``_init_schema``, and the obvious wrong
-    "fix" (deleting the ``-wal``) loses committed transactions. ``chmod u+rw`` repair only inside the Hermes home
-    tree (Hermes owns those files; ``chmod`` fails on files the user doesn't own, bounding the repair exactly);
+    "fix" (deleting the ``-wal``) loses committed transactions. ``chmod u+rw`` repair only inside the Eir home
+    tree (Eir owns those files; ``chmod`` fails on files the user doesn't own, bounding the repair exactly);
     otherwise fail fast naming the file and command. Never deletes/truncates a WAL sidecar — once writable, the
     normal open checkpoints it. ``:memory:``/``file:`` skipped. Shared with ``kanban_db``.
 
@@ -564,7 +564,7 @@ def preflight_db_writability(db_path: Path, *, db_label: str = "state.db", direc
         return
     home: Optional[Path] = None
     with contextlib.suppress(Exception):  # pragma: no cover - defensive
-        home = Path(get_hermes_home()).resolve()
+        home = Path(get_eir_home()).resolve()
     # SQLite needs a writable directory in every journal mode (WAL/SHM sidecars, or the DELETE-mode journal).
     sidecars = (db_path.with_name(db_path.name + "-wal"), db_path.with_name(db_path.name + "-shm"))
     files = () if directory_only else tuple((p, False) for p in (db_path, *sidecars) if p.is_file())
@@ -583,7 +583,7 @@ def preflight_db_writability(db_path: Path, *, db_label: str = "state.db", direc
         wal_note = (" Do NOT delete the -wal file — it contains committed data that "
                     "will be merged into the database once it is writable." if p.name.endswith("-wal") else "")
         raise sqlite3.OperationalError(
-            f"{db_label} is not writable: {'directory' if is_dir else 'file'} {p} is read-only for this user. Hermes "
+            f"{db_label} is not writable: {'directory' if is_dir else 'file'} {p} is read-only for this user. Eir "
             f"needs read-write access to open the database. Fix with: chmod u+rw{x} '{p}' (files owned by another "
             f"user may need sudo/chown).{wal_note}")
 
@@ -597,12 +597,12 @@ def _connect_repair_durable(db_path: Path, *, timeout: float = 5.0) -> sqlite3.C
     implicit transaction. Barriers are best-effort: on a malformed schema even ``PRAGMA synchronous=FULL`` raises,
     so whole-file rewrites call :func:`_reapply_durability_barriers` once the schema parses again.
 
-    Tracked (:func:`hermes_cli.sqlite_safe_read.connect_tracked`) because repair connections hold the
+    Tracked (:func:`eir_cli.sqlite_safe_read.connect_tracked`) because repair connections hold the
     strongest locks in the process (``locking_mode=EXCLUSIVE``, ``BEGIN IMMEDIATE``); an untracked fd let
     the byte-level probes ``open()``/``close()`` the live file, which cancels every POSIX advisory lock this
     process holds on it (sqlite.org/howtocorrupt §2.2) and lets an external writer commit mid-repair (#63386).
     """
-    from hermes_cli.sqlite_safe_read import connect_tracked
+    from eir_cli.sqlite_safe_read import connect_tracked
 
     conn = connect_tracked(db_path, tracking_path=db_path, timeout=timeout, isolation_level=None)
     _reapply_durability_barriers(conn)
@@ -618,7 +618,7 @@ def _reapply_durability_barriers(conn: sqlite3.Connection) -> bool:
     """Best-effort (re)application of the macOS write barriers; True if accepted.
     Call before ``VACUUM``/``REINDEX`` once the schema parses: a connection opened
     on a malformed schema could not take them at open time. Never raises."""
-    from hermes_state_wal import _apply_macos_checkpoint_barrier, _enforce_macos_synchronous_full
+    from eir_state_wal import _apply_macos_checkpoint_barrier, _enforce_macos_synchronous_full
     try:
         _apply_macos_checkpoint_barrier(conn)
         _enforce_macos_synchronous_full(conn)
@@ -631,10 +631,10 @@ def apply_durability_barriers(conn: sqlite3.Connection) -> bool:
     """Durability barriers for guest users of ``state.db`` that must inherit its owner's journal mode. Also
     applies the configured ``database.synchronous`` level, a per-connection pragma that otherwise only
     rides on the journal-mode setup path guests must not run."""
-    from hermes_state_wal import _apply_synchronous_pragma
+    from eir_state_wal import _apply_synchronous_pragma
     ok = _reapply_durability_barriers(conn)
     with contextlib.suppress(Exception):
-        from hermes_cli.config import cfg_get, load_config_readonly  # local: avoids an import cycle
+        from eir_cli.config import cfg_get, load_config_readonly  # local: avoids an import cycle
         if (raw_synchronous := cfg_get(load_config_readonly(), "database", "synchronous", default=None)) is not None:
             _apply_synchronous_pragma(conn, raw_synchronous, db_label="state.db (guest)")
     return ok
@@ -712,7 +712,7 @@ def _schema_not_built(exc: BaseException) -> bool:
     return any(m in str(exc).lower() for m in ("no such table", "no such column"))
 
 
-# Hermes-owned FTS5 objects: the virtual tables and their shadow b-trees. Full-matched, so a
+# Eir-owned FTS5 objects: the virtual tables and their shadow b-trees. Full-matched, so a
 # user-created lookalike (``archive_fts_data``) is not swept into the rebuildable set.
 _FTS_OBJECT_RE = re.compile(
     r"messages_fts(_trigram|_cjk)?(_data|_idx|_content|_docsize|_config|_segdir|_segments)?"
@@ -751,7 +751,7 @@ def state_db_has_structural_damage(db_path: Path) -> bool:
     while ``messages``/``sessions`` read cleanly, and the FTS rebuild ladder cannot help.
     Cannot-open / locked stays False so the caller keeps the FTS path."""
     try:
-        from hermes_cli.sqlite_safe_read import connect_tracked
+        from eir_cli.sqlite_safe_read import connect_tracked
         conn = connect_tracked(read_only_db_uri(db_path), uri=True, timeout=1.0, tracking_path=db_path)
     except sqlite3.Error:
         return False
@@ -797,10 +797,10 @@ def _retired_cjk_snapshot_health(db_path: Path, conn: sqlite3.Connection) -> Opt
     """``_db_opens_cleanly`` for a store that still holds the retired CJK index, judged on a disposable copy
     with the index retired. A copy that cannot be made or does not fit the temporary volume yields
     ``HealthCheckUnavailable``; a source SQLite cannot read is still reported as damage."""
-    from hermes_state_fts import drop_retired_cjk_index
+    from eir_state_fts import drop_retired_cjk_index
 
     try:
-        with tempfile.TemporaryDirectory(prefix="hermes-cjk-probe-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="eir-cjk-probe-") as tmp:
             snapshot = Path(tmp) / "state.db"
             try:
                 _copy_database_snapshot(db_path, snapshot, source_connection=conn)
@@ -843,8 +843,8 @@ def _db_opens_cleanly(db_path: Path) -> Optional[str]:
 
     See #50502.
     """
-    from hermes_state import SessionDB
-    from hermes_state_fts import drop_retired_cjk_index, retired_cjk_index_present
+    from eir_state import SessionDB
+    from eir_state_fts import drop_retired_cjk_index, retired_cjk_index_present
     # ── Strategy 0.5: rebuild stale B-tree indexes (#63386) ── PRAGMA integrity_check can report "wrong #
     # of entries in index" when a B-tree index (e.g. idx_sessions_handoff_state) falls out of sync with its
     # base table. REINDEX rewrites the index b-tree from the canonical table rows using the existing index
@@ -883,7 +883,7 @@ def _db_opens_cleanly(db_path: Path) -> Optional[str]:
             # would, so a stale ``_idx`` row at the next segid (IntegrityError "constraint failed", the #100227
             # class: integrity_check and MATCH both clean, every real append fails) is hit here rather than
             # by the user's next message.
-            probe_session_id = f"_hermes_fts_health_probe_{time.time_ns()}"
+            probe_session_id = f"_eir_fts_health_probe_{time.time_ns()}"
             try:
                 if not conn.in_transaction:
                     conn.execute("BEGIN IMMEDIATE")
@@ -915,11 +915,11 @@ def _db_opens_cleanly(db_path: Path) -> Optional[str]:
 def _live_writer_holds_db(db_path: Path) -> bool:
     """True when another process (or a connection outside this call) still holds ``db_path``.
 
-    The foreign-holder scan (``hermes_state_holders``) is the authority: any other process with the DB or a
+    The foreign-holder scan (``eir_state_holders``) is the authority: any other process with the DB or a
     WAL sidecar open, a deleted WAL generation, or an unknown/uninspectable holder fails CLOSED. The SQLite
     probe (``locking_mode=EXCLUSIVE`` + ``BEGIN IMMEDIATE``) is only an additional positive signal — it cannot
     see a ``journal_mode=DELETE`` reader and cannot run on a malformed file, which is why the scan comes first."""
-    import hermes_state_holders as _state_holders
+    import eir_state_holders as _state_holders
     return _state_holders.live_writer_holds_db(db_path, connect_repair_durable=_connect_repair_durable)
 
 
@@ -985,7 +985,7 @@ def repair_state_db_schema(db_path: Path, *, backup: bool = True) -> dict[str, A
         # exclusive guard in the locked routine excludes writers through promotion and sees DELETE-mode readers too.
         elif _live_writer_holds_db(db_path):
             _repair_skip(report, "skipped", "a live writer still holds state.db; skipped schema surgery to avoid tearing "
-                         "b-tree pages under a concurrent writer. Stop the gateway (hermes gateway stop) and retry.")
+                         "b-tree pages under a concurrent writer. Stop the gateway (eir gateway stop) and retry.")
         else:
             # Probe journal mode BEFORE surgery: a rebuilt file comes back in the default (delete) mode and nothing
             # else records the flip. Unprobeable (damaged file) -> database.journal_mode is the restore target.
@@ -1008,7 +1008,7 @@ def _probe_journal_mode_for_repair(db_path: Path) -> Optional[str]:
     """Best-effort journal-mode probe: ``wal``/``delete``, or ``None`` when the file cannot be opened or
     probed (malformed header, concurrent opener's locks — both expected on the repair path); callers then
     fall back to ``database.journal_mode``."""
-    from hermes_state_wal import _on_disk_journal_mode
+    from eir_state_wal import _on_disk_journal_mode
     try:
         with _repair_conn(db_path) as conn:
             return _on_disk_journal_mode(conn)
@@ -1035,7 +1035,7 @@ def _restore_journal_mode_after_repair(db_path: Path, before_mode: Optional[str]
     The transactional promotion already leaves the destination in its pre-repair mode, so on that path this
     is mostly the WAL-companion re-assertion; the reopen is the hazard, not the mode. See #101064.
     """
-    from hermes_state_wal import apply_wal_with_fallback
+    from eir_state_wal import apply_wal_with_fallback
     try:
         if conn is None:
             with _repair_conn(db_path) as owned:
@@ -1134,7 +1134,7 @@ def _repair_state_db_schema_locked(
 
 def _unlink_db_triple(path: Path) -> Optional[str]:
     """Remove *path* and every SQLite sidecar; return any cleanup failure."""
-    from hermes_state import _IS_WINDOWS
+    from eir_state import _IS_WINDOWS
     failures: list[str] = []
     for victim in (path, *_sidecars(path)):
         for attempt in range(10):

@@ -15,7 +15,7 @@ the UI thread; the command's own ``CommandDef`` already declares
 never consulted.
 
 These tests exercise the detector without starting a prompt_toolkit app,
-mirroring tests/hermes_cli/test_cli_steer_busy_path.py.
+mirroring tests/eir_cli/test_cli_steer_busy_path.py.
 """
 
 from __future__ import annotations
@@ -23,10 +23,10 @@ from __future__ import annotations
 
 
 def _make_cli():
-    """Bare HermesCLI (no __init__): the detector only reads _agent_running."""
-    from cli import HermesCLI
+    """Bare EirCLI (no __init__): the detector only reads _agent_running."""
+    from cli import EirCLI
 
-    return HermesCLI.__new__(HermesCLI)
+    return EirCLI.__new__(EirCLI)
 
 
 class TestBackgroundInlineDetector:
@@ -75,7 +75,7 @@ class TestBackgroundBusyPolicyContract:
     """The registry already declares the intent this detector implements."""
 
     def test_bg_and_btw_declare_dispatch_while_busy(self):
-        from hermes_cli.commands import resolve_command
+        from eir_cli.commands import resolve_command
 
         for name in ("bg", "btw"):
             cmd = resolve_command(name)
@@ -84,6 +84,6 @@ class TestBackgroundBusyPolicyContract:
             assert cmd.busy_policy == "dispatch"
 
     def test_background_name_is_retired(self):
-        from hermes_cli.commands import resolve_command
+        from eir_cli.commands import resolve_command
 
         assert resolve_command("background") is None

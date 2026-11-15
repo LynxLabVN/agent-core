@@ -1,8 +1,8 @@
 import json
 import sys
 
-from hermes_cli.session_export import export_record_count, render_sessions_export
-from hermes_cli.session_export_html import (
+from eir_cli.session_export import export_record_count, render_sessions_export
+from eir_cli.session_export_html import (
     _generate_messages_html,
     generate_multi_session_html_export,
 )
@@ -96,12 +96,12 @@ def test_export_record_count_switches_unit_for_prompt_only_exports():
 
 
 def test_sessions_export_cli_prompt_only_stdout(monkeypatch, capsys, tmp_path):
-    import hermes_cli.main as main_mod
-    import hermes_state
+    import eir_cli.main as main_mod
+    import eir_state
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path))
     path = tmp_path / "state.db"
-    db = hermes_state.SessionDB(db_path=path)
+    db = eir_state.SessionDB(db_path=path)
     db.create_session("sess-123", "cli")
     for message in _sample_session()["messages"]:
         db.append_message("sess-123", message["role"], message["content"])
@@ -110,7 +110,7 @@ def test_sessions_export_cli_prompt_only_stdout(monkeypatch, capsys, tmp_path):
     monkeypatch.setattr(
         sys,
         "argv",
-        ["hermes", "sessions", "export", "-", "--session-id", "sess", "--only", "user-prompts"],
+        ["eir", "sessions", "export", "-", "--session-id", "sess", "--only", "user-prompts"],
     )
 
     main_mod.main()

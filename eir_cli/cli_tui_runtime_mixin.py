@@ -1,6 +1,6 @@
 """Classic-TUI run loop phases: input processing, after-turn bookkeeping, startup banner/prewarm/maintenance, prompt_toolkit application build, signal handlers and shutdown.
 
-Mixin split out of ``cli.py``; bound onto ``HermesCLI`` via the MRO.
+Mixin split out of ``cli.py``; bound onto ``EirCLI`` via the MRO.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from agent.i18n import t
 from agent.interrupt_compat import request_hard_interrupt
 from agent import terminal_image
 from contextlib import suppress
-from hermes_constants import get_hermes_home
+from eir_constants import get_eir_home
 from prompt_toolkit.application import Application
 from rich.markup import escape as _escape
 
@@ -44,7 +44,7 @@ class CLITuiRuntimeMixin:
                     if not self._agent_running:
                         self._tui_idle_tick()
                     continue
-                from hermes_cli.gateway_queue import OwnQueueHold
+                from eir_cli.gateway_queue import OwnQueueHold
                 held = OwnQueueHold.begin(self, user_input)
                 if held is None:
                     self._tui_process_one_input(user_input)
@@ -153,7 +153,7 @@ class CLITuiRuntimeMixin:
             n = len(submit_images)
             _attached = t("cli.tui.images_attached_one" if n == 1 else "cli.tui.images_attached_other", count=n)
             _cprint(f"  {_DIM}{_attached}{_RST}")
-            from hermes_cli.cli_inline_images import print_inline_images
+            from eir_cli.cli_inline_images import print_inline_images
             print_inline_images(self, submit_images)
 
         self._agent_running = self._interactive_turn = True
@@ -253,7 +253,7 @@ class CLITuiRuntimeMixin:
         # Arm the exit backstop now that shutdown intent is unambiguous — covers wedges in the unwind below
         # that would otherwise leave the process alive with no watchdog (#65998 class).
         _arm_exit_watchdog_on_shutdown_signal()
-        from hermes_cli.cli_shutdown import _is_gateway_viewer
+        from eir_cli.cli_shutdown import _is_gateway_viewer
         if _is_gateway_viewer(self):
             # A lost terminal (SIGHUP, or the emulator's SIGTERM) is a disconnect, not /exit: the
             # gateway keeps the turn and its background subagents, as for a dropped socket. A signal
@@ -281,7 +281,7 @@ class CLITuiRuntimeMixin:
         from cli import _accent_hex, _detect_light_mode
         with suppress(Exception):  # light-mode probe before pt grabs the tty (cached)
             _detect_light_mode()
-        from hermes_cli.cli_inline_images import vscode_images_hint
+        from eir_cli.cli_inline_images import vscode_images_hint
         _show_vscode_images_hint = False
         with suppress(Exception):  # VS Code image probe: same pre-pt window, cached, ~10 ms
             _show_vscode_images_hint = vscode_images_hint(self._inline_images_mode)
@@ -291,8 +291,8 @@ class CLITuiRuntimeMixin:
             if _term_lines > 2:
                 print("\n" * (_term_lines - 1), end="", flush=True)
 
-        from hermes_cli.gateway_client import GatewayClientError
-        from hermes_cli.gateway_owner_restart import SuccessorWaitStopped
+        from eir_cli.gateway_client import GatewayClientError
+        from eir_cli.gateway_owner_restart import SuccessorWaitStopped
         try:
             self._ensure_gateway_session()  # the banner shows the gateway session's id and inventory
         except SuccessorWaitStopped as exc:  # Ctrl+C while the gateway restarted: nothing was opened
@@ -316,14 +316,14 @@ class CLITuiRuntimeMixin:
         # so; this TTY is where they can. Either answer pins an image, so it is asked once.
         if sys.stdin.isatty():
             try:
-                from hermes_cli.sandbox_image_switch import offer_interactive
+                from eir_cli.sandbox_image_switch import offer_interactive
                 from cli import _cprint
                 offer_interactive(cprint=_cprint)
             except Exception:
                 logger.debug("sandbox image switch offer failed", exc_info=True)
             # Low disk + auto-prune never decided: ask once (either answer ends it for good).
             try:
-                from hermes_cli.prune_advisor import offer_interactive as _offer_auto_prune
+                from eir_cli.prune_advisor import offer_interactive as _offer_auto_prune
                 from cli import _cprint
                 _offer_auto_prune(cprint=_cprint)
             except Exception:
@@ -336,7 +336,7 @@ class CLITuiRuntimeMixin:
         _welcome_text = t("cli.tui.welcome")
         _welcome_color = "#FFF8DC"
         try:
-            from hermes_cli.skin_engine import get_active_skin
+            from eir_cli.skin_engine import get_active_skin
             _welcome_skin = get_active_skin()
             _welcome_text = _welcome_skin.get_branding("welcome", _welcome_text)
             _welcome_color = _welcome_skin.get_color("banner_text", _welcome_color)
@@ -346,7 +346,7 @@ class CLITuiRuntimeMixin:
 
         self._tui_startup_prewarm_and_warnings(_welcome_skin)
         if _show_vscode_images_hint:
-            from hermes_cli.skin_engine import get_active_skin
+            from eir_cli.skin_engine import get_active_skin
             _tip_color = get_active_skin().get_color("banner_dim", "#B8860B")
             self._console_print(f"[dim {_tip_color}]{t('cli.tip_line', tip=t('cli.tui.vscode_images_hint'))}[/]")
         else:
@@ -365,13 +365,13 @@ class CLITuiRuntimeMixin:
         """Idle-window prewarms (picker cache, agent runtime imports) plus the redaction-off and OpenClaw-residue banners."""
         # Warm the /model picker cache off-thread (else its first open blocks ~1-2s).
         with suppress(Exception):
-            from hermes_cli.model_switch_providers import prewarm_picker_cache_async
+            from eir_cli.model_switch_providers import prewarm_picker_cache_async
             prewarm_picker_cache_async()
 
         # Pre-import the agent runtime (~1.5s: run_agent + OpenAI SDK) off-thread; the import
         # lock makes an early submit block on the remaining work rather than redo it.
         # Skipped when Termux defers agent startup on purpose.
-        if os.environ.get("HERMES_DEFER_AGENT_STARTUP") != "1":
+        if os.environ.get("EIR_DEFER_AGENT_STARTUP") != "1":
             def _prewarm_agent_runtime() -> None:
                 try:
                     import run_agent
@@ -386,7 +386,7 @@ class CLITuiRuntimeMixin:
             # The redactor snapshots its state at import time so any toggle now won't affect the running
             # process — we just want the operator to see that they're running without the safety net. See
             # #17691.
-            _redact_raw = os.getenv("HERMES_REDACT_SECRETS", "true")
+            _redact_raw = os.getenv("EIR_REDACT_SECRETS", "true")
             if _redact_raw.lower() not in {"1", "true", "yes", "on"}:
                 self._console_print(
                     f"[bold red]{t('cli.tui.redaction_disabled_title')}[/] "
@@ -405,7 +405,7 @@ class CLITuiRuntimeMixin:
                     _resid_color = "#B8860B"
                 self._console_print(f"[{_resid_color}]{openclaw_residue_hint_cli()}[/]")
                 try:
-                    from hermes_cli.config import get_config_path as _get_cfg_path_resid
+                    from eir_cli.config import get_config_path as _get_cfg_path_resid
                     mark_seen(_get_cfg_path_resid(), OPENCLAW_RESIDUE_FLAG)
                 except Exception:
                     pass  # banner fires again next session
@@ -422,7 +422,7 @@ class CLITuiRuntimeMixin:
 
     def _run_startup_maintenance(self):
         with suppress(Exception):
-            from hermes_cli.plugins_idle_tasks import run_idle_jobs
+            from eir_cli.plugins_idle_tasks import run_idle_jobs
             run_idle_jobs(
                 idle_for_seconds=float("inf"),  # CLI startup = fully idle
                 on_summary=lambda msg: self._console_print(f"[dim #6b7684]💾 {msg}[/]"),
@@ -525,7 +525,7 @@ class CLITuiRuntimeMixin:
         # Without this line the terminal sits silent through the whole cleanup window.
         with suppress(Exception):
             print(f"{_DIM}{t('cli.tui.shutting_down')}{_RST}", flush=True)
-        from hermes_cli.cli_shutdown import _gateway_owns_session_end
+        from eir_cli.cli_shutdown import _gateway_owns_session_end
         if self.agent and self._agent_running and not (
                 self._detach_on_exit and _gateway_owns_session_end(self.agent)):
             # A gateway turn left by Ctrl+D is not interrupted: ``end_session`` below detaches this
@@ -568,7 +568,7 @@ class CLITuiRuntimeMixin:
                 # /exit --delete: remove transcripts + SQLite history.
                 try:
                     _sid = _closing_sid
-                    if self._session_db.delete_session(_sid, sessions_dir=get_hermes_home() / "sessions"):
+                    if self._session_db.delete_session(_sid, sessions_dir=get_eir_home() / "sessions"):
                         _cprint(f"  {_DIM}{t('cli.tui.session_deleted', session_id=_escape(_sid))}{_RST}")
                     else:
                         _cprint(f"  {_DIM}{t('cli.tui.session_delete_missing', session_id=_escape(_sid))}{_RST}")
@@ -582,7 +582,7 @@ class CLITuiRuntimeMixin:
         # short; a signal-driven exit never asks.
         import cli as _cli_mod
         if not _cli_mod._signal_watchdog_armed and _cli_mod._active_worktree:
-            from hermes_cli.worktree_exit import apply_exit_choice, ask_exit_choice
+            from eir_cli.worktree_exit import apply_exit_choice, ask_exit_choice
             with suppress(Exception, KeyboardInterrupt):
                 ask_exit_choice(_cli_mod._active_worktree)
                 apply_exit_choice(_cli_mod._active_worktree, _cprint)

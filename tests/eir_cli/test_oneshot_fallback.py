@@ -1,4 +1,4 @@
-"""#81209: ``hermes -z`` must consult the fallback chain at *resolution* time.
+"""#81209: ``eir -z`` must consult the fallback chain at *resolution* time.
 
 A quota-exhausted / expired primary raises ``AuthError`` from ``resolve_runtime_provider`` before
 ``AIAgent`` exists, so the mid-session ``fallback_model`` wiring never gets a chance. The shared
@@ -6,8 +6,8 @@ A quota-exhausted / expired primary raises ``AuthError`` from ``resolve_runtime_
 
 import pytest
 
-from hermes_cli.auth import AuthError
-from hermes_cli.runtime_provider import resolve_runtime_with_fallback
+from eir_cli.auth import AuthError
+from eir_cli.runtime_provider import resolve_runtime_with_fallback
 
 _CFG = {"fallback_providers": [
     {"provider": "anthropic", "model": "claude-x", "api_key": "fb-key"},
@@ -27,7 +27,7 @@ class TestResolveRuntimeWithFallback:
                 raise AuthError("anthropic key missing")
             return {"provider": kw["requested"], "api_key": "k"}
 
-        monkeypatch.setattr("hermes_cli.runtime_provider.resolve_runtime_provider", fake_resolve)
+        monkeypatch.setattr("eir_cli.runtime_provider.resolve_runtime_provider", fake_resolve)
         runtime, entry = resolve_runtime_with_fallback(_CFG, requested="openai-codex", target_model="gpt-5.4")
         assert (runtime["provider"], entry["model"]) == ("openai", "gpt-x")
         # Chain walked in config order; the first entry got its inline api_key and its own model.
@@ -37,7 +37,7 @@ class TestResolveRuntimeWithFallback:
         def all_fail(**kw):
             raise AuthError("primary down" if kw.get("requested") == "openai-codex" else "fallback down")
 
-        monkeypatch.setattr("hermes_cli.runtime_provider.resolve_runtime_provider", all_fail)
+        monkeypatch.setattr("eir_cli.runtime_provider.resolve_runtime_provider", all_fail)
         with pytest.raises(AuthError, match="primary down"):  # primary-error precedence
             resolve_runtime_with_fallback(_CFG, requested="openai-codex")
 
@@ -45,10 +45,10 @@ class TestResolveRuntimeWithFallback:
         def typo(**kw):
             raise ValueError("Unknown provider 'antropic'")
 
-        monkeypatch.setattr("hermes_cli.runtime_provider.resolve_runtime_provider", typo)
+        monkeypatch.setattr("eir_cli.runtime_provider.resolve_runtime_provider", typo)
         with pytest.raises(ValueError):
             resolve_runtime_with_fallback(_CFG, requested="antropic")
-        monkeypatch.setattr("hermes_cli.runtime_provider.resolve_runtime_provider", lambda **kw: {"provider": "p"})
+        monkeypatch.setattr("eir_cli.runtime_provider.resolve_runtime_provider", lambda **kw: {"provider": "p"})
         assert resolve_runtime_with_fallback({}) == ({"provider": "p"}, None)
 
         # A misconfigured *fallback* entry is skipped, but loudly: a typo must not vanish at debug level.
@@ -59,8 +59,8 @@ class TestResolveRuntimeWithFallback:
                 raise ValueError("Unknown provider")
             return {"provider": kw["requested"]}
 
-        monkeypatch.setattr("hermes_cli.runtime_provider.resolve_runtime_provider", primary_down_first_entry_typo)
-        with caplog.at_level("WARNING", logger="hermes_cli.runtime_provider"):
+        monkeypatch.setattr("eir_cli.runtime_provider.resolve_runtime_provider", primary_down_first_entry_typo)
+        with caplog.at_level("WARNING", logger="eir_cli.runtime_provider"):
             _, entry = resolve_runtime_with_fallback(_CFG, requested="openai-codex")
         assert entry["provider"] == "openai"
         assert any(r.levelname == "WARNING" and "anthropic" in r.getMessage() for r in caplog.records)

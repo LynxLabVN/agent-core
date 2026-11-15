@@ -18,14 +18,14 @@ export const GATEWAY_STOP_TIMEOUT_MS = 20_000
 
 /** Best-effort all-profile drain for uninstall. The deletion lock gate follows. */
 export function stopGatewayBeforeUpdate(
-  hermesCliPath: string,
-  hermesHome: string,
+  eirCliPath: string,
+  eirHome: string,
   deps: StopGatewayBeforeUpdateDeps = {}
 ): boolean {
-  return runGatewayLifecycleCommand(hermesCliPath, ['gateway', 'stop', '--all'], deps)
+  return runGatewayLifecycleCommand(eirCliPath, ['gateway', 'stop', '--all'], deps)
 }
 
-function runGatewayLifecycleCommand(hermesCliPath: string, args: string[], deps: StopGatewayBeforeUpdateDeps): boolean {
+function runGatewayLifecycleCommand(eirCliPath: string, args: string[], deps: StopGatewayBeforeUpdateDeps): boolean {
   const isWindows = deps.isWindows ?? process.platform === 'win32'
 
   if (!isWindows) {
@@ -36,15 +36,15 @@ function runGatewayLifecycleCommand(hermesCliPath: string, args: string[], deps:
   const exec = deps.execFileSync ?? execFileSync
 
   if (deps.spy) {
-    deps.spy(hermesCliPath, args)
+    deps.spy(eirCliPath, args)
   }
 
-  if (!existsSync(hermesCliPath)) {
+  if (!existsSync(eirCliPath)) {
     return false
   }
 
   try {
-    exec(hermesCliPath, args, {
+    exec(eirCliPath, args, {
       timeout: GATEWAY_STOP_TIMEOUT_MS,
       windowsHide: true,
       stdio: 'ignore',

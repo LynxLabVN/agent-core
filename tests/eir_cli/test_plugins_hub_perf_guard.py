@@ -5,14 +5,14 @@ import threading
 from pathlib import Path
 from types import SimpleNamespace
 
-from hermes_cli import web_server
-import hermes_cli.config as _cfg_mod
-import hermes_cli.web_routers.dashboard_ui as _rt_dashboard_ui
-import hermes_cli.web_server_dashboard as _web_server_dashboard
-import hermes_cli.web_server_memory as _web_server_memory
-from hermes_cli import plugins_cmd
-from hermes_cli import plugin_catalog
-from hermes_cli import plugins_cmd_catalog
+from eir_cli import web_server
+import eir_cli.config as _cfg_mod
+import eir_cli.web_routers.dashboard_ui as _rt_dashboard_ui
+import eir_cli.web_server_dashboard as _web_server_dashboard
+import eir_cli.web_server_memory as _web_server_memory
+from eir_cli import plugins_cmd
+from eir_cli import plugin_catalog
+from eir_cli import plugins_cmd_catalog
 from tools import registry as tools_registry
 
 
@@ -22,7 +22,7 @@ _PLUGIN_ROW = [("demo", "1.0.0", "demo plugin", "user", "/tmp/demo-plugin", "dem
 def _patch_minimal_hub_dependencies(monkeypatch, *, check_fn, discover_all_plugins=None):
     monkeypatch.setattr(web_server, "_get_dashboard_plugins", lambda force_rescan=False: [])
     monkeypatch.setattr(_web_server_memory, "_discover_memory_provider_statuses", list)
-    monkeypatch.setattr(_cfg_mod, "get_hermes_home", lambda: Path("/tmp/hermes-home"))
+    monkeypatch.setattr(_cfg_mod, "get_eir_home", lambda: Path("/tmp/eir-home"))
     monkeypatch.setattr(_cfg_mod, "load_config", lambda: {"dashboard": {"hidden_plugins": []}})
 
     monkeypatch.setattr(
@@ -103,7 +103,7 @@ def test_plugins_hub_cold_cache_schedules_background_probe(monkeypatch):
     # auth requirement.
     refreshed = _web_server_dashboard._merged_plugins_hub(force_refresh=True)
     assert refreshed["plugins"][0]["auth_required"] is True
-    assert refreshed["plugins"][0]["auth_command"] == "hermes auth demo"
+    assert refreshed["plugins"][0]["auth_command"] == "eir auth demo"
 
 
 
@@ -120,7 +120,7 @@ def test_plugins_hub_uses_cached_failed_check_fn_verdict(monkeypatch):
     payload = _web_server_dashboard._merged_plugins_hub(force_refresh=True)
 
     assert payload["plugins"][0]["auth_required"] is True
-    assert payload["plugins"][0]["auth_command"] == "hermes auth demo"
+    assert payload["plugins"][0]["auth_command"] == "eir auth demo"
 
 
 
@@ -153,7 +153,7 @@ def test_plugins_hub_route_builds_catalog_annotations_off_event_loop(monkeypatch
 def test_plugin_install_endpoint_invalidates_hub_cache(monkeypatch):
     import asyncio
 
-    from hermes_cli.web_models import _AgentPluginInstallBody
+    from eir_cli.web_models import _AgentPluginInstallBody
 
     tools_registry.invalidate_check_fn_cache()
     _web_server_dashboard._invalidate_plugins_hub_cache()

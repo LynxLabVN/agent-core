@@ -5,7 +5,7 @@ listener (``electron/native-oauth.ts`` + ``native-oauth-login.ts``). The Webapp 
 its own, so the gateway SERVING it takes that role: it holds the PKCE verifier, hands the browser
 the remote's ``/auth/native/authorize`` URL, and its own route
 ``/webapp/gateway-connections/oauth/callback`` is the loopback redirect. The remote needs no new
-code: it is the same native flow Desktop drives (``hermes_cli/dashboard_auth/routes.py``), which
+code: it is the same native flow Desktop drives (``eir_cli/dashboard_auth/routes.py``), which
 accepts only a loopback IP-literal redirect, so the callback is addressed to
 ``127.0.0.1:<serving port>``. A browser on another machine lands on its own loopback instead; it
 completes the same flight by pasting that address (:func:`complete_from_url`).
@@ -29,7 +29,7 @@ from urllib.parse import parse_qs, urlencode, urlparse
 
 import httpx
 
-from hermes_cli import gateway_connections as store
+from eir_cli import gateway_connections as store
 
 NATIVE_FLOW_ID = "native_pkce"
 CALLBACK_PATH = "/webapp/gateway-connections/oauth/callback"
@@ -184,7 +184,7 @@ def start_sign_in(connection_id: str, *, bound_host: str, bound_port: int, provi
     if not status_supports_native_flow(_remote_status(base_url, headers)):
         raise OAuthSignInError(
             f"{base_url} does not offer native sign-in (no interactive sign-in provider, or an older "
-            "Hermes). Update that gateway or connect with a session token.")
+            "Eir). Update that gateway or connect with a session token.")
     verifier, challenge = generate_pkce_pair()
     state = _b64url(secrets.token_bytes(24))
     flight = _Flight(connection_id=connection_id, base_url=base_url, verifier=verifier,
@@ -263,7 +263,7 @@ def complete_from_url(callback_url: str, *, connection_id: str = "") -> dict:
     a flight that connection started."""
     parsed = urlparse(str(callback_url or "").strip())
     if parsed.path.rstrip("/") != CALLBACK_PATH:
-        raise OAuthSignInError("That address is not a Hermes gateway sign-in redirect.")
+        raise OAuthSignInError("That address is not a Eir gateway sign-in redirect.")
     query = {k: v[0] for k, v in parse_qs(parsed.query).items() if v}
     return complete_sign_in(code=query.get("code", ""), state=query.get("state", ""),
                             error=query.get("error", ""), error_description=query.get("error_description", ""),

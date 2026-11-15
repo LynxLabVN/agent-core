@@ -1,4 +1,4 @@
-"""`hermes gateway tickets`: HTTP and WebSocket tickets for a client that reaches the gateway over SSH.
+"""`eir gateway tickets`: HTTP and WebSocket tickets for a client that reaches the gateway over SSH.
 
 The real CLI runs as a subprocess, as an SSH exec would run it: `--probe` against nothing, and
 `--serve` against a real control socket with a real ticket store, then against a real gateway
@@ -26,7 +26,7 @@ from websockets.exceptions import InvalidStatus
 from gateway.runtime_bootstrap import TicketStore
 from tests.gateway.test_native_http_auth import daemon, headers
 from tests.gateway.test_normal_runtime_boot import control
-from tests.hermes_cli.test_gateway_attach import REPO, _attach, _serve
+from tests.eir_cli.test_gateway_attach import REPO, _attach, _serve
 
 
 @pytest.fixture
@@ -40,8 +40,8 @@ def home(request):
 
 
 def _command(home, mode):
-    env = {**os.environ, "HERMES_HOME": str(home), "PYTHONPATH": str(REPO)}
-    return [sys.executable, "-m", "hermes_cli.main", "gateway", "tickets", mode, "--json"], env
+    env = {**os.environ, "EIR_HOME": str(home), "PYTHONPATH": str(REPO)}
+    return [sys.executable, "-m", "eir_cli.main", "gateway", "tickets", mode, "--json"], env
 
 
 def _run(home, mode, stdin=""):
@@ -431,7 +431,7 @@ def _multiplexing_daemon(tmp_path, names):
         (home / "profiles" / name).mkdir(parents=True)
         (home / "profiles" / name / "config.yaml").write_text(json.dumps(model))
     env = {k: os.environ[k] for k in ("PATH", "LANG", "TZ", "TIRITH_ENABLED") if k in os.environ}
-    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home), PYTHONPATH=str(REPO),
+    env.update(HOME=str(user), USERPROFILE=str(user), EIR_HOME=str(home), PYTHONPATH=str(REPO),
                PYTHONUNBUFFERED="1")
     with (tmp_path / "gateway.log").open("w+") as log:
         process = subprocess.Popen([sys.executable, "-m", "gateway.run"], cwd=REPO, env=env,
@@ -540,8 +540,8 @@ async def _socket_calls(origin, ticket, calls):
     """Dial /api/ws with *ticket* and answer each (method, params): its result, or its error message."""
     url = origin.replace("http:", "ws:") + "/api/ws"
     answers = []
-    async with connect(url, subprotocols=["hermes-gateway-v1", "hermes-gateway-ticket." + ticket], proxy=None) as ws:
-        assert ws.subprotocol == "hermes-gateway-v1"
+    async with connect(url, subprotocols=["eir-gateway-v1", "eir-gateway-ticket." + ticket], proxy=None) as ws:
+        assert ws.subprotocol == "eir-gateway-v1"
         for number, (method, params) in enumerate(calls):
             await ws.send(json.dumps({"jsonrpc": "2.0", "id": number, "method": method, "params": params}))
             async with asyncio.timeout(30):

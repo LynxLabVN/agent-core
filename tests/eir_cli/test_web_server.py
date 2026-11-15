@@ -1,4 +1,4 @@
-"""Tests for hermes_cli.web_server and related config utilities."""
+"""Tests for eir_cli.web_server and related config utilities."""
 
 import asyncio
 import os
@@ -13,26 +13,26 @@ from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
 
 import pytest
-import hermes_yaml as yaml
+import eir_yaml as yaml
 
-from hermes_cli.config import (
+from eir_cli.config import (
     reload_env,
     redact_key,
     OPTIONAL_ENV_VARS,
 )
-from hermes_cli.config_secret_refs import provider_name_key_env
+from eir_cli.config_secret_refs import provider_name_key_env
 import gateway.status as _gw_status
-import hermes_cli.config as _cfg_mod
-import hermes_cli.web_routers.chat_ws as _rt_chat_ws
-import hermes_cli.web_server_chat as _web_server_chat
-import hermes_cli.web_server_config as _web_server_config
-import hermes_cli.web_server_dashboard as _web_server_dashboard
-import hermes_cli.web_server_files as _web_server_files
-import hermes_cli.web_server_gateway as _web_server_gateway
-import hermes_cli.web_server_lifecycle as _web_server_lifecycle
-import hermes_cli.web_server_memory as _web_server_memory
-import hermes_cli.web_server_messaging as _web_server_messaging
-import hermes_cli.web_server_sessions as _web_server_sessions
+import eir_cli.config as _cfg_mod
+import eir_cli.web_routers.chat_ws as _rt_chat_ws
+import eir_cli.web_server_chat as _web_server_chat
+import eir_cli.web_server_config as _web_server_config
+import eir_cli.web_server_dashboard as _web_server_dashboard
+import eir_cli.web_server_files as _web_server_files
+import eir_cli.web_server_gateway as _web_server_gateway
+import eir_cli.web_server_lifecycle as _web_server_lifecycle
+import eir_cli.web_server_memory as _web_server_memory
+import eir_cli.web_server_messaging as _web_server_messaging
+import eir_cli.web_server_sessions as _web_server_sessions
 from datetime import UTC
 
 
@@ -52,8 +52,8 @@ _EXAMPLE_PLUGIN_FIXTURE = (
 
 
 @pytest.fixture
-def _install_example_plugin(_isolate_hermes_home):
-    """Drop the example-dashboard fixture into the per-test HERMES_HOME
+def _install_example_plugin(_isolate_eir_home):
+    """Drop the example-dashboard fixture into the per-test EIR_HOME
     user-plugins directory and force the web_server's dashboard plugin
     cache + API mount to rediscover it.
 
@@ -62,20 +62,20 @@ def _install_example_plugin(_isolate_hermes_home):
     user's sidebar. It is now a tests-only fixture: any test that needs
     ``/api/plugins/example/hello`` or ``/dashboard-plugins/example/...``
     requests this fixture so the plugin appears only for that test's
-    isolated ``HERMES_HOME``.
+    isolated ``EIR_HOME``.
 
     The user-plugin source is preferred over a transient
-    ``HERMES_BUNDLED_PLUGINS`` override because the bundled dir is
+    ``EIR_BUNDLED_PLUGINS`` override because the bundled dir is
     resolved per-call (other tests in the suite implicitly rely on the
-    real bundled plugins — kanban, hermes-achievements, model providers
+    real bundled plugins — kanban, eir-achievements, model providers
     — being available, and globally swapping that root would yank them
     all). User plugins are first in the discovery search order, so
     laying down the fixture here is enough.
     """
-    from hermes_constants import get_hermes_home
-    from hermes_cli import web_server
+    from eir_constants import get_eir_home
+    from eir_cli import web_server
 
-    user_plugins_dir = get_hermes_home() / "plugins"
+    user_plugins_dir = get_eir_home() / "plugins"
     user_plugins_dir.mkdir(parents=True, exist_ok=True)
     dst = user_plugins_dir / "example-dashboard"
     if dst.exists():
@@ -87,9 +87,9 @@ def _install_example_plugin(_isolate_hermes_home):
     # An installed-but-not-enabled user plugin has its API mount skipped
     # and its assets 404'd — which is the whole point of the gate. These
     # fixtures exist to exercise the *serving* paths, so opt the example
-    # plugin in exactly as a real operator would with `hermes plugins
+    # plugin in exactly as a real operator would with `eir plugins
     # enable example`.
-    from hermes_cli.config import load_config, save_config
+    from eir_cli.config import load_config, save_config
     _cfg = load_config()
     _plugins_cfg = _cfg.setdefault("plugins", {})
     _enabled = _plugins_cfg.get("enabled")
@@ -104,7 +104,7 @@ def _install_example_plugin(_isolate_hermes_home):
     #   1. Identify the routes the mount call appends.
     #   2. Restore the original list on teardown — otherwise leftover
     #      ``/api/plugins/example/*`` routes leak into subsequent tests
-    #      and start serving requests against a torn-down HERMES_HOME.
+    #      and start serving requests against a torn-down EIR_HOME.
     app = web_server.app
     original_routes = list(app.router.routes)
 
@@ -166,7 +166,7 @@ class TestReloadEnv:
 
 
     def test_removes_deleted_known_vars(self, tmp_path):
-        """reload_env() removes known Hermes vars not present in .env."""
+        """reload_env() removes known Eir vars not present in .env."""
         env_file = tmp_path / ".env"
         env_file.write_text("")  # empty .env
         # Pick a known key from OPTIONAL_ENV_VARS
@@ -197,16 +197,16 @@ class TestRedactKey:
 
 
     def test_session_token_resolution_preserves_loaded_app_auth(self, monkeypatch):
-        import hermes_cli.web_server as ws
-        import hermes_cli.web_server_session_token as st
+        import eir_cli.web_server as ws
+        import eir_cli.web_server_session_token as st
         from starlette.testclient import TestClient
 
         original_app = ws.app
         original_header_name = ws._SESSION_HEADER_NAME
         original_token = ws._SESSION_TOKEN
-        monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", "desktop-seeded-token")
+        monkeypatch.setenv("EIR_DASHBOARD_SESSION_TOKEN", "desktop-seeded-token")
         assert st.resolve_session_token() == "desktop-seeded-token"
-        monkeypatch.delenv("HERMES_DASHBOARD_SESSION_TOKEN", raising=False)
+        monkeypatch.delenv("EIR_DASHBOARD_SESSION_TOKEN", raising=False)
         with patch.object(st.secrets, "token_urlsafe", return_value="generated-token"):
             assert st.resolve_session_token() == "generated-token"
 
@@ -224,14 +224,14 @@ class TestRedactKey:
 
 
 @pytest.fixture
-def mutation_owner(monkeypatch, _isolate_hermes_home):
+def mutation_owner(monkeypatch, _isolate_eir_home):
     from gateway.session_authority import SessionAuthority
-    from hermes_constants import get_hermes_home
-    from hermes_cli.web_server import app
-    from hermes_state import SessionDB
-    from hermes_state_runtime import begin_runtime_epoch
+    from eir_constants import get_eir_home
+    from eir_cli.web_server import app
+    from eir_state import SessionDB
+    from eir_state_runtime import begin_runtime_epoch
 
-    home = get_hermes_home()
+    home = get_eir_home()
     db = SessionDB(db_path=home / 'state.db')
     authority = SessionAuthority(SimpleNamespace(_draining=False), profile_id=str(home),
         instance_id='test-owner', db=db, epoch=begin_runtime_epoch(db, instance_id='test-owner'))
@@ -246,18 +246,18 @@ class TestWebServerEndpoints:
     """Test the FastAPI REST endpoints using Starlette TestClient."""
 
     @pytest.fixture(autouse=True)
-    def _setup_test_client(self, monkeypatch, _isolate_hermes_home):
-        """Create a TestClient and isolate the state DB under the test HERMES_HOME."""
+    def _setup_test_client(self, monkeypatch, _isolate_eir_home):
+        """Create a TestClient and isolate the state DB under the test EIR_HOME."""
         try:
             from starlette.testclient import TestClient
         except ImportError:
             pytest.skip("fastapi/starlette not installed")
 
-        import hermes_state
-        from hermes_constants import get_hermes_home
-        from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
+        import eir_state
+        from eir_constants import get_eir_home
+        from eir_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
 
-        monkeypatch.setattr(hermes_state, "DEFAULT_DB_PATH", get_hermes_home() / "state.db")
+        monkeypatch.setattr(eir_state, "DEFAULT_DB_PATH", get_eir_home() / "state.db")
 
         self.client = TestClient(app)
         self.client.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
@@ -267,11 +267,11 @@ class TestWebServerEndpoints:
         """Repeated GET-only polls must not checkpoint another writer's WAL."""
         import sqlite3
 
-        from hermes_constants import get_hermes_home
-        from hermes_state import SessionDB
+        from eir_constants import get_eir_home
+        from eir_state import SessionDB
 
         _web_server_sessions._last_auto_archive_check.clear()
-        db_path = get_hermes_home() / "state.db"
+        db_path = get_eir_home() / "state.db"
         wal_path = Path(f"{db_path}-wal")
         writer = SessionDB(db_path=db_path)
         monitor = None
@@ -344,12 +344,12 @@ class TestWebServerEndpoints:
 
 
     def test_get_sessions_leaves_auto_archive_to_owner(self):
-        from hermes_cli import web_server
-        from hermes_cli.config import load_config, save_config
-        from hermes_constants import get_hermes_home
-        from hermes_state import SessionDB
+        from eir_cli import web_server
+        from eir_cli.config import load_config, save_config
+        from eir_constants import get_eir_home
+        from eir_state import SessionDB
 
-        db_path = get_hermes_home() / "state.db"
+        db_path = get_eir_home() / "state.db"
         seed = SessionDB(db_path=db_path)
         try:
             seed.create_session("stale", source="cli")
@@ -394,14 +394,14 @@ class TestWebServerEndpoints:
             verify.close()
 
     def test_get_sessions_missing_store_is_unavailable_without_creation(self):
-        from hermes_constants import get_hermes_home
+        from eir_constants import get_eir_home
 
-        before = set(get_hermes_home().glob("state.db*"))
+        before = set(get_eir_home().glob("state.db*"))
         response = self.client.get("/api/sessions?limit=50&offset=0")
 
         assert response.status_code == 503
         assert "not initialized" in response.json()["detail"]
-        assert set(get_hermes_home().glob("state.db*")) == before
+        assert set(get_eir_home().glob("state.db*")) == before
 
     def test_startup_eager_reconcile_is_read_only_on_a_healthy_store(self, monkeypatch):
         """A current-schema store gets NO writable open from the dashboard (#107688).
@@ -410,11 +410,11 @@ class TestWebServerEndpoints:
         dashboard (close-time checkpoint, possible FTS rebuild) is the
         two-writer corruption vector. Only the stale-schema heal may write.
         """
-        import hermes_state
-        from hermes_constants import get_hermes_home
-        from hermes_state import SessionDB
+        import eir_state
+        from eir_constants import get_eir_home
+        from eir_state import SessionDB
 
-        SessionDB(db_path=get_hermes_home() / "state.db").close()
+        SessionDB(db_path=get_eir_home() / "state.db").close()
 
         writable_opens = []
         real_init = SessionDB.__init__
@@ -424,7 +424,7 @@ class TestWebServerEndpoints:
                 writable_opens.append(kwargs)
             return real_init(self, *args, **kwargs)
 
-        monkeypatch.setattr(hermes_state.SessionDB, "__init__", spy)
+        monkeypatch.setattr(eir_state.SessionDB, "__init__", spy)
         _web_server_lifecycle._eager_reconcile_own_session_db()
 
         assert writable_opens == []
@@ -433,22 +433,22 @@ class TestWebServerEndpoints:
         """A store the eager reconcile cannot open must not break startup."""
         import sqlite3 as sqlite3_module
 
-        import hermes_state
+        import eir_state
 
 
         def boom(*args, **kwargs):
             raise sqlite3_module.OperationalError("database is locked")
 
-        monkeypatch.setattr(hermes_state, "SessionDB", boom)
+        monkeypatch.setattr(eir_state, "SessionDB", boom)
         # Must swallow — reads report unavailable until owner recovery.
         _web_server_lifecycle._eager_reconcile_own_session_db()
 
     def test_failed_schema_probes_never_escalate_reads(self, monkeypatch):
         from fastapi import HTTPException
-        from hermes_constants import get_hermes_home
-        from hermes_state import SessionDB
+        from eir_constants import get_eir_home
+        from eir_state import SessionDB
 
-        db_path = get_hermes_home() / "state.db"
+        db_path = get_eir_home() / "state.db"
         seed = SessionDB(db_path=db_path)
         seed.create_session("unfixable", source="cli")
         seed.close()
@@ -468,7 +468,7 @@ class TestWebServerEndpoints:
         """Unscoped SQLITE_CORRUPT must not escalate a dashboard read to writes."""
         import sqlite3
 
-        import hermes_state
+        import eir_state
 
         db_path = tmp_path / "state.db"
         db_path.write_bytes(b"not-empty")
@@ -478,7 +478,7 @@ class TestWebServerEndpoints:
             opens.append(kwargs.get("read_only", False))
             raise sqlite3.DatabaseError("database disk image is malformed")
 
-        monkeypatch.setattr(hermes_state, "SessionDB", corrupt_open)
+        monkeypatch.setattr(eir_state, "SessionDB", corrupt_open)
 
         from fastapi import HTTPException
         with pytest.raises(HTTPException, match="corrupt"):
@@ -487,7 +487,7 @@ class TestWebServerEndpoints:
         assert opens == [True]
 
     def test_decode_error_never_triggers_writable_heal(self, tmp_path, monkeypatch):
-        import hermes_state
+        import eir_state
         from fastapi import HTTPException
 
         db_path = tmp_path / "state.db"
@@ -498,15 +498,15 @@ class TestWebServerEndpoints:
             opens.append(kwargs.get("read_only", False))
             raise UnicodeDecodeError("utf-8", b"\x81", 0, 1, "invalid start byte")
 
-        monkeypatch.setattr(hermes_state, "SessionDB", corrupt_open)
+        monkeypatch.setattr(eir_state, "SessionDB", corrupt_open)
         with pytest.raises(HTTPException, match="corrupt"):
             _web_server_sessions._open_session_db_at_path(db_path, read_only=True)
         assert opens == [True]
 
     def test_get_sessions_zero_byte_store_is_not_quarantined(self):
-        from hermes_constants import get_hermes_home
+        from eir_constants import get_eir_home
 
-        db_path = get_hermes_home() / "state.db"
+        db_path = get_eir_home() / "state.db"
         db_path.parent.mkdir(parents=True, exist_ok=True)
         db_path.touch()
 
@@ -535,13 +535,13 @@ class TestWebServerEndpoints:
         """?profile=<name> must resolve liveness from the profile's own home.
 
         The gateway status readers resolve process-level paths and ignore the
-        HERMES_HOME contextvar override (#56986), so /api/messaging/platforms
+        EIR_HOME contextvar override (#56986), so /api/messaging/platforms
         has to pass the profile directory explicitly — otherwise it reports a
         DIFFERENT profile's gateway as this profile's, which hides a real
         outage behind a false "connected" (issue #71211).
         """
-        from hermes_cli import web_server
-        from hermes_cli import profiles as profiles_mod
+        from eir_cli import web_server
+        from eir_cli import profiles as profiles_mod
 
         worker_home = profiles_mod.get_profile_dir("worker")
         worker_home.mkdir(parents=True)
@@ -613,12 +613,12 @@ class FlatProvMemoryProvider(MemoryProvider):
             {"key": "mode", "label": "Mode", "choices": ["cloud", "local_external"], "default": "cloud"},
             {"key": "api_url", "label": "API URL", "default": ""},
             {"key": "api_key", "label": "API key", "secret": True, "env_var": "FLATPROV_API_KEY"},
-            {"key": "bank_id", "label": "Bank", "default": "hermes"},
+            {"key": "bank_id", "label": "Bank", "default": "eir"},
             {"key": "recall_budget", "label": "Budget", "choices": ["low", "mid", "high"], "default": "mid"},
         ]
 
-    def save_config(self, values, hermes_home):
-        path = Path(hermes_home) / "flatprov" / "config.json"
+    def save_config(self, values, eir_home):
+        path = Path(eir_home) / "flatprov" / "config.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         existing = json.loads(path.read_text()) if path.exists() else {}
         existing.update(values)
@@ -642,17 +642,17 @@ CONFIG_SCHEMA = ProviderConfigSchema(
 """
 
     def _install_flatprov(self):
-        from hermes_constants import get_hermes_home
+        from eir_constants import get_eir_home
 
-        plugin_dir = get_hermes_home() / "plugins" / "flatprov"
+        plugin_dir = get_eir_home() / "plugins" / "flatprov"
         plugin_dir.mkdir(parents=True, exist_ok=True)
         (plugin_dir / "__init__.py").write_text(self._FLATPROV_INIT, encoding="utf-8")
         (plugin_dir / "config_schema.py").write_text(self._FLATPROV_SCHEMA, encoding="utf-8")
         return plugin_dir
 
     def test_declared_surface_put_writes_config_and_secret(self):
-        from hermes_constants import get_hermes_home
-        from hermes_cli.config import load_env
+        from eir_constants import get_eir_home
+        from eir_cli.config import load_env
 
         self._install_flatprov()
         resp = self.client.put(
@@ -670,7 +670,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         assert resp.json() == {"ok": True}
         assert load_env()["FLATPROV_API_KEY"] == "fp-declared-key"
 
-        config_path = get_hermes_home() / "flatprov" / "config.json"
+        config_path = get_eir_home() / "flatprov" / "config.json"
         provider_config = json.loads(config_path.read_text(encoding="utf-8"))
         assert provider_config["mode"] == "local_external"
         assert provider_config["api_url"] == "http://localhost:8888"
@@ -681,8 +681,8 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         """Dashboard dependency setup publishes through PM, never direct pip."""
         import subprocess as _subprocess
 
-        from hermes_cli import web_server
-        from hermes_cli import memory_setup
+        from eir_cli import web_server
+        from eir_cli import memory_setup
 
         prepared = []
         monkeypatch.setattr(
@@ -710,13 +710,13 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         data = resp.json()
         pip_rows = [row for row in data["results"] if row["kind"] == "pip"]
         assert pip_rows and pip_rows[0]["status"] == "installed"
-        assert pip_rows[0]["command"] == "hermes pm install"
+        assert pip_rows[0]["command"] == "eir pm install"
         assert prepared == ["flatprov"]
 
 
     def test_put_memory_provider_config_writes_config_and_secret(self):
-        from hermes_constants import get_hermes_home
-        from hermes_cli.config import load_config, load_env
+        from eir_constants import get_eir_home
+        from eir_cli.config import load_config, load_env
 
         self._install_flatprov()
         resp = self.client.put(
@@ -737,7 +737,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         assert load_config()["memory"]["provider"] == "flatprov"
         assert load_env()["FLATPROV_API_KEY"] == "fp-test-key"
 
-        config_path = get_hermes_home() / "flatprov" / "config.json"
+        config_path = get_eir_home() / "flatprov" / "config.json"
         provider_config = json.loads(config_path.read_text(encoding="utf-8"))
         assert provider_config["mode"] == "local_external"
         assert provider_config["api_url"] == "http://localhost:8888"
@@ -755,7 +755,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
                     "mode": "cloud",
                     "api_url": "https://api.example.invalid",
                     "api_key": "secret-value",
-                    "bank_id": "hermes",
+                    "bank_id": "eir",
                     "recall_budget": "mid",
                 }
             },
@@ -775,7 +775,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
 
 
     def test_get_media_requires_auth(self):
-        from hermes_cli.web_server import _SESSION_HEADER_NAME
+        from eir_cli.web_server import _SESSION_HEADER_NAME
 
         resp = self.client.get(
             "/api/media",
@@ -788,7 +788,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
 
 
     def test_media_proxy_requires_auth(self):
-        from hermes_cli.web_server import _SESSION_HEADER_NAME
+        from eir_cli.web_server import _SESSION_HEADER_NAME
 
         resp = self.client.get(
             "/api/media/proxy",
@@ -832,7 +832,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
                 assert url == "https://v3.fal.media/media/abc123"
                 return _Resp()
 
-        import hermes_cli.web_routers.files as files_router
+        import eir_cli.web_routers.files as files_router
 
         monkeypatch.setattr(files_router, "_require_token", lambda request: None, raising=False)
         # The route imports httpx locally; patch the module it resolves from.
@@ -885,7 +885,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
 
 
     def test_import_sessions_endpoint_imports_exported_json(self, mutation_owner):
-        from hermes_state import SessionDB
+        from eir_state import SessionDB
 
         payload = {
             "id": "imported-web-session",
@@ -935,7 +935,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         """Regression for the #39140 CTE salvage: a corrupted parent chain
         that loops (a -> b -> a) must terminate (UNION dedup) instead of
         recursing forever like UNION ALL would."""
-        from hermes_state import SessionDB
+        from eir_state import SessionDB
 
         db = SessionDB()
         try:
@@ -959,7 +959,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         subagent run (``_delegate_from``) or a /branch fork (``_branched_from``) is its own conversation and
         never listed as a continuation, so following it parks the user's chat in a hidden row; only
         compression continuations are followed."""
-        from hermes_state import SessionDB
+        from eir_state import SessionDB
 
         db = SessionDB()
         try:
@@ -982,66 +982,66 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         assert resp.json()["session_id"] == "primary-cont"
 
 
-    def test_update_hermes_returns_docker_guidance_without_spawning(self, monkeypatch):
+    def test_update_eir_returns_docker_guidance_without_spawning(self, monkeypatch):
 
         spawned = False
 
         def fail_spawn(*_args, **_kwargs):
             nonlocal spawned
             spawned = True
-            raise AssertionError("docker update guard should not spawn hermes update")
+            raise AssertionError("docker update guard should not spawn eir update")
 
         # Bypass the managed-externally gate so we reach the docker install check.
         monkeypatch.setattr(_web_server_files, "_dashboard_local_update_managed_externally", lambda: False)
         # The shared admission gate (#91277 Phase 3) resolves the install
-        # method through hermes_cli.config directly.
+        # method through eir_cli.config directly.
         monkeypatch.setattr(
-            "hermes_cli.config.detect_install_method", lambda *_a, **_k: "docker"
+            "eir_cli.config.detect_install_method", lambda *_a, **_k: "docker"
         )
         monkeypatch.setattr(_cfg_mod, "detect_install_method", lambda _root: "docker")
-        monkeypatch.setattr(_web_server_gateway, "_spawn_hermes_action", fail_spawn)
-        _web_server_gateway._ACTION_PROCS.pop("hermes-update", None)
-        _web_server_gateway._ACTION_RESULTS.pop("hermes-update", None)
+        monkeypatch.setattr(_web_server_gateway, "_spawn_eir_action", fail_spawn)
+        _web_server_gateway._ACTION_PROCS.pop("eir-update", None)
+        _web_server_gateway._ACTION_RESULTS.pop("eir-update", None)
 
-        resp = self.client.post("/api/hermes/update")
+        resp = self.client.post("/api/eir/update")
 
         assert resp.status_code == 200
         data = resp.json()
         assert data["ok"] is False
-        assert data["name"] == "hermes-update"
+        assert data["name"] == "eir-update"
         assert data["pid"] is None
         assert data["error"] == "docker_update_unsupported"
         assert spawned is False
 
-        status = self.client.get("/api/actions/hermes-update/status")
+        status = self.client.get("/api/actions/eir-update/status")
         assert status.status_code == 200
         status_data = status.json()
         assert status_data["running"] is False
         assert status_data["exit_code"] == 1
         assert status_data["pid"] is None
 
-    def test_update_hermes_returns_apt_guidance_without_spawning(self, monkeypatch):
+    def test_update_eir_returns_apt_guidance_without_spawning(self, monkeypatch):
 
         spawned = False
 
         def fail_spawn(*_args, **_kwargs):
             nonlocal spawned
             spawned = True
-            raise AssertionError("APT-managed update guard should not spawn hermes update")
+            raise AssertionError("APT-managed update guard should not spawn eir update")
 
         monkeypatch.setattr(_web_server_files, "_dashboard_local_update_managed_externally", lambda: False)
         # The shared admission gate (#91277 Phase 3) resolves the install
-        # method through hermes_cli.config directly, so patch it there (the
+        # method through eir_cli.config directly, so patch it there (the
         # web_server module alias only feeds the /update/check endpoint).
         monkeypatch.setattr(
-            "hermes_cli.config.detect_install_method", lambda *_a, **_k: "apt"
+            "eir_cli.config.detect_install_method", lambda *_a, **_k: "apt"
         )
         monkeypatch.setattr(_cfg_mod, "detect_install_method", lambda _root: "apt")
-        monkeypatch.setattr(_web_server_gateway, "_spawn_hermes_action", fail_spawn)
-        _web_server_gateway._ACTION_PROCS.pop("hermes-update", None)
-        _web_server_gateway._ACTION_RESULTS.pop("hermes-update", None)
+        monkeypatch.setattr(_web_server_gateway, "_spawn_eir_action", fail_spawn)
+        _web_server_gateway._ACTION_PROCS.pop("eir-update", None)
+        _web_server_gateway._ACTION_RESULTS.pop("eir-update", None)
 
-        resp = self.client.post("/api/hermes/update")
+        resp = self.client.post("/api/eir/update")
 
         assert resp.status_code == 200
         data = resp.json()
@@ -1051,15 +1051,15 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         assert data["update_command"]
         assert spawned is False
 
-        check = self.client.get("/api/hermes/update/check")
+        check = self.client.get("/api/eir/update/check")
         assert check.status_code == 200
         check_data = check.json()
         assert check_data["install_method"] == "apt"
         assert check_data["can_apply"] is False
         assert check_data["update_command"] == data["update_command"]
 
-    def test_update_hermes_spawns_with_action_id(self, monkeypatch):
-        from hermes_cli import web_server
+    def test_update_eir_spawns_with_action_id(self, monkeypatch):
+        from eir_cli import web_server
 
         class Proc:
             pid = 12345
@@ -1073,24 +1073,24 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         monkeypatch.setattr(_web_server_files, "_dashboard_local_update_managed_externally", lambda: False)
         monkeypatch.setattr(_cfg_mod, "detect_install_method", lambda _root: "git")
         monkeypatch.setattr(web_server.secrets, "token_hex", lambda _size: "a" * 32)
-        monkeypatch.setattr(_web_server_gateway, "_spawn_hermes_action", fake_spawn)
-        _web_server_gateway._ACTION_PROCS.pop("hermes-update", None)
-        _web_server_gateway._ACTION_RESULTS.pop("hermes-update", None)
+        monkeypatch.setattr(_web_server_gateway, "_spawn_eir_action", fake_spawn)
+        _web_server_gateway._ACTION_PROCS.pop("eir-update", None)
+        _web_server_gateway._ACTION_RESULTS.pop("eir-update", None)
 
-        resp = self.client.post("/api/hermes/update")
+        resp = self.client.post("/api/eir/update")
 
         assert resp.status_code == 200
         assert resp.json() == {
             "ok": True,
             "pid": 12345,
-            "name": "hermes-update",
+            "name": "eir-update",
             "action_id": "a" * 32,
         }
         assert calls == [
-            (["update"], "hermes-update", {"HERMES_ACTION_ID": "a" * 32})
+            (["update"], "eir-update", {"EIR_ACTION_ID": "a" * 32})
         ]
 
-    def test_update_hermes_reuses_running_action(self, monkeypatch):
+    def test_update_eir_reuses_running_action(self, monkeypatch):
 
         class Proc:
             pid = 24680
@@ -1102,23 +1102,23 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         monkeypatch.setattr(_cfg_mod, "detect_install_method", lambda _root: "git")
         monkeypatch.setattr(
             _web_server_gateway,
-            "_spawn_hermes_action",
+            "_spawn_eir_action",
             lambda *_args, **_kwargs: pytest.fail("must not spawn a duplicate update"),
         )
-        _web_server_gateway._ACTION_PROCS["hermes-update"] = Proc()
-        _web_server_gateway._ACTION_IDS["hermes-update"] = "b" * 32
+        _web_server_gateway._ACTION_PROCS["eir-update"] = Proc()
+        _web_server_gateway._ACTION_IDS["eir-update"] = "b" * 32
 
         try:
-            resp = self.client.post("/api/hermes/update")
+            resp = self.client.post("/api/eir/update")
         finally:
-            _web_server_gateway._ACTION_PROCS.pop("hermes-update", None)
-            _web_server_gateway._ACTION_IDS.pop("hermes-update", None)
+            _web_server_gateway._ACTION_PROCS.pop("eir-update", None)
+            _web_server_gateway._ACTION_IDS.pop("eir-update", None)
 
         assert resp.status_code == 200
         assert resp.json() == {
             "ok": True,
             "pid": 24680,
-            "name": "hermes-update",
+            "name": "eir-update",
             "already_running": True,
             "action_id": "b" * 32,
         }
@@ -1126,13 +1126,13 @@ CONFIG_SCHEMA = ProviderConfigSchema(
 
     def test_model_set_maps_unknown_vendor_to_aggregator(self, monkeypatch):
         """A bare vendor name from analytics rows (no billing_provider) is not
-        a Hermes provider — keep the user's aggregator instead of writing a
+        a Eir provider — keep the user's aggregator instead of writing a
         provider that can never resolve credentials."""
         monkeypatch.setattr(
-            "hermes_cli.model_cost_guard.expensive_model_warning",
+            "eir_cli.model_cost_guard.expensive_model_warning",
             lambda *_args, **_kwargs: None,
         )
-        from hermes_cli.config import load_config, save_config
+        from eir_cli.config import load_config, save_config
         cfg = load_config()
         cfg["model"] = {"provider": "openrouter", "default": "openai/gpt-5.5"}
         save_config(cfg)
@@ -1157,10 +1157,10 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         (``provider_configured: false``: nothing carried inference at boot) must follow at once, with
         the ``setup.ready`` broadcast, or the web chat stays gated on "need setup" until a restart
         (setup.status answers from the record)."""
-        from hermes_cli import free_tier_bootstrap as fb
+        from eir_cli import free_tier_bootstrap as fb
 
         fb.reset_for_tests()
-        monkeypatch.setattr("hermes_cli.model_cost_guard.expensive_model_warning", lambda *_a, **_k: None)
+        monkeypatch.setattr("eir_cli.model_cost_guard.expensive_model_warning", lambda *_a, **_k: None)
         monkeypatch.setattr("agent.bedrock_adapter.has_aws_credentials", lambda *_a, **_kw: False)
         broadcasts = []
         monkeypatch.setattr(fb, "_broadcast", broadcasts.append)
@@ -1186,8 +1186,8 @@ CONFIG_SCHEMA = ProviderConfigSchema(
 
     def test_reveal_env_var(self, tmp_path):
         """POST /api/env/reveal should return the real unredacted value."""
-        from hermes_cli.config import save_env_value
-        from hermes_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN
+        from eir_cli.config import save_env_value
+        from eir_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN
         save_env_value("TEST_REVEAL_KEY", "super-secret-value-12345")
         resp = self.client.post(
             "/api/env/reveal",
@@ -1202,8 +1202,8 @@ CONFIG_SCHEMA = ProviderConfigSchema(
 
     def test_reveal_env_var_custom_session_header_ignores_proxy_authorization(self, tmp_path):
         """A valid dashboard session header should coexist with proxy auth."""
-        from hermes_cli.config import save_env_value
-        from hermes_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN
+        from eir_cli.config import save_env_value
+        from eir_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN
 
         save_env_value("TEST_REVEAL_PROXY_AUTH", "secret-value")
         resp = self.client.post(
@@ -1220,8 +1220,8 @@ CONFIG_SCHEMA = ProviderConfigSchema(
 
     def test_reveal_env_var_legacy_authorization_header_still_works(self, tmp_path):
         """Keep old dashboard bundles working while the new header rolls out."""
-        from hermes_cli.config import save_env_value
-        from hermes_cli.web_server import _SESSION_TOKEN
+        from eir_cli.config import save_env_value
+        from eir_cli.web_server import _SESSION_TOKEN
 
         save_env_value("TEST_REVEAL_LEGACY_AUTH", "secret-value")
         resp = self.client.post(
@@ -1273,7 +1273,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
     def test_telegram_onboarding_apply_reports_restart_failure_after_save(
         self, monkeypatch
     ):
-        from hermes_cli.config import load_config, load_env
+        from eir_cli.config import load_config, load_env
 
         with _web_server_messaging._telegram_onboarding_lock:
             _web_server_messaging._telegram_onboarding_pairings.clear()
@@ -1283,7 +1283,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
                 return {
                     "pairing_id": "pair-restart-fails",
                     "poll_token": "poll-secret",
-                    "suggested_username": "hermes_pair_restart_fails_bot",
+                    "suggested_username": "eir_pair_restart_fails_bot",
                     "deep_link": "https://t.me/newbot/HermesSetupBot/hermes_pair_restart_fails_bot",
                     "qr_payload": "https://t.me/newbot/HermesSetupBot/hermes_pair_restart_fails_bot",
                     "expires_at": "2027-05-18T00:00:00.000Z",
@@ -1293,7 +1293,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
             assert bearer_token == "poll-secret"
             return {
                 "status": "ready",
-                "bot_username": "hermes_pair_restart_fails_bot",
+                "bot_username": "eir_pair_restart_fails_bot",
                 "owner_user_id": 123456789,
                 "token": "123456:SECRET",
             }
@@ -1307,7 +1307,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
             assert name == "gateway-restart"
             raise RuntimeError("supervisor unavailable")
 
-        monkeypatch.setattr(_web_server_gateway, "_spawn_hermes_action", fail_spawn_action)
+        monkeypatch.setattr(_web_server_gateway, "_spawn_eir_action", fail_spawn_action)
 
         start = self.client.post("/api/messaging/telegram/onboarding/start", json={})
         assert start.status_code == 200
@@ -1336,7 +1336,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
     def test_unauthenticated_api_blocked(self):
         """API requests without the session token should be rejected."""
         from starlette.testclient import TestClient
-        from hermes_cli.web_server import app
+        from eir_cli.web_server import app
         # Create a client WITHOUT the dashboard session header
         unauth_client = TestClient(app)
         resp = unauth_client.get("/api/env")
@@ -1357,7 +1357,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
     def test_parse_model_ids_handles_openai_and_bare_shapes(self):
         """Model discovery must tolerate the common /v1/models shapes and
         never raise (so a slightly non-standard local endpoint still works)."""
-        from hermes_cli.web_server_profiles import _parse_model_ids
+        from eir_cli.web_server_profiles import _parse_model_ids
 
         class FakeResp:
             def __init__(self, payload, ok=True):
@@ -1387,9 +1387,9 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         """A custom endpoint that requires auth must persist model.api_key (where
         the runtime reads it) AND register a named custom_providers entry so the
         endpoint reappears as a ready row in the picker — matching the
-        ``hermes model`` custom flow. Regression for the desktop loop where a
+        ``eir model`` custom flow. Regression for the desktop loop where a
         keyed custom endpoint could never be configured from the GUI."""
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
 
         resp = self.client.post(
             "/api/model/set",
@@ -1432,7 +1432,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         authenticating to the deleted host, and the credential the operator
         just removed through the dashboard survives the delete.
         """
-        from hermes_cli.config import get_env_value, load_config
+        from eir_cli.config import get_env_value, load_config
 
         self.client.post(
             "/api/providers/custom-endpoints",
@@ -1473,7 +1473,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         PyYAML loads unquoted 2070 as int; string lookup then 404ed, so
         Desktop could list the endpoint but not assign or delete it.
         """
-        from hermes_cli.config import get_config_path, load_config
+        from eir_cli.config import get_config_path, load_config
 
         get_config_path().write_text(
             "model:\n"
@@ -1515,7 +1515,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         """
         from urllib.parse import quote
 
-        from hermes_cli.config import get_config_path, load_config
+        from eir_cli.config import get_config_path, load_config
 
         get_config_path().write_text(
             "model:\n"
@@ -1565,7 +1565,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
     def test_unslugged_display_name_still_resolves_to_its_slug_key(self):
         """Compatibility fallback: a caller sending the display name reaches the
         dashboard-minted slug key; an unknown id is still a 404."""
-        from hermes_cli.config import get_config_path, load_config
+        from eir_cli.config import get_config_path, load_config
 
         get_config_path().write_text(
             "providers:\n"
@@ -1590,10 +1590,10 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         so every custom provider silently landed in the default profile and
         never appeared for the profile the user was actually configuring.
         """
-        from hermes_cli import profiles as profiles_mod
-        from hermes_constants import get_hermes_home
+        from eir_cli import profiles as profiles_mod
+        from eir_constants import get_eir_home
 
-        default_home = get_hermes_home()
+        default_home = get_eir_home()
         worker_home = profiles_mod.get_profile_dir("worker")
         worker_home.mkdir(parents=True)
         (worker_home / "config.yaml").touch()  # identity marker: bare dirs are not profiles
@@ -1633,7 +1633,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
 
 
     def test_custom_endpoint_rejects_malformed_url_without_changing_saved_state(self):
-        from hermes_cli.config import get_config_path, get_env_path
+        from eir_cli.config import get_config_path, get_env_path
 
         assert self.client.post("/api/providers/custom-endpoints", json={
             "id": "proxy", "name": "Proxy", "base_url": "https://llm.example.com/v1",
@@ -1655,7 +1655,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
 
     def test_custom_endpoint_save_keeps_the_api_key_out_of_config(self):
         """The key belongs in .env behind key_env, never in config.yaml (#69449)."""
-        from hermes_cli.config import get_env_value, load_config
+        from eir_cli.config import get_env_value, load_config
 
         self.client.post(
             "/api/providers/custom-endpoints",
@@ -1687,7 +1687,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         alias resolves to its canonical model + ``agent.reasoning_overrides`` instead of being
         saved as a literal upstream model id.
         """
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
 
         response = self.client.post(
             "/api/providers/custom-endpoints",
@@ -1732,7 +1732,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         the ``canonical_model`` / ``reasoning_effort`` a gateway advertises (#93622)."""
         import contextlib
 
-        from hermes_cli.web_routers import config_env
+        from eir_cli.web_routers import config_env
 
         class FakeResp:
             status_code = 200
@@ -1771,7 +1771,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         POST /chat/completions — the #93622 reporter's host."""
         import contextlib
 
-        from hermes_cli.web_routers import config_env
+        from eir_cli.web_routers import config_env
 
         class Resp:
             def __init__(self, status):
@@ -1826,9 +1826,9 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         secret by the time Save sees it. Migrating it would duplicate the
         user's secret into a second env var they never asked for.
         """
-        import hermes_yaml as yaml
+        import eir_yaml as yaml
 
-        from hermes_cli.config import get_config_path, get_env_value
+        from eir_cli.config import get_config_path, get_env_value
 
         monkeypatch.setenv("MY_PROXY_KEY", "sk-user-managed")
         get_config_path().write_text(
@@ -1867,7 +1867,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         and ``:8001`` onto one name, so saving the second silently overwrites
         the first's key.
         """
-        from hermes_cli.config import get_env_value
+        from eir_cli.config import get_env_value
 
         for port, key in ((8000, "sk-first"), (8001, "sk-second")):
             self.client.post(
@@ -1908,7 +1908,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
     def test_env_rejects_its_redacted_preview(self):
         """Invariant: a GET preview (sentinel or legacy bare mask) never gains write
         authority, even after another actor rotates the secret behind it."""
-        from hermes_cli.config import load_env, save_env_value
+        from eir_cli.config import load_env, save_env_value
 
         key = "OPENAI_API_KEY"
         real = "sk-live-secret-abcdef1234567890"
@@ -1931,7 +1931,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         """Invariant: preview rejection runs before any mutation (messaging clear+set),
         and custom-endpoint display strings (``${KEY_ENV}`` / legacy plaintext preview)
         are refused even after the entry rotated underneath them."""
-        from hermes_cli.config import load_config, load_env, save_config, save_env_value
+        from eir_cli.config import load_config, load_env, save_config, save_env_value
 
         key = "DISCORD_BOT_TOKEN"
         real = "discord-live-secret-abcdef1234567890"
@@ -1974,7 +1974,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
 
     def test_activating_an_endpoint_carries_its_credential_either_way(self):
         """Activate must work for both key_env and pre-#69449 plaintext entries."""
-        from hermes_cli.config import load_config, save_config
+        from eir_cli.config import load_config, save_config
 
         cfg = load_config()
         cfg["providers"] = {
@@ -2011,14 +2011,14 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         providers forked a keyless entry and left the legacy row, so the next
         request 401s (#126589).
         """
-        from hermes_cli.config import load_config, save_config, save_env_value
+        from eir_cli.config import load_config, save_config, save_env_value
 
-        save_env_value("HERMES_CUSTOM_127_0_0_1_8001_API_KEY", "secret-value")
+        save_env_value("EIR_CUSTOM_127_0_0_1_8001_API_KEY", "secret-value")
         cfg = load_config()
         cfg["custom_providers"] = [{
             "name": "Qwen Local",
             "base_url": "http://127.0.0.1:8001/v1",
-            "key_env": "HERMES_CUSTOM_127_0_0_1_8001_API_KEY",
+            "key_env": "EIR_CUSTOM_127_0_0_1_8001_API_KEY",
             "model": "qwen",
             "api_mode": "chat_completions",
         }]
@@ -2038,17 +2038,17 @@ CONFIG_SCHEMA = ProviderConfigSchema(
 
         cfg = load_config()
         assert cfg.get("custom_providers") == []
-        assert cfg["providers"]["qwen-local"]["key_env"] == "HERMES_CUSTOM_127_0_0_1_8001_API_KEY"
+        assert cfg["providers"]["qwen-local"]["key_env"] == "EIR_CUSTOM_127_0_0_1_8001_API_KEY"
         rows = {e["id"]: e for e in self.client.get("/api/providers/custom-endpoints").json()["endpoints"]}
         assert rows["qwen-local"]["source"] == "providers"
         assert rows["qwen-local"]["has_api_key"] is True
-        assert rows["qwen-local"]["api_key_preview"] == "${HERMES_CUSTOM_127_0_0_1_8001_API_KEY}"
+        assert rows["qwen-local"]["api_key_preview"] == "${EIR_CUSTOM_127_0_0_1_8001_API_KEY}"
 
     def test_legacy_custom_providers_entries_get_a_row_and_can_be_deleted(self):
         """A post-migration ``custom_providers:`` list entry is still routed by the
         runtime (``get_compatible_custom_providers``), so Custom Endpoints must show
         it — and Delete must remove it from the legacy list, not 404 (#114471)."""
-        from hermes_cli.config import load_config, save_config
+        from eir_cli.config import load_config, save_config
 
         cfg = load_config()
         cfg["providers"] = {
@@ -2075,7 +2075,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
     def test_activating_a_legacy_custom_providers_entry_promotes_it(self):
         """Use on a legacy row moves the entry under ``providers:`` (the v12+ shape the
         main slot names by key) instead of 404ing on a row the list just rendered."""
-        from hermes_cli.config import load_config, save_config
+        from eir_cli.config import load_config, save_config
 
         cfg = load_config()
         cfg["custom_providers"] = [
@@ -2099,7 +2099,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
 
 
     def test_get_sessions_positive_limit_still_works(self):
-        from hermes_state import SessionDB
+        from eir_state import SessionDB
 
         db = SessionDB()
         try:
@@ -2123,7 +2123,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
 
 
     def test_profiles_sessions_positive_limit_still_works(self):
-        from hermes_state import SessionDB
+        from eir_state import SessionDB
 
         db = SessionDB()
         try:
@@ -2142,7 +2142,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
     def test_profiles_sessions_pages_past_500_rows(self):
         """The aggregate route must not strand rows after its old 500-row
         per-profile source cap (issue #88438)."""
-        from hermes_state import SessionDB
+        from eir_state import SessionDB
 
         db = SessionDB()
         try:
@@ -2166,7 +2166,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
     def test_get_session_messages_rejects_negative_limit(self):
         """limit=-1 previously bypassed the documented 500-row clamp because
         min(-1, 500) == -1, which SQLite treats as 'no limit'."""
-        from hermes_state import SessionDB
+        from eir_state import SessionDB
 
         db = SessionDB()
         try:
@@ -2186,7 +2186,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         """A limit above the documented 500-row cap is silently clamped
         (existing ``min(limit, 500)`` behaviour), not rejected — the request
         still succeeds."""
-        from hermes_state import SessionDB
+        from eir_state import SessionDB
 
         db = SessionDB()
         try:
@@ -2206,7 +2206,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         Guards the #80680 contract — display reads opt into compacted history
         explicitly; the dashboard default view stays as it was.
         """
-        from hermes_state import SessionDB
+        from eir_state import SessionDB
 
         db = SessionDB()
         try:
@@ -2238,7 +2238,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         """include_compacted=true returns the full display history: archived
         (active=0, compacted=1) rows plus live rows, in insertion order.
         """
-        from hermes_state import SessionDB
+        from eir_state import SessionDB
 
         db = SessionDB()
         try:
@@ -2276,7 +2276,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
             _MERGED_SUMMARY_DELIMITER,
             _SUMMARY_END_MARKER,
         )
-        from hermes_state import SessionDB
+        from eir_state import SessionDB
 
         handoff = (
             f"{SUMMARY_PREFIX}\n{HISTORICAL_TASK_HEADING}\nold task\n\n"
@@ -2338,7 +2338,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         order=latest + include_compacted=true) pages back from the newest
         message and returns the window in chronological order.
         """
-        from hermes_state import SessionDB
+        from eir_state import SessionDB
 
         db = SessionDB()
         try:
@@ -2374,7 +2374,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
 
     def test_get_session_messages_omitted_limit_defaults_to_500(self):
         """The dashboard must never load an entire unbounded transcript."""
-        from hermes_state import SessionDB
+        from eir_state import SessionDB
 
         db = SessionDB()
         try:
@@ -2422,7 +2422,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         ]
 
     def test_export_session_streams_bounded_message_pages(self, monkeypatch):
-        from hermes_state import SessionDB
+        from eir_state import SessionDB
 
         db = SessionDB()
         try:
@@ -2457,7 +2457,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         assert calls == [(500, 0, True), (500, 500, True)]
     def test_pick_silent_default_model_empty_list_returns_empty_string(self):
         """Empty model list must return \"\" so the caller degrades gracefully."""
-        from hermes_cli.models import pick_silent_default_model
+        from eir_cli.models import pick_silent_default_model
 
         assert pick_silent_default_model([], "nous") == ""
         assert pick_silent_default_model([], "") == ""
@@ -2467,7 +2467,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         """Unit coverage for the frontier-tier predicate used by the cost-safe
         silent policy. Anchored on the claude- prefix so community/distill
         slugs whose lowercase form merely contains opus are rejected."""
-        from hermes_cli.models import _is_anthropic_frontier_tier
+        from eir_cli.models import _is_anthropic_frontier_tier
 
         # Opus + Fable, dash + dot, vendor-prefixed, colon-suffixed.
         assert _is_anthropic_frontier_tier("claude-opus-4-8") is True
@@ -2509,7 +2509,7 @@ class TestBuildSchemaFromConfig:
         blank entry server-side (the clear item is client-side via
         ``clearable``), and never empty even without tzdata (UTC fallback).
         """
-        from hermes_cli.web_server_config import CONFIG_SCHEMA, _timezone_options
+        from eir_cli.web_server_config import CONFIG_SCHEMA, _timezone_options
 
         entry = CONFIG_SCHEMA["timezone"]
         assert entry["type"] == "select"
@@ -2560,7 +2560,7 @@ class TestConfigRoundTrip:
             from starlette.testclient import TestClient
         except ImportError:
             pytest.skip("fastapi/starlette not installed")
-        from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
+        from eir_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
         self.client = TestClient(app)
         self.client.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
 
@@ -2570,7 +2570,7 @@ class TestConfigRoundTrip:
         round-trip. Deep-merge is required — a shallow merge would drop
         ``agent.<custom_key>`` when the frontend sends a partial ``agent``
         dict containing only schema-known sub-fields."""
-        from hermes_cli.config import read_raw_config, save_config
+        from eir_cli.config import read_raw_config, save_config
 
         # Seed config with a key under `agent` that isn't in the schema.
         # Use a sentinel name to avoid colliding with future schema fields.
@@ -2632,7 +2632,7 @@ class TestConfigRoundTrip:
 
     def test_desktop_terminal_font_round_trip_preserves_terminal_config(self):
         """The Appearance picker persists a font without replacing sibling settings."""
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
 
         web_config = self.client.get("/api/config").json()
         terminal_before = dict(web_config.get("terminal", {}))
@@ -2660,17 +2660,17 @@ class TestNewEndpoints:
     """Tests for session detail, logs, cron, skills, tools, raw config, analytics."""
 
     @pytest.fixture(autouse=True)
-    def _setup(self, monkeypatch, _isolate_hermes_home):
+    def _setup(self, monkeypatch, _isolate_eir_home):
         try:
             from starlette.testclient import TestClient
         except ImportError:
             pytest.skip("fastapi/starlette not installed")
 
-        import hermes_state
-        from hermes_constants import get_hermes_home
-        from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
+        import eir_state
+        from eir_constants import get_eir_home
+        from eir_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
 
-        monkeypatch.setattr(hermes_state, "DEFAULT_DB_PATH", get_hermes_home() / "state.db")
+        monkeypatch.setattr(eir_state, "DEFAULT_DB_PATH", get_eir_home() / "state.db")
 
         self.client = TestClient(app)
         self.client.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
@@ -2685,8 +2685,8 @@ class TestNewEndpoints:
     def test_profiles_create_builder_mcp_auth_is_profile_scoped(
         self, monkeypatch
     ):
-        from hermes_constants import get_hermes_home
-        import hermes_cli.profiles as profiles_mod
+        from eir_constants import get_eir_home
+        import eir_cli.profiles as profiles_mod
 
         monkeypatch.setattr(profiles_mod, "create_wrapper_script", lambda name: None)
 
@@ -2730,7 +2730,7 @@ class TestNewEndpoints:
         assert resp.status_code == 200
         assert resp.json()["mcp_written"] == 3
 
-        root = get_hermes_home()
+        root = get_eir_home()
         profile_dir = root / "profiles" / "builder-auth"
         config_text = (profile_dir / "config.yaml").read_text(encoding="utf-8")
         config = yaml.safe_load(config_text)
@@ -2769,7 +2769,7 @@ class TestNewEndpoints:
 
     def test_discord_toolsets_read_and_write_discord_platform(self):
         """Platform-restricted toolsets must not be saved as successful CLI no-ops."""
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
 
         listing = {t["name"]: t for t in self.client.get("/api/tools/toolsets").json()}
         assert listing["discord"]["platform"] == "discord"
@@ -2845,18 +2845,18 @@ class TestNewEndpoints:
         never-installed KittenTTS/Piper. The endpoint now reports the honest
         state so keyless ≠ ready.
         """
-        from hermes_cli import tools_config
-        from hermes_cli.nous_account import NousPortalAccountInfo
+        from eir_cli import tools_config
+        from eir_cli.nous_account import NousPortalAccountInfo
 
         # Logged out of Nous Portal → managed subscription rows need sign-in.
         monkeypatch.setattr(
-            "hermes_cli.nous_subscription.get_nous_portal_account_info",
+            "eir_cli.nous_subscription.get_nous_portal_account_info",
             lambda *a, **k: NousPortalAccountInfo(
                 logged_in=False, source="none", fresh=False, paid_service_access=None
             ),
         )
         # No xAI credentials → the Grok OAuth-backed row needs sign-in.
-        from hermes_cli import tools_config_post_setup
+        from eir_cli import tools_config_post_setup
 
         monkeypatch.setattr(tools_config, "_xai_credentials_present", lambda: False)
         # Local TTS engines not installed → their rows need setup.
@@ -2890,10 +2890,10 @@ class TestNewEndpoints:
         told the user to sign in. The endpoint now reports the entitlement
         gap so the client can drive the existing Nous OAuth flow.
         """
-        from hermes_cli.nous_account import NousPortalAccountInfo
+        from eir_cli.nous_account import NousPortalAccountInfo
 
         monkeypatch.setattr(
-            "hermes_cli.nous_subscription.get_nous_portal_account_info",
+            "eir_cli.nous_subscription.get_nous_portal_account_info",
             lambda *a, **k: NousPortalAccountInfo(
                 logged_in=False, source="none", fresh=False, paid_service_access=None
             ),
@@ -2911,7 +2911,7 @@ class TestNewEndpoints:
         # The selection is still persisted — activation is what's gated.
         # Managed rows store the single 'nous' provider string (the runtime
         # maps it to the Browser Use cloud through the Nous Tool Gateway).
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
         cfg = load_config()
         assert cfg["browser"]["cloud_provider"] == "nous"
         assert "use_gateway" not in cfg["browser"]
@@ -2944,7 +2944,7 @@ class TestNewEndpoints:
         assert body["ok"] is True
         assert body["capability"] == "search"
 
-        from hermes_cli.config import load_config
+        from eir_cli.config import load_config
         cfg = load_config()
         assert cfg["web"]["search_backend"] == "searxng"
         # The shared backend selected first must be preserved for extract.
@@ -2966,23 +2966,23 @@ class TestNewEndpoints:
 
     def test_terminal_ssh_probe_ready_when_configured(self, monkeypatch):
         """SSH host + user in config.yaml -> ready."""
-        from hermes_cli.config import load_config, save_config
+        from eir_cli.config import load_config, save_config
 
         monkeypatch.setattr(shutil, "which", lambda name: None)
         config = load_config()
         config.setdefault("terminal", {})
         config["terminal"]["ssh_host"] = "devbox.example.com"
-        config["terminal"]["ssh_user"] = "hermes"
+        config["terminal"]["ssh_user"] = "eir"
         save_config(config)
 
         body = self.client.get("/api/tools/terminal/backends").json()
         ssh = next(r for r in body["backends"] if r["name"] == "ssh")
         assert ssh["status"] == "ready"
-        assert "hermes@devbox.example.com" in ssh["detail"]
+        assert "eir@devbox.example.com" in ssh["detail"]
 
 
     def test_analytics_usage_includes_skill_breakdown(self):
-        from hermes_state import SessionDB
+        from eir_state import SessionDB
 
         db = SessionDB()
         try:
@@ -3042,7 +3042,7 @@ class TestNewEndpoints:
         from datetime import datetime
         from zoneinfo import ZoneInfo
 
-        from hermes_state import SessionDB
+        from eir_state import SessionDB
 
         db = SessionDB()
         try:
@@ -3097,18 +3097,18 @@ class TestDesktopLoopbackAuthExemption:
     """``_desktop_loopback_auth_exempt`` decides the #96490 exemption."""
 
     def test_exempt_with_desktop_env_and_session_token_on_loopback(self, monkeypatch):
-        from hermes_cli import web_server
+        from eir_cli import web_server
 
-        monkeypatch.setenv("HERMES_DESKTOP", "1")
-        monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", "desktop-minted")
+        monkeypatch.setenv("EIR_DESKTOP", "1")
+        monkeypatch.setenv("EIR_DASHBOARD_SESSION_TOKEN", "desktop-minted")
         assert web_server._desktop_loopback_auth_exempt("127.0.0.1") is True
         assert web_server._desktop_loopback_auth_exempt("::1") is True
 
     def test_exempt_via_ssh_spawn_credentials_without_env_token(self, monkeypatch):
-        from hermes_cli import web_server
+        from eir_cli import web_server
 
-        monkeypatch.setenv("HERMES_DESKTOP", "1")
-        monkeypatch.delenv("HERMES_DASHBOARD_SESSION_TOKEN", raising=False)
+        monkeypatch.setenv("EIR_DESKTOP", "1")
+        monkeypatch.delenv("EIR_DASHBOARD_SESSION_TOKEN", raising=False)
         assert web_server._desktop_loopback_auth_exempt(
             "127.0.0.1", ssh_session_token="tok"
         )
@@ -3117,35 +3117,35 @@ class TestDesktopLoopbackAuthExemption:
         )
 
     def test_not_exempt_without_desktop_env(self, monkeypatch):
-        from hermes_cli import web_server
+        from eir_cli import web_server
 
-        monkeypatch.delenv("HERMES_DESKTOP", raising=False)
-        monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", "tok")
+        monkeypatch.delenv("EIR_DESKTOP", raising=False)
+        monkeypatch.setenv("EIR_DASHBOARD_SESSION_TOKEN", "tok")
         assert web_server._desktop_loopback_auth_exempt("127.0.0.1") is False
 
     def test_not_exempt_without_any_credential(self, monkeypatch):
-        from hermes_cli import web_server
+        from eir_cli import web_server
 
-        # HERMES_DESKTOP=1 alone is not enough: a plain serve with the env var
+        # EIR_DESKTOP=1 alone is not enough: a plain serve with the env var
         # exported must stay gated.
-        monkeypatch.setenv("HERMES_DESKTOP", "1")
-        monkeypatch.delenv("HERMES_DASHBOARD_SESSION_TOKEN", raising=False)
+        monkeypatch.setenv("EIR_DESKTOP", "1")
+        monkeypatch.delenv("EIR_DASHBOARD_SESSION_TOKEN", raising=False)
         assert web_server._desktop_loopback_auth_exempt("127.0.0.1") is False
 
     def test_not_exempt_on_non_loopback_bind(self, monkeypatch):
-        from hermes_cli import web_server
+        from eir_cli import web_server
 
-        monkeypatch.setenv("HERMES_DESKTOP", "1")
-        monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", "tok")
+        monkeypatch.setenv("EIR_DESKTOP", "1")
+        monkeypatch.setenv("EIR_DASHBOARD_SESSION_TOKEN", "tok")
         assert web_server._desktop_loopback_auth_exempt("0.0.0.0") is False
         assert web_server._desktop_loopback_auth_exempt("192.168.1.10") is False
 
     def test_public_url_engages_gate_for_non_desktop_loopback(self, monkeypatch):
-        from hermes_cli import web_server
+        from eir_cli import web_server
 
         # Sanity: the base behaviour is untouched — a non-Desktop loopback
         # serve with a public_url configured stays ticket-gated.
-        monkeypatch.delenv("HERMES_DESKTOP", raising=False)
+        monkeypatch.delenv("EIR_DESKTOP", raising=False)
         assert web_server.should_require_dashboard_auth(
             "127.0.0.1", frozenset({"dash.example.com"})
         ) is True
@@ -3156,18 +3156,18 @@ class TestDesktopHostRendezvousIsolation:
 
     def test_desktop_backend_does_not_claim_the_host_serve_record(self, monkeypatch, tmp_path):
         """A Desktop child must not block a separately supervised public dashboard, yet a
-        terminal `hermes plugins install` on a Desktop-only box must still find it (#119644):
+        terminal `eir plugins install` on a Desktop-only box must still find it (#119644):
         it publishes under its OWN role, which the attach ladder never reads."""
         import io
         import urllib.request
         from gateway import host_rendezvous as hr
-        from hermes_cli import web_server
-        from hermes_cli.main_dashboard import _host_backend_attachment
-        from hermes_cli.plugins_activation import notify_serve_backend
+        from eir_cli import web_server
+        from eir_cli.main_dashboard import _host_backend_attachment
+        from eir_cli.plugins_activation import notify_serve_backend
 
-        monkeypatch.setenv("HERMES_GATEWAY_LOCK_DIR", str(tmp_path / "locks"))
-        monkeypatch.setenv("HERMES_DESKTOP", "1")
-        monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", "desktop-spawn-token")
+        monkeypatch.setenv("EIR_GATEWAY_LOCK_DIR", str(tmp_path / "locks"))
+        monkeypatch.setenv("EIR_DESKTOP", "1")
+        monkeypatch.setenv("EIR_DASHBOARD_SESSION_TOKEN", "desktop-spawn-token")
         monkeypatch.setattr(web_server, "_SESSION_TOKEN", "desktop-spawn-token")
         monkeypatch.setattr(hr, "cleanup_on_exit", lambda role: None)
         dialed = []
@@ -3180,7 +3180,7 @@ class TestDesktopHostRendezvousIsolation:
                 return False
 
         def _fake_urlopen(request, timeout=None):
-            dialed.append((request.full_url, request.get_header("X-hermes-session-token")))
+            dialed.append((request.full_url, request.get_header("X-eir-session-token")))
             return _Reply(b'{"ok": true}')
 
         monkeypatch.setattr(urllib.request, "urlopen", _fake_urlopen)
@@ -3190,7 +3190,7 @@ class TestDesktopHostRendezvousIsolation:
             # Not a host owner: the supervised public dashboard's attach ladder sees nobody.
             assert hr.read_record(hr.ROLE_SERVE) is None
             assert _host_backend_attachment() is None
-            # ...but a terminal `hermes plugins install` still lights up its open chats.
+            # ...but a terminal `eir plugins install` still lights up its open chats.
             assert notify_serve_backend("demo", tmp_path) == {"ok": True}
             assert dialed == [("http://127.0.0.1:9231/api/dashboard/agent-plugins/activate",
                                "desktop-spawn-token")]
@@ -3200,12 +3200,12 @@ class TestDesktopHostRendezvousIsolation:
 
     def test_standalone_backend_still_claims_the_host_serve_record(self, monkeypatch):
         """The Desktop exclusion must not alter standalone dashboard discovery — including a
-        supervised service whose shell merely inherited HERMES_DESKTOP=1 without the token."""
+        supervised service whose shell merely inherited EIR_DESKTOP=1 without the token."""
         from gateway import host_rendezvous as hr
-        from hermes_cli import web_server
+        from eir_cli import web_server
 
-        monkeypatch.setenv("HERMES_DESKTOP", "1")
-        monkeypatch.delenv("HERMES_DASHBOARD_SESSION_TOKEN", raising=False)
+        monkeypatch.setenv("EIR_DESKTOP", "1")
+        monkeypatch.delenv("EIR_DASHBOARD_SESSION_TOKEN", raising=False)
         claimed = []
         published = []
         monkeypatch.setattr(
@@ -3240,7 +3240,7 @@ class TestOrphanedOwnerReclaim:
             updated_at="2026-09-24T00:00:00+00:00")
 
     def _owner_entry(self, pid=555, create_time=55.0, spawner_pid=700, spawner_create=7.0):
-        from hermes_cli import process_identity as pi
+        from eir_cli import process_identity as pi
         from pathlib import Path as _Path
 
         return {
@@ -3258,10 +3258,10 @@ class TestOrphanedOwnerReclaim:
         """
         import types
         from gateway import host_rendezvous as hr
-        from hermes_cli import web_server
-        from hermes_cli import process_identity as pi
+        from eir_cli import web_server
+        from eir_cli import process_identity as pi
 
-        monkeypatch.setenv("HERMES_GATEWAY_LOCK_DIR", str(tmp_path / "locks"))
+        monkeypatch.setenv("EIR_GATEWAY_LOCK_DIR", str(tmp_path / "locks"))
         monkeypatch.setattr(web_server, "is_desktop_owned_backend", lambda: False)
         claims = iter([hr.HostLockOutcome.HELD_BY_OTHER, hr.HostLockOutcome.ACQUIRED])
         claimed, published = [], []
@@ -3319,7 +3319,7 @@ class TestOrphanedOwnerReclaim:
 
     def test_unprovable_owner_is_untouched(self, monkeypatch, tmp_path):
         """Null spawner whose parent is alive: unprovable means never touch."""
-        from hermes_cli import dashboard_procs
+        from eir_cli import dashboard_procs
 
         entry = self._owner_entry(spawner_pid=None, spawner_create=None)
         monkeypatch.setattr(dashboard_procs, "_process_ppid", lambda pid: 1234)
@@ -3341,7 +3341,7 @@ class TestModelContextLength:
 
     def test_normalize_extracts_context_length_from_dict(self):
         """normalize should surface context_length from model dict."""
-        from hermes_cli.web_server_config import _normalize_config_for_web
+        from eir_cli.web_server_config import _normalize_config_for_web
 
         cfg = {
             "model": {
@@ -3356,7 +3356,7 @@ class TestModelContextLength:
 
     def test_normalize_bare_string_model_yields_zero(self):
         """normalize should set model_context_length=0 for bare string model."""
-        from hermes_cli.web_server_config import _normalize_config_for_web
+        from eir_cli.web_server_config import _normalize_config_for_web
 
         result = _normalize_config_for_web({"model": "anthropic/claude-sonnet-4"})
         assert result["model"] == "anthropic/claude-sonnet-4"
@@ -3365,8 +3365,8 @@ class TestModelContextLength:
 
     def test_denormalize_writes_context_length_into_model_dict(self):
         """denormalize should write model_context_length back into model dict."""
-        from hermes_cli.web_server_config import _denormalize_config_from_web
-        from hermes_cli.config import save_config
+        from eir_cli.web_server_config import _denormalize_config_from_web
+        from eir_cli.config import save_config
 
         # Set up disk config with model as a dict
         save_config({
@@ -3385,8 +3385,8 @@ class TestModelContextLength:
         """The Settings autosave now sends a diff, not the full draft: editing
         only the Context Window control must not omit ``model`` and thereby
         drop the context_length edit on the floor (#89597 review)."""
-        from hermes_cli.web_server_config import _denormalize_config_from_web
-        from hermes_cli.config import save_config
+        from eir_cli.web_server_config import _denormalize_config_from_web
+        from eir_cli.config import save_config
 
         save_config({
             "model": {"default": "anthropic/claude-sonnet-4", "provider": "anthropic",
@@ -3407,8 +3407,8 @@ class TestModelContextLength:
         to the diff-omission bug rather than the separate, pre-existing (and
         intentional, see ``apply_main_model_assignment``) behavior where a
         real provider switch drops the context_length override."""
-        from hermes_cli.web_server_config import _denormalize_config_from_web
-        from hermes_cli.config import save_config
+        from eir_cli.web_server_config import _denormalize_config_from_web
+        from eir_cli.config import save_config
 
         save_config({
             "model": {"default": "anthropic/claude-sonnet-4", "context_length": 150000}
@@ -3427,9 +3427,9 @@ class TestDenormalizeProviderSwitch:
     def test_vendor_slug_switches_off_non_aggregator_provider(self):
         """ollama-local + a vendor/model slug → switch to openrouter and drop
         the stale local base_url (the issue's exact repro)."""
-        from hermes_cli.web_server_config import _denormalize_config_from_web
+        from eir_cli.web_server_config import _denormalize_config_from_web
         from unittest.mock import patch as _patch
-        from hermes_cli.config import save_config
+        from eir_cli.config import save_config
 
         save_config({
             "model": {
@@ -3440,7 +3440,7 @@ class TestDenormalizeProviderSwitch:
             }
         })
 
-        with _patch("hermes_cli.models_detect.provider_has_credentials", lambda p: p == "openrouter"):
+        with _patch("eir_cli.models_detect.provider_has_credentials", lambda p: p == "openrouter"):
             result = _denormalize_config_from_web({"model": "google/gemini-2.5-flash"})
         model = result["model"]
         assert model["provider"] == "openrouter"
@@ -3453,13 +3453,13 @@ class TestDenormalizeProviderSwitch:
     def test_context_length_override_survives_provider_switch(self):
         """An explicit context-length override must persist alongside a
         provider switch."""
-        from hermes_cli.web_server_config import _denormalize_config_from_web
+        from eir_cli.web_server_config import _denormalize_config_from_web
         from unittest.mock import patch as _patch
-        from hermes_cli.config import save_config
+        from eir_cli.config import save_config
 
         save_config({"model": {"default": "llama3.2", "provider": "ollama-local"}})
 
-        with _patch("hermes_cli.models_detect.provider_has_credentials", lambda p: p == "openrouter"):
+        with _patch("eir_cli.models_detect.provider_has_credentials", lambda p: p == "openrouter"):
             result = _denormalize_config_from_web({
                 "model": "google/gemini-2.5-flash",
                 "model_context_length": 128000,
@@ -3473,11 +3473,11 @@ class TestDenormalizeProviderSwitch:
         ``PUT /api/config`` — not fall back to the flat string, which the deep-merge would
         write OVER the on-disk ``model:`` dict (provider/base_url/api_mode/slots destroyed)."""
         from starlette.testclient import TestClient
-        from hermes_constants import get_hermes_home
-        from hermes_cli.model_switch import ModelSwitchResult
-        from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
+        from eir_constants import get_eir_home
+        from eir_cli.model_switch import ModelSwitchResult
+        from eir_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
 
-        cfg_path = get_hermes_home() / "config.yaml"
+        cfg_path = get_eir_home() / "config.yaml"
         cfg_path.write_text(
             "model:\n"
             "  default: llama3.2\n"
@@ -3489,8 +3489,8 @@ class TestDenormalizeProviderSwitch:
             "    fast: qwen3\n",
             encoding="utf-8")
         before = cfg_path.read_bytes()
-        monkeypatch.setattr("hermes_cli.models_detect.provider_has_credentials", lambda p: p == "openrouter")
-        monkeypatch.setattr("hermes_cli.model_switch.switch_model",
+        monkeypatch.setattr("eir_cli.models_detect.provider_has_credentials", lambda p: p == "openrouter")
+        monkeypatch.setattr("eir_cli.model_switch.switch_model",
                             lambda **_kw: ModelSwitchResult(success=False, error_message="models.dev offline"))
 
         client = TestClient(app)
@@ -3510,7 +3510,7 @@ class TestModelInfoEndpoint:
             from starlette.testclient import TestClient
         except ImportError:
             pytest.skip("fastapi/starlette not installed")
-        from hermes_cli.web_server import app
+        from eir_cli.web_server import app
         self.client = TestClient(app)
 
 
@@ -3565,13 +3565,13 @@ class TestStatusRemoteGateway:
         except ImportError:
             pytest.skip("fastapi/starlette not installed")
 
-        from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
+        from eir_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
         self.client = TestClient(app)
         self.client.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
 
     def test_status_falls_back_to_remote_probe(self, monkeypatch):
         """When local PID check fails and remote probe succeeds, gateway shows running."""
-        import hermes_cli.web_server as ws
+        import eir_cli.web_server as ws
 
         monkeypatch.setattr(_gw_status, "get_running_pid_cached", lambda: None)
         monkeypatch.setattr(_gw_status, "read_runtime_status", lambda: None)
@@ -3594,7 +3594,7 @@ class TestStatusRemoteGateway:
 
     def test_status_remote_running_null_pid(self, monkeypatch):
         """Remote gateway running but PID not in response — pid should be None."""
-        import hermes_cli.web_server as ws
+        import eir_cli.web_server as ws
 
         monkeypatch.setattr(_gw_status, "get_running_pid_cached", lambda: None)
         monkeypatch.setattr(_gw_status, "read_runtime_status", lambda: None)
@@ -3615,7 +3615,7 @@ class TestStatusInstallId:
     """Stable per-install identity on /api/status.
 
     Behaviour contracts: the id is minted once, persisted under the ROOT
-    Hermes home (not the profile home), survives a fresh process-cache read,
+    Eir home (not the profile home), survives a fresh process-cache read,
     and is byte-identical for every profile served by the same install — the
     desktop uses it to collapse duplicate roster rows when one backend is
     registered under two addresses.
@@ -3628,8 +3628,8 @@ class TestStatusInstallId:
         except ImportError:
             pytest.skip("fastapi/starlette not installed")
 
-        import hermes_cli.web_server as ws
-        from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
+        import eir_cli.web_server as ws
+        from eir_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
 
         # Fresh process cache per test: the cache is process-global by design
         # (stability), so tests must not observe a previous test's id.
@@ -3638,7 +3638,7 @@ class TestStatusInstallId:
         self.client.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
 
     def test_status_reports_persistent_install_id(self, monkeypatch):
-        from hermes_constants import get_default_hermes_root
+        from eir_constants import get_default_eir_root
 
         monkeypatch.setattr(_gw_status, "get_running_pid_cached", lambda: None)
         monkeypatch.setattr(_gw_status, "read_runtime_status", lambda: None)
@@ -3651,7 +3651,7 @@ class TestStatusInstallId:
         assert re.fullmatch(r"[0-9a-f]{32}", install_id)
 
         # Persisted under the ROOT home, and stable across calls.
-        id_file = get_default_hermes_root() / "install_id"
+        id_file = get_default_eir_root() / "install_id"
         assert id_file.is_file()
         assert id_file.read_text(encoding="utf-8").strip() == install_id
 
@@ -3660,7 +3660,7 @@ class TestStatusInstallId:
 
     def test_install_id_survives_process_cache_reset(self, monkeypatch):
         """A restart (fresh cache) re-reads the SAME persisted id."""
-        import hermes_cli.web_server as ws
+        import eir_cli.web_server as ws
 
         first = ws.get_install_id()
         assert first
@@ -3668,20 +3668,20 @@ class TestStatusInstallId:
         assert ws.get_install_id() == first
 
     def test_all_profiles_of_one_install_share_the_id(self, monkeypatch, tmp_path):
-        """HERMES_HOME=<root> and HERMES_HOME=<root>/profiles/<name> resolve to
+        """EIR_HOME=<root> and EIR_HOME=<root>/profiles/<name> resolve to
         the same id file — profiles share one physical install identity."""
-        import hermes_cli.web_server as ws
+        import eir_cli.web_server as ws
 
-        root = tmp_path / "hermes-root"
+        root = tmp_path / "eir-root"
         profile_home = root / "profiles" / "research"
         profile_home.mkdir(parents=True)
 
-        monkeypatch.setenv("HERMES_HOME", str(root))
+        monkeypatch.setenv("EIR_HOME", str(root))
         monkeypatch.setattr(ws, "_INSTALL_ID_CACHE", {"value": None})
         root_id = ws.get_install_id()
         assert root_id
 
-        monkeypatch.setenv("HERMES_HOME", str(profile_home))
+        monkeypatch.setenv("EIR_HOME", str(profile_home))
         monkeypatch.setattr(ws, "_INSTALL_ID_CACHE", {"value": None})
         assert ws.get_install_id() == root_id
         # Exactly one id file exists — under the root, not the profile home.
@@ -3689,12 +3689,12 @@ class TestStatusInstallId:
         assert not (profile_home / "install_id").exists()
 
     def test_corrupt_id_file_is_replaced_not_propagated(self, monkeypatch, tmp_path):
-        import hermes_cli.web_server as ws
+        import eir_cli.web_server as ws
 
-        root = tmp_path / "hermes-root"
+        root = tmp_path / "eir-root"
         root.mkdir()
         (root / "install_id").write_text("not-a-valid-id\n", encoding="utf-8")
-        monkeypatch.setenv("HERMES_HOME", str(root))
+        monkeypatch.setenv("EIR_HOME", str(root))
         monkeypatch.setattr(ws, "_INSTALL_ID_CACHE", {"value": None})
 
         value = ws.get_install_id()
@@ -3718,7 +3718,7 @@ class TestGatewayBusyReadout:
         except ImportError:
             pytest.skip("fastapi/starlette not installed")
 
-        from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
+        from eir_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
         self.client = TestClient(app)
         self.client.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
 
@@ -3766,7 +3766,7 @@ class TestStatusMemoryBlock:
         except ImportError:
             pytest.skip("fastapi/starlette not installed")
 
-        from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
+        from eir_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
         self.client = TestClient(app)
         self.client.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
 
@@ -3815,7 +3815,7 @@ class TestGatewayUpdatedAtContract:
         except ImportError:
             pytest.skip("fastapi/starlette not installed")
 
-        from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
+        from eir_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
         self.client = TestClient(app)
         self.client.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
 
@@ -3856,7 +3856,7 @@ class TestGatewayUpdatedAtContract:
         """Cross-container path: the remote /health/detailed body is the
         runtime source, and a numeric updated_at from an older gateway build
         must still come out as string|null."""
-        import hermes_cli.web_server as ws
+        import eir_cli.web_server as ws
 
         monkeypatch.setattr(_gw_status, "get_running_pid_cached", lambda: None)
         monkeypatch.setattr(_gw_status, "read_runtime_status", lambda: None)
@@ -3888,14 +3888,14 @@ class TestNormaliseThemeDefinition:
 
 
     def test_rejects_non_dict(self):
-        from hermes_cli.web_server_dashboard import _normalise_theme_definition
+        from eir_cli.web_server_dashboard import _normalise_theme_definition
         assert _normalise_theme_definition("string") is None
         assert _normalise_theme_definition(None) is None
         assert _normalise_theme_definition([1, 2, 3]) is None
 
     def test_loose_colors_shorthand(self):
         """Bare hex strings under `colors` parse as {hex, alpha=1.0}."""
-        from hermes_cli.web_server_dashboard import _normalise_theme_definition
+        from eir_cli.web_server_dashboard import _normalise_theme_definition
         result = _normalise_theme_definition({
             "name": "loose",
             "colors": {"background": "#000000", "midground": "#ffffff"},
@@ -3909,14 +3909,14 @@ class TestNormaliseThemeDefinition:
 
 
 class TestDiscoverUserThemes:
-    """Tests for _discover_user_themes() — scans ~/.hermes/dashboard-themes/."""
+    """Tests for _discover_user_themes() — scans ~/.eir/dashboard-themes/."""
 
     def test_returns_empty_when_dir_missing(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("EIR_HOME", str(tmp_path))
         assert _web_server_dashboard._discover_user_themes() == []
 
     def test_loads_and_normalises_yaml(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("EIR_HOME", str(tmp_path))
         themes_dir = tmp_path / "dashboard-themes"
         themes_dir.mkdir()
         (themes_dir / "ocean.yaml").write_text(
@@ -3940,7 +3940,7 @@ class TestDiscoverUserThemes:
 
 
     def test_ignores_transient_profile_override(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("EIR_HOME", str(tmp_path))
         themes_dir = tmp_path / "dashboard-themes"
         themes_dir.mkdir()
         (themes_dir / "mine.yaml").write_text("name: mine\n", encoding="utf-8")
@@ -3948,16 +3948,16 @@ class TestDiscoverUserThemes:
         other = tmp_path / "other-profile"
         other.mkdir()
 
-        from hermes_constants import (
-            reset_hermes_home_override,
-            set_hermes_home_override,
+        from eir_constants import (
+            reset_eir_home_override,
+            set_eir_home_override,
         )
 
-        token = set_hermes_home_override(str(other))
+        token = set_eir_home_override(str(other))
         try:
             results = _web_server_dashboard._discover_user_themes()
         finally:
-            reset_hermes_home_override(token)
+            reset_eir_home_override(token)
 
         assert [r["name"] for r in results] == ["mine"]
 
@@ -3968,8 +3968,8 @@ class TestThemeBootstrapCSS:
     the default-teal first-paint flash for user YAML themes."""
 
     @staticmethod
-    def _write_theme(hermes_home, name="ocean"):
-        themes_dir = hermes_home / "dashboard-themes"
+    def _write_theme(eir_home, name="ocean"):
+        themes_dir = eir_home / "dashboard-themes"
         themes_dir.mkdir(exist_ok=True)
         (themes_dir / f"{name}.yaml").write_text(
             f"name: {name}\n"
@@ -3990,7 +3990,7 @@ class TestThemeBootstrapCSS:
     def _mount_spa_client(tmp_path, monkeypatch):
         from fastapi import FastAPI
         from starlette.testclient import TestClient
-        import hermes_cli.web_server as ws
+        import eir_cli.web_server as ws
 
         dist = tmp_path / "web_dist"
         (dist / "assets").mkdir(parents=True)
@@ -4004,7 +4004,7 @@ class TestThemeBootstrapCSS:
         return TestClient(spa_app)
 
     def test_serve_index_injects_bootstrap_for_user_theme(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("EIR_HOME", str(tmp_path))
         self._write_theme(tmp_path)
         monkeypatch.setattr(
             _cfg_mod, "load_config", lambda: {"dashboard": {"theme": "ocean"}}
@@ -4012,11 +4012,11 @@ class TestThemeBootstrapCSS:
         client = self._mount_spa_client(tmp_path, monkeypatch)
         resp = client.get("/chat")
         assert resp.status_code == 200
-        assert '<style id="hermes-theme-bootstrap">' in resp.text
+        assert '<style id="eir-theme-bootstrap">' in resp.text
         assert "--background-base:#0a1628;" in resp.text
         # Injected inside <head>, before the closing tag.
         head = resp.text.split("</head>")[0]
-        assert "hermes-theme-bootstrap" in head
+        assert "eir-theme-bootstrap" in head
 
 
 class TestNormaliseThemeExtensions:
@@ -4026,7 +4026,7 @@ class TestNormaliseThemeExtensions:
 
 
     def test_custom_css_passthrough_and_capped(self):
-        from hermes_cli.web_server_dashboard import _normalise_theme_definition
+        from eir_cli.web_server_dashboard import _normalise_theme_definition
         # Small CSS passes through verbatim.
         r = _normalise_theme_definition({
             "name": "t",
@@ -4041,7 +4041,7 @@ class TestNormaliseThemeExtensions:
 
 
     def test_component_styles_per_bucket(self):
-        from hermes_cli.web_server_dashboard import _normalise_theme_definition
+        from eir_cli.web_server_dashboard import _normalise_theme_definition
         r = _normalise_theme_definition({
             "name": "t",
             "componentStyles": {
@@ -4075,25 +4075,25 @@ class TestDeleteSessionEndpoint:
     """
 
     @pytest.fixture(autouse=True)
-    def _setup_test_client(self, monkeypatch, _isolate_hermes_home):
+    def _setup_test_client(self, monkeypatch, _isolate_eir_home):
         try:
             from starlette.testclient import TestClient
         except ImportError:
             pytest.skip("fastapi/starlette not installed")
 
-        import hermes_state
-        from hermes_constants import get_hermes_home
-        from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
+        import eir_state
+        from eir_constants import get_eir_home
+        from eir_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
 
         monkeypatch.setattr(
-            hermes_state, "DEFAULT_DB_PATH", get_hermes_home() / "state.db"
+            eir_state, "DEFAULT_DB_PATH", get_eir_home() / "state.db"
         )
 
         self.auth_client = TestClient(app)
         self.auth_client.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
 
     def _seed(self, ids):
-        from hermes_state import SessionDB
+        from eir_state import SessionDB
 
         db = SessionDB()
         try:
@@ -4103,7 +4103,7 @@ class TestDeleteSessionEndpoint:
             db.close()
 
     def _exists(self, sid) -> bool:
-        from hermes_state import SessionDB
+        from eir_state import SessionDB
 
         db = SessionDB()
         try:
@@ -4137,10 +4137,10 @@ class TestDeleteSessionEndpoint:
     def test_delete_existing_session_scrubs_row_and_disk(self, mutation_owner):
         # The canonical delete retires rows; the endpoint must also remove the secret-bearing
         # session_<id>.json snapshots and request dumps the CLI delete path removes (#60207).
-        from hermes_constants import get_hermes_home
+        from eir_constants import get_eir_home
 
         self._seed(["disk-scrub"])
-        sessions_dir = get_hermes_home() / "sessions"
+        sessions_dir = get_eir_home() / "sessions"
         sessions_dir.mkdir(parents=True, exist_ok=True)
         for name, body in (
             ("session_disk-scrub.json", '{"messages": [{"content": "secret-token"}]}'),
@@ -4164,10 +4164,10 @@ class TestDeleteSessionEndpoint:
     def test_delete_named_profile_session_scrubs_profile_disk(self, monkeypatch):
         from types import SimpleNamespace
         from gateway.session_authority import SessionAuthority
-        from hermes_cli import profiles as profiles_mod
-        from hermes_cli.web_server import app
-        from hermes_state import SessionDB
-        from hermes_state_runtime import begin_runtime_epoch
+        from eir_cli import profiles as profiles_mod
+        from eir_cli.web_server import app
+        from eir_state import SessionDB
+        from eir_state_runtime import begin_runtime_epoch
 
         profile_home = profiles_mod.get_profile_dir("worker")
         profile_home.mkdir(parents=True)
@@ -4205,7 +4205,7 @@ class TestDeleteSessionEndpoint:
         else:
             assert mutation_owner.db.try_acquire_compression_lock(sid, "foreign-compressor")
         from starlette.testclient import TestClient
-        from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
+        from eir_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
         client = TestClient(app, raise_server_exceptions=False)
         client.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
         self.auth_client = client
@@ -4222,7 +4222,7 @@ class TestBulkDeleteSessionsEndpoint:
 
     1. Route-ordering: ``/api/sessions/bulk-delete`` must shadow the
        templated ``/api/sessions/{session_id}`` route below it (see
-       the block comment in ``hermes_cli/web_server.py``).
+       the block comment in ``eir_cli/web_server.py``).
     2. Behaviour parity with :meth:`SessionDB.delete_sessions` — real
        deleted count, archive/active sessions deleted on explicit
        selection.
@@ -4231,18 +4231,18 @@ class TestBulkDeleteSessionsEndpoint:
     """
 
     @pytest.fixture(autouse=True)
-    def _setup_test_client(self, monkeypatch, _isolate_hermes_home):
+    def _setup_test_client(self, monkeypatch, _isolate_eir_home):
         try:
             from starlette.testclient import TestClient
         except ImportError:
             pytest.skip("fastapi/starlette not installed")
 
-        import hermes_state
-        from hermes_constants import get_hermes_home
-        from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
+        import eir_state
+        from eir_constants import get_eir_home
+        from eir_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
 
         monkeypatch.setattr(
-            hermes_state, "DEFAULT_DB_PATH", get_hermes_home() / "state.db"
+            eir_state, "DEFAULT_DB_PATH", get_eir_home() / "state.db"
         )
 
         self.client = TestClient(app)
@@ -4250,7 +4250,7 @@ class TestBulkDeleteSessionsEndpoint:
         self.auth_client.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
 
     def _seed(self, ids):
-        from hermes_state import SessionDB
+        from eir_state import SessionDB
 
         db = SessionDB()
         try:
@@ -4261,7 +4261,7 @@ class TestBulkDeleteSessionsEndpoint:
 
 
     def test_deletes_listed_sessions_only(self):
-        from hermes_state import SessionDB
+        from eir_state import SessionDB
 
         self._seed(["a", "b", "c"])
         resp = self.auth_client.post(
@@ -4298,20 +4298,20 @@ class TestDeleteEmptySessionsEndpoint:
     """
 
     @pytest.fixture(autouse=True)
-    def _setup_test_client(self, monkeypatch, _isolate_hermes_home):
+    def _setup_test_client(self, monkeypatch, _isolate_eir_home):
         try:
             from starlette.testclient import TestClient
         except ImportError:
             pytest.skip("fastapi/starlette not installed")
 
-        import hermes_state
-        from hermes_constants import get_hermes_home
-        from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
+        import eir_state
+        from eir_constants import get_eir_home
+        from eir_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
 
-        # Pin the SessionDB to the isolated HERMES_HOME so each test
+        # Pin the SessionDB to the isolated EIR_HOME so each test
         # starts with a clean state.db.
         monkeypatch.setattr(
-            hermes_state, "DEFAULT_DB_PATH", get_hermes_home() / "state.db"
+            eir_state, "DEFAULT_DB_PATH", get_eir_home() / "state.db"
         )
 
         self.client = TestClient(app)
@@ -4326,7 +4326,7 @@ class TestDeleteEmptySessionsEndpoint:
         * ``live``    — un-ended, empty → must survive (active)
         * ``archived``— ended, empty, archived → must survive
         """
-        from hermes_state import SessionDB
+        from eir_state import SessionDB
 
         db = SessionDB()
         try:
@@ -4362,7 +4362,7 @@ class TestDeleteEmptySessionsEndpoint:
         """DELETE returns the deleted count and removes only the
         empty-ended-unarchived rows — same shape contract as the
         DB-level method's unit tests."""
-        from hermes_state import SessionDB
+        from eir_state import SessionDB
 
         self._seed()
         resp = self.auth_client.delete("/api/sessions/empty")
@@ -4386,10 +4386,10 @@ class TestDeleteEmptySessionsEndpoint:
     def test_delete_removes_on_disk_files_of_deleted_sessions_only(self):
         """Deleting an empty session also removes its files in ``sessions/``.
         A kept session's files stay."""
-        from hermes_constants import get_hermes_home
+        from eir_constants import get_eir_home
 
         self._seed()
-        sessions_dir = get_hermes_home() / "sessions"
+        sessions_dir = get_eir_home() / "sessions"
         sessions_dir.mkdir(parents=True, exist_ok=True)
         deleted_files = [sessions_dir / "session_empty1.json", sessions_dir / "request_dump_empty2_1.json"]
         kept_file = sessions_dir / "session_hasmsg.json"
@@ -4407,24 +4407,24 @@ class TestPluginAPIAuth:
     """Tests that plugin API routes require the session token (issue #19533)."""
 
     @pytest.fixture(autouse=True)
-    def _setup_test_client(self, monkeypatch, _isolate_hermes_home, _install_example_plugin):
+    def _setup_test_client(self, monkeypatch, _isolate_eir_home, _install_example_plugin):
         """Create a TestClient without the session token header.
 
         Pulls in ``_install_example_plugin`` so ``test_plugin_route_allows_auth``
         has the ``/api/plugins/example/hello`` endpoint available — the
         example plugin is no longer a bundled plugin, so the fixture
-        installs it into the per-test ``HERMES_HOME``.
+        installs it into the per-test ``EIR_HOME``.
         """
         try:
             from starlette.testclient import TestClient
         except ImportError:
             pytest.skip("fastapi/starlette not installed")
 
-        import hermes_state
-        from hermes_constants import get_hermes_home
-        from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
+        import eir_state
+        from eir_constants import get_eir_home
+        from eir_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
 
-        monkeypatch.setattr(hermes_state, "DEFAULT_DB_PATH", get_hermes_home() / "state.db")
+        monkeypatch.setattr(eir_state, "DEFAULT_DB_PATH", get_eir_home() / "state.db")
 
         self.client = TestClient(app)
         self.auth_client = TestClient(app)
@@ -4435,7 +4435,7 @@ class TestPluginAPIAuth:
         """Plugin API routes should work with a valid session token.
 
         Uses ``/api/plugins/example/hello`` from the example-dashboard
-        test fixture (installed into HERMES_HOME by the class-level
+        test fixture (installed into EIR_HOME by the class-level
         ``_install_example_plugin`` fixture) — a stable, side-effect-free
         GET that's only loaded for tests. With a valid token the handler
         should run (200); without one the middleware should 401 before
@@ -4468,12 +4468,12 @@ class TestPluginAPIAuth:
         """Auth must be plugin-agnostic, not kanban-specific.
 
         The middleware fix is at the gate level (no per-plugin allowlist),
-        so any plugin's API surface — kanban, hermes-achievements, future
+        so any plugin's API surface — kanban, eir-achievements, future
         plugins — must require the session token. Hit a non-kanban plugin
         path to lock that in.
         """
-        # Real plugin path (hermes-achievements is loaded by default).
-        resp = self.client.get("/api/plugins/hermes-achievements/overview")
+        # Real plugin path (eir-achievements is loaded by default).
+        resp = self.client.get("/api/plugins/eir-achievements/overview")
         assert resp.status_code == 401
         # Same for an arbitrary plugin namespace that doesn't even exist —
         # the middleware should 401 before routing decides 404, so an
@@ -4494,7 +4494,7 @@ class TestDashboardPluginManifestExtensions:
         return plug_dir
 
     def test_override_and_hidden_carried_through(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("EIR_HOME", str(tmp_path))
         self._write_plugin(tmp_path, "skin-home", {
             "name": "skin-home",
             "label": "Skin Home",
@@ -4502,7 +4502,7 @@ class TestDashboardPluginManifestExtensions:
             "slots": ["sidebar", "header-left"],
             "entry": "dist/index.js",
         })
-        from hermes_cli import web_server
+        from eir_cli import web_server
         # Bust the process-level cache so the test plugin is picked up.
         web_server._dashboard_plugins_cache = None
         plugins = web_server._get_dashboard_plugins(force_rescan=True)
@@ -4514,10 +4514,10 @@ class TestDashboardPluginManifestExtensions:
     def test_user_plugins_ignore_profile_home_override(self, tmp_path, monkeypatch):
         """Regression: user dashboard extensions are a dashboard-owned asset
         (like theme YAML), so they must stay visible after a context-local
-        HERMES_HOME override scopes a request to another profile."""
-        from hermes_constants import (
-            reset_hermes_home_override,
-            set_hermes_home_override,
+        EIR_HOME override scopes a request to another profile."""
+        from eir_constants import (
+            reset_eir_home_override,
+            set_eir_home_override,
         )
         launch_home = tmp_path / "launch"
         launch_home.mkdir()
@@ -4530,19 +4530,19 @@ class TestDashboardPluginManifestExtensions:
         other = tmp_path / "other-profile"
         other.mkdir()
 
-        monkeypatch.setenv("HERMES_HOME", str(launch_home))
-        token = set_hermes_home_override(str(other))
+        monkeypatch.setenv("EIR_HOME", str(launch_home))
+        token = set_eir_home_override(str(other))
         try:
             plugins = _web_server_dashboard._discover_dashboard_plugins()
         finally:
-            reset_hermes_home_override(token)
+            reset_eir_home_override(token)
         assert any(p["name"] == "skin-home" for p in plugins)
 
     def test_user_plugins_found_under_profile_scoped_process(self, tmp_path, monkeypatch):
         """Regression #87197: a profile-scoped process (``--profile <name>``
-        sets HERMES_HOME=<root>/profiles/<name>) must still discover user
-        plugins installed in the hermes root's plugins/ directory."""
-        root = tmp_path / "hermes-root"
+        sets EIR_HOME=<root>/profiles/<name>) must still discover user
+        plugins installed in the eir root's plugins/ directory."""
+        root = tmp_path / "eir-root"
         profile_home = root / "profiles" / "presale"
         profile_home.mkdir(parents=True)
         self._write_plugin(root, "meeting-intelligence", {
@@ -4552,14 +4552,14 @@ class TestDashboardPluginManifestExtensions:
             "entry": "dist/index.js",
         })
 
-        monkeypatch.setenv("HERMES_HOME", str(profile_home))
+        monkeypatch.setenv("EIR_HOME", str(profile_home))
         plugins = _web_server_dashboard._discover_dashboard_plugins()
         assert any(p["name"] == "meeting-intelligence" for p in plugins)
 
     def test_profile_local_plugin_wins_over_root_plugin(self, tmp_path, monkeypatch):
         """A same-named plugin in the profile home takes precedence over the
         root copy (seen_names dedupe, profile scanned first)."""
-        root = tmp_path / "hermes-root"
+        root = tmp_path / "eir-root"
         profile_home = root / "profiles" / "presale"
         profile_home.mkdir(parents=True)
         self._write_plugin(profile_home, "dupe", {
@@ -4575,7 +4575,7 @@ class TestDashboardPluginManifestExtensions:
             "entry": "dist/index.js",
         })
 
-        monkeypatch.setenv("HERMES_HOME", str(profile_home))
+        monkeypatch.setenv("EIR_HOME", str(profile_home))
         plugins = _web_server_dashboard._discover_dashboard_plugins()
         entries = [p for p in plugins if p["name"] == "dupe"]
         assert len(entries) == 1
@@ -4585,7 +4585,7 @@ class TestDashboardPluginManifestExtensions:
         """A denied plugin directory or manifest must not prevent valid plugins loading."""
         from pathlib import Path
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("EIR_HOME", str(tmp_path))
         self._write_plugin(tmp_path, "valid", {
             "name": "valid",
             "label": "Valid Plugin",
@@ -4597,7 +4597,7 @@ class TestDashboardPluginManifestExtensions:
         (denied_plugin / "dashboard").mkdir(parents=True)
         (denied_plugin / "dashboard" / "manifest.json").write_text("{}", encoding="utf-8")
 
-        from hermes_cli import web_server_dashboard
+        from eir_cli import web_server_dashboard
         original_search_dirs = web_server_dashboard._dashboard_plugin_search_dirs
         original_scandir = web_server_dashboard.os.scandir
         original_exists = Path.exists
@@ -4629,12 +4629,12 @@ class TestDashboardPluginManifestExtensions:
 # /api/pty WebSocket — terminal bridge for the dashboard "Chat" tab.
 #
 # These tests drive the endpoint with a tiny fake command (typically ``cat``
-# or ``sh -c 'printf …'``) instead of the real ``hermes --tui`` binary.  The
+# or ``sh -c 'printf …'``) instead of the real ``eir --tui`` binary.  The
 # endpoint resolves its argv through ``_resolve_chat_argv``, so tests
 # monkeypatch that hook.
 # ---------------------------------------------------------------------------
 
-from hermes_cli import main as _main_mod, main_tui_launch
+from eir_cli import main as _main_mod, main_tui_launch
 
 
 skip_on_windows = pytest.mark.skipif(
@@ -4645,10 +4645,10 @@ skip_on_windows = pytest.mark.skipif(
 @skip_on_windows
 class TestPtyWebSocket:
     @pytest.fixture(autouse=True)
-    def _setup(self, monkeypatch, _isolate_hermes_home):
+    def _setup(self, monkeypatch, _isolate_eir_home):
         from starlette.testclient import TestClient
 
-        import hermes_cli.web_server as ws
+        import eir_cli.web_server as ws
 
         # Avoid exec'ing the actual TUI in tests: every test below installs
         # its own fake argv via ``web_server_chat._resolve_chat_argv``.
@@ -4671,7 +4671,7 @@ class TestPtyWebSocket:
     def test_tui_python_env_is_this_process_not_the_shell(self, tmp_path):
         """A dev shell's interpreter and tree never reach the TUI's gateway child."""
 
-        command = f"hermes-review-python{Path(sys.executable).suffix}"
+        command = f"eir-review-python{Path(sys.executable).suffix}"
         bin_dir = tmp_path / "bin"
         bin_dir.mkdir()
         executable = bin_dir / command
@@ -4679,18 +4679,18 @@ class TestPtyWebSocket:
         # the venv (tmpfs /tmp vs disk home) where hard links raise EXDEV.
         shutil.copy2(sys.executable, executable)
         env = {
-            "HERMES_CWD": str(tmp_path), "HERMES_PYTHON_SRC_ROOT": str(tmp_path),
-            "HERMES_PYTHON": str(executable),
+            "EIR_CWD": str(tmp_path), "EIR_PYTHON_SRC_ROOT": str(tmp_path),
+            "EIR_PYTHON": str(executable),
             "PATH": str(bin_dir),
         }
 
         main_tui_launch._apply_tui_python_env(env)
 
-        assert (env["HERMES_PYTHON"], env["HERMES_PYTHON_SRC_ROOT"]) == (sys.executable, str(_main_mod.PROJECT_ROOT))
+        assert (env["EIR_PYTHON"], env["EIR_PYTHON_SRC_ROOT"]) == (sys.executable, str(_main_mod.PROJECT_ROOT))
 
 
     def test_unavailable_platform_closes_with_message(self, monkeypatch):
-        from hermes_cli.pty_bridge import PtyUnavailableError
+        from eir_cli.pty_bridge import PtyUnavailableError
 
         def _raise(argv, **kwargs):
             raise PtyUnavailableError("pty missing for tests")
@@ -4724,7 +4724,7 @@ class TestPtyWebSocket:
         asserting the exact fan-out contract.
         """
         import asyncio
-        from hermes_cli import web_server as ws_mod
+        from eir_cli import web_server as ws_mod
 
         class _FakeSub:
             def __init__(self):
@@ -4768,8 +4768,8 @@ class TestPtyWebSocket:
 
 
 def test_resolve_chat_argv_injects_gateway_ws_url(monkeypatch):
-    import hermes_cli.main_tui_launch as tui_launch
-    import hermes_cli.web_server as ws
+    import eir_cli.main_tui_launch as tui_launch
+    import eir_cli.web_server as ws
 
     monkeypatch.setenv("PATH", "/run/current-system/sw/bin:/usr/bin")
     monkeypatch.setattr(
@@ -4783,7 +4783,7 @@ def test_resolve_chat_argv_injects_gateway_ws_url(monkeypatch):
     _argv, _cwd, env = _web_server_chat._resolve_chat_argv()
 
     assert env is not None
-    gateway_url = env.get("HERMES_TUI_GATEWAY_URL", "")
+    gateway_url = env.get("EIR_TUI_GATEWAY_URL", "")
     assert gateway_url.startswith("ws://127.0.0.1:9119/api/ws?")
     assert "token=" in gateway_url
 
@@ -4802,7 +4802,7 @@ class TestDashboardPluginStaticAssetAllowlist:
     """
 
     @pytest.fixture(autouse=True)
-    def _setup_test_client(self, monkeypatch, _isolate_hermes_home, _install_example_plugin):
+    def _setup_test_client(self, monkeypatch, _isolate_eir_home, _install_example_plugin):
         """Create a TestClient and install the example-dashboard fixture.
 
         The static-asset allowlist tests need a plugin to point at —
@@ -4810,14 +4810,14 @@ class TestDashboardPluginStaticAssetAllowlist:
         is served while ``plugin_api.py`` and ``__pycache__/*.pyc``
         from the same directory are not. Since the example plugin is
         no longer bundled, ``_install_example_plugin`` lays it down in
-        the per-test ``HERMES_HOME`` user-plugins dir.
+        the per-test ``EIR_HOME`` user-plugins dir.
         """
         try:
             from starlette.testclient import TestClient
         except ImportError:
             pytest.skip("fastapi/starlette not installed")
 
-        from hermes_cli.web_server import app
+        from eir_cli.web_server import app
 
         self.client = TestClient(app)
 
@@ -4885,13 +4885,13 @@ class TestValidateProviderCredential:
     """Live-probe credential validation (/api/providers/validate)."""
 
     @pytest.fixture(autouse=True)
-    def _setup_test_client(self, monkeypatch, _isolate_hermes_home):
+    def _setup_test_client(self, monkeypatch, _isolate_eir_home):
         try:
             from starlette.testclient import TestClient
         except ImportError:
             pytest.skip("fastapi/starlette not installed")
 
-        from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
+        from eir_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
 
         self.client = TestClient(app)
         self.client.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
@@ -5066,17 +5066,17 @@ class TestDesktopCronTicker:
             from starlette.testclient import TestClient
         except ImportError:
             pytest.skip("fastapi/starlette not installed")
-        from hermes_cli.web_server import app
+        from eir_cli.web_server import app
 
         return TestClient(app)
 
-    def test_ticker_runs_when_desktop(self, monkeypatch, _isolate_hermes_home):
+    def test_ticker_runs_when_desktop(self, monkeypatch, _isolate_eir_home):
         import cron.scheduler as sched
 
         called = threading.Event()
         monkeypatch.setattr(sched, "tick", lambda *a, **k: called.set())
-        monkeypatch.setenv("HERMES_DESKTOP", "1")
-        monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", "desktop-spawn-token")
+        monkeypatch.setenv("EIR_DESKTOP", "1")
+        monkeypatch.setenv("EIR_DASHBOARD_SESSION_TOKEN", "desktop-spawn-token")
 
         with self._client():
             assert called.wait(3.0), "expected cron tick under a Desktop-owned backend"
@@ -5092,7 +5092,7 @@ class TestServeIndexMissingIndex:
     def _client_with_dist(tmp_path, monkeypatch, *, write_index: bool):
         from fastapi import FastAPI
         from starlette.testclient import TestClient
-        import hermes_cli.web_server as ws
+        import eir_cli.web_server as ws
 
         dist = tmp_path / "web_dist"
         (dist / "assets").mkdir(parents=True)
@@ -5101,7 +5101,7 @@ class TestServeIndexMissingIndex:
                 "<html><head></head><body>SPA</body></html>", encoding="utf-8"
             )
         monkeypatch.setattr(ws, "WEB_DIST", dist)
-        monkeypatch.delenv("HERMES_SERVE_HEADLESS", raising=False)
+        monkeypatch.delenv("EIR_SERVE_HEADLESS", raising=False)
         spa_app = FastAPI()
         _web_server_dashboard.mount_spa(spa_app)
         return TestClient(spa_app), dist
@@ -5135,7 +5135,7 @@ class TestServeIndexMissingIndex:
     def test_index_uses_ssh_token_applied_after_spa_mount(
         self, tmp_path, monkeypatch
     ):
-        import hermes_cli.web_server as ws
+        import eir_cli.web_server as ws
 
         monkeypatch.setattr(ws, "_SESSION_TOKEN", "before-mount")
         client, _dist = self._client_with_dist(
@@ -5146,15 +5146,15 @@ class TestServeIndexMissingIndex:
         resp = client.get("/chat")
 
         assert resp.status_code == 200
-        assert 'window.__HERMES_SESSION_TOKEN__="after-mount"' in resp.text
+        assert 'window.__EIR_SESSION_TOKEN__="after-mount"' in resp.text
 
 
 class TestHeadlessServeTokenPage:
-    """Headless `hermes serve` must serve the Desktop token handshake page
+    """Headless `eir serve` must serve the Desktop token handshake page
     at `/` when the dashboard auth gate is off (#94227).
 
     The Electron renderer boots by fetching `/` and extracting
-    ``window.__HERMES_SESSION_TOKEN__`` for WebSocket auth. Headless serve
+    ``window.__EIR_SESSION_TOKEN__`` for WebSocket auth. Headless serve
     used to 404 every path, so after an update replaced the backend (and
     the spawn-token env pin no longer matched the token the new backend
     generated) the renderer was stuck with a stale token, /api/ws rejected
@@ -5165,9 +5165,9 @@ class TestHeadlessServeTokenPage:
     def _headless_client(monkeypatch, *, gated: bool):
         from fastapi import FastAPI
         from starlette.testclient import TestClient
-        import hermes_cli.web_server as ws
+        import eir_cli.web_server as ws
 
-        monkeypatch.setenv("HERMES_SERVE_HEADLESS", "1")
+        monkeypatch.setenv("EIR_SERVE_HEADLESS", "1")
         spa_app = FastAPI()
         spa_app.state.auth_required = gated
         _web_server_dashboard.mount_spa(spa_app)
@@ -5184,20 +5184,20 @@ class TestHeadlessServeTokenPage:
         # Must match the desktop's extraction regex exactly
         # (apps/desktop/electron/dashboard-token.ts).
         match = re.search(
-            r'window\.__HERMES_SESSION_TOKEN__\s*=\s*("(?:\\.|[^"\\])*")',
+            r'window\.__EIR_SESSION_TOKEN__\s*=\s*("(?:\\.|[^"\\])*")',
             resp.text,
         )
         assert match, resp.text
         import json as _json
 
         assert _json.loads(match.group(1)) == ws._SESSION_TOKEN
-        assert "window.__HERMES_AUTH_REQUIRED__=false" in resp.text
+        assert "window.__EIR_AUTH_REQUIRED__=false" in resp.text
 
     def test_root_uses_ssh_token_applied_after_spa_mount(self, monkeypatch):
         import json
         import re
 
-        import hermes_cli.web_server as ws
+        import eir_cli.web_server as ws
 
         monkeypatch.setattr(ws, "_SESSION_TOKEN", "before-mount")
         client, ws = self._headless_client(monkeypatch, gated=False)
@@ -5205,7 +5205,7 @@ class TestHeadlessServeTokenPage:
         ws._apply_ssh_session_token("after-mount")
         resp = client.get("/")
         match = re.search(
-            r'window\.__HERMES_SESSION_TOKEN__\s*=\s*("(?:\\.|[^"\\])*")',
+            r'window\.__EIR_SESSION_TOKEN__\s*=\s*("(?:\\.|[^"\\])*")',
             resp.text,
         )
 
@@ -5237,7 +5237,7 @@ class TestHashedAssetCacheHeaders:
     def _client(tmp_path, monkeypatch):
         from fastapi import FastAPI
         from starlette.testclient import TestClient
-        import hermes_cli.web_server as ws
+        import eir_cli.web_server as ws
 
         dist = tmp_path / "web_dist"
         (dist / "assets").mkdir(parents=True)
@@ -5253,7 +5253,7 @@ class TestHashedAssetCacheHeaders:
             encoding="utf-8",
         )
         monkeypatch.setattr(ws, "WEB_DIST", dist)
-        monkeypatch.delenv("HERMES_SERVE_HEADLESS", raising=False)
+        monkeypatch.delenv("EIR_SERVE_HEADLESS", raising=False)
         spa_app = FastAPI()
         _web_server_dashboard.mount_spa(spa_app)
         return TestClient(spa_app)
@@ -5276,12 +5276,12 @@ class TestHashedAssetCacheHeaders:
         # handling) must survive the header change.
         prefixed = client.get(
             "/assets/index-abc123.css",
-            headers={"X-Forwarded-Prefix": "/hermes"},
+            headers={"X-Forwarded-Prefix": "/eir"},
         )
         assert prefixed.status_code == 200
         assert prefixed.headers["cache-control"] == self._IMMUTABLE
-        assert "url(/hermes/ds-assets/bg.png)" in prefixed.text
-        assert "url(/hermes/fonts-terminal/x.woff2)" in prefixed.text
+        assert "url(/eir/ds-assets/bg.png)" in prefixed.text
+        assert "url(/eir/fonts-terminal/x.woff2)" in prefixed.text
 
     def test_index_html_stays_no_store(self, tmp_path, monkeypatch):
         client = self._client(tmp_path, monkeypatch)
@@ -5305,17 +5305,17 @@ class TestDashboardComponentHealth:
     """Component-health rollup: error middleware, /api/status components, self-test."""
 
     @pytest.fixture(autouse=True)
-    def _setup(self, monkeypatch, _isolate_hermes_home):
+    def _setup(self, monkeypatch, _isolate_eir_home):
         try:
             from starlette.testclient import TestClient
         except ImportError:
             pytest.skip("fastapi/starlette not installed")
 
-        import hermes_state
-        from hermes_constants import get_hermes_home
-        import hermes_cli.web_server as ws
+        import eir_state
+        from eir_constants import get_eir_home
+        import eir_cli.web_server as ws
 
-        monkeypatch.setattr(hermes_state, "DEFAULT_DB_PATH", get_hermes_home() / "state.db")
+        monkeypatch.setattr(eir_state, "DEFAULT_DB_PATH", get_eir_home() / "state.db")
         # Fresh state holder per test so counters don't leak across tests.
         monkeypatch.setattr(ws, "DASHBOARD_HEALTH", ws.DashboardHealth())
         self.ws = ws
@@ -5372,18 +5372,18 @@ class TestSessionPatchUnread:
     read/unread, and GET /api/sessions surfaces the derived flag."""
 
     @pytest.fixture(autouse=True)
-    def _setup_test_client(self, monkeypatch, _isolate_hermes_home, mutation_owner):
+    def _setup_test_client(self, monkeypatch, _isolate_eir_home, mutation_owner):
         try:
             from starlette.testclient import TestClient
         except ImportError:
             pytest.skip("fastapi/starlette not installed")
 
-        import hermes_state
-        from hermes_constants import get_hermes_home
-        from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
+        import eir_state
+        from eir_constants import get_eir_home
+        from eir_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
 
         monkeypatch.setattr(
-            hermes_state, "DEFAULT_DB_PATH", get_hermes_home() / "state.db"
+            eir_state, "DEFAULT_DB_PATH", get_eir_home() / "state.db"
         )
 
         self.owner = mutation_owner
@@ -5391,7 +5391,7 @@ class TestSessionPatchUnread:
         self.auth_client = TestClient(app)
         self.auth_client.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
 
-        from hermes_state import SessionDB
+        from eir_state import SessionDB
 
         db = SessionDB()
         try:
@@ -5453,7 +5453,7 @@ class TestSessionPatchUnread:
 def test_mount_spa_dynamic_web_dist_recheck(tmp_path, monkeypatch):
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
-    from hermes_cli import web_server
+    from eir_cli import web_server
 
     app = FastAPI()
     dist = tmp_path / "web_dist"
@@ -5482,14 +5482,14 @@ class TestSubmittedCustomEndpointSurvivesAssignment:
     replace what the user typed and had persisted."""
 
     def test_submitted_custom_endpoint_wins_over_an_env_endpoint(self, monkeypatch):
-        from hermes_cli.model_assignment import apply_main_model_assignment
+        from eir_cli.model_assignment import apply_main_model_assignment
 
         monkeypatch.setenv("CUSTOM_BASE_URL", "http://127.0.0.1:9999/v1")
         monkeypatch.setattr(
-            "hermes_cli.models_validate.validate_requested_model",
+            "eir_cli.models_validate.validate_requested_model",
             lambda *a, **k: {"accepted": True, "persist": True, "recognized": True, "message": None})
-        monkeypatch.setattr("hermes_cli.model_switch.get_model_info", lambda *a, **k: None)
-        monkeypatch.setattr("hermes_cli.model_switch.get_model_capabilities", lambda *a, **k: None)
+        monkeypatch.setattr("eir_cli.model_switch.get_model_info", lambda *a, **k: None)
+        monkeypatch.setattr("eir_cli.model_switch.get_model_capabilities", lambda *a, **k: None)
 
         cfg = {"model": {"provider": "openrouter", "default": "m"}}
         result = _web_server_config._validated_main_model_selection(

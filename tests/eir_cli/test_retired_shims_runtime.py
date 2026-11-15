@@ -23,7 +23,7 @@ def _call(module, name):
 
 @pytest.fixture
 def takeover(monkeypatch):
-    from hermes_cli import _old_updater
+    from eir_cli import _old_updater
 
     child = Mock(return_value=(0, {}))  # never spawn the real _update_takeover.py
     monkeypatch.setattr(_old_updater, "_run_child", child)
@@ -34,10 +34,10 @@ def takeover(monkeypatch):
 @pytest.mark.parametrize("module,name", SHIMS, ids="{0[0]}.{0[1]}".format)
 @pytest.mark.parametrize("frame", ["live", "current-updater"])
 def test_current_code_never_starts_the_takeover(module, name, frame, takeover):
-    # A live serve/gateway/plugin, or the CURRENT `hermes update` (sentinel local), reaching a
+    # A live serve/gateway/plugin, or the CURRENT `eir update` (sentinel local), reaching a
     # retired shim must get a catchable error, not a full update finish that restarts it.
-    sentinel = "    _hermes_current_updater_frame = True\n" if frame == "current-updater" else ""
-    namespace = {"__name__": "hermes_cli.update_cmd", "_call": _call}
+    sentinel = "    _eir_current_updater_frame = True\n" if frame == "current-updater" else ""
+    namespace = {"__name__": "eir_cli.update_cmd", "_call": _call}
     exec(f"def _cmd_update_impl(m, n):\n{sentinel}    _call(m, n)\n" if sentinel else
          "def serve(m, n):\n    _call(m, n)\n", namespace)
     entry = namespace["_cmd_update_impl" if sentinel else "serve"]
@@ -50,7 +50,7 @@ def test_current_code_never_starts_the_takeover(module, name, frame, takeover):
 @pytest.mark.parametrize("module,name", SHIMS, ids="{0[0]}.{0[1]}".format)
 def test_historical_updater_frame_still_hands_off(module, name, takeover):
     # A historical on-disk `_cmd_update_impl` (no sentinel local) keeps handing off exactly as before.
-    namespace = {"__name__": "hermes_cli.update_cmd", "_call": _call}
+    namespace = {"__name__": "eir_cli.update_cmd", "_call": _call}
     exec("def _cmd_update_impl(m, n):\n    pre_update_version = '1.0'\n    _helper(m, n)\n"
          "def _helper(m, n):\n    _call(m, n)\n", namespace)
     with pytest.raises(SystemExit) as stopped:
@@ -60,9 +60,9 @@ def test_historical_updater_frame_still_hands_off(module, name, takeover):
 
 
 def test_module_mode_historical_updater_still_hands_off(takeover):
-    # `python -m hermes_cli.main update` from a release before update_cmd.py existed: its
-    # cmd_update runs as `__main__`, compiled from this checkout's hermes_cli/main.py.
-    from hermes_cli import _old_updater
+    # `python -m eir_cli.main update` from a release before update_cmd.py existed: its
+    # cmd_update runs as `__main__`, compiled from this checkout's eir_cli/main.py.
+    from eir_cli import _old_updater
 
     main_py = str(Path(_old_updater.__file__).resolve().with_name("main.py"))
     namespace = {"__name__": "__main__", "_call": _call}
@@ -85,11 +85,11 @@ def test_a_main_script_elsewhere_is_live_code(takeover):
 
 def test_current_module_mode_updater_is_live_code(takeover):
     # The current tree's own cmd_update run via `python -m` carries the sentinel local.
-    from hermes_cli import _old_updater
+    from eir_cli import _old_updater
 
     main_py = str(Path(_old_updater.__file__).resolve().with_name("main.py"))
     namespace = {"__name__": "__main__", "_call": _call}
-    exec(compile("def cmd_update(m, n):\n    _hermes_current_updater_frame = True\n    _call(m, n)\n",
+    exec(compile("def cmd_update(m, n):\n    _eir_current_updater_frame = True\n    _call(m, n)\n",
                  main_py, "exec"), namespace)
     with pytest.raises(Exception, match="retired"):
         namespace["cmd_update"]("tools.lazy_deps", "install_specs")

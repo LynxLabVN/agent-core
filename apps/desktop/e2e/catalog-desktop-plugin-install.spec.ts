@@ -3,7 +3,7 @@
  * 2026-11-07): the install worked, but the card kept its "+", the plugin sat switched off (it ships
  * `defaultEnabled: false`), and a second Install answered "already exists" with Force out of sight.
  *
- * Real Electron and real `hermes serve`. The catalog feed is answered with one entry that points at a
+ * Real Electron and real `eir serve`. The catalog feed is answered with one entry that points at a
  * local Git repository laid out like hermes-official-plugins (plugin.yaml + desktop/plugin.js, no agent
  * half), so the install clones, checks out the pinned commit and publishes for real, with no network.
  *
@@ -20,7 +20,7 @@ import { expect, test } from './test'
 
 const CATALOG_FEED = 'https://nousresearch.github.io/hermes-agent/docs/api/plugins.json'
 const NAME = 'accent-picker'
-const INSTALL_ORIGIN = '.hermes-origin.json'
+const INSTALL_ORIGIN = '.eir-origin.json'
 
 const PLUGIN_JS = `export default {
   id: 'accent',
@@ -85,7 +85,7 @@ test('a desktop-only catalog plugin shows installed, turns on, and an older copy
   test.setTimeout(300_000)
   const { page, sandbox } = fixture!
   await waitForAppReady(fixture!, 120_000)
-  const folder = path.join(sandbox.hermesHome, 'desktop-plugins', NAME)
+  const folder = path.join(sandbox.eirHome, 'desktop-plugins', NAME)
   const addButton = page.getByRole('button', { name: `Add ${NAME}` })
   const pluginSwitch = page.getByRole('switch', { name: 'Accent Picker' })
 
@@ -110,7 +110,7 @@ test('a desktop-only catalog plugin shows installed, turns on, and an older copy
     repo: pathToFileURL(repo).href,
     sha
   })
-  expect(fs.existsSync(path.join(folder, '.hermes-package.json'))).toBe(false)
+  expect(fs.existsSync(path.join(folder, '.eir-package.json'))).toBe(false)
   await expect(addButton).toHaveCount(0, { timeout: 30_000 })
   await expect(pluginSwitch).toHaveAttribute('aria-checked', 'true', { timeout: 30_000 })
 

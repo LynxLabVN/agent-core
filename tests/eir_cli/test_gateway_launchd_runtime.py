@@ -14,8 +14,8 @@ import sys
 
 import pytest
 
-from hermes_cli import gateway_launchd_runtime as launchd_runtime
-from hermes_cli.gateway_launchd_runtime import GatewayJob, start_gateway_job
+from eir_cli import gateway_launchd_runtime as launchd_runtime
+from eir_cli.gateway_launchd_runtime import GatewayJob, start_gateway_job
 from tests.waiting import wait_until
 
 

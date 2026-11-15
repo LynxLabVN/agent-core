@@ -1,9 +1,9 @@
-"""``hermes desktop`` from inside a BUNDLED desktop payload.
+"""``eir desktop`` from inside a BUNDLED desktop payload.
 
 A bundled artifact ships the CLI inside ``<app>/resources/agent-payload``
 and the desktop app is the artifact itself — there is no source tree to
 build and the app resources are signed and read-only. These tests pin the
-two halves of that: where the launcher is (hermes_cli.bundled_app) and
+two halves of that: where the launcher is (eir_cli.bundled_app) and
 that cmd_gui starts it instead of running the checkout build ladder.
 
 The layout resolver is pure path arithmetic over real directories, so
@@ -19,13 +19,13 @@ from unittest.mock import patch
 
 import pytest
 
-import hermes_cli.main as cli_main
-from hermes_cli.bundled_app import (
+import eir_cli.main as cli_main
+from eir_cli.bundled_app import (
     NotBundledApp,
     launch_detached,
     resolve_bundle_layout,
 )
-from hermes_cli.steward import is_bundled_payload
+from eir_cli.steward import is_bundled_payload
 
 STAMP = {
     "schemaVersion": 2,
@@ -66,7 +66,7 @@ def _payload(app_root: Path, *, resources_name: str = "resources") -> Path:
 def _linux_bundle(tmp_path: Path) -> Path:
     app = tmp_path / "linux-unpacked"
     repo = _payload(app)
-    _exe(app / "Hermes")
+    _exe(app / "Eir")
     # The helpers a Linux Electron tree ships beside its launcher.
     _exe(app / "chrome-sandbox")
     _exe(app / "chrome_crashpad_handler")
@@ -76,17 +76,17 @@ def _linux_bundle(tmp_path: Path) -> Path:
 
 
 def _windows_bundle(tmp_path: Path) -> Path:
-    app = tmp_path / "Hermes"
+    app = tmp_path / "Eir"
     repo = _payload(app)
-    _exe(app / "Hermes.exe")
-    _exe(app / "Uninstall Hermes.exe")
+    _exe(app / "Eir.exe")
+    _exe(app / "Uninstall Eir.exe")
     return repo
 
 
 def _macos_bundle(tmp_path: Path) -> Path:
-    app = tmp_path / "Hermes.app"
+    app = tmp_path / "Eir.app"
     repo = _payload(app / "Contents", resources_name="Resources")
-    _exe(app / "Contents" / "MacOS" / "Hermes")
+    _exe(app / "Contents" / "MacOS" / "Eir")
     return repo
 
 
@@ -99,11 +99,11 @@ def _host_bundle(tmp_path: Path) -> tuple[Path, Path]:
     """
     if sys.platform == "win32":
         repo = _windows_bundle(tmp_path)
-        return repo, tmp_path / "Hermes" / "Hermes.exe"
+        return repo, tmp_path / "Eir" / "Eir.exe"
     if sys.platform == "darwin":
-        return _macos_bundle(tmp_path), tmp_path / "Hermes.app/Contents/MacOS/Hermes"
+        return _macos_bundle(tmp_path), tmp_path / "Eir.app/Contents/MacOS/Eir"
     repo = _linux_bundle(tmp_path)
-    return repo, tmp_path / "linux-unpacked" / "Hermes"
+    return repo, tmp_path / "linux-unpacked" / "Eir"
 
 
 class TestResolveBundleLayout:
@@ -113,19 +113,19 @@ class TestResolveBundleLayout:
         layout = resolve_bundle_layout(repo, platform="linux")
         assert layout.app_root == tmp_path / "linux-unpacked"
         assert layout.payload.name == "agent-payload"
-        assert layout.launcher == tmp_path / "linux-unpacked" / "Hermes"
+        assert layout.launcher == tmp_path / "linux-unpacked" / "Eir"
 
     def test_windows_launcher_is_never_the_uninstaller(self, tmp_path):
         repo = _windows_bundle(tmp_path)
         layout = resolve_bundle_layout(repo, platform="win32")
-        assert layout.launcher == tmp_path / "Hermes" / "Hermes.exe"
+        assert layout.launcher == tmp_path / "Eir" / "Eir.exe"
 
     def test_macos_app_root_climbs_out_of_contents_resources(self, tmp_path):
         repo = _macos_bundle(tmp_path)
         layout = resolve_bundle_layout(repo, platform="darwin")
-        assert layout.app_root == tmp_path / "Hermes.app"
-        assert layout.resources == tmp_path / "Hermes.app" / "Contents" / "Resources"
-        assert layout.launcher == tmp_path / "Hermes.app" / "Contents" / "MacOS" / "Hermes"
+        assert layout.app_root == tmp_path / "Eir.app"
+        assert layout.resources == tmp_path / "Eir.app" / "Contents" / "Resources"
+        assert layout.launcher == tmp_path / "Eir.app" / "Contents" / "MacOS" / "Eir"
 
     def test_ambiguous_launcher_reports_none_rather_than_guessing(self, tmp_path):
         repo = _windows_bundle(tmp_path)
@@ -133,14 +133,14 @@ class TestResolveBundleLayout:
         assert resolve_bundle_layout(repo, platform="win32").launcher is None
 
     def test_a_checkout_is_not_a_bundle(self, tmp_path):
-        checkout = tmp_path / "hermes-agent"
+        checkout = tmp_path / "eir-agent"
         (checkout / "apps" / "desktop").mkdir(parents=True)
         with pytest.raises(NotBundledApp):
             resolve_bundle_layout(checkout)
 
     def test_a_sealed_tree_with_no_app_is_not_a_bundle(self, tmp_path):
         # docker/nix shape: sealed repo, no agent-payload parent.
-        repo = tmp_path / "opt" / "hermes" / "repo"
+        repo = tmp_path / "opt" / "eir" / "repo"
         repo.mkdir(parents=True)
         with pytest.raises(NotBundledApp):
             resolve_bundle_layout(repo)
@@ -155,20 +155,20 @@ class TestShapePredicate:
     def test_a_surviving_desktop_package_json_does_not_make_a_bundle(self, tmp_path):
         """repo/apps/desktop survives the payload prune, so a filesystem
         probe cannot be the authority — only the stamp can."""
-        checkout = tmp_path / "hermes-agent"
+        checkout = tmp_path / "eir-agent"
         (checkout / "apps" / "desktop").mkdir(parents=True)
         (checkout / "apps" / "desktop" / "package.json").write_text("{}\n")
         assert not is_bundled_payload(checkout)
 
     def test_a_bootstrap_artifact_is_not_bundled(self, tmp_path):
-        root = tmp_path / "hermes-agent"
+        root = tmp_path / "eir-agent"
         root.mkdir()
         stamp = dict(STAMP, payload="bootstrap", tag=None)
         (root / "install-stamp.json").write_text(json.dumps(stamp) + "\n")
         assert not is_bundled_payload(root)
 
     def test_an_unreadable_stamp_is_not_bundled(self, tmp_path):
-        root = tmp_path / "hermes-agent"
+        root = tmp_path / "eir-agent"
         root.mkdir()
         (root / "install-stamp.json").write_text("{ not json\n")
         assert not is_bundled_payload(root)
@@ -183,11 +183,11 @@ class TestLaunchDetached:
             seen["kwargs"] = kwargs
             return SimpleNamespace(pid=1234)
 
-        with patch("hermes_cli.bundled_app.subprocess.Popen", side_effect=fake_popen):
-            pid = launch_detached(["/app/Hermes", "--no-sandbox"], cwd="/app")
+        with patch("eir_cli.bundled_app.subprocess.Popen", side_effect=fake_popen):
+            pid = launch_detached(["/app/Eir", "--no-sandbox"], cwd="/app")
 
         assert pid == 1234
-        assert seen["argv"] == ["/app/Hermes", "--no-sandbox"]
+        assert seen["argv"] == ["/app/Eir", "--no-sandbox"]
         assert seen["kwargs"]["cwd"] == "/app"
         assert seen["kwargs"]["stdout"] is subprocess.DEVNULL
         assert seen["kwargs"]["stderr"] is subprocess.DEVNULL
@@ -220,7 +220,7 @@ class TestCmdGuiOnABundle:
     def _args(**overrides):
         base = dict(
             source=False, build_only=False, fake_boot=False, ignore_existing=False,
-            hermes_root=None, cwd=None, skip_build=False, force_build=False,
+            eir_root=None, cwd=None, skip_build=False, force_build=False,
         )
         base.update(overrides)
         return SimpleNamespace(**base)
@@ -239,7 +239,7 @@ class TestCmdGuiOnABundle:
             launches.append([str(a) for a in argv])
             return SimpleNamespace(pid=4242)
 
-        from hermes_cli import main_desktop, source_build
+        from eir_cli import main_desktop, source_build
         import pm
         monkeypatch.setattr(cli_main, "PROJECT_ROOT", repo)
         monkeypatch.setattr(source_build, "source_build_env", lambda env, **kwargs: dict(env))
@@ -252,7 +252,7 @@ class TestCmdGuiOnABundle:
         monkeypatch.setattr(main_desktop, "_desktop_linux_needs_disable_setuid_sandbox", lambda *a: setuid_helper_unusable)
         monkeypatch.setattr(main_desktop, "_detect_linux_password_store", lambda: None)
 
-        with patch("hermes_cli.bundled_app.subprocess.Popen", side_effect=record_popen), \
+        with patch("eir_cli.bundled_app.subprocess.Popen", side_effect=record_popen), \
              patch.object(cli_main.subprocess, "run", side_effect=record_run), \
              pytest.raises(SystemExit) as exit_info:
             cli_main.cmd_gui(args)
@@ -279,15 +279,15 @@ class TestCmdGuiOnABundle:
         assert launches == [[str(launcher), "--disable-setuid-sandbox"]]
 
     def test_explicit_profile_reaches_the_bundled_launcher(self, tmp_path, monkeypatch):
-        """`hermes -p work desktop` on a bundle hands Electron --profile work."""
+        """`eir -p work desktop` on a bundle hands Electron --profile work."""
         repo, launcher = _host_bundle(tmp_path / "app")
-        # HERMES_HOME outside the platform home is the root itself on every OS.
-        root = tmp_path / "hermes-root"
+        # EIR_HOME outside the platform home is the root itself on every OS.
+        root = tmp_path / "eir-root"
         profile = root / "profiles" / "work"
         profile.mkdir(parents=True)
         (profile / "config.yaml").write_text("{}\n", encoding="utf-8")
-        monkeypatch.setenv("HERMES_HOME", str(root))
-        monkeypatch.setattr(sys, "argv", ["hermes", "-p", "work", "desktop"])
+        monkeypatch.setenv("EIR_HOME", str(root))
+        monkeypatch.setattr(sys, "argv", ["eir", "-p", "work", "desktop"])
         monkeypatch.setattr(cli_main, "_explicit_cli_profile", None)
         cli_main._apply_profile_override()
 
@@ -298,7 +298,7 @@ class TestCmdGuiOnABundle:
         assert launches == [[str(launcher), "--profile", "work"]]
 
     def test_a_checkout_still_takes_the_build_ladder(self, tmp_path, monkeypatch):
-        checkout = tmp_path / "hermes-agent"
+        checkout = tmp_path / "eir-agent"
         (checkout / "apps" / "desktop").mkdir(parents=True)
         (checkout / "apps" / "desktop" / "package.json").write_text("{}\n")
         _code, builds, launches = self._run(monkeypatch, checkout, self._args())
@@ -332,8 +332,8 @@ class TestCmdGuiOnABundle:
     def test_a_bundle_with_no_resolvable_launcher_reports_damage(self, tmp_path, monkeypatch):
         app = tmp_path / "linux-unpacked"
         repo = _payload(app)
-        _exe(app / "Hermes")
-        _exe(app / "Hermes-Other")
+        _exe(app / "Eir")
+        _exe(app / "Eir-Other")
         code, builds, launches = self._run(monkeypatch, repo, self._args())
 
         assert code == 1

@@ -1,4 +1,4 @@
-"""``hermes curator`` subcommand parser."""
+"""``eir curator`` subcommand parser."""
 
 from __future__ import annotations
 
@@ -15,8 +15,8 @@ def build_curator_parser(subparsers) -> None:
             "Bundled and hub-installed skills are never touched. "
             "Archives are recoverable; auto-deletion never happens.")
     try:
-        from hermes_cli.curator import register_cli as _register_curator_cli
+        from eir_cli.curator import register_cli as _register_curator_cli
 
         _register_curator_cli(curator_parser)
     except Exception as _exc:
-        logging.getLogger("hermes_cli.main").debug("curator CLI wiring failed: %s", _exc)
+        logging.getLogger("eir_cli.main").debug("curator CLI wiring failed: %s", _exc)

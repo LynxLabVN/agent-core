@@ -6,11 +6,11 @@ hand the old secret (or hand-written ``extra_headers``) to the new address.
 
 import pytest
 
-import hermes_cli.main as hermes_main
+import eir_cli.main as eir_main
 
 
 def _drive_cli_custom_flow(monkeypatch, url: str, secret_answers: list[str]) -> list[str]:
-    """Run ``hermes model`` → Custom endpoint against the real temp HERMES_HOME; return the
+    """Run ``eir model`` → Custom endpoint against the real temp EIR_HOME; return the
     keys the endpoint probe was handed."""
     probed_keys: list[str] = []
 
@@ -19,17 +19,17 @@ def _drive_cli_custom_flow(monkeypatch, url: str, secret_answers: list[str]) -> 
         return {"models": [], "probed_url": f"{base_url}/models", "resolved_base_url": None,
                 "suggested_base_url": None, "used_fallback": False}
 
-    monkeypatch.setattr("hermes_cli.models.probe_api_models", _probe)
-    monkeypatch.setattr("hermes_cli.main_provider_setup._prompt_custom_api_mode_selection",
+    monkeypatch.setattr("eir_cli.models.probe_api_models", _probe)
+    monkeypatch.setattr("eir_cli.main_provider_setup._prompt_custom_api_mode_selection",
                         lambda *_a, **_k: "chat_completions")
     # URL, then model name / context length / display name.
     answers = iter([url, "probe-model", "", ""])
     monkeypatch.setattr("builtins.input", lambda _prompt="": next(answers))
     secrets = iter(secret_answers)
-    monkeypatch.setattr("hermes_cli.secret_prompt.masked_secret_prompt", lambda _prompt="": next(secrets))
-    monkeypatch.setattr("hermes_cli.model_setup_flows_custom._report_context_length_detection",
+    monkeypatch.setattr("eir_cli.secret_prompt.masked_secret_prompt", lambda _prompt="": next(secrets))
+    monkeypatch.setattr("eir_cli.model_setup_flows_custom._report_context_length_detection",
                         lambda *_a: None)
-    hermes_main._model_flow_custom({})
+    eir_main._model_flow_custom({})
     return probed_keys
 
 
@@ -45,7 +45,7 @@ def _drive_cli_custom_flow(monkeypatch, url: str, secret_answers: list[str]) -> 
     ],
 )
 def test_cli_blank_key_reuses_stored_key_only_on_its_own_origin(monkeypatch, url, secret_answers, expected_key):
-    from hermes_cli.config import get_env_path, save_env_value
+    from eir_cli.config import get_env_path, save_env_value
 
     save_env_value("OPENAI_API_KEY", "sk-old-origin-fixture")
     save_env_value("OPENAI_BASE_URL", "https://llm.old.example/v1")
@@ -62,7 +62,7 @@ def test_cli_blank_key_reuses_stored_key_only_on_its_own_origin(monkeypatch, url
     ("https://llm.old.example/v2", True),    # same origin: it is still that host's credential
 ])
 def test_cli_keyless_save_drops_the_previous_hosts_model_credential(monkeypatch, url, kept):
-    from hermes_cli.config import load_config, save_config
+    from eir_cli.config import load_config, save_config
 
     cfg = load_config()
     cfg["model"] = {"provider": "custom", "default": "m", "base_url": "https://llm.old.example/v1",
@@ -79,20 +79,20 @@ def test_cli_keyless_save_drops_the_previous_hosts_model_credential(monkeypatch,
 
 class TestDesktopEndpointEdit:
     @pytest.fixture(autouse=True)
-    def _client(self, _isolate_hermes_home):
+    def _client(self, _isolate_eir_home):
         from starlette.testclient import TestClient
 
-        from hermes_cli.config import load_config, save_config, save_env_value
-        from hermes_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
+        from eir_cli.config import load_config, save_config, save_env_value
+        from eir_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
 
         cfg = load_config()
         cfg["providers"] = {"myep": {
             "name": "myep", "base_url": "https://llm.old.example/v1", "model": "m",
-            "key_env": "HERMES_CUSTOM_MYEP_API_KEY", "key_cmd": "print-old-token",
+            "key_env": "EIR_CUSTOM_MYEP_API_KEY", "key_cmd": "print-old-token",
             "extra_headers": {"X-Org-Token": "hdr-old-fixture"}, "models": {"m": {}},
         }}
         save_config(cfg)
-        save_env_value("HERMES_CUSTOM_MYEP_API_KEY", "sk-old-origin-fixture")
+        save_env_value("EIR_CUSTOM_MYEP_API_KEY", "sk-old-origin-fixture")
         self.client = TestClient(app)
         self.client.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
 
@@ -101,7 +101,7 @@ class TestDesktopEndpointEdit:
             "id": "myep", "name": "myep", "base_url": base_url, "model": "m", "make_default": False, **extra})
 
     def test_new_origin_without_a_key_is_refused_and_nothing_changes(self):
-        from hermes_cli.config import get_config_path, get_env_path, load_config
+        from eir_cli.config import get_config_path, get_env_path, load_config
 
         saved = {path: path.read_bytes() for path in (get_config_path(), get_env_path())}
         response = self._edit("https://llm.new.example/v1")
@@ -113,14 +113,14 @@ class TestDesktopEndpointEdit:
         # Same origin, new path: the stored credentials stay.
         assert self._edit("https://llm.old.example/v2").status_code == 200
         entry = load_config()["providers"]["myep"]
-        assert entry["key_env"] == "HERMES_CUSTOM_MYEP_API_KEY"
+        assert entry["key_env"] == "EIR_CUSTOM_MYEP_API_KEY"
         assert entry["extra_headers"] == {"X-Org-Token": "hdr-old-fixture"}
 
     @pytest.mark.parametrize("old_credential", [{"api_key": "sk-old-origin-fixture"},
                                                 {"key_env": "MY_OWN_LLM_KEY"}])
     def test_default_save_probe_never_reloads_the_old_hosts_key(self, monkeypatch, old_credential):
         """Explicit blank key + make_default: validation probes the new host keyless."""
-        from hermes_cli.config import load_config, save_config, save_env_value
+        from eir_cli.config import load_config, save_config, save_env_value
 
         cfg = load_config()
         entry = cfg["providers"]["myep"]
@@ -136,7 +136,7 @@ class TestDesktopEndpointEdit:
             return {"models": ["m"], "probed_url": f"{base_url}/models", "resolved_base_url": None,
                     "suggested_base_url": None, "used_fallback": False}
 
-        monkeypatch.setattr("hermes_cli.models.probe_api_models", _probe)
+        monkeypatch.setattr("eir_cli.models.probe_api_models", _probe)
         response = self._edit("https://llm.new.example/v1", api_key="", make_default=True)
 
         assert response.status_code == 200, response.text
@@ -146,15 +146,15 @@ class TestDesktopEndpointEdit:
     @pytest.mark.parametrize("new_key", ["", "sk-new-dotenv-fixture"])
     def test_move_leaves_no_old_key_under_the_legacy_variable(self, new_key):
         """The guard leaves ``key_env`` to ``_apply_endpoint_key``, which clears or rewrites the row's
-        own ``HERMES_CUSTOM_*`` variable; dropping it first left the old host's key in .env."""
-        from hermes_cli.config import get_env_path, get_env_value
-        old = get_env_value("HERMES_CUSTOM_MYEP_API_KEY")
+        own ``EIR_CUSTOM_*`` variable; dropping it first left the old host's key in .env."""
+        from eir_cli.config import get_env_path, get_env_value
+        old = get_env_value("EIR_CUSTOM_MYEP_API_KEY")
         assert old
         assert self._edit("https://llm.new.example/v1", api_key=new_key).status_code == 200
         assert old not in get_env_path().read_text()
 
     def test_new_origin_with_its_key_drops_every_old_credential(self):
-        from hermes_cli.config import get_env_value, load_config
+        from eir_cli.config import get_env_value, load_config
 
         assert self._edit("https://llm.new.example/v1", api_key="sk-new-origin-fixture").status_code == 200
         entry = load_config()["providers"]["myep"]
@@ -168,15 +168,15 @@ class TestDesktopEndpointEdit:
     ("base_url", {"apiKey": "sk-old-dotenv-fixture"}), ("base_url", {"keyEnv": "MYEP_KEY"}),
     ("base_url", {"apiKeyEnv": "MYEP_KEY"}),
 ])
-def test_desktop_move_of_an_entry_addressed_by_api_or_url_drops_its_key(_isolate_hermes_home, address_field,
+def test_desktop_move_of_an_entry_addressed_by_api_or_url_drops_its_key(_isolate_eir_home, address_field,
                                                                          credential):
     """Migrated v12 entries store the address under ``api``; hand-written ones may use ``url`` or the
     camelCase aliases the readers accept (``baseUrl``, ``apiKey``/``keyEnv``/``apiKeyEnv``)."""
     from starlette.testclient import TestClient
 
-    from hermes_cli.config import load_config, save_config, save_env_value
-    from hermes_cli.runtime_provider import resolve_runtime_provider
-    from hermes_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
+    from eir_cli.config import load_config, save_config, save_env_value
+    from eir_cli.runtime_provider import resolve_runtime_provider
+    from eir_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
 
     cfg = load_config()
     cfg["providers"] = {"myep": {"name": "myep", address_field: "https://llm.old.example/v1", "model": "m",
@@ -204,11 +204,11 @@ def test_desktop_move_of_an_entry_addressed_by_api_or_url_drops_its_key(_isolate
     assert resolve_runtime_provider().get("api_key") != "sk-old-dotenv-fixture"
 
 
-def test_desktop_move_of_a_legacy_custom_providers_row_keeps_its_key_home(_isolate_hermes_home):
+def test_desktop_move_of_a_legacy_custom_providers_row_keeps_its_key_home(_isolate_eir_home):
     from starlette.testclient import TestClient
 
-    from hermes_cli.config import get_env_path, load_config, save_config
-    from hermes_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
+    from eir_cli.config import get_env_path, load_config, save_config
+    from eir_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
 
     cfg = load_config()
     cfg.pop("providers", None)
@@ -229,15 +229,15 @@ def test_desktop_move_of_a_legacy_custom_providers_row_keeps_its_key_home(_isola
 
 
 @pytest.mark.parametrize("pool_key", ["myep", "custom:myep"])
-def test_desktop_move_never_resolves_a_pooled_key_recorded_for_the_old_origin(_isolate_hermes_home, pool_key):
-    """A ``hermes auth add myep`` row lives in auth.json with the origin it was added for; after the
+def test_desktop_move_never_resolves_a_pooled_key_recorded_for_the_old_origin(_isolate_eir_home, pool_key):
+    """A ``eir auth add myep`` row lives in auth.json with the origin it was added for; after the
     entry moves, neither ``custom:myep`` nor a bare ``custom`` route may pick it at the new host."""
     from starlette.testclient import TestClient
 
     from agent.credential_pool import AUTH_TYPE_API_KEY, SOURCE_MANUAL, PooledCredential, load_pool
-    from hermes_cli.config import load_config, save_config
-    from hermes_cli.runtime_provider import resolve_runtime_provider
-    from hermes_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
+    from eir_cli.config import load_config, save_config
+    from eir_cli.runtime_provider import resolve_runtime_provider
+    from eir_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
 
     old, new, pooled = "https://llm.old.example/v1", "https://llm.new.example/v1", "sk-pooled-old-secret"
     cfg = load_config()
@@ -269,8 +269,8 @@ def test_desktop_move_never_resolves_a_pooled_key_recorded_for_the_old_origin(_i
 def test_dashboard_aux_slot_moved_to_a_new_origin_without_a_key_drops_the_old_key(monkeypatch):
     """Desktop Settings → Auxiliary: a slot re-pointed at another host with a blank key keeps no
     key entered for its previous host; a same-origin path change keeps it."""
-    from hermes_cli.web_server_config import _apply_aux_assignment_sync
-    monkeypatch.setattr("hermes_cli.config.save_config", lambda _cfg: None)
+    from eir_cli.web_server_config import _apply_aux_assignment_sync
+    monkeypatch.setattr("eir_cli.config.save_config", lambda _cfg: None)
     old_key = "sk-aux-old-host-fixture"
 
     def _assign(new_url):

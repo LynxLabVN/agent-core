@@ -24,17 +24,17 @@ from pathlib import Path
 
 import pytest
 
-from hermes_cli import kanban as kanban_cli
-from hermes_cli import kanban_db as kb
-from hermes_cli import kanban_db_connect as kbc
-from hermes_cli import kanban_db_dispatch as kbd
+from eir_cli import kanban as kanban_cli
+from eir_cli import kanban_db as kb
+from eir_cli import kanban_db_connect as kbc
+from eir_cli import kanban_db_dispatch as kbd
 
 
 @pytest.fixture
 def kanban_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     kb.init_db()
     return home
@@ -128,7 +128,7 @@ def test_dependency_block_with_terminal_parents_parks_then_escalates(
         # The edge exists before the run: link_tasks refuses to gate a running child retroactively.
         child = _running_task(conn, title="child-of-done", parents=(parent,))
 
-        # `hermes kanban block <child> --kind dependency waiting on upstream`
+        # `eir kanban block <child> --kind dependency waiting on upstream`
         args = argparse.Namespace(task_id=child, ids=None, reason=["waiting", "on", "upstream"], kind="dependency")
         assert kanban_cli._cmd_block(args) == 0
         assert "needs_input" in capsys.readouterr().out

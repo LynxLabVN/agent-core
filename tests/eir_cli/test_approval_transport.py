@@ -8,9 +8,9 @@ import threading
 import time
 
 import pytest
-import hermes_yaml as yaml
+import eir_yaml as yaml
 
-from hermes_cli.plugins import PluginContext, PluginManager, PluginManifest
+from eir_cli.plugins import PluginContext, PluginManager, PluginManifest
 from tools import approval_context, approval_prompt
 
 
@@ -29,7 +29,7 @@ def _context(manager: PluginManager, name: str = "fixture-approval") -> PluginCo
 
 
 def _request():
-    from hermes_cli.approval_transport import ApprovalRequest
+    from eir_cli.approval_transport import ApprovalRequest
 
     return ApprovalRequest.create(
         command="rm -rf /tmp/example",
@@ -80,17 +80,17 @@ def test_force_reload_clears_transport_registry(monkeypatch):
 def test_transport_registry_is_manager_and_profile_isolated(monkeypatch, tmp_path):
     first = PluginManager()
     second = PluginManager()
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "profiles" / "work"))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path / "profiles" / "work"))
     _context(first).register_approval_transport("phone", lambda request: None)
 
     assert first.get_approval_transport("phone") is not None
     assert second.get_approval_transport("phone") is None
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "profiles" / "personal"))
+    monkeypatch.setenv("EIR_HOME", str(tmp_path / "profiles" / "personal"))
     assert first.get_approval_transport("phone") is None
 
 
 def test_host_accepts_bound_sync_and_async_decisions():
-    from hermes_cli.approval_transport import invoke_approval_transport
+    from eir_cli.approval_transport import invoke_approval_transport
 
     request = _request()
     sync_result = invoke_approval_transport(
@@ -110,7 +110,7 @@ def test_host_accepts_bound_sync_and_async_decisions():
 
 
 def test_host_rejects_scope_not_offered_by_request():
-    from hermes_cli.approval_transport import ApprovalRequest, invoke_approval_transport
+    from eir_cli.approval_transport import ApprovalRequest, invoke_approval_transport
 
     request = ApprovalRequest.create(
         command="dangerous",
@@ -155,7 +155,7 @@ def test_host_rejects_scope_not_offered_by_request():
     ],
 )
 def test_host_rejects_invalid_or_stale_decisions(present, failure):
-    from hermes_cli.approval_transport import invoke_approval_transport
+    from eir_cli.approval_transport import invoke_approval_transport
 
     result = invoke_approval_transport(present, _request(), timeout_seconds=1)
 
@@ -164,7 +164,7 @@ def test_host_rejects_invalid_or_stale_decisions(present, failure):
 
 
 def test_host_timeout_and_exception_deny_without_waiting_forever():
-    from hermes_cli.approval_transport import invoke_approval_transport
+    from eir_cli.approval_transport import invoke_approval_transport
 
     def hangs(_request):
         time.sleep(1)
@@ -182,7 +182,7 @@ def test_host_timeout_and_exception_deny_without_waiting_forever():
 
 
 def test_host_transport_wait_is_interruptible_and_pollable():
-    from hermes_cli.approval_transport import invoke_approval_transport
+    from eir_cli.approval_transport import invoke_approval_transport
 
     polls = []
 
@@ -204,7 +204,7 @@ def test_host_transport_wait_is_interruptible_and_pollable():
 
 
 def test_host_rejects_decision_completed_after_deadline(monkeypatch):
-    import hermes_cli.approval_transport as transport_module
+    import eir_cli.approval_transport as transport_module
 
     main_thread = threading.get_ident()
 
@@ -227,7 +227,7 @@ def test_host_rejects_decision_completed_after_deadline(monkeypatch):
 
 
 def test_host_caps_hung_transport_workers():
-    from hermes_cli.approval_transport import (
+    from eir_cli.approval_transport import (
         _MAX_ACTIVE_TRANSPORT_WORKERS,
         invoke_approval_transport,
     )
@@ -443,11 +443,11 @@ def test_explicit_builtin_fallback_uses_existing_surface(monkeypatch):
 def test_live_temp_home_fixture_plugin_routes_and_hardline_stays_core_owned(
     tmp_path, monkeypatch
 ):
-    """Real discovery + config + guard path under an isolated HERMES_HOME."""
-    import hermes_cli.plugins as plugins_module
+    """Real discovery + config + guard path under an isolated EIR_HOME."""
+    import eir_cli.plugins as plugins_module
     from tools import approval
 
-    home = tmp_path / "hermes-home"
+    home = tmp_path / "eir-home"
     plugin_dir = home / "plugins" / "fixture-approval"
     bundled = tmp_path / "empty-bundled"
     plugin_dir.mkdir(parents=True)
@@ -468,7 +468,7 @@ from pathlib import Path
 
 
 def present(request):
-    output = Path(os.environ["HERMES_HOME"]) / "transport-invocations.jsonl"
+    output = Path(os.environ["EIR_HOME"]) / "transport-invocations.jsonl"
     with output.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps({
             "request_id": request.request_id,
@@ -496,34 +496,34 @@ def register(ctx):
             }
         )
     )
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.setenv("HERMES_BUNDLED_PLUGINS", str(bundled))
-    monkeypatch.delenv("HERMES_GATEWAY_SESSION", raising=False)
+    monkeypatch.setenv("EIR_HOME", str(home))
+    monkeypatch.setenv("EIR_BUNDLED_PLUGINS", str(bundled))
+    monkeypatch.delenv("EIR_GATEWAY_SESSION", raising=False)
     monkeypatch.setattr(approval, "_YOLO_MODE_FROZEN", False)
     manager = PluginManager()
     monkeypatch.setattr(plugins_module, "_plugin_manager", manager)
-    token = approval_context.set_hermes_interactive_context(True)
+    token = approval_context.set_eir_interactive_context(True)
     approval.clear_session("local")
     approval._permanent_approved.clear()
     try:
         routed = approval.check_all_command_guards(
-            "rm -rf /tmp/hermes-approval-transport-fixture", "local"
+            "rm -rf /tmp/eir-approval-transport-fixture", "local"
         )
         manager.discover_and_load(force=True)
         reloaded = approval.check_all_command_guards(
-            "rm -rf /tmp/hermes-approval-transport-fixture-reloaded", "local"
+            "rm -rf /tmp/eir-approval-transport-fixture-reloaded", "local"
         )
-        gateway_token = approval_context.set_hermes_interactive_context(False)
-        monkeypatch.setenv("HERMES_GATEWAY_SESSION", "1")
+        gateway_token = approval_context.set_eir_interactive_context(False)
+        monkeypatch.setenv("EIR_GATEWAY_SESSION", "1")
         try:
             gateway_routed = approval.check_all_command_guards(
-                "rm -rf /tmp/hermes-approval-transport-fixture-gateway", "local"
+                "rm -rf /tmp/eir-approval-transport-fixture-gateway", "local"
             )
         finally:
-            approval_context.reset_hermes_interactive_context(gateway_token)
+            approval_context.reset_eir_interactive_context(gateway_token)
         hardline = approval.check_all_command_guards("rm -rf /", "local")
     finally:
-        approval_context.reset_hermes_interactive_context(token)
+        approval_context.reset_eir_interactive_context(token)
 
     records = [
         json.loads(line)

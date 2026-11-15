@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 def create() -> dict | None:
     """Make the worktree for a chat launched from the current directory: a fresh tree under
-    ``<repo>/.worktrees/`` on its own ``hermes/`` branch, locked so the stale-tree sweep keeps it.
+    ``<repo>/.worktrees/`` on its own ``eir/`` branch, locked so the stale-tree sweep keeps it.
 
     -> ``{path, branch, repo_root, base}``, or None when it could not be made (the reason was
     printed). Pass ``path`` as the session's cwd.
@@ -29,10 +29,10 @@ def create() -> dict | None:
 
             _threading.Thread(
                 target=_maintain_pack_health, args=(repo,), name="pack-maintenance", daemon=True).start()
-        from hermes_cli.config import get_hermes_home
+        from eir_cli.config import get_eir_home
         # The session's frozen cwd keeps this checkout; name the store from creation so a
         # launcher killed with its terminal still leaves the tree to its sessions.
-        wt_info = _setup_worktree(retain_db=get_hermes_home() / "state.db")
+        wt_info = _setup_worktree(retain_db=get_eir_home() / "state.db")
     except Exception as exc:  # health: allow BLE001 -- every failure is told to the user and the launch stops
         print(f"✗ Failed to create the session worktree: {exc}", file=sys.stderr)
     return wt_info
@@ -43,8 +43,8 @@ def _frozen_cwd(db, session_id) -> str:
     row's cwd is main's stamp, which for a classic ``-w`` session is the repo root, not the tree."""
     import sqlite3
 
-    from hermes_state_local import local_receipt
-    from hermes_state_runtime import RuntimeStoreError
+    from eir_state_local import local_receipt
+    from eir_state_runtime import RuntimeStoreError
     try:
         return str(local_receipt(db, session_id)["policy"].get("cwd") or "").strip()
     except (RuntimeStoreError, KeyError, AttributeError, sqlite3.Error):  # no readable policy: use the row's cwd
@@ -53,19 +53,19 @@ def _frozen_cwd(db, session_id) -> str:
 
 def restore(session_id: str) -> str | None:
     """Bring back the worktree a resumed session needs: when the session's cwd is a ``-w`` tree
-    Hermes recorded and a quit removed, recreate it at the same path, on its old branch when that
+    Eir recorded and a quit removed, recreate it at the same path, on its old branch when that
     survived. Call it before the client attaches, or every turn is refused ``workspace_unavailable``.
 
-    -> its path, or None when the session's directory exists or is not a tree Hermes recorded.
+    -> its path, or None when the session's directory exists or is not a tree Eir recorded.
     """
     cwd = ""
-    from hermes_cli.main import _session_db
+    from eir_cli.main import _session_db
     with _session_db() as db:  # a store error is swallowed: nothing to recreate
         cwd = (_frozen_cwd(db, session_id)
                or ((db.get_session(session_id) or {}).get("cwd") or "").strip())
     if not cwd or os.path.isdir(cwd):
         return None
-    from hermes_cli.tui_worktree_resume import recreate_tui_worktree
+    from eir_cli.tui_worktree_resume import recreate_tui_worktree
     return recreate_tui_worktree(cwd, session_id)
 
 
@@ -78,15 +78,15 @@ def _remove_idle_clean_tui_worktree(wt_info: dict) -> bool:
     still works in it; and by ``_cleanup_worktree`` when it is dirty, holds unpushed commits or
     something no branch keeps.
     """
-    from hermes_cli.config import get_hermes_home
-    from hermes_cli.worktree_exit import _still_in_use
-    from hermes_cli.worktree_ops import _retained_tree_is_live, _tree_still_served
+    from eir_cli.config import get_eir_home
+    from eir_cli.worktree_exit import _still_in_use
+    from eir_cli.worktree_ops import _retained_tree_is_live, _tree_still_served
 
     path = wt_info.get("path")
     if not path or not Path(path).is_dir():
         return False
     try:
-        db_path = str(get_hermes_home() / "state.db")
+        db_path = str(get_eir_home() / "state.db")
         if _retained_tree_is_live(db_path, path, pending_only=True):
             return False
         if _still_in_use(path):
@@ -111,9 +111,9 @@ def finish(info: dict, session_id: str | None, *, ask: bool) -> None:
     path is printed to stderr.
     """
     if ask:
-        from hermes_cli.worktree_exit import ask_exit_choice
+        from eir_cli.worktree_exit import ask_exit_choice
         ask_exit_choice(info)
-    from hermes_cli.worktree_exit import apply_exit_choice
+    from eir_cli.worktree_exit import apply_exit_choice
     if apply_exit_choice(info, print):
         return  # archived or discarded at the user's request
     if _remove_idle_clean_tui_worktree(info):
@@ -123,8 +123,8 @@ def finish(info: dict, session_id: str | None, *, ask: bool) -> None:
     if session_id:
         # The launch lock names this (exiting) pid; hand it to the session so a later
         # launch's stale prune keeps the tree while the session is resumable.
-        from hermes_cli.config import get_hermes_home
-        from hermes_cli.worktree_ops import _retain_worktree_for_session
+        from eir_cli.config import get_eir_home
+        from eir_cli.worktree_ops import _retain_worktree_for_session
         _retain_worktree_for_session(info["repo_root"], info["path"], session_id,
-                                     get_hermes_home() / "state.db")
+                                     get_eir_home() / "state.db")
     print(f"Worktree retained for this session: {info['path']}", file=sys.stderr)

@@ -14,13 +14,13 @@ description: >
   the final script path and bytes; direct runtime calls bypass the agent gate.
   The subprocess environment is minimized, not a sandbox: approved code can
   access files, credentials and the network. Approval binds only the top-level
-  script. Internal Hermes approval and interrupt APIs may change and produce
+  script. Internal Eir approval and interrupt APIs may change and produce
   catalog rule 9 warnings. The plugin itself makes no runtime network calls
   or telemetry.
 maintainer: am423
 tier: community
 category: tools
-requires_hermes: ">=0.21.6"
+requires_eir: ">=0.21.6"
 version: "0.4.1"
 capabilities:
   provides_tools:

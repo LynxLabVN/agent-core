@@ -38,7 +38,7 @@ def busy_input_mode_from_config(display: dict) -> str:
 
 
 def _skin_hex(key: str, fallback: str) -> str:
-    from hermes_cli.skin_engine import get_active_skin
+    from eir_cli.skin_engine import get_active_skin
     return get_active_skin().get_color(key, fallback) or fallback
 
 
@@ -51,15 +51,15 @@ def _fg(hex_color: str, bold: bool = False) -> str:
 
 
 def _brand_glyph() -> tuple[str, str]:
-    """(glyph, name) from the skin's response label, e.g. ``" ☤ Hermes "`` → ("☤", "Hermes")."""
-    from hermes_cli.skin_engine import get_active_skin
-    label = get_active_skin().get_branding("response_label", " ☤ Hermes ")
+    """(glyph, name) from the skin's response label, e.g. ``" ☤ Eir "`` → ("☤", "Eir")."""
+    from eir_cli.skin_engine import get_active_skin
+    label = get_active_skin().get_branding("response_label", " ☤ Eir ")
     parts = label.split(None, 1)
-    return (parts[0], parts[1].strip()) if len(parts) == 2 else ("☤", label.strip() or "Hermes")
+    return (parts[0], parts[1].strip()) if len(parts) == 2 else ("☤", label.strip() or "Eir")
 
 
 def prompt_glyph() -> str:
-    from hermes_cli.skin_engine import get_active_skin
+    from eir_cli.skin_engine import get_active_skin
     return get_active_skin().get_branding("prompt_symbol", "❯").strip() or "❯"
 
 
@@ -224,7 +224,7 @@ def _cwd_label() -> str:
     cwd = os.getenv("TERMINAL_CWD") or os.getcwd()
     home = os.path.expanduser("~")
     short = "~" + cwd[len(home):] if cwd == home or cwd.startswith(home + os.sep) else cwd
-    from hermes_cli.status_bar_git import current_git_branch
+    from eir_cli.status_bar_git import current_git_branch
     branch = current_git_branch(cwd)
     return f"{short} ({branch})" if branch else short
 
@@ -312,7 +312,7 @@ def _render_safely(render, cli) -> list:
         return render(cli)
     except Exception:  # health: allow BLE001 -- a render callback must never take down the app frame
         logger.debug("%s failed", render.__name__, exc_info=True)
-        return [("", f" {getattr(cli, 'model', '') or 'Hermes'}")]
+        return [("", f" {getattr(cli, 'model', '') or 'Eir'}")]
 
 
 def _status_line_fragments(cli) -> list:
@@ -372,7 +372,7 @@ def modern_input_rules(cli, kb):
     def _can_queue() -> bool:
         from prompt_toolkit.application import get_app
         from cli import _looks_like_slash_command
-        from hermes_cli.cli_subagent_monitor import modal_prompt_active
+        from eir_cli.cli_subagent_monitor import modal_prompt_active
         buf = get_app().current_buffer
         text = buf.text.strip()
         return bool(getattr(cli, "_agent_running", False) and text and buf.complete_state is None

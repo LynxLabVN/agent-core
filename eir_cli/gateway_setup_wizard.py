@@ -1,7 +1,7 @@
-"""Gateway platform setup wizard (hermes gateway setup): platform registry/status table, per-platform setup prompts, service offer.
+"""Gateway platform setup wizard (eir gateway setup): platform registry/status table, per-platform setup prompts, service offer.
 
-Extracted from ``hermes_cli/gateway.py``. Bodies read facade helpers through ``_gw()`` (late
-binding on ``hermes_cli.gateway``) so the seams tests and callers patch on the facade keep
+Extracted from ``eir_cli/gateway.py``. Bodies read facade helpers through ``_gw()`` (late
+binding on ``eir_cli.gateway``) so the seams tests and callers patch on the facade keep
 intercepting the moved code.
 """
 from __future__ import annotations
@@ -12,7 +12,7 @@ import sys
 
 
 def _gw():
-    from hermes_cli import gateway  # late: the facade imports this module
+    from eir_cli import gateway  # late: the facade imports this module
     return gateway
 
 
@@ -24,7 +24,7 @@ _PLATFORMS = [
         "setup_instructions": [
             "1. In Mattermost: Integrations → Bot Accounts → Add Bot Account",
             "   (System Console → Integrations → Bot Accounts must be enabled)",
-            "2. Give it a username (e.g. hermes) and copy the bot token",
+            "2. Give it a username (e.g. eir) and copy the bot token",
             "3. Works with any self-hosted Mattermost instance — enter your server URL",
             "4. Find your user ID (the profile dialog does not show it):",
             "   Admins: System Console → User Management → Users → open your user.",
@@ -44,7 +44,7 @@ _PLATFORMS = [
              "help": "Your user ID from step 4 above (26 characters, not your @username)."},
             {"name": "MATTERMOST_HOME_CHANNEL",
              "prompt": "Home channel ID (for cron/notification delivery, or empty to set later with /set-home)",
-             "password": False, "help": "Channel ID where Hermes delivers cron results and notifications."},
+             "password": False, "help": "Channel ID where Eir delivers cron results and notifications."},
             {"name": "MATTERMOST_REPLY_MODE",
              "prompt": "Reply mode — 'off' for flat messages, 'thread' for threaded replies (default: off)",
              "password": False,
@@ -60,7 +60,7 @@ def _all_platforms() -> list[dict]:
     running gateway; user-installed ones still need ``plugins.enabled`` (untrusted code). Matrix is
     hidden on Windows: python-olm has no wheel or native build (use WSL)."""
     try:
-        from hermes_cli.plugins import discover_plugins
+        from eir_cli.plugins import discover_plugins
         discover_plugins()
     except Exception as e:
         _gw().logger.debug("plugin discovery failed during platform enumeration: %s", e)
@@ -152,7 +152,7 @@ _UNAUTHORIZED_ACCESS_CHOICES = {
         "Keep unknown senders silent"),
     False: (1,
         "Enable open access (anyone can message the bot)",
-        "Use DM pairing (unknown users request access, you approve with 'hermes pairing approve')",
+        "Use DM pairing (unknown users request access, you approve with 'eir pairing approve')",
         "Politely decline unknown senders (one-time message, then silence)",
         "Skip for now (bot will deny all users until configured)"),
 }
@@ -171,14 +171,14 @@ def _prompt_unauthorized_access(platform_key: str) -> None:
         if is_email:
             _set_platform_unauthorized_dm_behavior("email", "pair")
         _gw().print_success("  DM pairing mode — users will receive a code to request access.")
-        _gw().print_info("  Approve with: hermes pairing approve <platform> <code>")
+        _gw().print_info("  Approve with: eir pairing approve <platform> <code>")
     elif access_idx == 2:
         _set_platform_unauthorized_dm_behavior(platform_key, "decline")
         _gw().print_success("  Unknown senders get one polite decline, then silence (unauthorized_dm_behavior: decline).")
     elif is_email:
         _gw().print_success("  Unknown email senders will be ignored.")
     else:
-        _gw().print_info("  Skipped — configure later with 'hermes gateway setup'")
+        _gw().print_info("  Skipped — configure later with 'eir gateway setup'")
 
 
 def _telegram_auto_setup(token_var: str) -> tuple[bool, object]:
@@ -191,7 +191,7 @@ def _telegram_auto_setup(token_var: str) -> tuple[bool, object]:
     if _gw().prompt("  Choice [1/2]", default="1").strip() != "1":
         return False, None
     try:
-        from hermes_cli.telegram_managed_bot import (
+        from eir_cli.telegram_managed_bot import (
             auto_setup_telegram_bot_result, is_valid_telegram_bot_token,
         )
     except ImportError:
@@ -258,7 +258,7 @@ def _prompt_allowlist_var(var: dict, platform_key: str, auto_owner_user_id) -> s
 
 def _setup_standard_platform(platform: dict):
     """Interactive setup for Telegram, Discord, or Slack."""
-    from hermes_cli.setup_hidden_env import is_setup_hidden_env as _is_setup_hidden_env
+    from eir_cli.setup_hidden_env import is_setup_hidden_env as _is_setup_hidden_env
     emoji, label, token_var = platform["emoji"], platform["label"], platform["token_var"]
     print_setup_header(f"{emoji} {label}")
 
@@ -322,8 +322,8 @@ def _setup_standard_platform(platform: dict):
 
 
 def _builtin_setup_fn(key: str):
-    """Resolve a built-in platform's setup function; late-bound to dodge the hermes_cli.setup cycle."""
-    from hermes_cli import setup as _s
+    """Resolve a built-in platform's setup function; late-bound to dodge the eir_cli.setup cycle."""
+    from eir_cli import setup as _s
     return {
         # telegram/discord/slack/whatsapp/dingtalk/feishu/wecom setup_fns come from their plugins.
         "webhooks": _gw().setup_platforms._setup_webhooks,
@@ -348,7 +348,7 @@ def _configure_platform(platform: dict) -> None:
     print_setup_header(f"{platform.get('emoji', '🔌')} {label}")
     required = entry.required_env if entry else []
     if required:
-        _gw().print_info(f"  Set these env vars in ~/.hermes/.env: {', '.join(required)}")
+        _gw().print_info(f"  Set these env vars in ~/.eir/.env: {', '.join(required)}")
     else:
         _gw().print_info(f"  Configure {label} in config.yaml under gateway.platforms.{platform['key']}")
     if platform.get("install_hint"):
@@ -374,7 +374,7 @@ def _setup_service_action(
             _gw()._service_call(backend, action, None if action == "restart" else system)
         elif action == "restart" and windows:
             _gw().stop_profile_gateway()
-            _gw().print_info("Start manually: hermes gateway")
+            _gw().print_info("Start manually: eir gateway")
     except _gw().UserSystemdUnavailableError as e:
         _gw().print_error(f"  {failed_label} — user systemd not reachable:")
         _gw()._print_indented(str(e))
@@ -402,16 +402,16 @@ _WIZARD_BACKEND_LABELS = {"systemd": "systemd", "launchd": "launchd", "windows":
 # Post-setup guidance when no service backend applies, keyed by the fallthrough reason.
 _WIZARD_NO_SERVICE_LINES = {
     "wsl": (
-        "  WSL detected but systemd is not running.", "  Run in foreground: hermes gateway run",
-        "  For persistence:   tmux new -s hermes 'hermes gateway run'",
+        "  WSL detected but systemd is not running.", "  Run in foreground: eir gateway run",
+        "  For persistence:   tmux new -s eir 'eir gateway run'",
         "  To enable systemd: add systemd=true to /etc/wsl.conf, then 'wsl --shutdown'",
     ),
     "termux": (
-        "  Termux does not use systemd/launchd services.", "  Run in foreground: hermes gateway run",
-        "  Or start it manually in the background (best effort): nohup hermes gateway run >{home}/logs/gateway.log 2>&1 &",
+        "  Termux does not use systemd/launchd services.", "  Run in foreground: eir gateway run",
+        "  Or start it manually in the background (best effort): nohup eir gateway run >{home}/logs/gateway.log 2>&1 &",
     ),
     "unsupported": (
-        "  Service install not supported on this platform.", "  Run in foreground: hermes gateway run",
+        "  Service install not supported on this platform.", "  Run in foreground: eir gateway run",
     ),
 }
 
@@ -426,7 +426,7 @@ def _wizard_service_status_block() -> None:
         _gw().print_systemd_scope_conflict_warning()
         print()
 
-    if _gw().supports_systemd_services() and _gw().has_legacy_hermes_units():
+    if _gw().supports_systemd_services() and _gw().has_legacy_eir_units():
         _gw().print_legacy_unit_warning()
         print()
 
@@ -470,10 +470,10 @@ def _wizard_install_service(backend: str) -> None:
     )
     if not (start_now or start_on_login):
         _gw().print_info("  Skipped start and auto-start setup.")
-        _gw().print_info("  You can install later: hermes gateway install")
+        _gw().print_info("  You can install later: eir gateway install")
         if _gw().supports_systemd_services():
-            _gw().print_info("  Or as a boot-time service: sudo hermes gateway install --system")
-        _gw().print_info("  Or run in foreground:  hermes gateway run")
+            _gw().print_info("  Or as a boot-time service: sudo eir gateway install --system")
+        _gw().print_info("  Or run in foreground:  eir gateway run")
         return
     try:
         installed_scope, did_install = None, True
@@ -491,12 +491,12 @@ def _wizard_install_service(backend: str) -> None:
             _gw()._setup_service_action("start", failed_label="Start failed", system=installed_scope == "system")
     except subprocess.CalledProcessError as e:
         _gw().print_error(f"  Install failed: {e}")
-        _gw().print_info("  You can try manually: hermes gateway install")
+        _gw().print_info("  You can try manually: eir gateway install")
     except SystemExit:
         # The backend installers exit non-zero on a refused write (a unit pinning another home);
         # setup reports it and goes on rather than ending the wizard.
         _gw().print_warning("  Gateway service install did not complete.")
-        _gw().print_info("  You can try manually: hermes gateway install")
+        _gw().print_info("  You can try manually: eir gateway install")
 
 
 def _wizard_post_setup() -> None:
@@ -521,7 +521,7 @@ def _wizard_post_setup() -> None:
         if _gw().is_wsl():
             reason, home = "wsl", ""
         elif _gw().is_termux():
-            from hermes_constants import display_hermes_home as _dhh
+            from eir_constants import display_eir_home as _dhh
             reason, home = "termux", _dhh()
         else:
             reason, home = "unsupported", ""
@@ -550,6 +550,6 @@ def gateway_setup():
         _gw()._wizard_post_setup()
     else:
         print()
-        _gw().print_info("No platforms configured. Run 'hermes gateway setup' when ready.")
+        _gw().print_info("No platforms configured. Run 'eir gateway setup' when ready.")
 
     print()

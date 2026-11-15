@@ -1,4 +1,4 @@
-import { Button } from '@hermes/plugin-sdk'
+import { Button } from '@eir/plugin-sdk'
 
 import type { CanonicalGroupEvent } from './canonical-group-history'
 import { useCanonicalGroupLabels } from './canonical-group-labels'

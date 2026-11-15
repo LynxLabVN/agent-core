@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { getToolsetModels, searchSkillsHub, testMcpServer } from './hermes'
+import { getToolsetModels, searchSkillsHub, testMcpServer } from './eir'
 
-describe('Hermes REST parity helpers (hub / mcp / maintenance)', () => {
+describe('Eir REST parity helpers (hub / mcp / maintenance)', () => {
   let api: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
     api = vi.fn().mockResolvedValue({})
-    Object.defineProperty(window, 'hermesDesktop', {
+    Object.defineProperty(window, 'eirDesktop', {
       configurable: true,
       value: { api }
     })
@@ -15,7 +15,7 @@ describe('Hermes REST parity helpers (hub / mcp / maintenance)', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
-    Reflect.deleteProperty(window, 'hermesDesktop')
+    Reflect.deleteProperty(window, 'eirDesktop')
   })
 
   it('encodes hub search params', async () => {

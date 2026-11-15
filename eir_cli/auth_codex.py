@@ -1,11 +1,11 @@
 """OpenAI Codex OAuth: token store, refresh, quota probe, device-code login.
 
-Tokens live in ~/.hermes/auth.json, NOT ~/.codex/: Hermes keeps its own Codex OAuth session
+Tokens live in ~/.eir/auth.json, NOT ~/.codex/: Eir keeps its own Codex OAuth session
 separate from the Codex CLI / VS Code extension so one app's refresh-token rotation cannot
 invalidate the other's session.
 
-Split out of ``hermes_cli/auth.py``; origin helpers are imported lazily inside each function
-so ``hermes_cli.auth.<name>`` patches still intercept (and no import cycle).
+Split out of ``eir_cli/auth.py``; origin helpers are imported lazily inside each function
+so ``eir_cli.auth.<name>`` patches still intercept (and no import cycle).
 """
 
 from __future__ import annotations
@@ -19,21 +19,21 @@ import time
 from contextlib import suppress
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Tuple
-from hermes_cli.auth_constants import (
+from eir_cli.auth_constants import (
     _decode_jwt_claims, AUTH_LOCK_TIMEOUT_SECONDS, AuthError,
     CODEX_ACCESS_TOKEN_REFRESH_SKEW_SECONDS, CODEX_OAUTH_CLIENT_ID, CODEX_OAUTH_TOKEN_URL,
     CODEX_RATE_LIMITED_CODE, DEFAULT_CODEX_BASE_URL, _codex_err, httpx)
-from hermes_cli.version_info import hermes_user_agent
+from eir_cli.version_info import eir_user_agent
 from utils import env_float, normalize_proxy_env_vars
 
 if TYPE_CHECKING:  # annotation-only; the runtime import would be a cycle
-    from hermes_cli.auth import ProviderConfig
+    from eir_cli.auth import ProviderConfig
 
-# Log-record parity with the origin module (caplog tests pin "hermes_cli.auth").
-logger = logging.getLogger("hermes_cli.auth")
+# Log-record parity with the origin module (caplog tests pin "eir_cli.auth").
+logger = logging.getLogger("eir_cli.auth")
 
 # ``{relogin}`` is filled at raise time with the profile-aware sign-in command: a bare
-# ``hermes auth`` from a named profile re-signs the ROOT store (93889b770da, #114012).
+# ``eir auth`` from a named profile re-signs the ROOT store (93889b770da, #114012).
 _MISSING_ACCESS_TOKEN_MSG = "Codex auth is missing access_token. Run `{relogin}` to re-authenticate."
 _MISSING_REFRESH_TOKEN_MSG = "Codex auth is missing refresh_token. Run `{relogin}` to re-authenticate."
 _NO_CREDENTIALS_MSG = "No Codex credentials stored. Run `{relogin}` to authenticate."
@@ -58,7 +58,7 @@ def _stripped(value: Any) -> str:
 
 def _clear_pool_entry_status(entry: dict[str, Any]) -> None:
     """Reset a pool entry's cooldown / last-error metadata to healthy."""
-    from hermes_cli.auth import _POOL_STATUS_FIELDS
+    from eir_cli.auth import _POOL_STATUS_FIELDS
     for status_field in _POOL_STATUS_FIELDS:
         entry[status_field] = None
 
@@ -69,7 +69,7 @@ def _codex_access_token_is_expiring(access_token: Any, skew_seconds: int) -> boo
 
 
 def _codex_base_url() -> str:
-    """The owning profile's ``HERMES_CODEX_BASE_URL`` override, else canonical chatgpt.com (the
+    """The owning profile's ``EIR_CODEX_BASE_URL`` override, else canonical chatgpt.com (the
     singleton route itself goes through ``_codex_pool_route_base_url``, which adds ``model.base_url``).
 
     Read through the profile scope, never ``os.environ``, for the same reason the pooled route does
@@ -83,7 +83,7 @@ def _codex_base_url() -> str:
     """
     from agent.secret_scope import UnscopedSecretError, get_secret_str
     try:
-        override = get_secret_str("HERMES_CODEX_BASE_URL", "").strip().rstrip("/")
+        override = get_secret_str("EIR_CODEX_BASE_URL", "").strip().rstrip("/")
     except UnscopedSecretError:
         logger.debug("No profile secret scope bound; Codex base URL falls back to canonical", exc_info=True)
         override = ""
@@ -92,13 +92,13 @@ def _codex_base_url() -> str:
 
 def _codex_pool_route_base_url(entry_base_url: Optional[str] = "") -> str:
     """Base URL the chat route sends a pooled Codex credential to — the same rule
-    ``runtime_provider._pool_entry_mode_and_url`` applies (``HERMES_CODEX_BASE_URL`` > ``model.base_url``
+    ``runtime_provider._pool_entry_mode_and_url`` applies (``EIR_CODEX_BASE_URL`` > ``model.base_url``
     while the row still carries the canonical URL > the row's own URL). A pooled gateway key belongs to
     that host only; composing it with the ambient default sends it to chatgpt.com (#121486)."""
     base = _stripped(entry_base_url).rstrip("/")
     try:
-        from hermes_cli.config import load_config_readonly
-        from hermes_cli.runtime_provider import _pool_entry_mode_and_url
+        from eir_cli.config import load_config_readonly
+        from eir_cli.runtime_provider import _pool_entry_mode_and_url
         model_cfg = load_config_readonly().get("model")
         return _pool_entry_mode_and_url(
             "openai-codex", None, model_cfg if isinstance(model_cfg, dict) else {}, "", base)[1]
@@ -107,7 +107,7 @@ def _codex_pool_route_base_url(entry_base_url: Optional[str] = "") -> str:
         # Profile-scoped override only (never the raw process env: a multiplexed sibling's gateway).
         with suppress(Exception):
             from agent.secret_scope import get_secret_str
-            base = _stripped(get_secret_str("HERMES_CODEX_BASE_URL", "")).rstrip("/") or base
+            base = _stripped(get_secret_str("EIR_CODEX_BASE_URL", "")).rstrip("/") or base
         return base or DEFAULT_CODEX_BASE_URL
 
 
@@ -121,7 +121,7 @@ def _codex_runtime_result(
 
 def _load_auth_store_maybe_locked(lock: bool) -> dict[str, Any]:
     """Load the auth store, taking the cross-process lock unless the caller already holds it."""
-    from hermes_cli.auth import _auth_store_lock, _load_auth_store
+    from eir_cli.auth import _auth_store_lock, _load_auth_store
     if lock:
         with _auth_store_lock():
             return _load_auth_store()
@@ -129,8 +129,8 @@ def _load_auth_store_maybe_locked(lock: bool) -> dict[str, Any]:
 
 
 def _read_codex_tokens(*, _lock: bool = True) -> dict[str, Any]:
-    """Read Codex OAuth tokens from Hermes auth store (~/.hermes/auth.json)."""
-    from hermes_cli.auth import _load_provider_state, _nonempty_str
+    """Read Codex OAuth tokens from Eir auth store (~/.eir/auth.json)."""
+    from eir_cli.auth import _load_provider_state, _nonempty_str
     auth_store = _load_auth_store_maybe_locked(_lock)
     state = _load_provider_state(auth_store, "openai-codex")
     if not state:
@@ -155,8 +155,8 @@ def _sync_codex_pool_entries(
     previous_singleton_tokens: Optional[dict[str, str]] = None) -> None:
     """Mirror a fresh Codex re-auth into the credential_pool OAuth entries.
 
-    ``device_code`` (the singleton-seeded entry from ``hermes setup`` / the model picker) is always
-    synced. ``manual:device_code`` (``hermes auth add openai-codex``) is synced only when its
+    ``device_code`` (the singleton-seeded entry from ``eir setup`` / the model picker) is always
+    synced. ``manual:device_code`` (``eir auth add openai-codex``) is synced only when its
     access_token equals the PREVIOUS singleton token — a legacy alias of the singleton; an entry
     with its own token material is an independent account and must be left alone. ``manual:api_key``
     and any other source are independent credentials and are never overwritten by a re-auth.
@@ -209,7 +209,7 @@ def _save_codex_tokens(
     ``set_active=False`` stores credentials for a side tool (image gen) without making Codex the
     active inference provider.
     """
-    from hermes_cli.auth import (
+    from eir_cli.auth import (
         _auth_file_path, _load_auth_store, _provider_state_transaction, _same_path,
         _save_auth_store, _store_provider_state, _utc_now_z)
     if last_refresh is None:
@@ -236,7 +236,7 @@ def _save_codex_tokens(
 
 def _recover_codex_tokens_from_cli(
         reason: str, observed_access_token: Optional[str] = None) -> Optional[dict[str, str]]:
-    """Adopt a valid Codex CLI token pair into Hermes auth, if available.
+    """Adopt a valid Codex CLI token pair into Eir auth, if available.
 
     Automatic adoption only; the interactive import offer in ``_login_openai_codex`` asks first and is
     not subject to ``auth.adopt_external_logins``.
@@ -248,7 +248,7 @@ def _recover_codex_tokens_from_cli(
     """
     from agent.credential_pool import _codex_principal_identity
     from agent.credential_sources import adopt_external_logins_enabled
-    from hermes_cli.auth import _import_codex_cli_tokens, _provider_state_transaction, _save_codex_tokens
+    from eir_cli.auth import _import_codex_cli_tokens, _provider_state_transaction, _save_codex_tokens
     if not adopt_external_logins_enabled():
         return None
     imported = _import_codex_cli_tokens()
@@ -268,7 +268,7 @@ def _recover_codex_tokens_from_cli(
         if known and _codex_principal_identity(imported["access_token"]) not in (None, known):
             logger.warning(
                 "Codex CLI recovery refused (%s): the Codex CLI login belongs to a different ChatGPT "
-                "workspace than the Hermes credential. Run `%s` to re-authenticate it.",
+                "workspace than the Eir credential. Run `%s` to re-authenticate it.",
                 reason, _codex_relogin_command())
             return None
         logger.info("Codex auth recovered from Codex CLI auth.json (%s).", reason)
@@ -462,7 +462,7 @@ def _codex_quota_exhausted_error(retry_after: Optional[int]) -> AuthError:
 
 def _codex_refresh_failure_error(response: httpx.Response) -> AuthError:
     """Decode a non-200 Codex token-refresh response into a shaped AuthError."""
-    from hermes_cli.auth import _nonempty_str
+    from eir_cli.auth import _nonempty_str
     code = "codex_refresh_failed"
     message = f"Codex token refresh failed with status {response.status_code}."
     try:
@@ -501,15 +501,15 @@ def _codex_refresh_failure_error(response: httpx.Response) -> AuthError:
 
 def refresh_codex_oauth_pure(
     access_token: str, refresh_token: str, *, timeout_seconds: float = 20.0) -> dict[str, Any]:
-    """Refresh Codex OAuth tokens without mutating Hermes auth state."""
-    from hermes_cli.auth import _nonempty_str, _utc_now_z
+    """Refresh Codex OAuth tokens without mutating Eir auth state."""
+    from eir_cli.auth import _nonempty_str, _utc_now_z
     del access_token  # Access token is only used by callers to decide whether to refresh.
     if not _nonempty_str(refresh_token):
         raise _codex_err(_MISSING_REFRESH_TOKEN_MSG.format(relogin=_codex_relogin_command()),
                          "codex_auth_missing_refresh_token", relogin=True)
     with _codex_http_client(
         timeout=httpx.Timeout(max(5.0, float(timeout_seconds))),
-        headers={"Accept": "application/json", "User-Agent": hermes_user_agent()}) as client:
+        headers={"Accept": "application/json", "User-Agent": eir_user_agent()}) as client:
         response = client.post(
             CODEX_OAUTH_TOKEN_URL, headers={"Content-Type": "application/x-www-form-urlencoded"},
             data={
@@ -548,7 +548,7 @@ def _refresh_codex_auth_tokens(tokens: dict[str, str], timeout_seconds: float) -
     finds root already rotated by its peer adopts the stored pair instead of replaying the
     consumed token. Both locks wait out a full endpoint timeout so the waiter adopts, not times out.
     """
-    from hermes_cli.auth import _provider_state_transaction, _save_codex_tokens, refresh_codex_oauth_pure
+    from eir_cli.auth import _provider_state_transaction, _save_codex_tokens, refresh_codex_oauth_pure
     lock_timeout = max(float(AUTH_LOCK_TIMEOUT_SECONDS), float(timeout_seconds) + 5.0)
     with _provider_state_transaction("openai-codex", lock_timeout) as (_store, state, _source):
         stored = (state or {}).get("tokens")
@@ -563,7 +563,7 @@ def _refresh_codex_auth_tokens(tokens: dict[str, str], timeout_seconds: float) -
                 timeout_seconds=timeout_seconds)
         except AuthError as exc:
             # Self-heal cross-store rotation: refresh_tokens are single-use, so when the Codex CLI
-            # (or another Hermes process) rotates the shared token this frozen copy fails with a
+            # (or another Eir process) rotates the shared token this frozen copy fails with a
             # relogin-required error (invalid_grant / refresh_token_reused / 401). Adopt the
             # canonical fresh token from ~/.codex/auth.json before surfacing a hard 401. Transient
             # failures (429 quota) keep relogin_required=False — the stored token is still valid —
@@ -586,7 +586,7 @@ def _refresh_codex_auth_tokens(tokens: dict[str, str], timeout_seconds: float) -
 
 def _import_codex_cli_tokens() -> Optional[dict[str, str]]:
     """Read ~/.codex/auth.json (Codex CLI file) tokens if valid and not expired; never writes."""
-    from hermes_cli.auth import _codex_access_token_is_expiring
+    from eir_cli.auth import _codex_access_token_is_expiring
     codex_home = os.getenv("CODEX_HOME", "").strip() or str(Path.home() / ".codex")
     auth_path = Path(codex_home).expanduser() / "auth.json"
     if not auth_path.is_file():
@@ -610,7 +610,7 @@ def resolve_codex_runtime_credentials(
     *, force_refresh: bool = False, refresh_if_expiring: bool = True,
     refresh_skew_seconds: int = CODEX_ACCESS_TOKEN_REFRESH_SKEW_SECONDS,
     read_only: bool = False) -> dict[str, Any]:
-    """Resolve runtime credentials from Hermes's own Codex token store.
+    """Resolve runtime credentials from Eir's own Codex token store.
 
     ``read_only=True`` (status / doctor / pickers) reports the stored state as-is: no Codex CLI
     adoption, no token refresh, no auth-store write — and it wins over ``force_refresh``. A
@@ -626,7 +626,7 @@ def resolve_codex_runtime_credentials(
     backup — gets a bare HTTP 401 ``Missing Authentication header`` from the wire instead of a usable
     credential. See issue #32992.
     """
-    from hermes_cli.auth import (
+    from eir_cli.auth import (
         _auth_store_lock, _codex_access_token_is_expiring, _probe_codex_quota_restored,
         _read_codex_tokens)
     read_error: Optional[AuthError] = None
@@ -642,7 +642,7 @@ def resolve_codex_runtime_credentials(
             with _auth_store_lock():
                 # Observe the singleton in the same locked snapshot the read validates, so recovery
                 # can compare-and-swap against exactly the credential it is repairing (#73667).
-                from hermes_cli.auth import _load_auth_store, _load_provider_state
+                from eir_cli.auth import _load_auth_store, _load_provider_state
                 raw = (_load_provider_state(_load_auth_store(), "openai-codex") or {}).get("tokens")
                 observed = raw.get("access_token") if isinstance(raw, dict) else None
                 data = _read_codex_tokens(_lock=False)
@@ -690,7 +690,7 @@ def resolve_codex_runtime_credentials(
                          "codex_auth_missing", relogin=True)
     tokens = dict(data["tokens"])
     access_token = _stripped(tokens.get("access_token"))
-    refresh_timeout_seconds = env_float("HERMES_CODEX_REFRESH_TIMEOUT_SECONDS", 20)
+    refresh_timeout_seconds = env_float("EIR_CODEX_REFRESH_TIMEOUT_SECONDS", 20)
 
     def _should_refresh(token: str) -> bool:
         if read_only:
@@ -699,7 +699,7 @@ def resolve_codex_runtime_credentials(
             refresh_if_expiring and _codex_access_token_is_expiring(token, refresh_skew_seconds))
 
     if _should_refresh(access_token):
-        # Re-read under lock to avoid racing with other Hermes processes
+        # Re-read under lock to avoid racing with other Eir processes
         lock_timeout = max(float(AUTH_LOCK_TIMEOUT_SECONDS), refresh_timeout_seconds + 5.0)
         with _auth_store_lock(timeout_seconds=lock_timeout):
             data = _read_codex_tokens(_lock=False)
@@ -708,7 +708,7 @@ def resolve_codex_runtime_credentials(
                 tokens = _refresh_codex_auth_tokens(tokens, refresh_timeout_seconds)
             access_token = _stripped(tokens.get("access_token"))
     return _codex_runtime_result(
-        access_token, source="hermes-auth-store", last_refresh=data.get("last_refresh"))
+        access_token, source="eir-auth-store", last_refresh=data.get("last_refresh"))
 
 
 def _is_codex_rate_limit_shaped(code: Any, reason: Any, message: Any) -> bool:
@@ -759,7 +759,7 @@ def _probe_codex_quota_restored(
     Probes are throttled per access token (module-local cache) so the hot selection path can fire
     this freely.
     """
-    from hermes_cli.auth import _codex_quota_probe_cache, _nonempty_str
+    from eir_cli.auth import _codex_quota_probe_cache, _nonempty_str
     token = _stripped(access_token)
     # Real Codex access tokens are JWTs. Refusing to probe non-JWT tokens avoids pointless
     # network calls for corrupt/placeholder entries (and keeps hermetic test fixtures offline).
@@ -826,7 +826,7 @@ def _refresh_expired_codex_probe_token(
     the stale token's probe slot, so neither the refresh nor the doomed 401 probe fire again
     until the interval has elapsed.
     """
-    from hermes_cli.auth import _codex_quota_probe_cache
+    from eir_cli.auth import _codex_quota_probe_cache
     token, refresh = _stripped(access_token), _stripped(refresh_token)
     if not token or not refresh or not _codex_access_token_is_expiring(token, 0):
         return None
@@ -847,7 +847,7 @@ def _refresh_expired_codex_probe_token(
 
 def _probe_codex_pool_entry_quota_restored(entry: dict[str, Any]) -> Optional[bool]:
     """``_probe_codex_quota_restored`` for a persisted pool entry, refreshing an expired token first."""
-    from hermes_cli.auth import _auth_store_lock, _load_auth_store, _save_auth_store
+    from eir_cli.auth import _auth_store_lock, _load_auth_store, _save_auth_store
     token = _stripped(entry.get("access_token"))
     fresh = _refresh_expired_codex_probe_token(token, entry.get("refresh_token"))
     if fresh:
@@ -878,7 +878,7 @@ def clear_codex_pool_quota_cooldowns(access_token: Optional[str] = None) -> int:
     entry just re-freezes with fresh metadata on its next 429).
     """
     from agent.credential_pool import _borrowed_single_use_pool_root, _profile_owns_pool_provider
-    from hermes_cli.auth import _auth_store_lock, _load_auth_store, _save_auth_store
+    from eir_cli.auth import _auth_store_lock, _load_auth_store, _save_auth_store
     cleared = 0
     try:
         # Same owner rule as ``persist_pool_entries``: a profile with no Codex rows of its own
@@ -910,7 +910,7 @@ def _codex_pool_rate_limit_status() -> Optional[dict[str, Any]]:
 
     Reads through ``read_credential_pool`` so a named profile with no Codex rows of its own sees
     the global-root pool (the per-provider fallback every other pool read uses)."""
-    from hermes_cli.auth import _nonempty_str, read_credential_pool
+    from eir_cli.auth import _nonempty_str, read_credential_pool
     from agent.credential_pool import _parse_absolute_timestamp
     try:
         now = time.time()
@@ -946,7 +946,7 @@ def _pool_codex_credential() -> tuple[str, str]:
     Fallback for ``resolve_codex_runtime_credentials`` when the singleton has no creds; reads
     through ``read_credential_pool`` so a profile inherits the global-root pool (#34143)."""
     from agent.credential_pool import _parse_absolute_timestamp
-    from hermes_cli.auth import _nonempty_str, read_credential_pool
+    from eir_cli.auth import _nonempty_str, read_credential_pool
     try:
         for entry in _codex_pool_dicts(read_credential_pool("openai-codex")):
             token = entry.get("access_token")
@@ -963,12 +963,12 @@ def _pool_codex_credential() -> tuple[str, str]:
 
 def _login_openai_codex(args, pconfig: ProviderConfig, *, force_new_login: bool = False) -> None:
     """OpenAI Codex login: device code by default, browser PKCE when opted in (``--browser`` /
-    ``auth.codex_login_flow``). Tokens stored in ~/.hermes/auth.json."""
-    from hermes_cli.auth import (
+    ``auth.codex_login_flow``). Tokens stored in ~/.eir/auth.json."""
+    from eir_cli.auth import (
         _codex_access_token_is_expiring, _import_codex_cli_tokens,
         _offer_existing_oauth_credentials, _print_login_success, _prompt_yes_no, _save_codex_tokens,
         _update_config_for_provider, resolve_codex_runtime_credentials)
-    from hermes_cli.auth_codex_browser import codex_oauth_login
+    from eir_cli.auth_codex_browser import codex_oauth_login
     del pconfig  # kept for parity with other provider login helpers
     if not force_new_login:
         if _offer_existing_oauth_credentials(
@@ -980,18 +980,18 @@ def _login_openai_codex(args, pconfig: ProviderConfig, *, force_new_login: bool 
         cli_tokens = _import_codex_cli_tokens()
         if cli_tokens:
             print("Found existing Codex CLI credentials at ~/.codex/auth.json")
-            print("Hermes will create its own session to avoid conflicts with Codex CLI / VS Code.")
+            print("Eir will create its own session to avoid conflicts with Codex CLI / VS Code.")
             if _prompt_yes_no(
                 "Import these credentials? (a separate login is recommended) [y/N]: ", default="n"):
                 _save_codex_tokens(cli_tokens)
                 config_path = _update_config_for_provider("openai-codex", _codex_base_url())
                 print()
                 print("Credentials imported. Note: if Codex CLI refreshes its token,")
-                print("Hermes will keep working independently with its own session.")
+                print("Eir will keep working independently with its own session.")
                 print(f"  Config updated: {config_path} (model.provider=openai-codex)")
                 return
 
-    # Run a fresh OAuth flow — Hermes gets its own session (device code unless the user opted in
+    # Run a fresh OAuth flow — Eir gets its own session (device code unless the user opted in
     # to the browser flow).
     print()
     creds = codex_oauth_login(args)
@@ -1005,7 +1005,7 @@ def _codex_login_rate_limited_error(response: httpx.Response, *, during: str = "
     """AuthError for a 429 from OpenAI's device-auth endpoints (throttle, not credential fault)."""
     # Upstream rate-limit / usage-quota exhaustion on the token endpoint. The stored refresh token is still
     # valid here — re-authenticating cannot lift a quota cap. Classify distinctly from auth failures so
-    # callers surface a "retry later" notice instead of a misleading "run hermes auth" prompt (see issue
+    # callers surface a "retry later" notice instead of a misleading "run eir auth" prompt (see issue
     # #32790).
     retry_after = _parse_retry_after_seconds(getattr(response, "headers", None))
     wait_hint = (
@@ -1126,7 +1126,7 @@ def _codex_exchange_authorization_code(
 
 def _codex_device_code_login() -> dict[str, Any]:
     """Run the OpenAI device code login flow and return credentials dict."""
-    from hermes_cli.auth import _utc_now_z
+    from eir_cli.auth import _utc_now_z
     issuer, client_id = "https://auth.openai.com", CODEX_OAUTH_CLIENT_ID
     device_data = _codex_request_device_code(issuer, client_id)
     user_code = device_data["user_code"]

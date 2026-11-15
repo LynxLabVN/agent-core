@@ -1,6 +1,6 @@
 import logging
 
-from hermes_cli import nous_auth_keepalive as keepalive
+from eir_cli import nous_auth_keepalive as keepalive
 
 # Both lifetimes have been observed on real installs.
 OBSERVED_LIFETIMES_SECONDS = (3594, 899)
@@ -129,16 +129,16 @@ def test_keepalive_falls_back_to_singleton_state(monkeypatch):
 def test_keepalive_binds_launch_scope_for_multiplexed_singleton_refresh(tmp_path, monkeypatch, caplog):
     """The daemon tick must not lose the launch profile's routing secrets."""
     from agent.secret_scope import is_multiplex_active, set_multiplex_active
-    from hermes_cli.auth_nous import _nous_inference_env_override, _nous_portal_env_override
+    from eir_cli.auth_nous import _nous_inference_env_override, _nous_portal_env_override
 
-    launch_home = tmp_path / ".hermes"
+    launch_home = tmp_path / ".eir"
     launch_home.mkdir()
     (launch_home / ".env").write_text(
         "NOUS_INFERENCE_BASE_URL=https://inference.example/v1\n"
-        "HERMES_PORTAL_BASE_URL=https://portal.example\n",
+        "EIR_PORTAL_BASE_URL=https://portal.example\n",
         encoding="utf-8",
     )
-    monkeypatch.setenv("HERMES_HOME", str(launch_home))
+    monkeypatch.setenv("EIR_HOME", str(launch_home))
     monkeypatch.setattr("agent.credential_pool.load_pool", lambda provider: None)
     monkeypatch.setattr(
         keepalive, "get_provider_auth_state", lambda provider: {"access_token": "stored-token"}
@@ -168,12 +168,12 @@ def test_keepalive_binds_launch_scope_for_multiplexed_pool_refresh(tmp_path, mon
     """Pool refreshes run under the same launch scope as singleton refreshes."""
     from agent.secret_scope import current_secret_scope, is_multiplex_active, set_multiplex_active
 
-    launch_home = tmp_path / ".hermes"
+    launch_home = tmp_path / ".eir"
     launch_home.mkdir()
     (launch_home / ".env").write_text(
         "NOUS_INFERENCE_BASE_URL=https://inference.example/v1\n", encoding="utf-8"
     )
-    monkeypatch.setenv("HERMES_HOME", str(launch_home))
+    monkeypatch.setenv("EIR_HOME", str(launch_home))
     seen = []
 
     class _Entry:

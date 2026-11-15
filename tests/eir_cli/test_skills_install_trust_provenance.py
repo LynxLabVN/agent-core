@@ -2,7 +2,7 @@
 
 ``skills_guard`` maps the reserved markers ``official`` / ``agent-created`` to the builtin /
 agent-created tiers, and builtin allows a dangerous verdict. Marketplace identifiers are
-publisher-chosen (a ClawHub slug), and the hermes-index adapter copies ``source`` from its JSON
+publisher-chosen (a ClawHub slug), and the eir-index adapter copies ``source`` from its JSON
 rows, so neither may reach those tiers.
 """
 
@@ -11,7 +11,7 @@ from io import StringIO
 import pytest
 from rich.console import Console
 
-import hermes_cli.skills_hub as cli_hub
+import eir_cli.skills_hub as cli_hub
 from tools.skills_hub_models import SkillBundle
 from tools.skills_hub_official import OptionalSkillSource
 
@@ -41,7 +41,7 @@ def _dangerous_dir(tmp_path):
     ("clawhub", "clawhub", "official"),                    # publisher slug == reserved marker
     ("clawhub", "clawhub", "agent-created"),
     ("skills-sh", "skills.sh", "skills-sh/official"),      # alias-prefixed marker
-    ("hermes-index", "official", "evil/repo/x"),           # index row stamped source=official
+    ("eir-index", "official", "evil/repo/x"),           # index row stamped source=official
 ])
 def test_non_optional_adapter_never_gets_elevated_trust(tmp_path, monkeypatch, source_id,
                                                         bundle_source, identifier):
@@ -73,7 +73,7 @@ def test_optional_skill_adapter_keeps_builtin_trust(tmp_path, monkeypatch):
 
 
 def test_optional_skill_upstream_pointer_bundle_does_not_get_builtin(tmp_path, monkeypatch):
-    """A catalog stub's ``metadata.hermes.upstream`` bundle is live third-party content: same adapter,
+    """A catalog stub's ``metadata.eir.upstream`` bundle is live third-party content: same adapter,
     but the dangerous verdict must still block."""
     from tools import skills_hub
     from tools.skills_guard import should_allow_install
@@ -110,20 +110,20 @@ def test_audit_does_not_elevate_reserved_lock_identifier(tmp_path, monkeypatch):
     assert "BLOCKED" in out
 
 
-def test_dashboard_scan_does_not_elevate_reserved_identifier(_isolate_hermes_home, monkeypatch, tmp_path):
+def test_dashboard_scan_does_not_elevate_reserved_identifier(_isolate_eir_home, monkeypatch, tmp_path):
     from fastapi.testclient import TestClient
 
-    from hermes_cli.web_server import app
+    from eir_cli.web_server import app
 
     q = _dangerous_dir(tmp_path)
     bundle = SkillBundle(name="official", files={"SKILL.md": _PAYLOAD}, source="clawhub",
                          identifier="official", trust_level="community")
     monkeypatch.setattr("tools.skills_hub_search.create_source_router", list)
-    monkeypatch.setattr("hermes_cli.skills_hub._resolve_source_meta_and_bundle",
+    monkeypatch.setattr("eir_cli.skills_hub._resolve_source_meta_and_bundle",
                         lambda ident, sources: (None, bundle, _Source("clawhub")))
     monkeypatch.setattr("tools.skills_hub_install.quarantine_bundle", lambda b: q)
 
-    import hermes_cli.web_server as ws
+    import eir_cli.web_server as ws
     client = TestClient(app)
     client.headers[ws._SESSION_HEADER_NAME] = ws._SESSION_TOKEN
     r = client.get("/api/skills/hub/scan?identifier=official")
@@ -164,7 +164,7 @@ def test_index_stamped_official_row_gets_external_panel_and_flat_category(tmp_pa
     monkeypatch.setattr(skills_hub, "HUB_DIR", tmp_path / "hub")
     monkeypatch.setattr(skills_hub, "ensure_hub_dirs", lambda: None)
     monkeypatch.setattr(skills_hub, "HubLockFile", lambda: type("L", (), {"get_installed": lambda s, n: None})())
-    monkeypatch.setattr(skills_hub_search, "create_source_router", lambda auth=None: [_Index("hermes-index")])
+    monkeypatch.setattr(skills_hub_search, "create_source_router", lambda auth=None: [_Index("eir-index")])
     monkeypatch.setattr(skills_hub_install, "quarantine_bundle", lambda b: q)
     monkeypatch.setattr(skills_hub_install, "install_from_quarantine", _install)
     monkeypatch.setattr(cli_hub, "_confirm", lambda: True)

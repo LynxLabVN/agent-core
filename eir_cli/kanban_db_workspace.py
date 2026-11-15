@@ -1,6 +1,6 @@
 """Task workspace lifecycle: scratch/dir/worktree resolution (incl. git worktree creation), post-completion cleanup with containment guards, worker tmux teardown and the first-use scratch-workspace tip.
 
-Split out of ``hermes_cli.kanban_db``; origin-resident helpers are reached
+Split out of ``eir_cli.kanban_db``; origin-resident helpers are reached
 late-bound via ``_kb`` (import-cycle breaking) so monkeypatching
 ``kanban_db.<name>`` keeps working.
 """
@@ -18,10 +18,10 @@ from typing import Optional
 from typing import TYPE_CHECKING
 import contextlib
 
-from hermes_cli.worktree_ops import release_lsp_clients
+from eir_cli.worktree_ops import release_lsp_clients
 
 if TYPE_CHECKING:
-    from hermes_cli.kanban_db import Task
+    from eir_cli.kanban_db import Task
 
 _REMOVABLE_KINDS = ("scratch", "worktree")
 
@@ -58,7 +58,7 @@ def _git(repo_root: Path, *args: str, timeout: int) -> subprocess.CompletedProce
     :func:`noninteractive_repo_git_env` (GHSA-7x36-8jrh-v4pw): the dispatcher runs ``worktree add``
     unattended, which executes the repo's hooks, ``core.fsmonitor`` and smudge filters.
     """
-    from hermes_cli._subprocess_compat import FILTER_DISCOVERY_FAILED, noninteractive_repo_git_env
+    from eir_cli._subprocess_compat import FILTER_DISCOVERY_FAILED, noninteractive_repo_git_env
     env = noninteractive_repo_git_env(repo_root)
     if env is None:
         return subprocess.CompletedProcess(["git", "-C", str(repo_root), *args], 1, "", FILTER_DISCOVERY_FAILED)
@@ -123,12 +123,12 @@ def _conn_uses_path(
 def _sibling_board_db_files(conn: sqlite3.Connection) -> list[Path]:
     """Every other board's ``kanban.db``. Raises ``OSError`` when the set is unknown.
 
-    ``kanban_db_path`` follows ``HERMES_KANBAN_DB`` and would collapse every
+    ``kanban_db_path`` follows ``EIR_KANBAN_DB`` and would collapse every
     slug onto the pinned file, so the scan uses the on-disk layout: the
     default board at ``<home>/kanban.db`` and named boards at
     ``<home>/kanban/boards/<slug>/kanban.db``.
     """
-    from hermes_cli.kanban_db_connect import _main_db_file  # late: import cycle
+    from eir_cli.kanban_db_connect import _main_db_file  # late: import cycle
 
     current_file = _main_db_file(conn)
     current = Path(current_file).resolve() if current_file else None
@@ -291,7 +291,7 @@ def _managed_scratch_path_info(p: Path) -> tuple[bool, Optional[str]]:
                 board,
             ))
 
-    override = os.environ.get("HERMES_KANBAN_WORKSPACES_ROOT", "").strip()
+    override = os.environ.get("EIR_KANBAN_WORKSPACES_ROOT", "").strip()
     if override:
         override_root = Path(override).expanduser()
         with contextlib.suppress(OSError):
@@ -345,11 +345,11 @@ def _scratch_workspace(conn: sqlite3.Connection, task_id: str) -> Optional[Path]
 
 def _is_managed_scratch_path(p: Path) -> bool:
     """True iff *p* is a STRICT descendant of a kanban-managed ``workspaces/``
-    root (``HERMES_KANBAN_WORKSPACES_ROOT``, ``<kanban_home>/kanban/workspaces``,
+    root (``EIR_KANBAN_WORKSPACES_ROOT``, ``<kanban_home>/kanban/workspaces``,
     or ``<kanban_home>/kanban/boards/<slug>/workspaces``). A path equal to a
     root is not managed (deleting it would wipe every task's scratch dir);
     ``<kanban_home>/kanban``, ``.../logs`` and ``.../boards/<slug>`` hold
-    Hermes' own DB and metadata. :func:`_cleanup_workspace` refuses
+    Eir' own DB and metadata. :func:`_cleanup_workspace` refuses
     ``rmtree`` outside managed storage — a board ``default_workdir`` on a real
     source tree paired with ``workspace_kind='scratch'`` would otherwise make
     task completion delete user data.
@@ -433,7 +433,7 @@ def _cleanup_worktree_workspace(
     it. The auto-generated ``wt/<task-id>`` branch is deleted with it; custom
     branches are kept. Best-effort."""
     try:
-        from hermes_cli.worktree_ops import _worktree_has_unpushed_commits, _worktree_is_dirty
+        from eir_cli.worktree_ops import _worktree_has_unpushed_commits, _worktree_is_dirty
     except Exception:
         return  # CLI safety predicates unavailable — preserve
     try:
@@ -840,4 +840,4 @@ def set_branch_name(conn: sqlite3.Connection, task_id: str, branch_name: str) ->
 
 # Late-bound origin namespace (see module docstring); imported LAST so this
 # module is fully populated before ``kanban_db`` imports from it.
-from hermes_cli import kanban_db as _kb
+from eir_cli import kanban_db as _kb

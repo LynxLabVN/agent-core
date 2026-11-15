@@ -10,23 +10,23 @@ from unittest.mock import patch
 
 import pytest
 
-from hermes_cli import profiles
-from hermes_cli.profile_distribution import DistributionManifest, install_distribution, write_manifest
+from eir_cli import profiles
+from eir_cli.profile_distribution import DistributionManifest, install_distribution, write_manifest
 
 
 @pytest.fixture()
 def profile_env(tmp_path, monkeypatch):
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".eir"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("EIR_HOME", str(home))
     return tmp_path
 
 
 def _create_and_delete(name: str) -> None:
     profiles.create_profile(name, no_alias=True)
-    with patch("hermes_cli.profiles._cleanup_gateway_service"), \
-         patch("hermes_cli.profiles._live_default_multiplexer", return_value=False):
+    with patch("eir_cli.profiles._cleanup_gateway_service"), \
+         patch("eir_cli.profiles._live_default_multiplexer", return_value=False):
         profiles.delete_profile(name, yes=True)
 
 
@@ -47,7 +47,7 @@ def _publish_by_install(tmp_path: Path, name: str) -> None:
 
 def _publish_by_rename(tmp_path: Path, name: str) -> None:
     profiles.create_profile("source", no_alias=True)
-    with patch("hermes_cli.profiles._cleanup_gateway_service"):
+    with patch("eir_cli.profiles._cleanup_gateway_service"):
         profiles.rename_profile("source", name)
 
 
