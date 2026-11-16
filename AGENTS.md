@@ -163,3 +163,14 @@ Every former god file is a **facade** (public entry points + the names other pac
 | `providers/` | `providers/README.md` | `ProviderProfile` registry and ABC |
 
 PR workflow: `CONTRIBUTING.md` (maintainers: the `eir-agent-dev` skill, not shipped here).
+
+## Upstream lineage
+
+This tree is a full rename (hermes-agent → eir) of `NousResearch/hermes-agent` at upstream tip
+`77a30e9127` (tagged `last-hermes-sync`). The `upstream` remote is disconnected; do not re-add it
+or pull from it. Some third-party surfaces keep the `hermes` string on purpose: Nous model IDs
+(`Hermes-3/4*`, `hermes-3/4-*`), wire headers `x-nous-hermes-*`, `nous-hermes-agent` product_id,
+`plugin-catalog/` filenames and `name:` fields, upstream-hosted asset/docs domains
+(`hermes-assets.nousresearch.com`, `hermes-agent.nousresearch.com`), and `https://...hermes...`
+URLs belonging to third parties. The health ratchet must baseline at or after the content pass
+(`4aa56bfe09`); earlier bases flag every renamed `EIR_*` env var as "new".
