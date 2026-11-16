@@ -50,7 +50,7 @@ _MAX_LIVE_BYTES = 16 * 1024 * 1024
 # The docs host 301s the document to GitHub Pages. A redirect anywhere else (or to plain http) is
 # refused: the document names the repo + sha every catalog install clones, so its integrity rests on
 # HTTPS to hosts Nous publishes to, and an open redirect must not extend that trust to a third host.
-_LIVE_CATALOG_HOSTS = frozenset({"eir-agent.nousresearch.com", "nousresearch.github.io"})
+_LIVE_CATALOG_HOSTS = frozenset({"hermes-agent.nousresearch.com", "nousresearch.github.io"})
 _MAX_LIVE_REDIRECTS = 5
 
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")

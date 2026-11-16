@@ -360,7 +360,7 @@ def _redirecting_to(target: str, doc: dict):
     import httpx
 
     def handler(request):
-        if request.url.host == "eir-agent.nousresearch.com":
+        if request.url.host == "hermes-agent.nousresearch.com":
             return httpx.Response(301, headers={"location": target})
         return httpx.Response(200, json=doc)
     return handler
