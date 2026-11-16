@@ -1,6 +1,6 @@
 # @format: yaml-en @entry:1
 # eir plugin catalog — entry: video-xray
-# (generated draft for PR to NousResearch/eir-agent plugin-catalog/)
+# (generated draft for PR to LynxLabVN/agent-core plugin-catalog/)
 
 # --- identity ---
 name: video-xray

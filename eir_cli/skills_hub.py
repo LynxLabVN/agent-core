@@ -699,7 +699,7 @@ def _is_official_adapter(matched_source) -> bool:
 
 def _scan_source_for_install(bundle, meta, identifier: str, matched_source) -> tuple[str, str | None]:
     """``(scan source, explicit trust tier or None)`` for a resolved hub bundle. Builtin trust only for the
-    official adapter's own optional-skills bytes (local, or its NousResearch/eir-agent live-repo fallback): a
+    official adapter's own optional-skills bytes (local, or its LynxLabVN/agent-core live-repo fallback): a
     catalog stub's upstream bundle is live third-party content labelled ``trusted``, so a dangerous verdict blocks."""
     if _is_official_adapter(matched_source):
         bundle_trust = getattr(bundle, "trust_level", "")

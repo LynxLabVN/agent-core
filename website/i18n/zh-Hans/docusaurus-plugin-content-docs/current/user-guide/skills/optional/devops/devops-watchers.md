@@ -81,7 +81,7 @@ python $EIR_HOME/skills/devops/watchers/scripts/watch_rss.py \
 
 ```bash
 python $EIR_HOME/skills/devops/watchers/scripts/watch_github.py \
-  --name eir-issues --repo NousResearch/eir-agent --scope issues
+  --name eir-issues --repo LynxLabVN/agent-core --scope issues
 ```
 
 轮询任意 JSON API：

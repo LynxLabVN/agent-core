@@ -97,7 +97,7 @@ def test_index_fallback_bundle_keeps_upstream_identity(monkeypatch):
         {"name": "brag", "source": "official", "identifier": "official/creative/brag",
          "repo": "example-owner/brag", "path": "skills/brag"},
         {"name": "arxiv", "source": "official", "identifier": "official/research/arxiv",
-         "repo": "NousResearch/eir-agent", "path": "optional-skills/research/arxiv"},
+         "repo": "LynxLabVN/agent-core", "path": "optional-skills/research/arxiv"},
     ]}, True
     monkeypatch.setattr(src, "_get_github", lambda: SimpleNamespace(fetch=lambda _ident: SkillBundle(
         **{**fetched.__dict__, "metadata": {}})))

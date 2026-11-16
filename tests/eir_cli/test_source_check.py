@@ -284,7 +284,7 @@ def test_channel_failure_never_probes_or_heals_a_branch(installation, name, fail
     elif failure == "malformed":
         body = "not JSON"
     elif failure == "foreign":
-        body["repository"] = "NousResearch/eir-agent"
+        body["repository"] = "LynxLabVN/agent-core"
     else:
         body["policy"] = "preview"
         del body["delivery"]
@@ -338,8 +338,8 @@ def test_running_revision_is_not_applied_to_an_explicit_target(installation, mon
     assert check_for_updates(install_root=linked, home=home)["currentSha"] == head
     # Default invocation retains the Nix revision probe even without a Git checkout.
     monkeypatch.setattr("eir_cli.config.get_project_root", lambda: home)
-    responses[MAIN_CHANNEL] = (200, source_channel("main", "NousResearch/eir-agent"))
-    responses["/repos/NousResearch/eir-agent/commits/main"] = (200, "e" * 40)
+    responses[MAIN_CHANNEL] = (200, source_channel("main", "LynxLabVN/agent-core"))
+    responses["/repos/LynxLabVN/agent-core/commits/main"] = (200, "e" * 40)
     assert check_for_updates(home=home)["behind"] == 0
 
 
@@ -472,7 +472,7 @@ def test_embedded_revision_keeps_https_ref_advertisement_recovery(installation, 
     monkeypatch.setenv("EIR_REVISION", head)
     monkeypatch.setattr("eir_cli.config.get_project_root", lambda: home)
     monkeypatch.setattr("eir_cli.config.detect_install_method", lambda root: "nix")
-    responses[MAIN_CHANNEL] = (200, source_channel("main", "NousResearch/eir-agent"))
+    responses[MAIN_CHANNEL] = (200, source_channel("main", "LynxLabVN/agent-core"))
     original = subprocess.run
     probes = []
 
@@ -509,7 +509,7 @@ def test_malformed_optional_changelog_and_cache_do_not_hide_the_update(installat
                         f"/repos/fixture/fork/compare/{head}...{'a' * 40}"] * 2
 
 
-@pytest.mark.parametrize("repository,heals", [("NousResearch/eir-agent", True), ("fixture/fork", False)])
+@pytest.mark.parametrize("repository,heals", [("LynxLabVN/agent-core", True), ("fixture/fork", False)])
 def test_official_ssh_healing_uses_public_https_without_retargeting_forks(installation, monkeypatch, repository, heals):
     from eir_cli.source_check import check_for_updates
     from eir_cli.update_channel import set_install_channel
@@ -581,7 +581,7 @@ def test_stable_release_the_checkout_already_contains_is_a_rollback(installation
     git("tag", "v1.2.3", shas[release], cwd=bare)
     git("remote", "set-url", "origin", str(bare))
     git("checkout", "-q", "--detach", shas[on])
-    api = "/repos/NousResearch/eir-agent"
+    api = "/repos/LynxLabVN/agent-core"
     responses[f"{api}/releases/latest"] = (200, {"draft": False, "prerelease": False, "tag_name": "v1.2.3"})
     responses[f"{api}/commits/v1.2.3"] = (200, {"sha": shas[release]})
 
@@ -623,7 +623,7 @@ def test_stable_release_the_updater_refuses_is_held_not_offered(
     git("checkout", "-q", "main")
     if ledgered:
         _ledgered_store(sibling)
-    api = "/repos/NousResearch/eir-agent"
+    api = "/repos/LynxLabVN/agent-core"
     responses[f"{api}/releases/latest"] = (200, {"draft": False, "prerelease": False, "tag_name": "v1.2.3"})
     responses[f"{api}/commits/v1.2.3"] = (200, {"sha": release})
 
@@ -679,15 +679,15 @@ def test_an_unfetched_release_is_judged_from_github(installation, tmp_path, monk
     git("remote", "set-url", "origin", str(bare))
     assert subprocess.run(["git", "cat-file", "-e", f"{release}^{{commit}}"], cwd=root,
                           stderr=subprocess.DEVNULL, check=False).returncode != 0
-    api = "/repos/NousResearch/eir-agent"
+    api = "/repos/LynxLabVN/agent-core"
     responses[f"{api}/releases/latest"] = (200, {"draft": False, "prerelease": False, "tag_name": "v1.2.3"})
     responses[f"{api}/commits/v1.2.3"] = (200, {"sha": release})
     responses[f"{api}/compare/{git('rev-parse', 'HEAD')}...{release}"] = (200, {"status": "diverged"})
     responses[f"{api}/git/trees/{release}"] = (200, {"truncated": False, "tree": [
         {"path": "eir_state.py", "type": "blob"}, {"path": "eir_state_common.py", "type": "blob"},
         {"path": "run_agent.py", "type": "blob"}]})
-    responses[f"/NousResearch/eir-agent/{release}/eir_state.py"] = (200, "from eir_state_common import *\n")
-    responses[f"/NousResearch/eir-agent/{release}/eir_state_common.py"] = (
+    responses[f"/LynxLabVN/agent-core/{release}/eir_state.py"] = (200, "from eir_state_common import *\n")
+    responses[f"/LynxLabVN/agent-core/{release}/eir_state_common.py"] = (
         200, "SCHEMA_SQL = 'CREATE TABLE IF NOT EXISTS sessions (id)'\n")
     if ledgered:
         _ledgered_store(home)

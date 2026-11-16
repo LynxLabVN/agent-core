@@ -6,7 +6,7 @@ Usage (via cron with --no-agent):
     eir cron create eir-issues \\
       --schedule "*/5 * * * *" --no-agent \\
       --script "$EIR_HOME/skills/devops/watchers/scripts/watch_github.py" \\
-      --script-args "--name eir-issues --repo NousResearch/eir-agent --scope issues"
+      --script-args "--name eir-issues --repo LynxLabVN/agent-core --scope issues"
 
 Set GITHUB_TOKEN (or GH_TOKEN) in the Eir .env file
 (``${EIR_HOME:-~/.eir}/.env``) to avoid the 60 req/hr

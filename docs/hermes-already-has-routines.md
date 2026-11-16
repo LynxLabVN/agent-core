@@ -153,7 +153,7 @@ Full automation blueprints gallery: [eir-agent.nousresearch.com/docs/reference/a
 
 Documentation: [eir-agent.nousresearch.com](https://hermes-agent.nousresearch.com)
 
-GitHub: [github.com/NousResearch/eir-agent](https://github.com/LynxLabVN/agent-core)
+GitHub: [github.com/LynxLabVN/agent-core](https://github.com/LynxLabVN/agent-core)
 
 ---
 

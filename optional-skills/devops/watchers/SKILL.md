@@ -66,7 +66,7 @@ Watch a GitHub repo (set `GITHUB_TOKEN` in `${EIR_HOME:-~/.eir}/.env` to avoid t
 
 ```bash
 python $EIR_HOME/skills/devops/watchers/scripts/watch_github.py \
-  --name eir-issues --repo NousResearch/eir-agent --scope issues
+  --name eir-issues --repo LynxLabVN/agent-core --scope issues
 ```
 
 Poll an arbitrary JSON API:

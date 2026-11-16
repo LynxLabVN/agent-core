@@ -66,7 +66,7 @@ class ActionResult:
     ``structuredContent`` leaves them ``None``, behavior unchanged.
 
     Beyond the transport-level ``ok`` flag, this carries cua-driver's structured action verdict so the model
-    can follow the documented verify → escalate ladder (NousResearch/eir-agent#67052).
+    can follow the documented verify → escalate ladder (LynxLabVN/agent-core#67052).
     """
 
     ok: bool

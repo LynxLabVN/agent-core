@@ -194,7 +194,7 @@ _RELEASE_URL_BASE = "https://github.com/LynxLabVN/agent-core/releases/tag"
 def get_latest_release_tag(repo_dir: Optional[Path] = None) -> Optional[tuple]:
     """Return ``(tag, release_url)`` for the latest local git tag, or None (a miss is cached too).
 
-    Release URL always points at the canonical NousResearch/eir-agent repo (forks get no link).
+    Release URL always points at the canonical LynxLabVN/agent-core repo (forks get no link).
     """
     def _compute():
         rd = repo_dir or _resolve_repo_dir()

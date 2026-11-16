@@ -1,4 +1,4 @@
-"""Row-addressed ``api_content`` backfill (NousResearch/eir-agent#102194).
+"""Row-addressed ``api_content`` backfill (LynxLabVN/agent-core#102194).
 
 The sidecar is stamped by the turn prologue and normally reaches the DB in the
 same INSERT as the clean content (the crash persist runs after the stamp). When

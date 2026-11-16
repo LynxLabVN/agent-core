@@ -1816,7 +1816,7 @@ def test_oauth_system_prompt_sanitizer_preserves_docs_url():
                     "Eir Agent by Nous Research uses eir-agent skills. "
                     "Docs: https://hermes-agent.nousresearch.com/docs ; "
                     "interpreter ~/.eir/eir-agent/venv/bin/python ; "
-                    "source github.com/NousResearch/eir-agent ; mail eir-agent@example.com ; "
+                    "source github.com/LynxLabVN/agent-core ; mail eir-agent@example.com ; "
                     "skill_view(name='eir-agent') ; eir-agent's docs ; built by eir-agent."
                 ),
             },
@@ -1834,7 +1834,7 @@ def test_oauth_system_prompt_sanitizer_preserves_docs_url():
     # Paths and repo slugs are addresses too: a subagent told to run
     # ``~/.eir/claude-code/venv/bin/python`` fails on a file that does not exist.
     assert "~/.eir/eir-agent/venv/bin/python" in system_text
-    assert "github.com/NousResearch/eir-agent" in system_text
+    assert "github.com/LynxLabVN/agent-core" in system_text
     assert "eir-agent@example.com" in system_text
     assert "skill_view(name='eir-agent')" in system_text  # a quoted slug is an identifier
     assert "built by claude-code." in system_text  # a sentence-final dot is prose

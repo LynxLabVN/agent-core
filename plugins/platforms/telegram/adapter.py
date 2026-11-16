@@ -326,7 +326,7 @@ _UPDATER_START_TIMEOUT = 30.0  # start_polling() can hang on a degraded pool aft
 # start_polling() can also hang when the connection pool is in a degraded state after
 # _drain_polling_connections(), particularly when both primary and fallback Telegram endpoints are
 # unreachable. Bounding start_polling() prevents the reconnect ladder from stalling indefinitely and allows
-# the heartbeat loop to trigger its own recovery path. Refs: NousResearch/eir-agent#59614
+# the heartbeat loop to trigger its own recovery path. Refs: LynxLabVN/agent-core#59614
 _INITIAL_POLLING_PROGRESS_TIMEOUT = 60.0
 # Bounded drain (shutdown()/initialize() of the getUpdates request) so a wedged socket can't freeze
 # _polling_error_task and gate every escalation path behind its in-flight guard.
@@ -335,7 +335,7 @@ _INITIAL_POLLING_PROGRESS_TIMEOUT = 60.0
 # _drain_polling_connections() and freezing the whole reconnect ladder (the tracked _polling_error_task
 # never completes, so every escalation path stays gated behind its in-flight guard). Bound the drain so the
 # ladder always advances toward the fatal-restart escalation. Matches _UPDATER_STOP_TIMEOUT. Refs:
-# NousResearch/eir-agent#66377
+# LynxLabVN/agent-core#66377
 _DRAIN_TIMEOUT = 15.0
 # Wedged-recovery watchdog: healthy worst case is stop + 2x drain + start + 60s backoff ≈ 135s, so
 # 300s in flight is unambiguously stuck and the heartbeat force-escalates.

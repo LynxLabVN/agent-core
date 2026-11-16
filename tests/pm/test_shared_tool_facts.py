@@ -1,4 +1,4 @@
-"""Regression for NousResearch/eir-agent#149497: shared tool-store pins stay usable."""
+"""Regression for LynxLabVN/agent-core#149497: shared tool-store pins stay usable."""
 
 import shutil
 

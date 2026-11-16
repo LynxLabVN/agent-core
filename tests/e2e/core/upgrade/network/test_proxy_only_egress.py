@@ -34,7 +34,7 @@ pytestmark = [
     pytest.mark.skipif(I.real_uv() is None, reason="uv required"),
 ]
 
-GIT_PATH = "/NousResearch/eir-agent.git/"
+GIT_PATH = "/LynxLabVN/agent-core.git/"
 
 
 @pytest.fixture(scope="module")

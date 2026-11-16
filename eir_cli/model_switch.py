@@ -99,16 +99,16 @@ def _bare_custom_provider_def(current_base_url: str) -> Optional[ProviderDef]:
 # --- Non-agentic model warning
 
 _EIR_MODEL_WARNING = (
-    "Nous Research Eir 3 & 4 models are NOT agentic and are not designed "
+    "Nous Research Hermes 3 & 4 models are NOT agentic and are not designed "
     "for use with Eir Agent. They lack the tool-calling capabilities "
     "required for agent workflows. Consider using an agentic model instead "
     "(Claude, GPT, Gemini, DeepSeek, etc.).")
 
 # Match only the real Nous Research Eir 3 / 4 chat families; a bare substring check
-# false-positived on tool-capable local Modelfiles like ``eir-brain:qwen3-14b-ctx16k``.
+# false-positived on tool-capable local Modelfiles like ``hermes-brain:qwen3-14b-ctx16k``.
 #   match:    NousResearch/Hermes-3-Llama-3.1-70B, hermes-4-405b, openrouter/hermes3:70b
-#   no match: eir-brain:qwen3-14b-ctx16k, qwen3:14b, claude-opus-4-6
-_NOUS_EIR_NON_AGENTIC_RE = re.compile(r"(?:^|[/:])eir[-_ ]?[34](?:[-_.:]|$)", re.IGNORECASE)
+#   no match: hermes-brain:qwen3-14b-ctx16k, qwen3:14b, claude-opus-4-6
+_NOUS_EIR_NON_AGENTIC_RE = re.compile(r"(?:^|[/:])hermes[-_ ]?[34](?:[-_.:]|$)", re.IGNORECASE)
 
 
 # Opaque proxy model IDs (Palantir Foundry: ``ri.language-model-service..language-model.<slug>``)

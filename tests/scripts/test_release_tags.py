@@ -76,7 +76,7 @@ def test_github_repo_parsed_from_ssh_and_https_urls(tmp_path, release_repo):
         subprocess.run(['git', 'config', f'remote.{name}.url', url], cwd=tmp_path, check=True)
 
     assert release.remote_github_repo("fork") == "ethernet8023/eir-agent"
-    assert release.remote_github_repo("origin") == "NousResearch/eir-agent"
+    assert release.remote_github_repo("origin") == "LynxLabVN/agent-core"
     assert release.remote_github_repo("gitlab") is None
     subprocess.run(['git', 'config', 'url.https://github.com/fork/.pushInsteadOf',
                     'https://github.com/NousResearch/'], cwd=tmp_path, check=True)

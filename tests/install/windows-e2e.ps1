@@ -192,7 +192,7 @@ function Confirm-OldChat([string]$Out) {
 }
 
 $RepoUrlHttps = "https://github.com/LynxLabVN/agent-core.git"
-$RepoUrlSsh   = "git@github.com:NousResearch/eir-agent.git"
+$RepoUrlSsh   = "git@github.com:LynxLabVN/agent-core.git"
 
 function Write-Step([string]$Message) {
     Write-Host ""
@@ -1485,7 +1485,7 @@ function Assert-RedirectIsTransportOnly {
     # like the rehearsal source, channel resolution would fail and this leg
     # would be testing a fork install rather than the real user path.
     $official = @('https://github.com/LynxLabVN/agent-core.git',
-                  'git@github.com:NousResearch/eir-agent.git')
+                  'git@github.com:LynxLabVN/agent-core.git')
     $configured = (Invoke-Git @('-C', $InstallDir, 'config', '--get', 'remote.origin.url') | Out-String).Trim()
     Assert-True ($official -contains $configured) "origin stays configured as an official URL (got '$configured')"
     $real = if ($env:EIR_E2E_REAL_GIT) { $env:EIR_E2E_REAL_GIT } else { 'git' }

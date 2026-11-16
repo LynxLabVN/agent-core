@@ -36,7 +36,7 @@ from tests.e2e.core.upgrade import _install_helpers as I
 from tests.e2e.core.upgrade.network import _netedge as N
 
 ASSETS = "eir-assets.nousresearch.com"
-REPOSITORY = "NousResearch/eir-agent"
+REPOSITORY = "LynxLabVN/agent-core"
 # Hosts a correctly isolated update must never reach directly; with the proxy they appear in
 # the proxy log as "refused" (the proxy has no route for them).
 PUBLIC_INDEXES = ("pypi.org", "files.pythonhosted.org", "registry.npmjs.org")

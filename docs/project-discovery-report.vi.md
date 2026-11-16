@@ -1,7 +1,7 @@
 # Báo cáo Khám phá Dự án — Eir Agent
 
 > Tài liệu tổng hợp từ quá trình khảo sát codebase tại `/home/duy/Documents/Workspace/Work/agent-core`
-> (repo: `NousResearch/eir-agent`). Ngày biên soạn: 15/11/2026.
+> (repo: `LynxLabVN/agent-core`). Ngày biên soạn: 15/11/2026.
 
 ---
 

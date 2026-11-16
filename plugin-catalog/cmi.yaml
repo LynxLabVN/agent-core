@@ -17,7 +17,7 @@ screenshots:
   - https://raw.githubusercontent.com/jeremiebergel/context-manager-intelligence/2f576931c05ae9bf778b5f3ca1158064af17e9b8/docs/catalog/shot-results.png
   - https://raw.githubusercontent.com/jeremiebergel/context-manager-intelligence/2f576931c05ae9bf778b5f3ca1158064af17e9b8/docs/catalog/shot-memory.png
 known_issues:
-  - "Imports private Eir core helpers (token estimator, tool-summary helper, ContextCompressor, pricing) that can break on a Eir release; public seams requested in NousResearch/eir-agent#152139."
+  - "Imports private Eir core helpers (token estimator, tool-summary helper, ContextCompressor, pricing) that can break on a Eir release; public seams requested in LynxLabVN/agent-core#152139."
 capabilities:
   provides_tools: []
   provides_hooks: []

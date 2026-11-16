@@ -22,7 +22,7 @@ concurrency:
 
 jobs:
   delist:
-    if: github.repository == 'NousResearch/eir-agent'
+    if: github.repository == 'LynxLabVN/agent-core'
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 20
     environment: trusted-automation

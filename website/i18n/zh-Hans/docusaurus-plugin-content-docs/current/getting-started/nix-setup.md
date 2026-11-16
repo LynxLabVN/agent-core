@@ -46,11 +46,11 @@ uv2nix 环境、覆盖包、插件依赖和开发 shell 使用同一个解释器
 
 ```bash
 # 直接运行（首次使用时构建，之后使用缓存）
-nix run github:NousResearch/eir-agent -- setup
-nix run github:NousResearch/eir-agent -- chat
+nix run github:LynxLabVN/agent-core -- setup
+nix run github:LynxLabVN/agent-core -- chat
 
 # 或持久化安装
-nix profile install github:NousResearch/eir-agent
+nix profile install github:LynxLabVN/agent-core
 eir setup
 eir chat
 ```
@@ -86,7 +86,7 @@ nix build
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    eir-agent.url = "github:NousResearch/eir-agent";
+    eir-agent.url = "github:LynxLabVN/agent-core";
   };
 
   outputs = { nixpkgs, eir-agent, ... }: {
@@ -696,7 +696,7 @@ services.eir-agent = {
 
 ```nix
 {
-  inputs.eir-agent.url = "github:NousResearch/eir-agent";
+  inputs.eir-agent.url = "github:LynxLabVN/agent-core";
   outputs = { eir-agent, nixpkgs, ... }: {
     nixpkgs.overlays = [ eir-agent.overlays.default ];
     # 然后：

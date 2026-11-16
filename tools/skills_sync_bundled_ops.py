@@ -65,7 +65,7 @@ _OWN_REPO_PREFIXES = ("nousresearch/eir-agent/skills/", "skills-sh/nousresearch/
 
 def bundled_skill_for_install(identifier: str) -> Optional[str]:
     """Bundled skill name an install identifier means, else None: a bare bundled name, or this
-    repo's own copy of one (``NousResearch/eir-agent/skills/<cat>/<name>``, which the Skills Hub
+    repo's own copy of one (``LynxLabVN/agent-core/skills/<cat>/<name>``, which the Skills Hub
     site hands out for built-ins, or its ``skills-sh/nousresearch/eir-agent/<name>`` mirror).
     Fetched from GitHub, that copy is scanned as a community skill and refused — every time."""
     ident = identifier.strip().strip("/")

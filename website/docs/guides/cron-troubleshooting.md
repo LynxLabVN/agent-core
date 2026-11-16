@@ -224,7 +224,7 @@ If you've worked through this guide and the issue persists:
 
 1. Run the job with `eir cron run <job_id>` (fires on next gateway tick) and watch for errors in the chat output
 2. Check `~/.eir/logs/agent.log` for scheduler messages and `~/.eir/logs/errors.log` for warnings
-3. Open an issue at [github.com/NousResearch/eir-agent](https://github.com/LynxLabVN/agent-core) with:
+3. Open an issue at [github.com/LynxLabVN/agent-core](https://github.com/LynxLabVN/agent-core) with:
    - The job ID and schedule
    - The delivery target
    - What you expected vs. what happened

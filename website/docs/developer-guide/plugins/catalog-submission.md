@@ -48,7 +48,7 @@ for word, and a test fails the build if the two drift apart.
 ## Opening the PR
 
 1. Add **one** file, `plugin-catalog/<name>.yaml`, to
-   [`NousResearch/eir-agent`](https://github.com/LynxLabVN/agent-core).
+   [`LynxLabVN/agent-core`](https://github.com/LynxLabVN/agent-core).
    The fields are documented in the README's
    [entry schema](https://github.com/LynxLabVN/agent-core/blob/main/plugin-catalog/README.md#entry-schema)
    and in [What's in an entry](../../user-guide/features/plugin-catalog.md#whats-in-an-entry).

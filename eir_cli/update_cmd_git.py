@@ -273,9 +273,9 @@ def _print_parked_branch_kept_notice(current_branch: str, target_branch: str, un
 
 OFFICIAL_REPO_URLS = {
     "https://github.com/LynxLabVN/agent-core.git",
-    "git@github.com:NousResearch/eir-agent.git",
+    "git@github.com:LynxLabVN/agent-core.git",
     "https://github.com/LynxLabVN/agent-core",
-    "git@github.com:NousResearch/eir-agent",
+    "git@github.com:LynxLabVN/agent-core",
 }
 OFFICIAL_REPO_URL = "https://github.com/LynxLabVN/agent-core.git"
 SKIP_UPSTREAM_PROMPT_FILE = ".skip_upstream_prompt"
@@ -342,7 +342,7 @@ def _offer_upstream_remote(git_cmd: list[str], cwd: Path, *, assume_yes: bool, i
     from eir_cli.update_cmd import _add_upstream_remote, _mark_skip_upstream_prompt
     print(
         "\nℹ Your fork is not tracking the official Eir repository.\n"
-        "  This means you may miss updates from NousResearch/eir-agent.\n"
+        "  This means you may miss updates from LynxLabVN/agent-core.\n"
     )
     if assume_yes or (input_fn is None and not (sys.stdin.isatty() and sys.stdout.isatty())):
         print(f"  Skipping upstream setup (non-interactive run).\n  Add it later with: {_UPSTREAM_ADD_CMD}")

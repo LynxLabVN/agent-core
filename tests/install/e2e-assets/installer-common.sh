@@ -3,7 +3,7 @@
 arm_source_redirect() {
   local repo="$1" work="$2" serve="$3"
   local https='https://github.com/LynxLabVN/agent-core.git'
-  local ssh='git@github.com:NousResearch/eir-agent.git'
+  local ssh='git@github.com:LynxLabVN/agent-core.git'
   local actual real_git quoted_git cfg="$work/gitconfig" shim="$work/shim"
   actual="$(git -C "$repo" remote get-url origin)"
   real_git="$(command -v git)"

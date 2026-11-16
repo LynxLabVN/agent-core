@@ -1,7 +1,7 @@
 # GMI NEXUS — catalog entry for the Eir plugin catalog.
 #
 # This is the file the pull request adds. It is added to
-# NousResearch/eir-agent under plugin-catalog/gmi-nexus.yaml.
+# LynxLabVN/agent-core under plugin-catalog/gmi-nexus.yaml.
 #
 # It pins commit 7b2d8c5eb7578d73f4f58907f9ddfe5e2da58fe9 of
 # https://github.com/Joystonm/hermes-gmi-nexus

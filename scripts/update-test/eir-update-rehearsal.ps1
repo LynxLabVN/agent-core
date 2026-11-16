@@ -62,7 +62,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 2.0
 
 $OfficialHttps = 'https://github.com/LynxLabVN/agent-core.git'
-$OfficialSsh = 'git@github.com:NousResearch/eir-agent.git'
+$OfficialSsh = 'git@github.com:LynxLabVN/agent-core.git'
 # Diff-area cap pre sets while the snapshot is alive (post restores the original).
 $ShadowStorageMax = [UInt64]128GB
 

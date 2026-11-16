@@ -21,7 +21,7 @@ Nous Research operates `nousresearch.com` and its subdomains. The ones Eir Agent
 
 Outside `nousresearch.com`:
 
-- **GitHub:** the [NousResearch organization](https://github.com/NousResearch) and its [eir-agent repository](https://github.com/LynxLabVN/agent-core) (source, releases, the Nix flake). Raw files from that repository are served from `raw.githubusercontent.com/NousResearch/eir-agent/...`; that is the same repository, not a separate source. Any other account or repository is not ours.
+- **GitHub:** the [NousResearch organization](https://github.com/NousResearch) and its [eir-agent repository](https://github.com/LynxLabVN/agent-core) (source, releases, the Nix flake). Raw files from that repository are served from `raw.githubusercontent.com/LynxLabVN/agent-core/...`; that is the same repository, not a separate source. Any other account or repository is not ours.
 - **Docker Hub:** the [`nousresearch/eir-agent`](https://hub.docker.com/r/nousresearch/hermes-agent) image, published by the repository's release workflow (see [Docker](../user-guide/docker.md)). Only the `nousresearch` namespace is official; images under other names or registries are not.
 - **X (Twitter):** [@NousResearch](https://x.com/NousResearch)
 - **Discord:** [discord.gg/NousResearch](https://discord.gg/NousResearch)
@@ -40,7 +40,7 @@ curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
 iex (irm https://hermes-agent.nousresearch.com/install.ps1)
 ```
 
-The other supported routes also stay on official sources: Desktop packages download from the [Eir website](https://hermes-agent.nousresearch.com/), Termux uses the signed APT repository on `eir-assets.nousresearch.com` (see the [Termux guide](./termux.md), not the script above), Nix builds from the GitHub repository (see [Nix & NixOS](./nix-setup.md)), and Docker pulls `nousresearch/eir-agent` from Docker Hub. Some guides fetch `install.ps1` straight from the repository at `raw.githubusercontent.com/NousResearch/eir-agent/main/scripts/install.ps1`; it is the same script.
+The other supported routes also stay on official sources: Desktop packages download from the [Eir website](https://hermes-agent.nousresearch.com/), Termux uses the signed APT repository on `eir-assets.nousresearch.com` (see the [Termux guide](./termux.md), not the script above), Nix builds from the GitHub repository (see [Nix & NixOS](./nix-setup.md)), and Docker pulls `nousresearch/eir-agent` from Docker Hub. Some guides fetch `install.ps1` straight from the repository at `raw.githubusercontent.com/LynxLabVN/agent-core/main/scripts/install.ps1`; it is the same script.
 
 If an installer, download, image, or "portal" is hosted anywhere other than the sources listed on this page, treat it as untrusted.
 

@@ -9,59 +9,59 @@
 # Workflows, composite actions, and this file: they decide what CI executes
 # and what the autofix job pushes to main. The scripts the workflows run get the
 # same review for the same reason.
-/.github/                       @NousResearch/eir-agent-core
-/scripts/ci/                    @NousResearch/eir-agent-core
+/.github/                       @LynxLabVN/agent-core-core
+/scripts/ci/                    @LynxLabVN/agent-core-core
 # The code-health gate decides whether a PR passes; weakening it is a CI change.
-/scripts/check                  @NousResearch/eir-agent-core
-/scripts/code_health/           @NousResearch/eir-agent-core
+/scripts/check                  @LynxLabVN/agent-core-core
+/scripts/code_health/           @LynxLabVN/agent-core-core
 
 # The committed system prompt + tools[] render every session sends (scripts/ci/prompt_surface.py).
 # The prompt-surface-review ruleset requires one eir-agent-core approval here; this line requests it.
-/tests/fixtures/prompt_surface/ @NousResearch/eir-agent-core
+/tests/fixtures/prompt_surface/ @LynxLabVN/agent-core-core
 
 # eslint configs can define custom ``fix`` functions that run arbitrary code.
-eslint.config.*                 @NousResearch/eir-agent-core
-/.prettierrc                    @NousResearch/eir-agent-core
+eslint.config.*                 @LynxLabVN/agent-core-core
+/.prettierrc                    @LynxLabVN/agent-core-core
 
 # MCP catalog entries define local commands users later install into
 # ``mcp_servers``; the installer decides how they are fetched and run.
-/optional-mcps/                 @NousResearch/eir-agent-core
-/eir_cli/mcp_catalog.py      @NousResearch/eir-agent-core
-/eir_agent/eir_cli/mcp_catalog.py @NousResearch/eir-agent-core
+/optional-mcps/                 @LynxLabVN/agent-core-core
+/eir_cli/mcp_catalog.py      @LynxLabVN/agent-core-core
+/eir_agent/eir_cli/mcp_catalog.py @LynxLabVN/agent-core-core
 
 # Files that execute at pip-install or interpreter startup.
-/setup.py                       @NousResearch/eir-agent-core
-/setup.cfg                      @NousResearch/eir-agent-core
-/sitecustomize.py               @NousResearch/eir-agent-core
-/usercustomize.py               @NousResearch/eir-agent-core
-*.pth                           @NousResearch/eir-agent-core
+/setup.py                       @LynxLabVN/agent-core-core
+/setup.cfg                      @LynxLabVN/agent-core-core
+/sitecustomize.py               @LynxLabVN/agent-core-core
+/usercustomize.py               @LynxLabVN/agent-core-core
+*.pth                           @LynxLabVN/agent-core-core
 
 # Dependency manifests, resolved pins, and image builds: an edit here changes
 # what gets installed and run without touching any reviewed source.
-pyproject.toml                  @NousResearch/eir-agent-core
-package.json                    @NousResearch/eir-agent-core
-uv.lock                         @NousResearch/eir-agent-core
-*package-lock.json              @NousResearch/eir-agent-core
-/pnpm-lock.yaml                 @NousResearch/eir-agent-core
-/flake.lock                     @NousResearch/eir-agent-core
-/pm/lock.json                   @NousResearch/eir-agent-core
-*Dockerfile                     @NousResearch/eir-agent-core
+pyproject.toml                  @LynxLabVN/agent-core-core
+package.json                    @LynxLabVN/agent-core-core
+uv.lock                         @LynxLabVN/agent-core-core
+*package-lock.json              @LynxLabVN/agent-core-core
+/pnpm-lock.yaml                 @LynxLabVN/agent-core-core
+/flake.lock                     @LynxLabVN/agent-core-core
+/pm/lock.json                   @LynxLabVN/agent-core-core
+*Dockerfile                     @LynxLabVN/agent-core-core
 
 # A root .npmrc (registry, auth) would apply to every pnpm install.
-.npmrc                          @NousResearch/eir-agent-core
+.npmrc                          @LynxLabVN/agent-core-core
 # The pnpm workspace's quarantine (minimumReleaseAge), its overrides, and the
 # dependencies allowed to run build scripts (allowBuilds) live here.
-/pnpm-workspace.yaml            @NousResearch/eir-agent-core
+/pnpm-workspace.yaml            @LynxLabVN/agent-core-core
 
 # Where PM fetches artifacts from.
-/pm/artifact-mirror.json        @NousResearch/eir-agent-core
+/pm/artifact-mirror.json        @LynxLabVN/agent-core-core
 
 # The installers users pipe into a shell, and the generator for the pins they carry.
-/scripts/install.sh             @NousResearch/eir-agent-core
-/scripts/install.ps1            @NousResearch/eir-agent-core
-/scripts/install.cmd            @NousResearch/eir-agent-core
-/scripts/gen-bootstrap-pins.py  @NousResearch/eir-agent-core
+/scripts/install.sh             @LynxLabVN/agent-core-core
+/scripts/install.ps1            @LynxLabVN/agent-core-core
+/scripts/install.cmd            @LynxLabVN/agent-core-core
+/scripts/gen-bootstrap-pins.py  @LynxLabVN/agent-core-core
 
 # The trust model and the scope authority for security reports.
-/SECURITY.md                    @NousResearch/eir-agent-core
+/SECURITY.md                    @LynxLabVN/agent-core-core
 

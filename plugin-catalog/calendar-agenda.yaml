@@ -1,7 +1,7 @@
 # Catalog entry for the Eir Agent Plugin Hackathon.
-# At submission time this file is added to the NousResearch/eir-agent
+# At submission time this file is added to the LynxLabVN/agent-core
 # repository as `plugin-catalog/calendar-agenda.yaml` via pull request.
-# Schema: plugin-catalog/README.md in NousResearch/eir-agent
+# Schema: plugin-catalog/README.md in LynxLabVN/agent-core
 # (mirrored at https://hermes-agent.nousresearch.com/docs/developer-guide/plugins/catalog-submission)
 #
 # Attribution: author/maintainer is the owner himself, GitHub `sanpeita`;

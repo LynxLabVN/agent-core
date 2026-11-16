@@ -1,4 +1,4 @@
-# Catalog entry for NousResearch/eir-agent: plugin-catalog/creature-workshop.yaml
+# Catalog entry for LynxLabVN/agent-core: plugin-catalog/creature-workshop.yaml
 # Pinned to the plugin's current commit; bump sha and version together.
 name: creature-workshop
 repo: https://github.com/creature-workshop/creature-workshop-plugin

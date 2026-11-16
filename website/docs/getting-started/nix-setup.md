@@ -63,17 +63,17 @@ No clone needed. Nix fetches, builds, and runs everything:
 
 ```bash
 # Run the desktop app
-nix run github:NousResearch/eir-agent#desktop
+nix run github:LynxLabVN/agent-core#desktop
 
 # Or install persistently
-nix profile install github:NousResearch/eir-agent#desktop
+nix profile install github:LynxLabVN/agent-core#desktop
 
 # run the tui
-nix run github:NousResearch/eir-agent -- setup
-nix run github:NousResearch/eir-agent -- --tui
+nix run github:LynxLabVN/agent-core -- setup
+nix run github:LynxLabVN/agent-core -- --tui
 
 # or install it in your profile
-nix profile install github:NousResearch/eir-agent
+nix profile install github:LynxLabVN/agent-core
 eir setup
 eir --tui
 ```
@@ -116,7 +116,7 @@ This module needs NixOS. Eir is an agent for one person. If you want an agent fo
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    eir-agent.url = "github:NousResearch/eir-agent";
+    eir-agent.url = "github:LynxLabVN/agent-core";
   };
 
   outputs = { nixpkgs, eir-agent, ... }: {
@@ -637,7 +637,7 @@ The option set is the same set that the NixOS module uses. It is `services.eir-a
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
-    eir-agent.url = "github:NousResearch/eir-agent";
+    eir-agent.url = "github:LynxLabVN/agent-core";
   };
 }
 ```
@@ -901,7 +901,7 @@ External flakes can override the package directly:
 
 ```nix
 {
-  inputs.eir-agent.url = "github:NousResearch/eir-agent";
+  inputs.eir-agent.url = "github:LynxLabVN/agent-core";
   outputs = { eir-agent, nixpkgs, ... }: {
     nixpkgs.overlays = [ eir-agent.overlays.default ];
     # Then:

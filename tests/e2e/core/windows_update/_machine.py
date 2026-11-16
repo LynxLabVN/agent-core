@@ -74,7 +74,7 @@ GATEWAY_READY_TIMEOUT = 240.0
 CANONICAL_URLS = (
     "https://github.com/LynxLabVN/agent-core.git",
     "https://github.com/LynxLabVN/agent-core",
-    "git@github.com:NousResearch/eir-agent.git",
+    "git@github.com:LynxLabVN/agent-core.git",
 )
 NEXT_MARKER = ".eir-e2e-next"
 # Captured before any machine strips PATH: harness plumbing (serve.git, rev-parse) only.

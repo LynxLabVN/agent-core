@@ -581,7 +581,7 @@ _OAUTH_SYSTEM_REPLACEMENTS = (
 )
 # The slug is rewritten only as a standalone prose word. Joined to a host, path, repo, mailbox
 # or quoted as an identifier (``eir-agent.nousresearch.com``, ``~/.eir/eir-agent/venv``,
-# ``NousResearch/eir-agent``, ``skill_view(name='eir-agent')``) it is an address the model
+# ``LynxLabVN/agent-core``, ``skill_view(name='eir-agent')``) it is an address the model
 # dereferences, and the rewritten form does not exist (#48860). The OPENING quote marks an
 # identifier; a sentence-final ``.`` or a possessive ``'s`` is prose.
 _OAUTH_SLUG_PATTERN = re.compile(r"""(?<![\w./:@'"`-])eir-agent(?![\w/@-]|\.\w)""")

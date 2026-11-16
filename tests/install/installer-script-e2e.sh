@@ -285,7 +285,7 @@ assert_redirect_is_transport_only() {
   # depending on the environment, and both are "the official URL" as far as
   # channel resolution is concerned.
   local official_https='https://github.com/LynxLabVN/agent-core.git'
-  local official_ssh='git@github.com:NousResearch/eir-agent.git'
+  local official_ssh='git@github.com:LynxLabVN/agent-core.git'
   local configured observed
   configured="$(git -C "$INSTALL_DIR" config --get remote.origin.url)"
   case "$configured" in
