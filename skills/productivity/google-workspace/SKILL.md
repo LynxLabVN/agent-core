@@ -13,7 +13,7 @@ required_credential_files:
 metadata:
   eir:
     tags: [Google, Gmail, Calendar, Drive, Sheets, Docs, Contacts, Email, OAuth]
-    homepage: https://github.com/NousResearch/hermes-agent
+    homepage: https://github.com/LynxLabVN/agent-core
     related_skills: [himalaya]
 ---
 

@@ -200,7 +200,7 @@ the eir-agent repo, so Nous has reviewed each entry before it shipped —
 `transport.command:` invocation.
 
 Manifests live at
-[`optional-mcps/<name>/manifest.yaml`](https://github.com/NousResearch/hermes-agent/tree/main/optional-mcps)
+[`optional-mcps/<name>/manifest.yaml`](https://github.com/LynxLabVN/agent-core/tree/main/optional-mcps)
 on GitHub. The picker also prints the manifest's `source:` URL at install
 time so you can quickly verify the upstream repo. The web dashboard's MCP
 page surfaces the same detail per catalog entry — transport, auth type, the
@@ -286,7 +286,7 @@ MCPs are never auto-updated. Re-run `eir mcp install <name>` to refresh
 after a Eir update if a manifest version changed.
 
 To add an MCP to the catalog, open a PR against
-[`optional-mcps/`](https://github.com/NousResearch/hermes-agent/tree/main/optional-mcps).
+[`optional-mcps/`](https://github.com/LynxLabVN/agent-core/tree/main/optional-mcps).
 
 ### Suggestion metadata (`suggest:`)
 

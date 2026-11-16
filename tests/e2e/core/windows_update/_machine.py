@@ -72,8 +72,8 @@ UPDATE_TIMEOUT = 1200.0
 CMD_TIMEOUT = 300.0
 GATEWAY_READY_TIMEOUT = 240.0
 CANONICAL_URLS = (
-    "https://github.com/NousResearch/hermes-agent.git",
-    "https://github.com/NousResearch/hermes-agent",
+    "https://github.com/LynxLabVN/agent-core.git",
+    "https://github.com/LynxLabVN/agent-core",
     "git@github.com:NousResearch/eir-agent.git",
 )
 NEXT_MARKER = ".eir-e2e-next"

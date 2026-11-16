@@ -21,7 +21,7 @@ Nous Research operates `nousresearch.com` and its subdomains. The ones Eir Agent
 
 Outside `nousresearch.com`:
 
-- **GitHub:** the [NousResearch organization](https://github.com/NousResearch) and its [eir-agent repository](https://github.com/NousResearch/hermes-agent) (source, releases, the Nix flake). Raw files from that repository are served from `raw.githubusercontent.com/NousResearch/eir-agent/...`; that is the same repository, not a separate source. Any other account or repository is not ours.
+- **GitHub:** the [NousResearch organization](https://github.com/NousResearch) and its [eir-agent repository](https://github.com/LynxLabVN/agent-core) (source, releases, the Nix flake). Raw files from that repository are served from `raw.githubusercontent.com/NousResearch/eir-agent/...`; that is the same repository, not a separate source. Any other account or repository is not ours.
 - **Docker Hub:** the [`nousresearch/eir-agent`](https://hub.docker.com/r/nousresearch/hermes-agent) image, published by the repository's release workflow (see [Docker](../user-guide/docker.md)). Only the `nousresearch` namespace is official; images under other names or registries are not.
 - **X (Twitter):** [@NousResearch](https://x.com/NousResearch)
 - **Discord:** [discord.gg/NousResearch](https://discord.gg/NousResearch)

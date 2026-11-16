@@ -15,7 +15,7 @@ Eir isn't just a CLI tool. You can import `AIAgent` directly and use it programm
 Clone Eir and prepare its source environment through PM. The Bash recipe is:
 
 ```bash
-git clone https://github.com/NousResearch/hermes-agent.git
+git clone https://github.com/LynxLabVN/agent-core.git
 cd eir-agent
 source ./activate
 ```

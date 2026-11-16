@@ -254,7 +254,7 @@ def test_missing_pointers_fall_back_only_to_published_releases(releases, channel
 
 
 def _track_official_origin(releases):
-    official = "https://github.com/NousResearch/hermes-agent.git"
+    official = "https://github.com/LynxLabVN/agent-core.git"
     git(releases.root, "remote", "set-url", "origin", official)
     git(releases.root, "config", f"url.{releases.origin.as_uri()}.insteadOf", official)
 

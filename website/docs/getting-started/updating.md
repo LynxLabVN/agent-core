@@ -543,7 +543,7 @@ A few situations stop with a message rather than carry on, because carrying on c
 eir --version
 ```
 
-Compare against the latest release at the [GitHub releases page](https://github.com/NousResearch/hermes-agent/releases).
+Compare against the latest release at the [GitHub releases page](https://github.com/LynxLabVN/agent-core/releases).
 
 ### Updating from Messaging Platforms
 

@@ -57,7 +57,7 @@ def test_no_open_issue_opens_one_with_the_watchdog_prefix(tmp_path):
     assert argv[5] == "[skills-index-watchdog] Skills index is stale or degraded (degraded)"
     body = argv[argv.index("--body") + 1]
     assert "**Status:** `degraded`\n**Detail:** github: 0 < 30" in body
-    assert "https://github.com/NousResearch/hermes-agent/actions/workflows/skills-index.yml" in body
+    assert "https://github.com/NousResearch/eir-agent/actions/workflows/skills-index.yml" in body
     assert all(c["token"] == "ghs_secret" and "ghs_secret" not in c["argv"] for c in calls)
 
 

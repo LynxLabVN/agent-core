@@ -83,7 +83,7 @@ the agent's own terminal and file tools can still reach sibling profiles
 (`~/.eir/profiles/*`). Different auth per profile's server
 does not change that. To keep people's data apart (family members,
 customers, teams), run each tenant's Eir as a **separate OS user** or in
-a **separate container**. See [SECURITY.md](https://github.com/NousResearch/hermes-agent/blob/main/SECURITY.md) §2.2.
+a **separate container**. See [SECURITY.md](https://github.com/LynxLabVN/agent-core/blob/main/SECURITY.md) §2.2.
 :::
 
 The **Chat** tab follows the switcher too: a scoped chat spawns its PTY

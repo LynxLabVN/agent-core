@@ -27,7 +27,7 @@ A quick search before you build saves your time and keeps the PR queue clean —
   gh search issues --repo NousResearch/eir-agent "<your terms>"
   gh search prs --repo NousResearch/eir-agent --state all "<your terms>"
   ```
-  Or use the web UI: [issues](https://github.com/NousResearch/hermes-agent/issues?q=) · [PRs (all states)](https://github.com/NousResearch/hermes-agent/pulls?q=is%3Apr).
+  Or use the web UI: [issues](https://github.com/LynxLabVN/agent-core/issues?q=) · [PRs (all states)](https://github.com/LynxLabVN/agent-core/pulls?q=is%3Apr).
 - **The issue tracker can lag the code.** Many requested features are already implemented in-tree, so also search the source (`search_files`, or your editor's grep) for the capability before proposing it.
 - **If an open PR already addresses it**, consider reviewing or improving that one instead of opening a competing duplicate.
 - **For larger work**, comment on the issue to signal you're working on it, so others don't start the same thing.
@@ -1072,7 +1072,7 @@ test(tools): add unit tests for file_operations
 
 ## Reporting Issues
 
-- Use [GitHub Issues](https://github.com/NousResearch/hermes-agent/issues)
+- Use [GitHub Issues](https://github.com/LynxLabVN/agent-core/issues)
 - Include: OS, Python version, Eir version (`eir --version`), full error traceback
 - Include steps to reproduce
 - Check existing issues before creating duplicates

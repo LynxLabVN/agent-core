@@ -164,5 +164,5 @@ A symlink to a divergent `node_modules` is worse than no install — the worktre
 - [Git Worktrees](../user-guide/git-worktrees.md) — the isolation model these helpers build on
 - [TUI](../user-guide/tui.md) — `eir --tui --dev` and the `EIR_TUI_DIR` prebuild path
 - [Desktop App](../user-guide/desktop.md) — building from source and the backend resolution ladder
-- [`apps/desktop/README.md`](https://github.com/NousResearch/hermes-agent/blob/main/apps/desktop/README.md) — dev server, sandbox script, and packaging
+- [`apps/desktop/README.md`](https://github.com/LynxLabVN/agent-core/blob/main/apps/desktop/README.md) — dev server, sandbox script, and packaging
 - [Environment Variables](../reference/environment-variables.md) — every `EIR_*` variable Eir reads

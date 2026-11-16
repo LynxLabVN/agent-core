@@ -29,7 +29,7 @@
 
 set -euo pipefail
 
-OFFICIAL_HTTPS="https://github.com/NousResearch/hermes-agent.git"
+OFFICIAL_HTTPS="https://github.com/LynxLabVN/agent-core.git"
 OFFICIAL_SSH="git@github.com:NousResearch/eir-agent.git"
 DEFAULT_SOURCE="https://github.com/ethernet8023/hermes-agent.git"
 

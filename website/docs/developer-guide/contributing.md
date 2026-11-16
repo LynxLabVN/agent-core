@@ -322,7 +322,7 @@ See [Package management](../reference/package-management.md) for PM commands and
 - **Comments**: Only when explaining non-obvious intent, trade-offs, or API quirks
 - **Error handling**: Catch specific exceptions. Use `logger.warning()`/`logger.error()` with `exc_info=True` for unexpected errors
 - **Cross-platform**: Never assume Unix (see below)
-- **Profile-safe paths**: Never hardcode `~/.eir` — use `get_eir_home()` from `eir_constants` for code paths and `display_eir_home()` for user-facing messages. See [AGENTS.md](https://github.com/NousResearch/hermes-agent/blob/main/AGENTS.md#profiles-multi-instance-support) for full rules.
+- **Profile-safe paths**: Never hardcode `~/.eir` — use `get_eir_home()` from `eir_constants` for code paths and `display_eir_home()` for user-facing messages. See [AGENTS.md](https://github.com/LynxLabVN/agent-core/blob/main/AGENTS.md#profiles-multi-instance-support) for full rules.
 
 ## Cross-Platform Compatibility
 
@@ -467,7 +467,7 @@ When you ask Eir to review a PR in a repository that has `.agents/checks/`, tell
 
 ## Reporting Issues
 
-- Use [GitHub Issues](https://github.com/NousResearch/hermes-agent/issues)
+- Use [GitHub Issues](https://github.com/LynxLabVN/agent-core/issues)
 - Include: OS, Python version, Eir version (`eir --version`), full error traceback
 - Include steps to reproduce
 - Check existing issues before creating duplicates
@@ -481,4 +481,4 @@ When you ask Eir to review a PR in a repository that has `.agents/checks/`, tell
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the [MIT License](https://github.com/NousResearch/hermes-agent/blob/main/LICENSE).
+By contributing, you agree that your contributions will be licensed under the [MIT License](https://github.com/LynxLabVN/agent-core/blob/main/LICENSE).

@@ -61,7 +61,7 @@ eir chat
 <summary><strong>从本地克隆构建</strong></summary>
 
 ```bash
-git clone https://github.com/NousResearch/hermes-agent.git
+git clone https://github.com/LynxLabVN/agent-core.git
 cd eir-agent
 nix build
 ./result/bin/eir setup

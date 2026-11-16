@@ -8,7 +8,7 @@ import { DirectiveContent } from './directive-text'
 
 const desktopWindow = window as unknown as { eirDesktop?: Window['eirDesktop'] }
 
-const PR_URL = 'https://github.com/NousResearch/hermes-agent/pull/107950'
+const PR_URL = 'https://github.com/LynxLabVN/agent-core/pull/107950'
 
 function installDesktopBridge() {
   const openExternal = vi.fn().mockResolvedValue(undefined)

@@ -12,7 +12,7 @@ import subprocess
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-OFFICIAL = "https://github.com/NousResearch/hermes-agent.git"
+OFFICIAL = "https://github.com/LynxLabVN/agent-core.git"
 
 pytestmark = pytest.mark.platforms("windows")
 

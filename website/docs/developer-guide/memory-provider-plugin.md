@@ -18,7 +18,7 @@ Eir discovers memory providers from four sources, in this precedence order:
 
 | Source | Location | Notes |
 |---|---|---|
-| Bundled | `plugins/memory/<name>/` | Ships with Eir. Closed to new providers — see [CONTRIBUTING](https://github.com/NousResearch/hermes-agent/blob/main/CONTRIBUTING.md). |
+| Bundled | `plugins/memory/<name>/` | Ships with Eir. Closed to new providers — see [CONTRIBUTING](https://github.com/LynxLabVN/agent-core/blob/main/CONTRIBUTING.md). |
 | User | `$EIR_HOME/plugins/<name>/` | Dropped in by the user, per profile. |
 | Project | `./.eir/plugins/<name>/` | Opt-in via `EIR_ENABLE_PROJECT_PLUGINS=1`. |
 | Package | `eir_agent.memory_providers` entry point | Distribution supplied by the installation owner; nothing to copy. |
