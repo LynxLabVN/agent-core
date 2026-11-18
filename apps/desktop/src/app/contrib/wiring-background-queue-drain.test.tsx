@@ -228,10 +228,14 @@ describe('ContribWiring background queue: independent remote owner', () => {
       // The queued row's id rides every drain so the gateway admits it at most once.
       submission_id: expect.any(String)
     })
-    expect.soft(fixture.remoteRequest).toHaveBeenCalledExactlyOnceWith('remote-healthy', 'worker', 'prompt.submit', {
-      session_id: 'rt-remote',
-      text: 'continue remotely'
-    })
+    // Scope the once-only claim to the submit: the titlebar readout pill also
+    // reads through this dispatcher (`session.context_breakdown`, a read-only
+    // estimate for the primary chat's meter).
+    const submits = (fixture.remoteRequest.mock.calls as unknown[][]).filter(call => call[2] === 'prompt.submit')
+
+    expect.soft(submits).toEqual([
+      ['remote-healthy', 'worker', 'prompt.submit', { session_id: 'rt-remote', text: 'continue remotely' }]
+    ])
     expect(getQueuedPrompts('stored-remote')).toHaveLength(0)
   })
 })

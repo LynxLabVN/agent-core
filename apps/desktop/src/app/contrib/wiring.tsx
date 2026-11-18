@@ -156,9 +156,7 @@ import {
   titlebarToolsWidthCss,
   TOUCH_TITLEBAR_HEIGHT
 } from '../shell/titlebar'
-import { TitlebarControls } from '../shell/titlebar-controls'
 import { useTouchTitlebar } from '../shell/use-touch-titlebar'
-import { WslgWindowControls } from '../shell/wslg-window-controls'
 import { UpdatesOverlay } from '../updates-overlay'
 
 import { ContribWiringContext } from './context'
@@ -179,6 +177,7 @@ import { McpInstallDeepLinkDialog } from './mcp-install-deeplink-dialog'
 import { useTitlebarToolContributions } from './panes'
 import { type AmbientGatewayRequest, createSessionRpcDispatcher } from './session-rpc-dispatcher'
 import { ChatRoutesSurface, SidebarSurface, StatusbarSurface, TerminalSurface } from './surfaces'
+import { TitlebarToolsBand } from './titlebar-tools-band'
 import type { WiringActions, WiringApi } from './types'
 import {
   useCreditsNoticeDemo,
@@ -1264,22 +1263,16 @@ export function ContribWiring({ children }: { children: ReactNode }) {
           } as CSSProperties
         }
       >
-        {/* HUD and the popped-out Browser have no titlebar to hang these off —
-            the clusters are `fixed`, so without this they'd float over the
-            surface as orphaned buttons. */}
-        {!isHudWindow() && !isBrowserWindow() && (
-          <TitlebarControls
-            leftTools={leftTitlebarTools}
-            onOpenSettings={() => navigate(SETTINGS_ROUTE)}
-            tools={rightTitlebarTools}
-          />
-        )}
-        {!isHudWindow() && customWindowControls && (
-          <WslgWindowControls
-            isFullscreen={Boolean(connection?.isFullscreen)}
-            isMaximized={Boolean(connection?.isMaximized)}
-          />
-        )}
+        <TitlebarToolsBand
+          customWindowControls={customWindowControls}
+          isFullscreen={Boolean(connection?.isFullscreen)}
+          isMaximized={Boolean(connection?.isMaximized)}
+          leftTools={leftTitlebarTools}
+          onOpenSettings={() => navigate(SETTINGS_ROUTE)}
+          onOpenSystem={() => openCommandCenterSection('system')}
+          requestGateway={requestGateway}
+          tools={rightTitlebarTools}
+        />
         {children}
       </div>
 

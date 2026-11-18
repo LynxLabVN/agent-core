@@ -48,9 +48,10 @@ const DESKTOP_BRIDGE_HANDLERS: Record<string, (ctx: GatewayEventContext) => void
     // Agent revealed a pane via the desktop-gated focus_pane tool, in
     // response to an explicit user request. Active session only — a
     // background turn must never move the user's focus (desktop AGENTS.md:
-    // offer, don't hijack).
+    // offer, don't hijack). `spotlight` lets the previous agent-revealed
+    // pane step aside (Simple; see revealDesktopPane).
     if (isActiveEvent) {
-      revealDesktopPane(payload?.pane ?? '')
+      revealDesktopPane(payload?.pane ?? '', { spotlight: true })
     }
   },
 

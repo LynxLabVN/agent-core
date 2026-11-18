@@ -1,9 +1,10 @@
 import { setTerminalTakeover } from '@/app/right-sidebar/store'
 import { isLayoutNode, type LayoutNode } from '@/components/pane-shell/tree/model'
 import { applyLayoutPreset, LAYOUTS_AREA } from '@/components/pane-shell/tree/presets'
-import { revealTreePane } from '@/components/pane-shell/tree/store'
+import { closeTreePane, revealTreePane } from '@/components/pane-shell/tree/store'
 import { registry } from '@/contrib/registry'
 
+import { $interfaceMode } from './interface-mode'
 import { setFileBrowserOpen, setSidebarOpen } from './layout'
 import { openReview } from './review'
 
@@ -30,12 +31,28 @@ const TREE_PANE_OF: Record<string, string> = {
   terminal: 'terminal'
 }
 
-/** Reveal a desktop pane by name. Returns false for an unknown pane. */
-export function revealDesktopPane(pane: string): boolean {
+// D2 spotlight: the agent's attention moves across the right-hand panes, and
+// the pane it revealed last steps aside when it reveals another — so at most
+// one agent-driven pane is ever open. Simple-only (in Advanced these are the
+// user's chrome), and only explicit agent reveals count (`spotlight: true`
+// from the active session's `pane.reveal`): a tour or layout pick, or a pane
+// the user opened, is never auto-closed.
+const SPOTLIGHT_PANES = new Set(['files', 'review', 'terminal'])
+let agentSpotlight: string | null = null
+
+/** Reveal a desktop pane by name. Returns false for an unknown pane.
+ *  `spotlight` marks an agent-driven reveal (see above). */
+export function revealDesktopPane(pane: string, options?: { spotlight?: boolean }): boolean {
   const reveal = PANE_REVEALERS[pane]
 
   if (!reveal) {
     return false
+  }
+
+  const spotlight = options?.spotlight === true && SPOTLIGHT_PANES.has(pane) && $interfaceMode.get() === 'simple'
+
+  if (spotlight && agentSpotlight && agentSpotlight !== pane) {
+    closeTreePane(agentSpotlight)
   }
 
   reveal()
@@ -44,6 +61,10 @@ export function revealDesktopPane(pane: string): boolean {
 
   if (treePane) {
     revealTreePane(treePane)
+  }
+
+  if (spotlight) {
+    agentSpotlight = pane
   }
 
   return true
