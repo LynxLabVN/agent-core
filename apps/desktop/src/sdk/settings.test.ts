@@ -5,6 +5,7 @@ import { host } from '@/sdk'
 import { $backdrop, setBackdrop } from '@/store/backdrop'
 import { $chatTextScale, setChatTextScale } from '@/store/chat-text-scale'
 import { $composerPopoutGesturesEnabled, setComposerPopoutGesturesEnabled } from '@/store/composer-popout'
+import { $interfaceMode } from '@/store/interface-mode'
 import { $introSplash, setIntroSplash } from '@/store/intro-splash'
 import { $reasoningCollapsedByDefault, setReasoningCollapsedByDefault } from '@/store/reasoning-disclosure'
 import { $sessionListDensity, setSessionListDensity } from '@/store/session-list-density'
@@ -22,6 +23,9 @@ const resetSettings = () => {
 
 describe('host.settings', () => {
   beforeEach(() => {
+    // The persistence contract is Advanced's: in Simple the mode shadows these
+    // surfaces and an SDK write is a session reveal, not a stored value.
+    $interfaceMode.set('advanced')
     resetSettings()
   })
 

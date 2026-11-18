@@ -1,9 +1,10 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, beforeEach, expect, it } from 'vitest'
 
 import { $backgroundStatusBySession } from '@/store/composer-status'
 import { $goalsBySession } from '@/store/goals'
+import { setInterfaceMode } from '@/store/interface-mode'
 import { $sessionControlBySession } from '@/store/session-control'
 import { $subagentsBySession, upsertSubagent } from '@/store/subagents'
 import { $todosBySession, clearSessionTodos, restoreSessionTodosFromSnapshot } from '@/store/todos'
@@ -33,6 +34,12 @@ const stack = (parked = false) => (
   </MemoryRouter>
 )
 
+beforeEach(() => {
+  // The subagent group is Advanced-tier (Simple keeps the stack to goals and
+  // todos); these group-set contracts pin the Advanced surface.
+  setInterfaceMode('advanced')
+})
+
 afterEach(() => {
   cleanup()
   $backgroundStatusBySession.set({})
@@ -41,6 +48,7 @@ afterEach(() => {
   $subagentsBySession.set({})
   $todosBySession.set({})
   clearSessionTodos('owner')
+  setInterfaceMode('simple')
 })
 
 it('offers a collapsed read-only checklist from an idle session, without a running spinner', () => {

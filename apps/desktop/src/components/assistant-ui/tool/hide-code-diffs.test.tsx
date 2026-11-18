@@ -2,6 +2,7 @@ import type { ThreadMessage } from '@assistant-ui/react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it } from 'vitest'
 
+import { setInterfaceMode } from '@/store/interface-mode'
 import { $hideCodeDiffs, $toolDisclosureStates, setHideCodeDiffs, setToolViewMode } from '@/store/tool-view'
 
 import { assistantMessage, stubThreadEnvironment, stubThreadViewportSize, ThreadRuntime } from '../test-utils'
@@ -31,6 +32,9 @@ function editMessage(toolName: string, failed = false): ThreadMessage {
 }
 
 beforeEach(() => {
+  // Disclosure is toggleable only in Advanced: Simple rests hideCodeDiffs on
+  // by policy, so this suite's on/off contract pins the Advanced scope.
+  setInterfaceMode('advanced')
   $toolDisclosureStates.set({})
   setHideCodeDiffs(false)
   setToolViewMode('product')
@@ -41,6 +45,7 @@ afterEach(() => {
   setHideCodeDiffs(false)
   setToolViewMode('product')
   $toolDisclosureStates.set({})
+  setInterfaceMode('simple')
 })
 
 it('keeps edit counts without code in either display mode and restores disclosure when disabled', async () => {

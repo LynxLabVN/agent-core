@@ -116,6 +116,9 @@ describe.each([
 
   beforeAll(async () => {
     host = await importHost(webapp)
+    // The one-door contract is Advanced's: Simple hides the rail unless the
+    // install has several profiles, and shadows the statusbar entirely.
+    ;(await import('@/store/interface-mode')).setInterfaceMode('advanced')
   })
 
   afterAll(() => {

@@ -53,6 +53,9 @@ describe('enforced dock (stacked Bots pane → sessions-zone tab, every boot)', 
 
   async function setupTree(initialTree: object, options: { routines?: boolean } = {}) {
     window.localStorage.setItem(TREE_KEY, JSON.stringify(initialTree))
+    // The boot invariant under test is Advanced's: Simple keeps a different
+    // resting tree, so the persisted shape wouldn't be adopted verbatim.
+    ;(await import('@/store/interface-mode')).setInterfaceMode('advanced')
 
     const tree = await import('@/components/pane-shell/tree/store')
     const model = await import('@/components/pane-shell/tree/model')

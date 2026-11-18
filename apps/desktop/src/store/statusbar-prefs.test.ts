@@ -10,16 +10,25 @@ describe('statusbar whole-bar visibility', () => {
     vi.resetModules()
   })
 
-  it('shows the bar on a fresh install and for installs that hid it under the v1 key', async () => {
+  it('rests hidden on a fresh install (Simple) and shows in Advanced, honouring a legacy v1 hide', async () => {
+    const { $interfaceMode } = await import('./interface-mode')
+
+    // Chat-first default: a fresh install never shows the bar.
+    expect((await loadStore()).$statusbarVisible.get()).toBe(false)
+    expect($interfaceMode.get()).toBe('simple')
+
+    // The user's own answer exists only in Advanced — including an install
+    // that hid the bar under the v1 key before the migration.
     window.localStorage.setItem(LEGACY_VISIBLE_KEY, 'false')
+    $interfaceMode.set('advanced')
 
-    const { $statusbarVisible } = await loadStore()
-
-    expect($statusbarVisible.get()).toBe(true)
+    expect((await loadStore()).$statusbarVisible.get()).toBe(true)
   })
 
   it('still honours a hide made after the update', async () => {
     const first = await loadStore()
+    const { $interfaceMode } = await import('./interface-mode')
+    $interfaceMode.set('advanced')
 
     first.toggleStatusbarVisible()
     expect(first.$statusbarVisible.get()).toBe(false)

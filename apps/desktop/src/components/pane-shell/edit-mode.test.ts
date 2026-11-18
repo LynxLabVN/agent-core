@@ -16,6 +16,8 @@ describe('$layoutEditRevealsHidden', () => {
     const { $layoutEditMode, $layoutEditRevealsHidden } = await import('./edit-mode')
     const { setInterfaceMode } = await import('@/store/interface-mode')
 
+    // Simple is the default now; the reveal contract lives in Advanced.
+    setInterfaceMode('advanced')
     expect($layoutEditRevealsHidden.get()).toBe(false)
 
     $layoutEditMode.set(true)

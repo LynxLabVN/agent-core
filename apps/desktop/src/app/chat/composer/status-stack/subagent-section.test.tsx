@@ -1,7 +1,8 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
+import { setInterfaceMode } from '@/store/interface-mode'
 import { $subagentsBySession, upsertSubagent } from '@/store/subagents'
 
 import { ComposerStatusStack } from './index'
@@ -17,9 +18,15 @@ vi.stubGlobal(
   }
 )
 
+beforeEach(() => {
+  // The subagent group is Advanced-tier; this section contract pins it.
+  setInterfaceMode('advanced')
+})
+
 afterEach(() => {
   cleanup()
   $subagentsBySession.set({})
+  setInterfaceMode('simple')
 })
 
 it('shows live work only from the composer session and keeps it hidden after collapse and progress', () => {

@@ -1,8 +1,9 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 import * as gateway from '@/store/gateway'
+import { setInterfaceMode } from '@/store/interface-mode'
 import { _resetSessionOwnerHintsForTests, setSessionOwnerHint } from '@/store/session'
 import { $subagentsBySession, upsertSubagent } from '@/store/subagents'
 
@@ -17,10 +18,16 @@ vi.stubGlobal(
   }
 )
 Element.prototype.animate = vi.fn(() => ({ cancel() {} }) as Animation)
+beforeEach(() => {
+  // The subagent group is Advanced-tier; this hydration contract pins it.
+  setInterfaceMode('advanced')
+})
+
 afterEach(() => {
   cleanup()
   $subagentsBySession.set({})
   _resetSessionOwnerHintsForTests()
+  setInterfaceMode('simple')
   vi.restoreAllMocks()
 })
 

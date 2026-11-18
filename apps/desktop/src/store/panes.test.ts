@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
+import { setInterfaceMode } from './interface-mode'
 import {
   $paneOpen,
   $paneStates,
@@ -16,6 +17,10 @@ const STORAGE_KEY = 'eir.desktop.paneStates.v1'
 
 describe('panes store', () => {
   beforeEach(() => {
+    // The raw-key persistence contract is Advanced's: Simple scopes pane state
+    // to `<key>.simple`, so these tests pin the mode they are about — via the
+    // setter, which also switches the layout storage scope.
+    setInterfaceMode('advanced')
     $paneStates.set({})
     window.localStorage.clear()
   })

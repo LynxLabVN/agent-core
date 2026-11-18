@@ -13,7 +13,10 @@ afterEach(cleanup)
 it.each([false, true])('restores floating geometry and collapse with keep-alive=%s', async keepAlive => {
   window.localStorage.clear()
   vi.resetModules()
+  // One-time continuity migration copies raw keys into the Simple scope, so
+  // seed BOTH: Advanced geometry and a distinct Simple one to swap against.
   window.localStorage.setItem('eir.desktop.floatingPanes.v1', JSON.stringify({ card: { x: 37, y: 71 } }))
+  window.localStorage.setItem('eir.desktop.floatingPanes.v1.simple', JSON.stringify({ card: { x: 12, y: 34 } }))
   const { registry } = await import('@/contrib/registry')
   const { setInterfaceMode } = await import('@/store/interface-mode')
   const { FloatingPanes } = await import('./floating-panes')
@@ -27,6 +30,9 @@ it.each([false, true])('restores floating geometry and collapse with keep-alive=
   })
 
   try {
+    // Simple is the default boot now; the first restore assertions are the
+    // Advanced geometry (the raw keys), so pin it for the opening read.
+    setInterfaceMode('advanced')
     const view = render(<FloatingPanes />)
     const card = () => view.container.querySelector<HTMLElement>('[data-floating-pane="card"]')!
     expect(card().style.left).toBe('37px')

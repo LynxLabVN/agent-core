@@ -38,8 +38,12 @@ function sessionsBotsTree() {
   )
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   window.localStorage.clear()
+  // The raw-key persistence assertions are Advanced's: Simple scopes the
+  // store's writes to `<key>.simple`.
+  const { setInterfaceMode } = await import('@/store/interface-mode')
+  setInterfaceMode('advanced')
   $hiddenStripTabs.set(new Set())
   $hiddenTreePanes.set(new Set())
   vi.mocked(notify).mockReset()

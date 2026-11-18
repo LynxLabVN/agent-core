@@ -9,6 +9,7 @@ import { $narrowOverlayPaneIds } from '@/components/pane-shell/narrow-overlay-st
 import { $narrowViewport } from '@/components/pane-shell/tree/store'
 import { registry } from '@/contrib/registry'
 import { I18nProvider } from '@/i18n'
+import { setInterfaceMode } from '@/store/interface-mode'
 import { $fileBrowserOpen, $leftSideOpen, CHAT_SIDEBAR_PANE_ID, FILE_BROWSER_PANE_ID } from '@/store/layout'
 import { REVIEW_PANE_ID } from '@/store/review'
 import { setTitlebarAppActionsSide } from '@/store/titlebar-app-actions'
@@ -194,6 +195,9 @@ describe('TitlebarControls fixed clusters', () => {
 
 describe('titlebar app-action cluster', () => {
   beforeEach(() => {
+    // These contracts pin Advanced chrome (the right-sidebar and HUD flips are
+    // Simple-hidden); the setter also switches the layout storage scope.
+    setInterfaceMode('advanced')
     vi.stubGlobal('eirDesktop', { ...window.eirDesktop, hud: { open: vi.fn() } })
   })
 
@@ -201,6 +205,7 @@ describe('titlebar app-action cluster', () => {
     $narrowViewport.set(false)
     $narrowOverlayPaneIds.set(new Set())
     setTitlebarAppActionsSide('right')
+    setInterfaceMode('simple')
     cleanup()
     vi.unstubAllGlobals()
     delete window.document.documentElement.dataset.eirDesktopHost

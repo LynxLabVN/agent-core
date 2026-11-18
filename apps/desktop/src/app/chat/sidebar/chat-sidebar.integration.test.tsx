@@ -8,6 +8,7 @@ import { $layoutTree, noteActiveTreeGroup } from '@/components/pane-shell/tree/s
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { registry } from '@/contrib/registry'
 import { $connectionsRegistry } from '@/store/connection-registry-state'
+import { setInterfaceMode } from '@/store/interface-mode'
 import {
   $pinnedSessionIds,
   $sidebarMessagingOpenIds,
@@ -97,6 +98,9 @@ describe('ChatSidebar navigation activity', () => {
   let disposeContributions: () => void
 
   beforeEach(() => {
+    // The Messaging row is Advanced-tier (Simple keeps the nav to chat-first
+    // surfaces); this suite pins the full nav contract.
+    setInterfaceMode('advanced')
     disposeContributions = registry.registerMany([
       { area: ROUTES_AREA, id: 'kanban-page', data: { path: '/kanban' }, render: () => null },
       { area: ROUTES_AREA, id: 'reports-page', data: { path: '/reports' }, render: () => null },
@@ -119,6 +123,7 @@ describe('ChatSidebar navigation activity', () => {
   afterEach(() => {
     cleanup()
     disposeContributions()
+    setInterfaceMode('simple')
     $selectedStoredSessionId.set(null)
     $sessions.set([])
     $removedSessionIds.set(new Set())

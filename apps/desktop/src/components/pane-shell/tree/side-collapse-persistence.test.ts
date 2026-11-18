@@ -6,6 +6,9 @@ import { LAYOUT_KEYS } from '@/lib/layout-persistence'
  * workspace is available; Files keeps its own toggle, independent of its side. */
 async function boot() {
   vi.resetModules()
+  // The persistence contract under test is Advanced's: raw keys, chrome
+  // defaults. Simple scopes every write to `<key>.simple`.
+  ;(await import('@/store/interface-mode')).setInterfaceMode('advanced')
   const tree = await import('./store')
   const model = await import('./model')
   const layout = await import('@/store/layout')

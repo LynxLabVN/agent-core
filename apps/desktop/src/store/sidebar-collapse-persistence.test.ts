@@ -4,6 +4,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // the REAL stores, then re-import them (fresh module state reading persisted
 // localStorage) to simulate a ⌃R reload. `bind` mirrors the controller wiring.
 async function loadStores() {
+  // These tests pin the Advanced persistence contract: the raw keys they
+  // assert are the Advanced scope, while Simple scopes to `<key>.simple`.
+  ;(await import('./interface-mode')).setInterfaceMode('advanced')
   const layout = await import('./layout')
   const tree = await import('@/components/pane-shell/tree/store')
 
