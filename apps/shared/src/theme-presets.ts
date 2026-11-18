@@ -549,6 +549,71 @@ export const THEME_PRESET_PALETTES = {
       userBubble: '#1e2a38',
       userBubbleBorder: '#2e4060'
     }
+  },
+  // Claude — warm cream neutrals carrying Eir's gold. First-party (like
+  // nous-alt): light must darken the brand gold, because #D89B04 reads ~2:1 on
+  // cream — the same problem the CLI's goldenrod ladder documents — so the
+  // accent drops to #8a6508 (~4.6:1 on the sand sidebar, ~5:1 on the canvas,
+  // white ink 5.3:1 on it). Dark lifts the gold instead, mirroring nous's
+  // #0053fd → #4a84fe move: #e3b341 clears ~7.7:1 on the warm dark surfaces
+  // and takes dark ink (#1f1e1d, 8.5:1) rather than white.
+  claude: {
+    colors: {
+      background: '#faf9f5',
+      foreground: '#141413',
+      card: '#f0eee6',
+      cardForeground: '#141413',
+      muted: '#f0eee6',
+      mutedForeground: '#6b6a5e',
+      popover: '#ffffff',
+      popoverForeground: '#141413',
+      primary: '#8a6508',
+      primaryForeground: '#ffffff',
+      secondary: '#f2ead3',
+      secondaryForeground: '#141413',
+      accent: '#f3efe0',
+      accentForeground: '#141413',
+      border: '#e3dfd2',
+      input: '#ffffff',
+      ring: '#8a6508',
+      midground: '#8a6508',
+      midgroundForeground: '#ffffff',
+      composerRing: '#8a6508',
+      destructive: '#c2410c',
+      destructiveForeground: '#ffffff',
+      sidebarBackground: '#f0eee6',
+      sidebarBorder: '#e3dfd2',
+      userBubble: '#f2ead3',
+      userBubbleBorder: '#e3dfd2'
+    },
+    darkColors: {
+      background: '#262624',
+      foreground: '#f0eee6',
+      card: '#30302e',
+      cardForeground: '#f0eee6',
+      muted: '#343430',
+      mutedForeground: '#a6a294',
+      popover: '#2e2e2b',
+      popoverForeground: '#f0eee6',
+      primary: '#e3b341',
+      primaryForeground: '#1f1e1d',
+      secondary: '#403a26',
+      secondaryForeground: '#ece7d6',
+      accent: '#3a3627',
+      accentForeground: '#ece7d6',
+      border: '#3f3e37',
+      input: '#2e2e2b',
+      ring: '#e3b341',
+      midground: '#e3b341',
+      midgroundForeground: '#1f1e1d',
+      composerRing: '#e3b341',
+      destructive: '#d4674f',
+      destructiveForeground: '#1f1e1d',
+      sidebarBackground: '#1f1e1d',
+      sidebarBorder: '#35342f',
+      userBubble: '#353024',
+      userBubbleBorder: '#453f2e'
+    }
   }
 } satisfies Record<string, ThemePresetPalette>
 

@@ -441,7 +441,22 @@ export const slateTheme: DesktopTheme = {
   }
 }
 
+/**
+ * Claude — warm cream neutrals carrying Eir's gold, the palette behind the
+ * chat-first shell. First-party (like nous-alt). Typography stays Eir's own
+ * defaults; the palette alone carries the look. `DEFAULT_SKIN_NAME` still
+ * points at nous until the shell lands — see #76579 for why the switch is a
+ * deliberate follow-up, not a line in this file.
+ */
+export const claudeTheme: DesktopTheme = {
+  name: 'claude',
+  label: 'Claude',
+  description: 'Warm cream neutrals with the Eir gold accent',
+  ...THEME_PRESET_PALETTES.claude
+}
+
 export const BUILTIN_THEMES: Record<string, DesktopTheme> = {
+  claude: claudeTheme,
   nous: nousTheme,
   github: githubTheme,
   catppuccin: catppuccinTheme,
