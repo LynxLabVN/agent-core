@@ -70,6 +70,7 @@ import {
   closeCommandPalette,
   setCommandPaletteOpen
 } from '@/store/command-palette'
+import { $desktopExtras } from '@/store/desktop-extras'
 import { completeFlow, recordAction } from '@/store/desktop-metrics'
 import { $bindings, bindingsFor } from '@/store/keybinds'
 import { $dismissedAutoProjectIds, $pinnedSessionIds, filterVisibleProjects } from '@/store/layout'
@@ -559,6 +560,7 @@ function CommandPaletteBody({ onExited }: { onExited: () => void }) {
   const { t } = useI18n()
   const pendingPage = useStore($commandPalettePage)
   const pendingSeed = useStore($commandPaletteSeed)
+  const extras = useStore($desktopExtras)
   const bindings = useStore($bindings)
   const worktrees = useStore($repoWorktrees)
   const projectTree = useStore($projectTree)
@@ -880,13 +882,19 @@ function CommandPaletteBody({ onExited }: { onExited: () => void }) {
           },
           { action: 'nav.profiles', icon: Users, id: 'nav-profiles', label: t.profiles.title, run: go(PROFILES_ROUTE) },
           { action: 'nav.agents', icon: Cpu, id: 'nav-agents', label: t.agents.title, run: go(AGENTS_ROUTE) },
-          {
-            icon: Starmap,
-            id: 'nav-starmap',
-            keywords: ['star map', 'memory', 'memories', 'skills', 'graph', 'learning', 'constellation'],
-            label: t.starmap.title,
-            run: go(STARMAP_ROUTE)
-          }
+          // Starmap rests with the extras: hidden from discovery until
+          // `desktop.extras` opts the profile back in.
+          ...(extras
+            ? [
+                {
+                  icon: Starmap,
+                  id: 'nav-starmap',
+                  keywords: ['star map', 'memory', 'memories', 'skills', 'graph', 'learning', 'constellation'],
+                  label: t.starmap.title,
+                  run: go(STARMAP_ROUTE)
+                }
+              ]
+            : [])
         ]
       },
       projectGroup,
@@ -1000,20 +1008,26 @@ function CommandPaletteBody({ onExited }: { onExited: () => void }) {
             label: cc.changeColorMode,
             to: 'color-mode'
           },
-          {
-            icon: PawPrint,
-            id: 'appearance-pets',
-            keywords: ['pet', 'petdex', 'mascot', 'pets', '/pet', 'paw'],
-            label: cc.pets.title,
-            to: 'pets'
-          },
-          {
-            icon: Egg,
-            id: 'appearance-generate-pet',
-            keywords: ['pet', 'generate', 'create', 'make', 'new pet', 'mascot', 'hatch', 'ai'],
-            label: cc.generatePet.title,
-            run: () => openPetGenerate()
-          }
+          // Petdex rests with the extras: both rows hide until
+          // `desktop.extras` opts the profile back in.
+          ...(extras
+            ? [
+                {
+                  icon: PawPrint,
+                  id: 'appearance-pets',
+                  keywords: ['pet', 'petdex', 'mascot', 'pets', '/pet', 'paw'],
+                  label: cc.pets.title,
+                  to: 'pets'
+                },
+                {
+                  icon: Egg,
+                  id: 'appearance-generate-pet',
+                  keywords: ['pet', 'generate', 'create', 'make', 'new pet', 'mascot', 'hatch', 'ai'],
+                  label: cc.generatePet.title,
+                  run: () => openPetGenerate()
+                }
+              ]
+            : [])
         ]
       },
       {

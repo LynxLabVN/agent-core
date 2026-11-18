@@ -6,6 +6,7 @@ import { BUILTIN_PERSONALITIES, normalizePersonalityValue, personalityNamesFromC
 import { composerServiceTier } from '@/lib/model-status-label'
 import { normalize } from '@/lib/text'
 import { $busyInputConfig, busyInputOwnerKey, normalizeBusyInputMode } from '@/store/busy-input-mode'
+import { publishDesktopExtras } from '@/store/desktop-extras'
 import { setDisplayTimestampsFromConfig } from '@/store/display-timestamps'
 import { $activeGatewayProfile } from '@/store/profile'
 import { localShowReasoning, setShowReasoningFromConfig } from '@/store/reasoning-disclosure'
@@ -84,6 +85,8 @@ export function useEirConfig({ activeSessionIdRef }: EirConfigOptions) {
         if (!canPublish()) {
           return
         }
+
+        publishDesktopExtras(config)
 
         const personality = normalizePersonalityValue(
           typeof config.display?.personality === 'string' ? config.display.personality : ''

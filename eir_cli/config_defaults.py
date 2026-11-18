@@ -1,3 +1,4 @@
+# health: allow FILE_LINES -- config defaults: the chat-first shell's one-key `desktop.extras` opt-in (pet + starmap) with its rationale comment; this pure-data defaults table grows only with new keys and holds no functions to extract
 """Default configuration data for Eir Agent: DEFAULT_CONFIG and OPTIONAL_ENV_VARS.
 
 Pure-data leaf module — must not import from eir_cli.config. Comments are the user-facing
@@ -2609,6 +2610,9 @@ DEFAULT_CONFIG = {
         # missing or broken. Empty = System32 OpenSSH, then Git for Windows' ssh.exe, then PATH.
         # Read by the app before its first window; restart to apply. Ignored off-Windows.
         "ssh_path": "",
+        # Whimsy gate: the petdex mascot and the starmap rest out of the chat-first
+        # shell unless this is true. One-line opt back in.
+        "extras": False,
         # Auto-continue a turn killed by a crash: resuming re-submits the interrupted prompt if
         # fresh; a stale one just shows the recovered partial transcript.
         "auto_continue": {

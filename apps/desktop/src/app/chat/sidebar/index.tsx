@@ -225,15 +225,16 @@ const SIDEBAR_NAV: SidebarNavItem[] = [
     route: CAPABILITIES_ROUTE,
     keybindActionId: 'nav.capabilities'
   },
+  // Messaging is setup machinery: Advanced keeps its row, Simple uses ⌘K.
   {
     id: 'messaging',
     label: '',
     icon: props => <Codicon name="comment" {...props} />,
     route: MESSAGING_ROUTE,
-    keybindActionId: 'nav.messaging'
+    keybindActionId: 'nav.messaging',
+    tier: 'advanced'
   },
-  // Artifacts and Scheduled jobs are outputs of running Eir the developer
-  // way; Capabilities and Messaging are how anyone sets it up.
+  // Artifacts are outputs of running Eir the developer way; Scheduled sits beside Sessions.
   {
     id: 'artifacts',
     label: '',
@@ -247,8 +248,7 @@ const SIDEBAR_NAV: SidebarNavItem[] = [
     label: '',
     icon: props => <Codicon name="watch" {...props} />,
     route: CRON_ROUTE,
-    keybindActionId: 'nav.cron',
-    tier: 'advanced'
+    keybindActionId: 'nav.cron'
   }
 ]
 

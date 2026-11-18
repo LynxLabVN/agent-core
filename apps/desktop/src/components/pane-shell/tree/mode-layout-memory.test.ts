@@ -164,10 +164,9 @@ it.each(['advanced', 'simple'] as const)(
     window.localStorage.setItem('eir.desktop.paneStates.v1', JSON.stringify(legacyPanes))
     window.localStorage.setItem('eir.desktop.layoutPreset.active', 'custom')
     window.localStorage.setItem('eir.desktop.hiddenStripTabs.v1', '["bots"]')
-
-    if (initialMode === 'simple') {
-      window.localStorage.setItem('eir.desktop.interfaceMode.v1', 'simple')
-    }
+    // The mode under test is pinned, not defaulted: Simple is now the default
+    // mode, so a record-less boot can't stand in for legacy Advanced anymore.
+    window.localStorage.setItem('eir.desktop.interfaceMode.v1', initialMode)
 
     const { mode, tree, panes, layout } = await boot()
     expect(mode.$interfaceMode.get()).toBe(initialMode)

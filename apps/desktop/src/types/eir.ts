@@ -497,6 +497,9 @@ export interface EirConfig {
   }
   desktop?: {
     font_family?: string
+    /** Whimsy gate: the petdex mascot and the starmap rest out of the
+     *  chat-first shell unless this is true (plan D1). */
+    extras?: boolean
     repo_scan_enabled?: boolean
     repo_scan_roots?: string[]
     repo_scan_exclude_paths?: string[]

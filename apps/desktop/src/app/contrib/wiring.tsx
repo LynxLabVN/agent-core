@@ -44,6 +44,7 @@ import { $desktopBoot } from '@/store/boot'
 import { requestVoiceConversationStart } from '@/store/composer'
 import { $activeConnectionId } from '@/store/connections'
 import { $cronReviewRequest, setCronFocusJobId } from '@/store/cron'
+import { $desktopExtras } from '@/store/desktop-extras'
 import { reconnectGateway } from '@/store/gateway-reconnect'
 import { $interfaceMode, shownInMode } from '@/store/interface-mode'
 import { $pinnedSessionIds, pinSession, restoreWorktree, unpinSession } from '@/store/layout'
@@ -394,6 +395,9 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     toggleCommandCenter,
     webhooksOpen
   } = useOverlayRouting()
+
+  // The whimsy gate: petdex + starmap rest unless `desktop.extras` is true.
+  const extras = useStore($desktopExtras)
 
   const {
     activeSessionIdRef,
@@ -1401,7 +1405,9 @@ export function ContribWiring({ children }: { children: ReactNode }) {
         </Suspense>
       )}
 
-      {starmapOpen && (
+      {/* Starmap rests unless the profile opted into `desktop.extras`; a
+          stale open request no-ops instead of mounting the overlay. */}
+      {starmapOpen && extras && (
         <Suspense fallback={null}>
           <StarmapView onClose={closeOverlayToPreviousRoute} />
         </Suspense>
@@ -1423,7 +1429,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
 
       {/* Petdex floating mascot — renders nothing unless installed + enabled.
           Never in the HUD: that window is the chat bar and nothing else. */}
-      {!isHudWindow() && !isBrowserWindow() && <FloatingPet />}
+      {!isHudWindow() && !isBrowserWindow() && extras && <FloatingPet />}
 
       {/* In-app tips. Renders nothing until the app is quiet and has something
           to point at, and nothing at all once they're off or all retired. The

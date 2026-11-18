@@ -39,14 +39,20 @@ export type InterfaceMode = 'advanced' | 'simple'
 /** Picker order — the quiet option first. */
 export const INTERFACE_MODES: readonly InterfaceMode[] = ['simple', 'advanced']
 
-export const DEFAULT_INTERFACE_MODE: InterfaceMode = 'advanced'
+// Chat-first is the DEFAULT (plan D1, 2026-11): a fresh or existing install
+// opens on the conversation — statusbar, standing panes and the Advanced
+// sidebar rows rest. Advanced is one click in the picker and persists from
+// then on (encode below), so the flip costs an existing power user exactly
+// one click, not their setup: mode shadows preferences, never rewrites them.
+export const DEFAULT_INTERFACE_MODE: InterfaceMode = 'simple'
 
 const INTERFACE_MODE_STORAGE_KEY = 'eir.desktop.interfaceMode.v1'
 
-// Advanced is the ABSENCE of a mode: encoded as "no key" so a user who never
-// touched the picker never gains a record, and clearing the key means Advanced.
+// Simple is the ABSENCE of a mode: encoded as "no key" so a user who never
+// touched the picker never gains a record, and clearing the key means Simple.
+// Advanced IS a record — one click, persisted forever after.
 const modeCodec: Codec<InterfaceMode> = {
-  decode: raw => (raw === 'simple' ? 'simple' : DEFAULT_INTERFACE_MODE),
+  decode: raw => (raw === 'simple' || raw === 'advanced' ? raw : DEFAULT_INTERFACE_MODE),
   encode: mode => (mode === DEFAULT_INTERFACE_MODE ? null : mode)
 }
 
