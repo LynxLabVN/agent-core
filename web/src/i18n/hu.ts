@@ -50,7 +50,7 @@ export const hu: Translations = {
   },
 
   app: {
-    brand: "Hermes Agent",
+    brand: "Eir",
     brandShort: "HA",
     closeNavigation: "Navigáció bezárása",
     closeModelTools: "Modell és eszközök bezárása",
@@ -92,18 +92,9 @@ export const hu: Translations = {
     webUi: "Web UI",
   },
 
-  // ── System page: Memory section ──
-  systemMemory: {
-    activeProvider: "Aktív memóriaszolgáltató",
-    noProvider: "nincs — csak beépített",
-    builtinLayer: "Beépített réteg",
-    builtinNote: "A MEMORY.md és a USER.md a Hermes saját memóriája, független minden külső szolgáltatótól. Alapértelmezés szerint mindkettő betöltődik a munkamenetekbe; a (memory.memory_enabled / memory.user_profile_enabled) beállítások külön-külön kikapcsolják őket. A szolgáltató kiegészíti őket, de sosem helyettesíti.",
-  },
-
   status: {
     actionFailed: "Művelet sikertelen",
     actionFinished: "Befejezve",
-    actionFinishedOwed: "Frissítve, de még függőben (futtasd újra a `hermes update` parancsot a befejezéshez)",
     actions: "Műveletek",
     agent: "Ügynök",
     activeSessions: "Aktív munkamenetek",
@@ -129,8 +120,8 @@ export const hu: Translations = {
     starting: "Indul",
     startedInBackground: "Háttérben elindítva — kövesse a naplókat a folyamathoz",
     stopped: "Leállítva",
-    updateHermes: "Hermes frissítése",
-    updatingHermes: "Hermes frissítése…",
+    updateHermes: "Eir frissítése",
+    updatingHermes: "Eir frissítése…",
     waitingForOutput: "Várakozás a kimenetre…",
   },
 
@@ -138,14 +129,8 @@ export const hu: Translations = {
     title: "Munkamenetek",
     history: "Előzmények",
     overview: "Áttekintés",
-    filterChats: "Csevegések",
-    filterAutomation: "Automatizálás",
-    filterAll: "Összes",
-    sourceFilter: "Munkamenet forrása",
-    anySource: "Bármely forrás",
     searchPlaceholder: "Keresés üzenettartalomban...",
     noSessions: "Még nincsenek munkamenetek",
-    noSessionsInFilter: "Nincs munkamenet ebben a szűrőben",
     noMatch: "Nincs a keresésnek megfelelő munkamenet",
     startConversation: "Indítson egy beszélgetést, hogy itt megjelenjen",
     noMessages: "Nincsenek üzenetek",
@@ -171,14 +156,9 @@ export const hu: Translations = {
     deleteSelectedConfirmMessage:
       "Ez véglegesen eltávolítja a kijelölt {count} munkamenetet és minden üzenetüket. A művelet nem vonható vissza.",
     selectedSessionsDeleted: "{count} munkamenet törölve",
-    selectedSessionsSkippedActive: "{deleted} törölve; {count} megtartva, mert egy kör még fut",
     failedToDeleteSelected: "Nem sikerült törölni a kijelölt munkameneteket",
     resumeInChat: "Folytatás a csevegésben",
     newChat: "Új csevegés",
-    workspace: "munkaterület",
-    workspaceDefault: "Alapértelmezett",
-    workspaceRescan: "Tárolók újrakeresése",
-    workspaceCustom: "Másik útvonal…",
     previousPage: "Előző oldal",
     nextPage: "Következő oldal",
     roles: {
@@ -338,11 +318,9 @@ export const hu: Translations = {
     disableRuntime: "Letiltás",
     enableAfterInstall: "Engedélyezés a telepítés után",
     enableRuntime: "Engedélyezés",
-    toggleTakesEffectAfterRestart:
-      "Mentve — indítsa újra az átjárót a módosítás alkalmazásához.",
     forceReinstall: "Kényszerített újratelepítés (a meglévő mappa előbb törlődik)",
     headline:
-      "Hermes-bővítmények felfedezése, telepítése, engedélyezése és frissítése (a `hermes plugins` paritás).",
+      "Eir-bővítmények felfedezése, telepítése, engedélyezése és frissítése (a `hermes plugins` paritás).",
     identifierLabel: "Git URL vagy owner/repo",
     inactive: "inaktív",
     installBtn: "Telepítés",
@@ -370,13 +348,6 @@ export const hu: Translations = {
     authRequired: "Hitelesítés szükséges",
     authRequiredHint: "Futtassa ezt a parancsot a hitelesítéshez:",
     updateGit: "Git pull",
-    updateAll: "Összes frissítése",
-    updatingAll: "Bővítmények frissítése…",
-    updateAllDone: (updated: number, needsReview: number, failed: number) =>
-      `Frissítve ${updated}, ellenőrzést igényel ${needsReview}, sikertelen ${failed}`,
-    autoUpdate: "Automatikus frissítés",
-    autoUpdateDesc: (hours: number) =>
-      `A bővítményfrissítések automatikus alkalmazása, amikor az átjáró ellenőriz (${hours} óránként). A frissített kód új munkamenetekben töltődik be.`,
     versionBadge: "Verzió",
     showInSidebar: "Megjelenítés az oldalsávon",
     hideFromSidebar: "Elrejtés az oldalsávról",
@@ -463,7 +434,7 @@ export const hu: Translations = {
     showValue: "Tényleges érték megjelenítése",
     hideValue: "Érték elrejtése",
     customTitle: "Egyéni kulcsok",
-    customHint: "A .env fájlban tárolt tetszőleges környezeti változók, amelyeket a Hermes nem ismer fel. Használd ezeket környezeti változók beillesztésére képességekhez, MCP-kiszolgálókhoz vagy saját eszközeidhez.",
+    customHint: "A .env fájlban tárolt tetszőleges környezeti változók, amelyeket a Eir nem ismer fel. Használd ezeket környezeti változók beillesztésére képességekhez, MCP-kiszolgálókhoz vagy saját eszközeidhez.",
     customConfigured: "{count} egyéni kulcs beállítva",
     addCustomKey: "Egyéni kulcs hozzáadása",
     customKeyName: "Változó neve",
@@ -475,25 +446,20 @@ export const hu: Translations = {
   oauth: {
     title: "Szolgáltatói bejelentkezések (OAuth)",
     providerLogins: "Szolgáltatói bejelentkezések (OAuth)",
-    description:
-      "{connected} / {total} OAuth-szolgáltató csatlakoztatva. Használja a Bejelentkezés gombot az irányítópult által támogatott folyamatokhoz; a CLI-parancsok továbbra is elérhetők külső vagy tartalék beállításhoz.",
+    description: "{connected} / {total} OAuth-szolgáltató csatlakoztatva. A bejelentkezési folyamat jelenleg a CLI-n keresztül fut; kattintson a Parancs másolása gombra, és illessze be egy terminálba a beállításhoz.",
     connected: "Csatlakoztatva",
     expired: "Lejárt",
-    notConnected: "Nincs csatlakoztatva. Használja a Bejelentkezés gombot, ha elérhető, vagy futtassa a {command} parancsot egy terminálban.",
+    notConnected: "Nincs csatlakoztatva. Futtassa a {command} parancsot egy terminálban.",
     runInTerminal: "egy terminálban.",
     noProviders: "Nem észlelhető OAuth-képes szolgáltató.",
     login: "Bejelentkezés",
     disconnect: "Lecsatlakozás",
     managedExternally: "Külsőleg kezelt",
     copied: "Másolva ✓",
-    copyCode: "Kód másolása",
-    copyFailed: "Nem sikerült automatikusan másolni. Jelölje ki a kódot, és másolja kézzel.",
     cli: "Másolás",
     copyCliCommand: "CLI-parancs másolása (külső / tartalék)",
     connect: "Csatlakozás",
     sessionExpires: "A munkamenet {time} múlva lejár",
-    sessionExpiredNoError:
-      "A bejelentkezés lejárt anélkül, hogy elérte volna a szolgáltatót. Ez általában azt jelenti, hogy a bejelentkezési oldal elakadt a megnyitott lapon (szerveroldali probléma) — fejezze be ott a bejelentkezést, majd kattintson az Újra gombra. Ha továbbra sem sikerül, használjon inkább API-kulcsot vagy a CLI-t.",
     initiatingLogin: "Bejelentkezési folyamat indítása…",
     exchangingCode: "Kód cseréje tokenekre…",
     connectedClosing: "Csatlakoztatva! Bezárás…",
@@ -528,11 +494,11 @@ export const hu: Translations = {
   achievements: {
     hero: {
       kicker: "Agentic Gamerscore",
-      title: "Hermes Achievements",
+      title: "Eir Achievements",
       subtitle:
-        "Gyűjthető Hermes-jelvények, valós munkamenet-előzmények alapján szerezve. Az ismert, de még nem szerzett teljesítmények Felfedezettként jelennek meg; a Titkos teljesítmények rejtve maradnak az első egyező viselkedésig.",
+        "Gyűjthető Eir-jelvények, valós munkamenet-előzmények alapján szerezve. Az ismert, de még nem szerzett teljesítmények Felfedezettként jelennek meg; a Titkos teljesítmények rejtve maradnak az első egyező viselkedésig.",
       scan_subtitle:
-        "Hermes munkamenet-előzmények vizsgálata. Az első vizsgálat 5–10 másodpercig is eltarthat nagy előzmények esetén.",
+        "Eir munkamenet-előzmények vizsgálata. Az első vizsgálat 5–10 másodpercig is eltarthat nagy előzmények esetén.",
     },
     actions: {
       rescan: "Újravizsgálat",
@@ -547,7 +513,7 @@ export const hu: Translations = {
       highest_tier: "Legmagasabb szint",
       highest_tier_hint: "Copper → Silver → Gold → Diamond → Olympian",
       latest: "Legutóbbi",
-      latest_hint_empty: "futtasd többet a Hermest",
+      latest_hint_empty: "futtasd többet a Eirt",
       none_yet: "Még semmi",
     },
     state: {
@@ -578,10 +544,10 @@ export const hu: Translations = {
       tiers_header: "Szintek",
       secret_header: "Titkos teljesítmények",
       secret_body:
-        "A titkos teljesítmények elrejtik a pontos kiváltó eseményt. Amint a Hermes kapcsolódó jelet észlel, a kártya Felfedezettre vált, és megjeleníti a követelményt.",
+        "A titkos teljesítmények elrejtik a pontos kiváltó eseményt. Amint a Eir kapcsolódó jelet észlel, a kártya Felfedezettre vált, és megjeleníti a követelményt.",
       scan_status_header: "Vizsgálat állapota",
       scan_status_body:
-        "A Hermes egyszer átvizsgálja a helyi előzményeket, majd a kártyák automatikusan megjelennek. Semmi sem akadt el, ha ez néhány másodpercig tart.",
+        "A Eir egyszer átvizsgálja a helyi előzményeket, majd a kártyák automatikusan megjelennek. Semmi sem akadt el, ha ez néhány másodpercig tart.",
       what_scanned_header: "Mit vizsgálunk",
       what_scanned_body:
         "Munkamenetek, eszközhívások, modell-metaadatok, hibák, teljesítmények és helyi feloldási állapot.",
@@ -628,7 +594,7 @@ export const hu: Translations = {
         "A „Megosztás az X-en” új lapon nyit meg egy előre kitöltött bejegyzést. Először kattints a „Kép másolása” gombra, ha az 1200×630-as jelvényt is csatolnád — az X engedi, hogy közvetlenül beillesszd a bejegyzésszerkesztőbe. A „PNG letöltése” bárhol felhasználható fájlként menti.",
       clipboard_unsupported:
         "A kép vágólapra másolása nem támogatott ebben a böngészőben — használd inkább a Letöltést.",
-      tweet_text: "Just unlocked {tier_part}\"{name}\" in Hermes Agent ☤",
+      tweet_text: "Just unlocked {tier_part}\"{name}\" in Eir Agent ☤",
     },
   },
   kanban: {
@@ -643,12 +609,6 @@ export const hu: Translations = {
       "A táblákkal külön tudod választani az egymással nem összefüggő munkafolyamokat — egyet projektenként, repónként vagy területenként. Az egyik tábla workerei sosem látják a másik tábla feladatait.",
     slug: "Slug",
     slugHint: "— kisbetűk, kötőjelek, pl. atm10-server",
-    confirmDoneMany:
-      "Mark {n} tasks as done? The workers' claims are released and dependent children become ready.",
-    confirmArchiveMany:
-      "Archive {n} tasks? They disappear from the default board view.",
-    confirmBlockedMany:
-      "Mark {n} tasks as blocked? The workers' claims are released.",
     displayName: "Megjelenítendő név",
     displayNameHint: "(opcionális)",
     description: "Leírás",

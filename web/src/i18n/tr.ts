@@ -50,7 +50,7 @@ export const tr: Translations = {
   },
 
   app: {
-    brand: "Hermes Agent",
+    brand: "Eir",
     brandShort: "HA",
     closeNavigation: "Gezintiyi kapat",
     closeModelTools: "Modeli ve araçları kapat",
@@ -92,18 +92,9 @@ export const tr: Translations = {
     webUi: "Web UI",
   },
 
-  // ── System page: Memory section ──
-  systemMemory: {
-    activeProvider: "Etkin bellek sağlayıcısı",
-    noProvider: "yok — yalnızca yerleşik",
-    builtinLayer: "Yerleşik katman",
-    builtinNote: "MEMORY.md ve USER.md, herhangi bir harici sağlayıcıdan bağımsız olarak Hermes'in kendi belleğidir. Varsayılan olarak ikisi de oturumlara yüklenir; (memory.memory_enabled / memory.user_profile_enabled) yapılandırma anahtarları her birini kapatır. Bir sağlayıcı bunlara ekleme yapar; asla yerlerini almaz.",
-  },
-
   status: {
     actionFailed: "İşlem başarısız",
     actionFinished: "Tamamlandı",
-    actionFinishedOwed: "Güncellendi, ancak bekleyen adımlar var (bitirmek için `hermes update` komutunu yeniden çalıştırın)",
     actions: "İşlemler",
     agent: "Agent",
     activeSessions: "Aktif Oturumlar",
@@ -129,8 +120,8 @@ export const tr: Translations = {
     starting: "Başlatılıyor",
     startedInBackground: "Arka planda başlatıldı — ilerleme için günlüklere bakın",
     stopped: "Durduruldu",
-    updateHermes: "Hermes'i Güncelle",
-    updatingHermes: "Hermes güncelleniyor…",
+    updateHermes: "Eir'i Güncelle",
+    updatingHermes: "Eir güncelleniyor…",
     waitingForOutput: "Çıktı bekleniyor…",
   },
 
@@ -138,14 +129,8 @@ export const tr: Translations = {
     title: "Oturumlar",
     history: "Geçmiş",
     overview: "Genel bakış",
-    filterChats: "Sohbetler",
-    filterAutomation: "Otomasyon",
-    filterAll: "Tümü",
-    sourceFilter: "Oturum kaynağı",
-    anySource: "Herhangi bir kaynak",
     searchPlaceholder: "Mesaj içeriğinde ara...",
     noSessions: "Henüz oturum yok",
-    noSessionsInFilter: "Bu filtrede oturum yok",
     noMatch: "Aramanızla eşleşen oturum yok",
     startConversation: "Burada görmek için bir konuşma başlatın",
     noMessages: "Mesaj yok",
@@ -171,14 +156,9 @@ export const tr: Translations = {
     deleteSelectedConfirmMessage:
       "Bu, seçilen {count} oturumu ve tüm mesajlarını kalıcı olarak siler. Bu işlem geri alınamaz.",
     selectedSessionsDeleted: "{count} oturum silindi",
-    selectedSessionsSkippedActive: "{deleted} silindi; bir tur çalıştığı için {count} tutuldu",
     failedToDeleteSelected: "Seçilen oturumlar silinemedi",
     resumeInChat: "Sohbette Devam Et",
     newChat: "Yeni sohbet",
-    workspace: "çalışma alanı",
-    workspaceDefault: "Varsayılan",
-    workspaceRescan: "Depoları yeniden tara",
-    workspaceCustom: "Başka yol…",
     previousPage: "Önceki sayfa",
     nextPage: "Sonraki sayfa",
     roles: {
@@ -338,11 +318,9 @@ export const tr: Translations = {
     disableRuntime: "Devre dışı bırak",
     enableAfterInstall: "Yüklemeden sonra etkinleştir",
     enableRuntime: "Etkinleştir",
-    toggleTakesEffectAfterRestart:
-      "Kaydedildi — değişikliği uygulamak için ağ geçidini yeniden başlatın.",
     forceReinstall: "Yeniden yüklemeyi zorla (önce mevcut klasörü sil)",
     headline:
-      "Hermes eklentilerini keşfedin, yükleyin, etkinleştirin ve güncelleyin (`hermes plugins` ile eşdeğer).",
+      "Eir eklentilerini keşfedin, yükleyin, etkinleştirin ve güncelleyin (`hermes plugins` ile eşdeğer).",
     identifierLabel: "Git URL veya owner/repo",
     inactive: "pasif",
     installBtn: "Yükle",
@@ -370,13 +348,6 @@ export const tr: Translations = {
     authRequired: "Kimlik doğrulama gerekli",
     authRequiredHint: "Kimlik doğrulamak için bu komutu çalıştırın:",
     updateGit: "Git pull",
-    updateAll: "Tümünü güncelle",
-    updatingAll: "Eklentiler güncelleniyor…",
-    updateAllDone: (updated: number, needsReview: number, failed: number) =>
-      `Güncellendi ${updated}, inceleme gerekli ${needsReview}, başarısız ${failed}`,
-    autoUpdate: "Otomatik güncelleme",
-    autoUpdateDesc: (hours: number) =>
-      `Ağ geçidi denetlediğinde (her ${hours} saatte) eklenti güncellemelerini otomatik uygula. Güncellenen kod yeni oturumlarda yüklenir.`,
     versionBadge: "Sürüm",
     showInSidebar: "Kenar çubuğunda göster",
     hideFromSidebar: "Kenar çubuğundan gizle",
@@ -463,7 +434,7 @@ export const tr: Translations = {
     showValue: "Gerçek değeri göster",
     hideValue: "Değeri gizle",
     customTitle: "Özel Anahtarlar",
-    customHint: ".env dosyanızda saklanan ve Hermes'in tanımadığı rastgele ortam değişkenleri. Bunları beceriler, MCP sunucuları veya kendi araçlarınız için ortam değişkenleri eklemek için kullanın.",
+    customHint: ".env dosyanızda saklanan ve Eir'in tanımadığı rastgele ortam değişkenleri. Bunları beceriler, MCP sunucuları veya kendi araçlarınız için ortam değişkenleri eklemek için kullanın.",
     customConfigured: "{count} özel anahtar ayarlandı",
     addCustomKey: "Özel anahtar ekle",
     customKeyName: "Değişken adı",
@@ -475,25 +446,20 @@ export const tr: Translations = {
   oauth: {
     title: "Sağlayıcı Girişleri (OAuth)",
     providerLogins: "Sağlayıcı Girişleri (OAuth)",
-    description:
-      "{connected}/{total} OAuth sağlayıcısı bağlandı. Panel destekli akışlar için Giriş'i kullanın; CLI komutları harici veya yedek kurulum için kullanılabilir.",
+    description: "{connected}/{total} OAuth sağlayıcısı bağlandı. Giriş akışları şu anda CLI üzerinden çalışır; Komutu kopyala'ya tıklayın ve kurmak için bir terminale yapıştırın.",
     connected: "Bağlandı",
     expired: "Süresi doldu",
-    notConnected: "Bağlı değil. Mümkünse Giriş'i kullanın veya bir terminalde {command} komutunu çalıştırın.",
+    notConnected: "Bağlı değil. Bir terminalde {command} komutunu çalıştırın.",
     runInTerminal: "bir terminalde.",
     noProviders: "OAuth uyumlu sağlayıcı algılanmadı.",
     login: "Giriş",
     disconnect: "Bağlantıyı kes",
     managedExternally: "Harici olarak yönetiliyor",
     copied: "Kopyalandı ✓",
-    copyCode: "Kodu kopyala",
-    copyFailed: "Otomatik olarak kopyalanamadı. Kodu seçip elle kopyalayın.",
     cli: "Kopyala",
     copyCliCommand: "CLI komutunu kopyala (harici / yedek için)",
     connect: "Bağlan",
     sessionExpires: "Oturumun süresi {time} sonra dolacak",
-    sessionExpiredNoError:
-      "Oturum açma, sağlayıcıya ulaşmadan süresi doldu. Bu genellikle oturum açma sayfasının açılan sekmede takıldığı anlamına gelir (sunucu tarafı sorun) — oradan oturum açmayı tamamlayın, ardından Yeniden Dene'ye tıklayın. Sorun devam ederse bunun yerine bir API anahtarı veya CLI kullanın.",
     initiatingLogin: "Giriş akışı başlatılıyor…",
     exchangingCode: "Kod, jetonlarla değiştiriliyor…",
     connectedClosing: "Bağlandı! Kapatılıyor…",
@@ -528,11 +494,11 @@ export const tr: Translations = {
   achievements: {
     hero: {
       kicker: "Agentic Gamerscore",
-      title: "Hermes Achievements",
+      title: "Eir Achievements",
       subtitle:
-        "Gerçek oturum geçmişinden kazanılan, koleksiyonluk Hermes rozetleri. Bilinen ama henüz tamamlanmamış başarılar Keşfedildi olarak gösterilir; Gizli başarılar ilk eşleşen davranış görünene kadar saklı kalır.",
+        "Gerçek oturum geçmişinden kazanılan, koleksiyonluk Eir rozetleri. Bilinen ama henüz tamamlanmamış başarılar Keşfedildi olarak gösterilir; Gizli başarılar ilk eşleşen davranış görünene kadar saklı kalır.",
       scan_subtitle:
-        "Hermes oturum geçmişi taranıyor. Büyük geçmişlerde ilk tarama 5–10 saniye sürebilir.",
+        "Eir oturum geçmişi taranıyor. Büyük geçmişlerde ilk tarama 5–10 saniye sürebilir.",
     },
     actions: {
       rescan: "Yeniden tara",
@@ -547,7 +513,7 @@ export const tr: Translations = {
       highest_tier: "En yüksek kademe",
       highest_tier_hint: "Copper → Silver → Gold → Diamond → Olympian",
       latest: "En son",
-      latest_hint_empty: "Hermes'i daha çok çalıştır",
+      latest_hint_empty: "Eir'i daha çok çalıştır",
       none_yet: "Henüz yok",
     },
     state: {
@@ -578,10 +544,10 @@ export const tr: Translations = {
       tiers_header: "Kademeler",
       secret_header: "Gizli başarılar",
       secret_body:
-        "Sırlar, tetikleyicilerini saklı tutar. Hermes ilgili bir sinyal gördüğünde kart Keşfedildi durumuna geçer ve gereksinimini gösterir.",
+        "Sırlar, tetikleyicilerini saklı tutar. Eir ilgili bir sinyal gördüğünde kart Keşfedildi durumuna geçer ve gereksinimini gösterir.",
       scan_status_header: "Tarama durumu",
       scan_status_body:
-        "Hermes yerel geçmişi bir kez tarıyor; sonra kartlar otomatik olarak görünür. Birkaç saniye sürmesi normaldir, hiçbir şey takılmadı.",
+        "Eir yerel geçmişi bir kez tarıyor; sonra kartlar otomatik olarak görünür. Birkaç saniye sürmesi normaldir, hiçbir şey takılmadı.",
       what_scanned_header: "Neler taranır",
       what_scanned_body:
         "Oturumlar, araç çağrıları, model meta verileri, hatalar, başarılar ve yerel açılma durumu.",
@@ -628,7 +594,7 @@ export const tr: Translations = {
         "X'te paylaş, yeni sekmede önceden doldurulmuş bir gönderi açar. 1200×630 rozetin eklenmesini istiyorsan önce Görseli kopyala'ya tıkla — X, görseli doğrudan tweet düzenleyiciye yapıştırmana izin verir. PNG indir, dosyayı her yerde kullanmak üzere kaydeder.",
       clipboard_unsupported:
         "Bu tarayıcıda panoya görsel kopyalama desteklenmiyor — bunun yerine İndir'i kullanın.",
-      tweet_text: "Just unlocked {tier_part}\"{name}\" in Hermes Agent ☤",
+      tweet_text: "Just unlocked {tier_part}\"{name}\" in Eir Agent ☤",
     },
   },
   kanban: {
@@ -643,12 +609,6 @@ export const tr: Translations = {
       "Panolar, ilgisiz iş akışlarını ayırmanızı sağlar — proje, depo veya alan başına bir pano. Bir panodaki worker'lar başka bir panonun görevlerini asla görmez.",
     slug: "Slug",
     slugHint: "— küçük harf, tire, ör. atm10-server",
-    confirmDoneMany:
-      "Mark {n} tasks as done? The workers' claims are released and dependent children become ready.",
-    confirmArchiveMany:
-      "Archive {n} tasks? They disappear from the default board view.",
-    confirmBlockedMany:
-      "Mark {n} tasks as blocked? The workers' claims are released.",
     displayName: "Görünen ad",
     displayNameHint: "(isteğe bağlı)",
     description: "Açıklama",

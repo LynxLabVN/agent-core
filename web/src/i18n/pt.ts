@@ -50,7 +50,7 @@ export const pt: Translations = {
   },
 
   app: {
-    brand: "Hermes Agent",
+    brand: "Eir",
     brandShort: "HA",
     closeNavigation: "Fechar navegação",
     closeModelTools: "Fechar modelo e ferramentas",
@@ -92,18 +92,9 @@ export const pt: Translations = {
     webUi: "Web UI",
   },
 
-  // ── System page: Memory section ──
-  systemMemory: {
-    activeProvider: "Provedor de memória ativo",
-    noProvider: "nenhum — apenas integrada",
-    builtinLayer: "Camada integrada",
-    builtinNote: "MEMORY.md e USER.md são a memória própria do Hermes, independente de qualquer provedor externo. Ambos são carregados nas sessões por padrão; as opções de configuração (memory.memory_enabled / memory.user_profile_enabled) desativam cada um. Um provedor se soma a eles; nunca os substitui.",
-  },
-
   status: {
     actionFailed: "Ação falhou",
     actionFinished: "Concluído",
-    actionFinishedOwed: "Atualizado, mas ainda pendente (execute `hermes update` novamente para concluir)",
     actions: "Ações",
     agent: "Agente",
     activeSessions: "Sessões ativas",
@@ -129,8 +120,8 @@ export const pt: Translations = {
     starting: "A iniciar",
     startedInBackground: "Iniciado em segundo plano — verifique os registos para acompanhar",
     stopped: "Parado",
-    updateHermes: "Atualizar Hermes",
-    updatingHermes: "A atualizar Hermes…",
+    updateHermes: "Atualizar Eir",
+    updatingHermes: "A atualizar Eir…",
     waitingForOutput: "À espera de saída…",
   },
 
@@ -138,14 +129,8 @@ export const pt: Translations = {
     title: "Sessões",
     history: "Histórico",
     overview: "Visão geral",
-    filterChats: "Conversas",
-    filterAutomation: "Automação",
-    filterAll: "Todas",
-    sourceFilter: "Origem da sessão",
-    anySource: "Qualquer origem",
     searchPlaceholder: "Pesquisar conteúdo das mensagens...",
     noSessions: "Ainda não há sessões",
-    noSessionsInFilter: "Nenhuma sessão neste filtro",
     noMatch: "Nenhuma sessão corresponde à pesquisa",
     startConversation: "Inicie uma conversa para a ver aqui",
     noMessages: "Sem mensagens",
@@ -171,14 +156,9 @@ export const pt: Translations = {
     deleteSelectedConfirmMessage:
       "Isto remove permanentemente {count} sessões selecionadas e todas as suas mensagens. Não pode ser desfeito.",
     selectedSessionsDeleted: "{count} sessões eliminadas",
-    selectedSessionsSkippedActive: "{deleted} eliminadas; {count} mantidas porque há um turno em curso",
     failedToDeleteSelected: "Falha ao eliminar as sessões selecionadas",
     resumeInChat: "Retomar no Chat",
     newChat: "Novo chat",
-    workspace: "área de trabalho",
-    workspaceDefault: "Padrão",
-    workspaceRescan: "Reexaminar repositórios",
-    workspaceCustom: "Outro caminho…",
     previousPage: "Página anterior",
     nextPage: "Página seguinte",
     roles: {
@@ -339,11 +319,9 @@ export const pt: Translations = {
     disableRuntime: "Desativar",
     enableAfterInstall: "Ativar após instalação",
     enableRuntime: "Ativar",
-    toggleTakesEffectAfterRestart:
-      "Salvo — reinicie o gateway para aplicar a alteração.",
     forceReinstall: "Forçar reinstalação (eliminar pasta existente primeiro)",
     headline:
-      "Descobrir, instalar, ativar e atualizar plugins Hermes (paridade com `hermes plugins`).",
+      "Descobrir, instalar, ativar e atualizar plugins Eir (paridade com `hermes plugins`).",
     identifierLabel: "URL Git ou owner/repo",
     inactive: "inativo",
     installBtn: "Instalar",
@@ -371,13 +349,6 @@ export const pt: Translations = {
     authRequired: "Autenticação necessária",
     authRequiredHint: "Execute este comando para autenticar:",
     updateGit: "Git pull",
-    updateAll: "Atualizar tudo",
-    updatingAll: "Atualizando plugins…",
-    updateAllDone: (updated: number, needsReview: number, failed: number) =>
-      `Atualizados ${updated}, precisam de revisão ${needsReview}, falharam ${failed}`,
-    autoUpdate: "Atualização automática",
-    autoUpdateDesc: (hours: number) =>
-      `Aplica atualizações de plugins automaticamente quando o gateway verifica (a cada ${hours} h). O código atualizado é carregado em novas sessões.`,
     versionBadge: "Versão",
     showInSidebar: "Mostrar na barra lateral",
     hideFromSidebar: "Ocultar da barra lateral",
@@ -464,7 +435,7 @@ export const pt: Translations = {
     showValue: "Mostrar valor real",
     hideValue: "Ocultar valor",
     customTitle: "Chaves personalizadas",
-    customHint: "Variáveis de ambiente arbitrárias armazenadas no seu .env que o Hermes não reconhece. Use-as para injetar variáveis de ambiente para skills, servidores MCP ou suas próprias ferramentas.",
+    customHint: "Variáveis de ambiente arbitrárias armazenadas no seu .env que o Eir não reconhece. Use-as para injetar variáveis de ambiente para skills, servidores MCP ou suas próprias ferramentas.",
     customConfigured: "{count} chave(s) personalizada(s) definida(s)",
     addCustomKey: "Adicionar uma chave personalizada",
     customKeyName: "Nome da variável",
@@ -476,25 +447,20 @@ export const pt: Translations = {
   oauth: {
     title: "Inícios de sessão de fornecedor (OAuth)",
     providerLogins: "Inícios de sessão de fornecedor (OAuth)",
-    description:
-      "{connected} de {total} fornecedores OAuth ligados. Use Iniciar sessão para fluxos suportados pelo painel; os comandos CLI continuam disponíveis para configuração externa ou de recurso.",
+    description: "{connected} de {total} fornecedores OAuth ligados. Os fluxos de início de sessão são executados via CLI; clique em Copiar comando e cole num terminal para configurar.",
     connected: "Ligado",
     expired: "Expirado",
-    notConnected: "Não ligado. Use Iniciar sessão quando disponível, ou execute {command} num terminal.",
+    notConnected: "Não ligado. Execute {command} num terminal.",
     runInTerminal: "num terminal.",
     noProviders: "Não foram detetados fornecedores compatíveis com OAuth.",
     login: "Iniciar sessão",
     disconnect: "Desligar",
     managedExternally: "Gerido externamente",
     copied: "Copiado ✓",
-    copyCode: "Copiar código",
-    copyFailed: "Não foi possível copiar automaticamente. Selecione o código e copie-o manualmente.",
     cli: "Copiar",
     copyCliCommand: "Copiar comando CLI (para externo / fallback)",
     connect: "Ligar",
     sessionExpires: "A sessão expira em {time}",
-    sessionExpiredNoError:
-      "O login expirou sem alcançar o provedor. Isso geralmente significa que a página de login travou na aba aberta (problema do lado do servidor) — conclua o login lá e clique em Tentar novamente. Se continuar falhando, use uma chave de API ou a CLI.",
     initiatingLogin: "A iniciar fluxo de início de sessão…",
     exchangingCode: "A trocar código por tokens…",
     connectedClosing: "Ligado! A fechar…",
@@ -529,11 +495,11 @@ export const pt: Translations = {
   achievements: {
     hero: {
       kicker: "Agentic Gamerscore",
-      title: "Hermes Achievements",
+      title: "Eir Achievements",
       subtitle:
-        "Distintivos colecionáveis do Hermes obtidos a partir do histórico real de sessões. Conquistas conhecidas mas ainda não obtidas aparecem como Descobertas; conquistas Secretas permanecem ocultas até surgir o primeiro comportamento correspondente.",
+        "Distintivos colecionáveis do Eir obtidos a partir do histórico real de sessões. Conquistas conhecidas mas ainda não obtidas aparecem como Descobertas; conquistas Secretas permanecem ocultas até surgir o primeiro comportamento correspondente.",
       scan_subtitle:
-        "A analisar o histórico de sessões do Hermes. A primeira análise pode demorar 5–10 segundos em históricos extensos.",
+        "A analisar o histórico de sessões do Eir. A primeira análise pode demorar 5–10 segundos em históricos extensos.",
     },
     actions: {
       rescan: "Voltar a analisar",
@@ -548,7 +514,7 @@ export const pt: Translations = {
       highest_tier: "Nível mais alto",
       highest_tier_hint: "Copper → Silver → Gold → Diamond → Olympian",
       latest: "Mais recente",
-      latest_hint_empty: "execute mais o Hermes",
+      latest_hint_empty: "execute mais o Eir",
       none_yet: "Ainda nenhuma",
     },
     state: {
@@ -579,10 +545,10 @@ export const pt: Translations = {
       tiers_header: "Níveis",
       secret_header: "Conquistas secretas",
       secret_body:
-        "As secretas escondem o seu acionador exato. Assim que o Hermes detetar um sinal relacionado, o cartão passa a Descoberta e mostra o requisito.",
+        "As secretas escondem o seu acionador exato. Assim que o Eir detetar um sinal relacionado, o cartão passa a Descoberta e mostra o requisito.",
       scan_status_header: "Estado da análise",
       scan_status_body:
-        "O Hermes analisa o histórico local uma vez e depois os cartões aparecem automaticamente. Nada está bloqueado se isto demorar alguns segundos.",
+        "O Eir analisa o histórico local uma vez e depois os cartões aparecem automaticamente. Nada está bloqueado se isto demorar alguns segundos.",
       what_scanned_header: "O que é analisado",
       what_scanned_body:
         "Sessões, chamadas de ferramentas, metadados de modelos, erros, conquistas e estado de desbloqueio local.",
@@ -629,7 +595,7 @@ export const pt: Translations = {
         "Partilhar no X abre uma publicação pré-preenchida num novo separador. Clique primeiro em Copiar imagem se quiser anexar o distintivo 1200×630 — o X permite colá-lo diretamente no compositor da publicação. Transferir PNG guarda o ficheiro para utilização em qualquer lado.",
       clipboard_unsupported:
         "A cópia de imagens para a área de transferência não é suportada neste navegador — utilize Transferir.",
-      tweet_text: "Just unlocked {tier_part}\"{name}\" in Hermes Agent ☤",
+      tweet_text: "Just unlocked {tier_part}\"{name}\" in Eir Agent ☤",
     },
   },
   kanban: {
@@ -644,12 +610,6 @@ export const pt: Translations = {
       "Os quadros permitem-lhe separar fluxos de trabalho não relacionados — um por projeto, repositório ou domínio. Os workers de um quadro nunca veem as tarefas de outro quadro.",
     slug: "Slug",
     slugHint: "— minúsculas, hífenes, p. ex. atm10-server",
-    confirmDoneMany:
-      "Mark {n} tasks as done? The workers' claims are released and dependent children become ready.",
-    confirmArchiveMany:
-      "Archive {n} tasks? They disappear from the default board view.",
-    confirmBlockedMany:
-      "Mark {n} tasks as blocked? The workers' claims are released.",
     displayName: "Nome a apresentar",
     displayNameHint: "(opcional)",
     description: "Descrição",

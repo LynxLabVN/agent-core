@@ -50,7 +50,7 @@ export const fr: Translations = {
   },
 
   app: {
-    brand: "Hermes Agent",
+    brand: "Eir",
     brandShort: "HA",
     closeNavigation: "Fermer la navigation",
     closeModelTools: "Fermer modèle et outils",
@@ -92,18 +92,9 @@ export const fr: Translations = {
     webUi: "Web UI",
   },
 
-  // ── System page: Memory section ──
-  systemMemory: {
-    activeProvider: "Fournisseur de mémoire actif",
-    noProvider: "aucun — intégré uniquement",
-    builtinLayer: "Couche intégrée",
-    builtinNote: "MEMORY.md et USER.md sont la mémoire propre de Hermes, indépendante de tout fournisseur externe. Les deux sont chargés dans les sessions par défaut ; les options de configuration (memory.memory_enabled / memory.user_profile_enabled) désactivent chacun. Un fournisseur s'y ajoute ; il ne les remplace jamais.",
-  },
-
   status: {
     actionFailed: "Action échouée",
     actionFinished: "Terminé",
-    actionFinishedOwed: "Mis à jour, mais encore en attente (relancez `hermes update` pour terminer)",
     actions: "Actions",
     agent: "Agent",
     activeSessions: "Sessions actives",
@@ -129,8 +120,8 @@ export const fr: Translations = {
     starting: "Démarrage",
     startedInBackground: "Démarré en arrière-plan — consultez les journaux pour la progression",
     stopped: "Arrêté",
-    updateHermes: "Mettre à jour Hermes",
-    updatingHermes: "Mise à jour de Hermes…",
+    updateHermes: "Mettre à jour Eir",
+    updatingHermes: "Mise à jour de Eir…",
     waitingForOutput: "En attente de la sortie…",
   },
 
@@ -138,14 +129,8 @@ export const fr: Translations = {
     title: "Sessions",
     history: "Historique",
     overview: "Aperçu",
-    filterChats: "Discussions",
-    filterAutomation: "Automatisation",
-    filterAll: "Toutes",
-    sourceFilter: "Source de la session",
-    anySource: "Toute source",
     searchPlaceholder: "Rechercher dans les messages...",
     noSessions: "Aucune session pour l'instant",
-    noSessionsInFilter: "Aucune session dans ce filtre",
     noMatch: "Aucune session ne correspond à votre recherche",
     startConversation: "Démarrez une conversation pour la voir ici",
     noMessages: "Aucun message",
@@ -171,14 +156,9 @@ export const fr: Translations = {
     deleteSelectedConfirmMessage:
       "Cela supprime définitivement {count} sessions sélectionnées et tous leurs messages. Cette action est irréversible.",
     selectedSessionsDeleted: "{count} sessions supprimées",
-    selectedSessionsSkippedActive: "{deleted} supprimées ; {count} conservées car un tour est en cours",
     failedToDeleteSelected: "Échec de la suppression des sessions sélectionnées",
     resumeInChat: "Reprendre dans le chat",
     newChat: "Nouveau chat",
-    workspace: "espace de travail",
-    workspaceDefault: "Par défaut",
-    workspaceRescan: "Rechercher à nouveau les dépôts",
-    workspaceCustom: "Autre chemin…",
     previousPage: "Page précédente",
     nextPage: "Page suivante",
     roles: {
@@ -339,11 +319,9 @@ export const fr: Translations = {
     disableRuntime: "Désactiver",
     enableAfterInstall: "Activer après l'installation",
     enableRuntime: "Activer",
-    toggleTakesEffectAfterRestart:
-      "Enregistré — redémarrez la passerelle pour appliquer la modification.",
     forceReinstall: "Forcer la réinstallation (supprimer d'abord le dossier existant)",
     headline:
-      "Découvrez, installez, activez et mettez à jour les plugins Hermes (parité avec `hermes plugins`).",
+      "Découvrez, installez, activez et mettez à jour les plugins Eir (parité avec `hermes plugins`).",
     identifierLabel: "URL Git ou owner/repo",
     inactive: "inactif",
     installBtn: "Installer",
@@ -371,13 +349,6 @@ export const fr: Translations = {
     authRequired: "Authentification requise",
     authRequiredHint: "Exécutez cette commande pour vous authentifier:",
     updateGit: "Git pull",
-    updateAll: "Tout mettre à jour",
-    updatingAll: "Mise à jour des plugins…",
-    updateAllDone: (updated: number, needsReview: number, failed: number) =>
-      `Mis à jour ${updated}, à vérifier ${needsReview}, échecs ${failed}`,
-    autoUpdate: "Mise à jour automatique",
-    autoUpdateDesc: (hours: number) =>
-      `Appliquer automatiquement les mises à jour des plugins lors des vérifications de la passerelle (toutes les ${hours} h). Le code mis à jour se charge dans les nouvelles sessions.`,
     versionBadge: "Version",
     showInSidebar: "Afficher dans la barre latérale",
     hideFromSidebar: "Masquer de la barre latérale",
@@ -464,7 +435,7 @@ export const fr: Translations = {
     showValue: "Afficher la valeur réelle",
     hideValue: "Masquer la valeur",
     customTitle: "Clés personnalisées",
-    customHint: "Variables d'environnement arbitraires stockées dans votre .env que Hermes ne reconnaît pas. Utilisez-les pour injecter des variables d'environnement pour des compétences, des serveurs MCP ou vos propres outils.",
+    customHint: "Variables d'environnement arbitraires stockées dans votre .env que Eir ne reconnaît pas. Utilisez-les pour injecter des variables d'environnement pour des compétences, des serveurs MCP ou vos propres outils.",
     customConfigured: "{count} clé(s) personnalisée(s) définie(s)",
     addCustomKey: "Ajouter une clé personnalisée",
     customKeyName: "Nom de la variable",
@@ -476,25 +447,20 @@ export const fr: Translations = {
   oauth: {
     title: "Connexions fournisseurs (OAuth)",
     providerLogins: "Connexions fournisseurs (OAuth)",
-    description:
-      "{connected} sur {total} fournisseurs OAuth connectés. Utilisez Connexion pour les flux pris en charge par le tableau de bord ; les commandes CLI restent disponibles pour une configuration externe ou de secours.",
+    description: "{connected} sur {total} fournisseurs OAuth connectés. Les flux de connexion s'exécutent actuellement via le CLI ; cliquez sur Copier la commande et collez-la dans un terminal pour configurer.",
     connected: "Connecté",
     expired: "Expiré",
-    notConnected: "Non connecté. Utilisez Connexion si disponible, ou exécutez {command} dans un terminal.",
+    notConnected: "Non connecté. Exécutez {command} dans un terminal.",
     runInTerminal: "dans un terminal.",
     noProviders: "Aucun fournisseur compatible OAuth détecté.",
     login: "Connexion",
     disconnect: "Déconnecter",
     managedExternally: "Géré en externe",
     copied: "Copié ✓",
-    copyCode: "Copier le code",
-    copyFailed: "Copie automatique impossible. Sélectionnez le code et copiez-le manuellement.",
     cli: "Copier",
     copyCliCommand: "Copier la commande CLI (pour externe / repli)",
     connect: "Connecter",
     sessionExpires: "La session expire dans {time}",
-    sessionExpiredNoError:
-      "La connexion a expiré sans atteindre le fournisseur. Cela signifie généralement que la page de connexion est restée bloquée dans l'onglet ouvert (problème côté serveur) — terminez la connexion là-bas, puis cliquez sur Réessayer. Si le problème persiste, utilisez une clé API ou la CLI à la place.",
     initiatingLogin: "Lancement du flux de connexion…",
     exchangingCode: "Échange du code contre des jetons…",
     connectedClosing: "Connecté ! Fermeture…",
@@ -528,11 +494,11 @@ export const fr: Translations = {
   achievements: {
     hero: {
       kicker: "Agentic Gamerscore",
-      title: "Hermes Achievements",
+      title: "Eir Achievements",
       subtitle:
-        "Badges Hermes à collectionner, gagnés à partir de l'historique réel des sessions. Les succès connus non terminés sont affichés comme Découverts ; les succès secrets restent cachés jusqu'à l'apparition du premier comportement correspondant.",
+        "Badges Eir à collectionner, gagnés à partir de l'historique réel des sessions. Les succès connus non terminés sont affichés comme Découverts ; les succès secrets restent cachés jusqu'à l'apparition du premier comportement correspondant.",
       scan_subtitle:
-        "Analyse de l'historique des sessions Hermes en cours. Le premier scan peut prendre 5 à 10 secondes sur les historiques volumineux.",
+        "Analyse de l'historique des sessions Eir en cours. Le premier scan peut prendre 5 à 10 secondes sur les historiques volumineux.",
     },
     actions: {
       rescan: "Relancer le scan",
@@ -547,7 +513,7 @@ export const fr: Translations = {
       highest_tier: "Niveau le plus élevé",
       highest_tier_hint: "Copper → Silver → Gold → Diamond → Olympian",
       latest: "Dernier",
-      latest_hint_empty: "utilisez Hermes davantage",
+      latest_hint_empty: "utilisez Eir davantage",
       none_yet: "Aucun pour l'instant",
     },
     state: {
@@ -578,10 +544,10 @@ export const fr: Translations = {
       tiers_header: "Niveaux",
       secret_header: "Succès secrets",
       secret_body:
-        "Les secrets cachent leur déclencheur exact. Dès qu'Hermes détecte un signal lié, la carte passe à Découvert et affiche son exigence.",
+        "Les secrets cachent leur déclencheur exact. Dès qu'Eir détecte un signal lié, la carte passe à Découvert et affiche son exigence.",
       scan_status_header: "État du scan",
       scan_status_body:
-        "Hermes analyse l'historique local une seule fois, puis les cartes apparaîtront automatiquement. Rien n'est bloqué si cela prend quelques secondes.",
+        "Eir analyse l'historique local une seule fois, puis les cartes apparaîtront automatiquement. Rien n'est bloqué si cela prend quelques secondes.",
       what_scanned_header: "Ce qui est analysé",
       what_scanned_body:
         "Sessions, appels d'outils, métadonnées du modèle, erreurs, succès et état de déblocage local.",
@@ -628,7 +594,7 @@ export const fr: Translations = {
         "Partager sur X ouvre une publication préremplie dans un nouvel onglet. Cliquez d'abord sur Copier l'image si vous voulez joindre le badge 1200×630 — X vous laisse le coller directement dans l'éditeur de tweet. Télécharger le PNG enregistre le fichier pour l'utiliser n'importe où.",
       clipboard_unsupported:
         "La copie d'image dans le presse-papiers n'est pas prise en charge par ce navigateur — utilisez Télécharger à la place.",
-      tweet_text: "Just unlocked {tier_part}\"{name}\" in Hermes Agent ☤",
+      tweet_text: "Just unlocked {tier_part}\"{name}\" in Eir Agent ☤",
     },
   },
   kanban: {
@@ -643,12 +609,6 @@ export const fr: Translations = {
       "Les tableaux vous permettent de séparer des flux de travail indépendants — un par projet, dépôt ou domaine. Les workers d'un tableau ne voient jamais les tâches d'un autre.",
     slug: "Slug",
     slugHint: "— minuscules, tirets, par ex. atm10-server",
-    confirmDoneMany:
-      "Mark {n} tasks as done? The workers' claims are released and dependent children become ready.",
-    confirmArchiveMany:
-      "Archive {n} tasks? They disappear from the default board view.",
-    confirmBlockedMany:
-      "Mark {n} tasks as blocked? The workers' claims are released.",
     displayName: "Nom affiché",
     displayNameHint: "(facultatif)",
     description: "Description",

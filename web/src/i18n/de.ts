@@ -50,7 +50,7 @@ export const de: Translations = {
   },
 
   app: {
-    brand: "Hermes Agent",
+    brand: "Eir",
     brandShort: "HA",
     closeNavigation: "Navigation schließen",
     closeModelTools: "Modell und Werkzeuge schließen",
@@ -92,18 +92,9 @@ export const de: Translations = {
     webUi: "Web UI",
   },
 
-  // ── System page: Memory section ──
-  systemMemory: {
-    activeProvider: "Aktiver Speicheranbieter",
-    noProvider: "keiner — nur integriert",
-    builtinLayer: "Integrierte Ebene",
-    builtinNote: "MEMORY.md und USER.md sind Hermes’ eigener Speicher, unabhängig von externen Anbietern. Beide werden standardmäßig in Sitzungen geladen; die Konfigurationsschalter (memory.memory_enabled / memory.user_profile_enabled) schalten sie einzeln ab. Ein Anbieter ergänzt sie, er ersetzt sie nie.",
-  },
-
   status: {
     actionFailed: "Aktion fehlgeschlagen",
     actionFinished: "Abgeschlossen",
-    actionFinishedOwed: "Aktualisiert, aber noch offen (`hermes update` erneut ausführen, um abzuschließen)",
     actions: "Aktionen",
     agent: "Agent",
     activeSessions: "Aktive Sitzungen",
@@ -129,8 +120,8 @@ export const de: Translations = {
     starting: "Startet",
     startedInBackground: "Im Hintergrund gestartet — siehe Protokolle für den Fortschritt",
     stopped: "Gestoppt",
-    updateHermes: "Hermes aktualisieren",
-    updatingHermes: "Hermes wird aktualisiert…",
+    updateHermes: "Eir aktualisieren",
+    updatingHermes: "Eir wird aktualisiert…",
     waitingForOutput: "Warte auf Ausgabe…",
   },
 
@@ -138,14 +129,8 @@ export const de: Translations = {
     title: "Sitzungen",
     history: "Verlauf",
     overview: "Übersicht",
-    filterChats: "Chats",
-    filterAutomation: "Automatisierung",
-    filterAll: "Alle",
-    sourceFilter: "Sitzungsquelle",
-    anySource: "Beliebige Quelle",
     searchPlaceholder: "Nachrichteninhalt suchen...",
     noSessions: "Noch keine Sitzungen",
-    noSessionsInFilter: "Keine Sitzungen in diesem Filter",
     noMatch: "Keine Sitzungen entsprechen deiner Suche",
     startConversation: "Starte eine Unterhaltung, um sie hier zu sehen",
     noMessages: "Keine Nachrichten",
@@ -171,14 +156,9 @@ export const de: Translations = {
     deleteSelectedConfirmMessage:
       "Dies entfernt {count} ausgewählte Sitzungen und alle zugehörigen Nachrichten dauerhaft. Dies kann nicht rückgängig gemacht werden.",
     selectedSessionsDeleted: "{count} Sitzungen gelöscht",
-    selectedSessionsSkippedActive: "{deleted} gelöscht; {count} behalten, weil noch ein Turn läuft",
     failedToDeleteSelected: "Ausgewählte Sitzungen konnten nicht gelöscht werden",
     resumeInChat: "Im Chat fortsetzen",
     newChat: "Neuer Chat",
-    workspace: "Arbeitsbereich",
-    workspaceDefault: "Standard",
-    workspaceRescan: "Repositories neu scannen",
-    workspaceCustom: "Anderer Pfad…",
     previousPage: "Vorherige Seite",
     nextPage: "Nächste Seite",
     roles: {
@@ -338,11 +318,9 @@ export const de: Translations = {
     disableRuntime: "Deaktivieren",
     enableAfterInstall: "Nach Installation aktivieren",
     enableRuntime: "Aktivieren",
-    toggleTakesEffectAfterRestart:
-      "Gespeichert — Gateway neu starten, um die Änderung anzuwenden.",
     forceReinstall: "Neuinstallation erzwingen (bestehenden Ordner zuerst löschen)",
     headline:
-      "Hermes-Plugins entdecken, installieren, aktivieren und aktualisieren (entspricht `hermes plugins`).",
+      "Eir-Plugins entdecken, installieren, aktivieren und aktualisieren (entspricht `hermes plugins`).",
     identifierLabel: "Git-URL oder owner/repo",
     inactive: "inaktiv",
     installBtn: "Installieren",
@@ -370,13 +348,6 @@ export const de: Translations = {
     authRequired: "Authentifizierung erforderlich",
     authRequiredHint: "Führe diesen Befehl aus, um dich zu authentifizieren:",
     updateGit: "Git pull",
-    updateAll: "Alle aktualisieren",
-    updatingAll: "Plugins werden aktualisiert…",
-    updateAllDone: (updated: number, needsReview: number, failed: number) =>
-      `Aktualisiert ${updated}, Prüfung nötig ${needsReview}, fehlgeschlagen ${failed}`,
-    autoUpdate: "Automatisch aktualisieren",
-    autoUpdateDesc: (hours: number) =>
-      `Plugin-Updates automatisch anwenden, wenn das Gateway prüft (alle ${hours} h). Aktualisierter Code wird in neuen Sitzungen geladen.`,
     versionBadge: "Version",
     showInSidebar: "In Sidebar anzeigen",
     hideFromSidebar: "Aus Sidebar ausblenden",
@@ -463,7 +434,7 @@ export const de: Translations = {
     showValue: "Echten Wert anzeigen",
     hideValue: "Wert ausblenden",
     customTitle: "Benutzerdefinierte Schlüssel",
-    customHint: "Beliebige Umgebungsvariablen in deiner .env, die Hermes nicht erkennt. Verwende sie, um Umgebungsvariablen für Skills, MCP-Server oder eigene Tools einzuschleusen.",
+    customHint: "Beliebige Umgebungsvariablen in deiner .env, die Eir nicht erkennt. Verwende sie, um Umgebungsvariablen für Skills, MCP-Server oder eigene Tools einzuschleusen.",
     customConfigured: "{count} benutzerdefinierte Schlüssel gesetzt",
     addCustomKey: "Benutzerdefinierten Schlüssel hinzufügen",
     customKeyName: "Variablenname",
@@ -475,25 +446,20 @@ export const de: Translations = {
   oauth: {
     title: "Anbieter-Logins (OAuth)",
     providerLogins: "Anbieter-Logins (OAuth)",
-    description:
-      "{connected} von {total} OAuth-Anbietern verbunden. Nutze Anmelden für vom Dashboard unterstützte Abläufe; CLI-Befehle bleiben für externe oder Fallback-Einrichtung verfügbar.",
+    description: "{connected} von {total} OAuth-Anbietern verbunden. Login-Abläufe laufen derzeit über die CLI; klicke auf Befehl kopieren und füge ihn in ein Terminal ein, um einzurichten.",
     connected: "Verbunden",
     expired: "Abgelaufen",
-    notConnected: "Nicht verbunden. Nutze Anmelden, falls verfügbar, oder führe {command} in einem Terminal aus.",
+    notConnected: "Nicht verbunden. Führe {command} in einem Terminal aus.",
     runInTerminal: "in einem Terminal.",
     noProviders: "Keine OAuth-fähigen Anbieter erkannt.",
     login: "Anmelden",
     disconnect: "Trennen",
     managedExternally: "Extern verwaltet",
     copied: "Kopiert ✓",
-    copyCode: "Code kopieren",
-    copyFailed: "Automatisches Kopieren fehlgeschlagen. Markiere den Code und kopiere ihn manuell.",
     cli: "Kopieren",
     copyCliCommand: "CLI-Befehl kopieren (für extern / Fallback)",
     connect: "Verbinden",
     sessionExpires: "Sitzung läuft in {time} ab",
-    sessionExpiredNoError:
-      "Die Anmeldung ist abgelaufen, ohne den Anbieter zu erreichen. Das bedeutet meist, dass die Anmeldeseite im geöffneten Tab hängen geblieben ist (serverseitiges Problem) — schließen Sie die Anmeldung dort ab und klicken Sie dann auf Erneut versuchen. Wenn es weiterhin fehlschlägt, verwenden Sie stattdessen einen API-Schlüssel oder die CLI.",
     initiatingLogin: "Login-Ablauf wird gestartet…",
     exchangingCode: "Code wird gegen Tokens getauscht…",
     connectedClosing: "Verbunden! Wird geschlossen…",
@@ -527,11 +493,11 @@ export const de: Translations = {
   achievements: {
     hero: {
       kicker: "Agentic Gamerscore",
-      title: "Hermes Achievements",
+      title: "Eir Achievements",
       subtitle:
-        "Sammelbare Hermes-Abzeichen, verdient durch echten Sitzungsverlauf. Bekannte, noch nicht abgeschlossene Achievements werden als Entdeckt angezeigt; geheime Achievements bleiben verborgen, bis das erste passende Verhalten auftritt.",
+        "Sammelbare Eir-Abzeichen, verdient durch echten Sitzungsverlauf. Bekannte, noch nicht abgeschlossene Achievements werden als Entdeckt angezeigt; geheime Achievements bleiben verborgen, bis das erste passende Verhalten auftritt.",
       scan_subtitle:
-        "Hermes-Sitzungsverlauf wird gescannt. Der erste Scan kann bei umfangreichem Verlauf 5–10 Sekunden dauern.",
+        "Eir-Sitzungsverlauf wird gescannt. Der erste Scan kann bei umfangreichem Verlauf 5–10 Sekunden dauern.",
     },
     actions: {
       rescan: "Neu scannen",
@@ -546,7 +512,7 @@ export const de: Translations = {
       highest_tier: "Höchste Stufe",
       highest_tier_hint: "Copper → Silver → Gold → Diamond → Olympian",
       latest: "Neueste",
-      latest_hint_empty: "nutze Hermes mehr",
+      latest_hint_empty: "nutze Eir mehr",
       none_yet: "Noch keine",
     },
     state: {
@@ -577,10 +543,10 @@ export const de: Translations = {
       tiers_header: "Stufen",
       secret_header: "Geheime Achievements",
       secret_body:
-        "Geheimnisse verbergen ihren genauen Auslöser. Sobald Hermes ein verwandtes Signal erkennt, wird die Karte zu Entdeckt und zeigt ihre Anforderung an.",
+        "Geheimnisse verbergen ihren genauen Auslöser. Sobald Eir ein verwandtes Signal erkennt, wird die Karte zu Entdeckt und zeigt ihre Anforderung an.",
       scan_status_header: "Scan-Status",
       scan_status_body:
-        "Hermes scannt den lokalen Verlauf einmalig, danach erscheinen die Karten automatisch. Es ist nichts hängengeblieben, wenn dies ein paar Sekunden dauert.",
+        "Eir scannt den lokalen Verlauf einmalig, danach erscheinen die Karten automatisch. Es ist nichts hängengeblieben, wenn dies ein paar Sekunden dauert.",
       what_scanned_header: "Was gescannt wird",
       what_scanned_body:
         "Sitzungen, Tool-Aufrufe, Modell-Metadaten, Fehler, Achievements und lokaler Freischaltstatus.",
@@ -627,7 +593,7 @@ export const de: Translations = {
         "Auf X teilen öffnet einen vorgefertigten Post in einem neuen Tab. Klicke zuerst auf Bild kopieren, wenn du das 1200×630-Abzeichen anhängen möchtest – X lässt dich es direkt in den Tweet-Editor einfügen. PNG herunterladen speichert die Datei zur Nutzung an beliebiger Stelle.",
       clipboard_unsupported:
         "Bildkopie über die Zwischenablage wird in diesem Browser nicht unterstützt – nutze stattdessen Herunterladen.",
-      tweet_text: "Just unlocked {tier_part}\"{name}\" in Hermes Agent ☤",
+      tweet_text: "Just unlocked {tier_part}\"{name}\" in Eir Agent ☤",
     },
   },
   kanban: {
@@ -642,12 +608,6 @@ export const de: Translations = {
       "Mit Boards kannst du voneinander unabhängige Arbeitsabläufe trennen — eines pro Projekt, Repository oder Domäne. Worker auf einem Board sehen niemals die Aufgaben eines anderen Boards.",
     slug: "Slug",
     slugHint: "— Kleinbuchstaben, Bindestriche, z. B. atm10-server",
-    confirmDoneMany:
-      "Mark {n} tasks as done? The workers' claims are released and dependent children become ready.",
-    confirmArchiveMany:
-      "Archive {n} tasks? They disappear from the default board view.",
-    confirmBlockedMany:
-      "Mark {n} tasks as blocked? The workers' claims are released.",
     displayName: "Anzeigename",
     displayNameHint: "(optional)",
     description: "Beschreibung",

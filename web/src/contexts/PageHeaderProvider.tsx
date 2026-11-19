@@ -1,5 +1,5 @@
-import { useMemo, useState, type ReactNode } from "react";
-import { useLocation } from "react-router";
+import { useLayoutEffect, useMemo, useState, type ReactNode } from "react";
+import { useLocation } from "react-router-dom";
 import { PageHeaderContext } from "./page-header-context";
 import { resolvePageTitle } from "@/lib/resolve-page-title";
 import { cn } from "@/lib/utils";
@@ -15,18 +15,20 @@ export function PageHeaderProvider({
   const { pathname } = useLocation();
   const { t } = useI18n();
   const [titleOverride, setTitleOverride] = useState<string | null>(null);
+  const [subTitleOverride, setSubTitleOverride] = useState<string | null>(null);
   const [afterTitle, setAfterTitle] = useState<ReactNode>(null);
   const [end, setEnd] = useState<ReactNode>(null);
 
-  // Reset before the new route commits: parent layout effects run after child
-  // effects, so clearing there would erase the new page's header actions.
-  const [previousPathname, setPreviousPathname] = useState(pathname);
-  if (pathname !== previousPathname) {
-    setPreviousPathname(pathname);
+  // Clear any per-page title / toolbar slots when the path changes. Child routes
+  // re-fill these on mount via usePageHeader.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useLayoutEffect(() => {
     setTitleOverride(null);
+    setSubTitleOverride(null);
     setAfterTitle(null);
     setEnd(null);
-  }
+  }, [pathname]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const defaultTitle = useMemo(
     () => resolvePageTitle(pathname, t, pluginTabs),
@@ -44,6 +46,7 @@ export function PageHeaderProvider({
       setAfterTitle,
       setEnd,
       setTitle: setTitleOverride,
+      setSubTitle: setSubTitleOverride,
     }),
     [],
   );
@@ -72,25 +75,30 @@ export function PageHeaderProvider({
             <div
               className={cn(
                 "flex min-w-0 flex-1 gap-2 sm:gap-3",
-                afterTitle && isEnvRoute
+                (afterTitle || subTitleOverride) && isEnvRoute
                   ? "flex-col items-start sm:flex-row sm:items-center"
-                  : afterTitle
+                  : afterTitle || subTitleOverride
                     ? "flex-row flex-wrap items-center"
                     : "flex-row items-center",
               )}
             >
-              <h1
-                className={cn(
-                  "font-expanded min-w-0 text-sm font-bold tracking-[0.08em] text-midground",
-                  afterTitle && isEnvRoute
-                    ? "max-w-full sm:min-w-0 sm:shrink sm:truncate"
-                    : afterTitle
-                      ? "shrink truncate"
-                      : "truncate",
-                )}
-              >
-                {displayTitle}
-              </h1>
+              <div className="flex min-w-0 flex-col">
+                <h1
+                  className={cn(
+                    "font-expanded min-w-0 text-sm font-bold tracking-[0.08em] text-midground",
+                    afterTitle && isEnvRoute
+                      ? "max-w-full sm:min-w-0 sm:shrink sm:truncate"
+                      : afterTitle
+                        ? "shrink truncate"
+                        : "truncate",
+                  )}
+                >
+                  {displayTitle}
+                </h1>
+                {subTitleOverride ? (
+                  <p className="text-xs text-muted-foreground">{subTitleOverride}</p>
+                ) : null}
+              </div>
               {afterTitle ? (
                 <div
                   className={cn(

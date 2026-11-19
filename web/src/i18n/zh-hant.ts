@@ -50,7 +50,7 @@ export const zhHant: Translations = {
   },
 
   app: {
-    brand: "Hermes Agent",
+    brand: "Eir",
     brandShort: "HA",
     closeNavigation: "關閉導覽",
     closeModelTools: "關閉模型與工具",
@@ -92,18 +92,9 @@ export const zhHant: Translations = {
     webUi: "管理面板",
   },
 
-  // ── System page: Memory section ──
-  systemMemory: {
-    activeProvider: "目前記憶提供者",
-    noProvider: "無 — 僅內建",
-    builtinLayer: "內建層",
-    builtinNote: "MEMORY.md 和 USER.md 是 Hermes 自己的記憶，獨立於任何外部提供者。兩者預設都會載入工作階段；設定開關 (memory.memory_enabled / memory.user_profile_enabled) 可分別關閉。外部提供者是對它們的補充，絕不會取代它們。",
-  },
-
   status: {
     actionFailed: "動作失敗",
     actionFinished: "已完成",
-    actionFinishedOwed: "已更新，但仍有待完成的步驟（重新執行 `hermes update` 以完成）",
     actions: "動作",
     agent: "代理",
     activeSessions: "使用中工作階段",
@@ -129,8 +120,8 @@ export const zhHant: Translations = {
     starting: "啟動中",
     startedInBackground: "已於背景啟動 — 請查看日誌以取得進度",
     stopped: "已停止",
-    updateHermes: "更新 Hermes",
-    updatingHermes: "正在更新 Hermes…",
+    updateHermes: "更新 Eir",
+    updatingHermes: "正在更新 Eir…",
     waitingForOutput: "等待輸出…",
   },
 
@@ -138,14 +129,8 @@ export const zhHant: Translations = {
     title: "工作階段",
     history: "歷史",
     overview: "總覽",
-    filterChats: "聊天",
-    filterAutomation: "自動化",
-    filterAll: "全部",
-    sourceFilter: "工作階段來源",
-    anySource: "任何來源",
     searchPlaceholder: "搜尋訊息內容...",
     noSessions: "尚無工作階段",
-    noSessionsInFilter: "此篩選條件下沒有工作階段",
     noMatch: "沒有符合的工作階段",
     startConversation: "開始對話後將顯示於此",
     noMessages: "尚無訊息",
@@ -171,14 +156,9 @@ export const zhHant: Translations = {
     deleteSelectedConfirmMessage:
       "此操作將永久刪除所選的 {count} 個工作階段及其所有訊息。無法復原。",
     selectedSessionsDeleted: "已刪除 {count} 個工作階段",
-    selectedSessionsSkippedActive: "已刪除 {deleted} 個；{count} 個因仍有回合執行中而保留",
     failedToDeleteSelected: "刪除所選工作階段失敗",
     resumeInChat: "在對話中繼續",
     newChat: "新對話",
-    workspace: "工作區",
-    workspaceDefault: "預設",
-    workspaceRescan: "重新掃描儲存庫",
-    workspaceCustom: "其他路徑…",
     previousPage: "上一頁",
     nextPage: "下一頁",
     roles: {
@@ -337,11 +317,9 @@ export const zhHant: Translations = {
     disableRuntime: "停用",
     enableAfterInstall: "安裝後啟用",
     enableRuntime: "啟用",
-    toggleTakesEffectAfterRestart:
-      "已儲存 — 重新啟動閘道以套用變更。",
     forceReinstall: "強制重新安裝（先刪除既有資料夾）",
     headline:
-      "探索、安裝、啟用並更新 Hermes 外掛（對齊 `hermes plugins` CLI）。",
+      "探索、安裝、啟用並更新 Eir 外掛（對齊 `hermes plugins` CLI）。",
     identifierLabel: "Git 網址或 owner/repo",
     inactive: "未啟用",
     installBtn: "安裝",
@@ -369,13 +347,6 @@ export const zhHant: Translations = {
     authRequired: "需要驗證",
     authRequiredHint: "執行此指令以完成驗證：",
     updateGit: "Git pull",
-    updateAll: "全部更新",
-    updatingAll: "正在更新外掛…",
-    updateAllDone: (updated: number, needsReview: number, failed: number) =>
-      `已更新 ${updated}，需審核 ${needsReview}，失敗 ${failed}`,
-    autoUpdate: "自動更新",
-    autoUpdateDesc: (hours: number) =>
-      `閘道檢查時（每 ${hours} 小時）自動套用外掛更新。更新後的程式碼會在新工作階段中載入。`,
     versionBadge: "版本",
     showInSidebar: "顯示於側邊欄",
     hideFromSidebar: "從側邊欄隱藏",
@@ -462,7 +433,7 @@ export const zhHant: Translations = {
     showValue: "顯示實際值",
     hideValue: "隱藏值",
     customTitle: "自訂密鑰",
-    customHint: "儲存在 .env 中、Hermes 無法識別的任意環境變數。可用於為技能、MCP 伺服器或你自己的工具注入環境變數。",
+    customHint: "儲存在 .env 中、Eir 無法識別的任意環境變數。可用於為技能、MCP 伺服器或你自己的工具注入環境變數。",
     customConfigured: "已設定 {count} 個自訂密鑰",
     addCustomKey: "新增自訂密鑰",
     customKeyName: "變數名稱",
@@ -474,25 +445,20 @@ export const zhHant: Translations = {
   oauth: {
     title: "提供者登入（OAuth）",
     providerLogins: "提供者登入（OAuth）",
-    description:
-      "已連線 {connected}/{total} 個 OAuth 提供者。儀表板支援的流程請使用「登入」；CLI 指令仍可用於外部或備用設定。",
+    description: "已連線 {connected}/{total} 個 OAuth 提供者。登入流程目前透過 CLI 執行；請點擊「複製指令」並貼到終端機完成設定。",
     connected: "已連線",
     expired: "已過期",
-    notConnected: "未連線。可用時請使用「登入」，或在終端機執行 {command}。",
+    notConnected: "未連線。請在終端機執行 {command}。",
     runInTerminal: "於終端機。",
     noProviders: "未偵測到支援 OAuth 的提供者。",
     login: "登入",
     disconnect: "中斷連線",
     managedExternally: "由外部管理",
     copied: "已複製 ✓",
-    copyCode: "複製代碼",
-    copyFailed: "無法自動複製。請選取代碼並手動複製。",
     cli: "複製",
     copyCliCommand: "複製 CLI 指令（外部 / 備援用）",
     connect: "連線",
     sessionExpires: "工作階段將於 {time} 後過期",
-    sessionExpiredNoError:
-      "登入已過期，且未能連線到提供方。這通常表示登入頁面在開啟的分頁中卡住了（伺服器端問題）——請在該分頁完成登入後點擊重試。若仍失敗，請改用 API 金鑰或 CLI。",
     initiatingLogin: "正在啟動登入流程…",
     exchangingCode: "正在交換權杖…",
     connectedClosing: "已連線！正在關閉…",
@@ -527,11 +493,11 @@ export const zhHant: Translations = {
   achievements: {
     hero: {
       kicker: "Agentic Gamerscore",
-      title: "Hermes Achievements",
+      title: "Eir Achievements",
       subtitle:
-        "從真實工作階段歷史中獲得的 Hermes 可收集徽章。已知尚未達成的成就會顯示為「已發現」；秘密成就在首次出現相符行為之前保持隱藏。",
+        "從真實工作階段歷史中獲得的 Eir 可收集徽章。已知尚未達成的成就會顯示為「已發現」；秘密成就在首次出現相符行為之前保持隱藏。",
       scan_subtitle:
-        "正在掃描 Hermes 工作階段歷史。在歷史紀錄較多時，首次掃描可能需要 5–10 秒。",
+        "正在掃描 Eir 工作階段歷史。在歷史紀錄較多時，首次掃描可能需要 5–10 秒。",
     },
     actions: {
       rescan: "重新掃描",
@@ -546,7 +512,7 @@ export const zhHant: Translations = {
       highest_tier: "最高等級",
       highest_tier_hint: "Copper → Silver → Gold → Diamond → Olympian",
       latest: "最新",
-      latest_hint_empty: "多多執行 Hermes",
+      latest_hint_empty: "多多執行 Eir",
       none_yet: "尚無",
     },
     state: {
@@ -577,10 +543,10 @@ export const zhHant: Translations = {
       tiers_header: "等級",
       secret_header: "秘密成就",
       secret_body:
-        "秘密成就會隱藏其確切觸發條件。一旦 Hermes 偵測到相關訊號，卡片便會變為「已發現」並顯示其需求。",
+        "秘密成就會隱藏其確切觸發條件。一旦 Eir 偵測到相關訊號，卡片便會變為「已發現」並顯示其需求。",
       scan_status_header: "掃描狀態",
       scan_status_body:
-        "Hermes 正在對本機歷史進行一次掃描，之後卡片會自動出現。即使需要幾秒鐘，也並未卡住。",
+        "Eir 正在對本機歷史進行一次掃描，之後卡片會自動出現。即使需要幾秒鐘，也並未卡住。",
       what_scanned_header: "掃描內容",
       what_scanned_body:
         "工作階段、工具呼叫、模型中繼資料、錯誤、成就以及本機解鎖狀態。",
@@ -627,7 +593,7 @@ export const zhHant: Translations = {
         "「在 X 上分享」會在新分頁中開啟預先填寫的貼文。若想附上 1200×630 的徽章，請先點擊「複製圖片」—— X 允許你直接貼到推文編輯器中。「下載 PNG」會將檔案儲存下來，可在任何地方使用。",
       clipboard_unsupported:
         "此瀏覽器不支援剪貼簿圖片複製 —— 請改用「下載」。",
-      tweet_text: "Just unlocked {tier_part}\"{name}\" in Hermes Agent ☤",
+      tweet_text: "Just unlocked {tier_part}\"{name}\" in Eir Agent ☤",
     },
   },
   kanban: {
@@ -642,12 +608,6 @@ export const zhHant: Translations = {
       "看板可將不相關的工作流分開——每個專案、程式碼庫或網域一個看板。一個看板上的工作者不會看到另一個看板的任務。",
     slug: "識別碼",
     slugHint: "— 小寫字母、連字號，例如 atm10-server",
-    confirmDoneMany:
-      "Mark {n} tasks as done? The workers' claims are released and dependent children become ready.",
-    confirmArchiveMany:
-      "Archive {n} tasks? They disappear from the default board view.",
-    confirmBlockedMany:
-      "Mark {n} tasks as blocked? The workers' claims are released.",
     displayName: "顯示名稱",
     displayNameHint: "（選填）",
     description: "描述",

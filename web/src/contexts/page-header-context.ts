@@ -5,6 +5,7 @@ export interface PageHeaderContextValue {
   setAfterTitle: (node: ReactNode) => void;
   setEnd: (node: ReactNode) => void;
   setTitle: (title: string | null) => void;
+  setSubTitle: (subTitle: string | null) => void;
 }
 
 export const PageHeaderContext = createContext<PageHeaderContextValue | null>(

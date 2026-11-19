@@ -50,7 +50,7 @@ export const af: Translations = {
   },
 
   app: {
-    brand: "Hermes Agent",
+    brand: "Eir",
     brandShort: "HA",
     closeNavigation: "Maak navigasie toe",
     closeModelTools: "Maak model en gereedskap toe",
@@ -92,18 +92,9 @@ export const af: Translations = {
     webUi: "Web UI",
   },
 
-  // ── System page: Memory section ──
-  systemMemory: {
-    activeProvider: "Aktiewe geheueverskaffer",
-    noProvider: "geen — slegs ingebou",
-    builtinLayer: "Ingeboude laag",
-    builtinNote: "MEMORY.md en USER.md is Hermes se eie geheue, apart van enige eksterne verskaffer. Albei word by verstek in sessies gelaai; die konfigurasieskakelaars (memory.memory_enabled / memory.user_profile_enabled) skakel elkeen af. 'n Verskaffer voeg daarby; dit vervang hulle nooit.",
-  },
-
   status: {
     actionFailed: "Aksie het misluk",
     actionFinished: "Voltooi",
-    actionFinishedOwed: "Bygewerk, maar nog uitstaande (voer `hermes update` weer uit om klaar te maak)",
     actions: "Aksies",
     agent: "Agent",
     activeSessions: "Aktiewe Sessies",
@@ -129,8 +120,8 @@ export const af: Translations = {
     starting: "Begin",
     startedInBackground: "Begin in agtergrond — kyk logs vir vordering",
     stopped: "Gestop",
-    updateHermes: "Werk Hermes op",
-    updatingHermes: "Besig om Hermes op te werk…",
+    updateHermes: "Werk Eir op",
+    updatingHermes: "Besig om Eir op te werk…",
     waitingForOutput: "Wag vir uitset…",
   },
 
@@ -138,14 +129,8 @@ export const af: Translations = {
     title: "Sessies",
     history: "Geskiedenis",
     overview: "Oorsig",
-    filterChats: "Geselse",
-    filterAutomation: "Outomatisering",
-    filterAll: "Alles",
-    sourceFilter: "Sessiebron",
-    anySource: "Enige bron",
     searchPlaceholder: "Soek boodskap-inhoud...",
     noSessions: "Nog geen sessies nie",
-    noSessionsInFilter: "Geen sessies in hierdie filter nie",
     noMatch: "Geen sessies stem ooreen met jou soektog nie",
     startConversation: "Begin 'n gesprek om dit hier te sien",
     noMessages: "Geen boodskappe",
@@ -171,14 +156,9 @@ export const af: Translations = {
     deleteSelectedConfirmMessage:
       "Dit verwyder {count} gekose sessies en al hul boodskappe permanent. Dit kan nie ongedaan gemaak word nie.",
     selectedSessionsDeleted: "{count} sessies geskrap",
-    selectedSessionsSkippedActive: "{deleted} geskrap; {count} behou omdat 'n beurt nog loop",
     failedToDeleteSelected: "Kon nie gekose sessies skrap nie",
     resumeInChat: "Hervat in Klets",
     newChat: "Nuwe klets",
-    workspace: "werkruimte",
-    workspaceDefault: "Verstek",
-    workspaceRescan: "Herskandeer bewaarplekke",
-    workspaceCustom: "Ander pad…",
     previousPage: "Vorige bladsy",
     nextPage: "Volgende bladsy",
     roles: {
@@ -338,11 +318,9 @@ export const af: Translations = {
     disableRuntime: "Deaktiveer",
     enableAfterInstall: "Aktiveer ná installasie",
     enableRuntime: "Aktiveer",
-    toggleTakesEffectAfterRestart:
-      "Gestoor — herbegin die gateway om die verandering toe te pas.",
     forceReinstall: "Forseer herinstallasie (skrap eers bestaande gids)",
     headline:
-      "Ontdek, installeer, aktiveer en werk Hermes-inproppe op (`hermes plugins` ekwivalent).",
+      "Ontdek, installeer, aktiveer en werk Eir-inproppe op (`hermes plugins` ekwivalent).",
     identifierLabel: "Git-URL of owner/repo",
     inactive: "onaktief",
     installBtn: "Installeer",
@@ -370,13 +348,6 @@ export const af: Translations = {
     authRequired: "Verifikasie vereis",
     authRequiredHint: "Voer hierdie opdrag uit om te verifieer:",
     updateGit: "Git pull",
-    updateAll: "Werk alles by",
-    updatingAll: "Inproppe word bygewerk…",
-    updateAllDone: (updated: number, needsReview: number, failed: number) =>
-      `Bygewerk ${updated}, moet hersien word ${needsReview}, misluk ${failed}`,
-    autoUpdate: "Outo-bywerk",
-    autoUpdateDesc: (hours: number) =>
-      `Pas inpropbywerkings outomaties toe wanneer die gateway kyk (elke ${hours} h). Bygewerkte kode laai in nuwe sessies.`,
     versionBadge: "Weergawe",
     showInSidebar: "Wys in sybalk",
     hideFromSidebar: "Versteek van sybalk",
@@ -463,7 +434,7 @@ export const af: Translations = {
     showValue: "Wys werklike waarde",
     hideValue: "Versteek waarde",
     customTitle: "Pasgemaakte sleutels",
-    customHint: "Arbitrêre omgewingsveranderlikes wat in jou .env gestoor is en wat Hermes nie herken nie. Gebruik dit om omgewingsveranderlikes vir vaardighede, MCP-bedieners of jou eie gereedskap in te spuit.",
+    customHint: "Arbitrêre omgewingsveranderlikes wat in jou .env gestoor is en wat Eir nie herken nie. Gebruik dit om omgewingsveranderlikes vir vaardighede, MCP-bedieners of jou eie gereedskap in te spuit.",
     customConfigured: "{count} pasgemaakte sleutel(s) gestel",
     addCustomKey: "Voeg 'n pasgemaakte sleutel by",
     customKeyName: "Veranderlike naam",
@@ -475,25 +446,20 @@ export const af: Translations = {
   oauth: {
     title: "Verskaffer-aanmeldings (OAuth)",
     providerLogins: "Verskaffer-aanmeldings (OAuth)",
-    description:
-      "{connected} van {total} OAuth-verskaffers gekoppel. Gebruik Meld aan vir vloeie wat die kontroleskerm ondersteun; CLI-opdragte bly beskikbaar vir eksterne of terugval-opstelling.",
+    description: "{connected} van {total} OAuth-verskaffers gekoppel. Aanmeldvloei loop tans via die CLI; klik Kopieer opdrag en plak in 'n terminaal om op te stel.",
     connected: "Gekoppel",
     expired: "Verval",
-    notConnected: "Nie gekoppel nie. Gebruik Meld aan indien beskikbaar, of voer {command} uit in 'n terminaal.",
+    notConnected: "Nie gekoppel nie. Voer {command} uit in 'n terminaal.",
     runInTerminal: "in 'n terminaal.",
     noProviders: "Geen OAuth-bekwame verskaffers opgespoor nie.",
     login: "Meld aan",
     disconnect: "Ontkoppel",
     managedExternally: "Ekstern bestuur",
     copied: "Gekopieer ✓",
-    copyCode: "Kopieer kode",
-    copyFailed: "Kon nie outomaties kopieer nie. Kies die kode en kopieer dit met die hand.",
     cli: "Kopieer",
     copyCliCommand: "Kopieer CLI-opdrag (vir ekstern / terugval)",
     connect: "Koppel",
     sessionExpires: "Sessie verval oor {time}",
-    sessionExpiredNoError:
-      "Aanmelding het verval sonder om die verskaffer te bereik. Dit beteken gewoonlik dat die aanmeldbladsy in die oop oortjie vasgeval het ('n bedienerkant-probleem) — voltooi die aanmelding daar en klik dan Probeer weer. As dit aanhou misluk, gebruik eerder 'n API-sleutel of die CLI.",
     initiatingLogin: "Aanmeldvloei word begin…",
     exchangingCode: "Kode word vir tokens omgeruil…",
     connectedClosing: "Gekoppel! Besig om toe te maak…",
@@ -528,11 +494,11 @@ export const af: Translations = {
   achievements: {
     hero: {
       kicker: "Agentic Gamerscore",
-      title: "Hermes Achievements",
+      title: "Eir Achievements",
       subtitle:
-        "Versamelbare Hermes-kentekens wat verdien word uit werklike sessiegeskiedenis. Bekende, onvoltooide prestasies word as Ontdek vertoon; Geheime prestasies bly verborge totdat die eerste ooreenstemmende gedrag verskyn.",
+        "Versamelbare Eir-kentekens wat verdien word uit werklike sessiegeskiedenis. Bekende, onvoltooide prestasies word as Ontdek vertoon; Geheime prestasies bly verborge totdat die eerste ooreenstemmende gedrag verskyn.",
       scan_subtitle:
-        "Hermes-sessiegeskiedenis word geskandeer. Die eerste skandering kan 5–10 sekondes neem op groot geskiedenisse.",
+        "Eir-sessiegeskiedenis word geskandeer. Die eerste skandering kan 5–10 sekondes neem op groot geskiedenisse.",
     },
     actions: {
       rescan: "Herskandeer",
@@ -547,7 +513,7 @@ export const af: Translations = {
       highest_tier: "Hoogste vlak",
       highest_tier_hint: "Copper → Silver → Gold → Diamond → Olympian",
       latest: "Jongste",
-      latest_hint_empty: "gebruik Hermes meer",
+      latest_hint_empty: "gebruik Eir meer",
       none_yet: "Nog geen",
     },
     state: {
@@ -578,10 +544,10 @@ export const af: Translations = {
       tiers_header: "Vlakke",
       secret_header: "Geheime prestasies",
       secret_body:
-        "Geheime hou hul presiese sneller verborge. Sodra Hermes 'n verwante sein sien, word die kaart Ontdek en wys sy vereiste.",
+        "Geheime hou hul presiese sneller verborge. Sodra Eir 'n verwante sein sien, word die kaart Ontdek en wys sy vereiste.",
       scan_status_header: "Skanderingstatus",
       scan_status_body:
-        "Hermes skandeer plaaslike geskiedenis een keer, daarna verskyn kaarte outomaties. Niks is vasgevang as dit 'n paar sekondes neem nie.",
+        "Eir skandeer plaaslike geskiedenis een keer, daarna verskyn kaarte outomaties. Niks is vasgevang as dit 'n paar sekondes neem nie.",
       what_scanned_header: "Wat geskandeer word",
       what_scanned_body:
         "Sessies, gereedskaproepe, modelmetadata, foute, prestasies en plaaslike ontsluitstatus.",
@@ -628,7 +594,7 @@ export const af: Translations = {
         "Deel op X maak 'n vooraf-ingevulde plasing in 'n nuwe oortjie oop. Klik eers op Kopieer beeld as jy die 1200×630-kenteken aangeheg wil hê — X laat jou dit direk in die tweet-skrywer plak. Laai PNG af stoor die lêer om enige plek te gebruik.",
       clipboard_unsupported:
         "Beeldkopiëring na knipbord word nie in hierdie blaaier ondersteun nie — gebruik eerder Aflaai.",
-      tweet_text: "Just unlocked {tier_part}\"{name}\" in Hermes Agent ☤",
+      tweet_text: "Just unlocked {tier_part}\"{name}\" in Eir Agent ☤",
     },
   },
   kanban: {
@@ -643,12 +609,6 @@ export const af: Translations = {
       "Borde laat u toe om onverwante werkstrome te skei — een per projek, repositorium of domein. Werkers op een bord sien nooit 'n ander bord se take nie.",
     slug: "Slug",
     slugHint: "— kleinletters, koppeltekens, bv. atm10-server",
-    confirmDoneMany:
-      "Mark {n} tasks as done? The workers' claims are released and dependent children become ready.",
-    confirmArchiveMany:
-      "Archive {n} tasks? They disappear from the default board view.",
-    confirmBlockedMany:
-      "Mark {n} tasks as blocked? The workers' claims are released.",
     displayName: "Vertoonnaam",
     displayNameHint: "(opsioneel)",
     description: "Beskrywing",

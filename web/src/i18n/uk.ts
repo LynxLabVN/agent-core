@@ -50,7 +50,7 @@ export const uk: Translations = {
   },
 
   app: {
-    brand: "Hermes Agent",
+    brand: "Eir",
     brandShort: "HA",
     closeNavigation: "Закрити навігацію",
     closeModelTools: "Закрити модель та інструменти",
@@ -92,18 +92,9 @@ export const uk: Translations = {
     webUi: "Web UI",
   },
 
-  // ── System page: Memory section ──
-  systemMemory: {
-    activeProvider: "Активний провайдер пам'яті",
-    noProvider: "немає — лише вбудована",
-    builtinLayer: "Вбудований шар",
-    builtinNote: "MEMORY.md і USER.md — власна пам'ять Hermes, незалежна від зовнішніх провайдерів. Типово обидва файли завантажуються в сесії; перемикачі конфігурації (memory.memory_enabled / memory.user_profile_enabled) вимикають кожен із них. Зовнішній провайдер доповнює їх, але ніколи не замінює.",
-  },
-
   status: {
     actionFailed: "Дія не вдалася",
     actionFinished: "Завершено",
-    actionFinishedOwed: "Оновлено, але роботу ще не завершено (запустіть `hermes update` знову, щоб завершити)",
     actions: "Дії",
     agent: "Агент",
     activeSessions: "Активні сесії",
@@ -129,8 +120,8 @@ export const uk: Translations = {
     starting: "Запускається",
     startedInBackground: "Запущено у фоні — перевірте журнали для прогресу",
     stopped: "Зупинено",
-    updateHermes: "Оновити Hermes",
-    updatingHermes: "Оновлення Hermes…",
+    updateHermes: "Оновити Eir",
+    updatingHermes: "Оновлення Eir…",
     waitingForOutput: "Очікування виводу…",
   },
 
@@ -138,14 +129,8 @@ export const uk: Translations = {
     title: "Сесії",
     history: "Історія",
     overview: "Огляд",
-    filterChats: "Чати",
-    filterAutomation: "Автоматизація",
-    filterAll: "Усі",
-    sourceFilter: "Джерело сесії",
-    anySource: "Будь-яке джерело",
     searchPlaceholder: "Пошук у вмісті повідомлень...",
     noSessions: "Поки немає сесій",
-    noSessionsInFilter: "У цьому фільтрі немає сесій",
     noMatch: "Жодна сесія не відповідає вашому пошуку",
     startConversation: "Почніть розмову, щоб побачити її тут",
     noMessages: "Немає повідомлень",
@@ -171,14 +156,9 @@ export const uk: Translations = {
     deleteSelectedConfirmMessage:
       "Це назавжди видалить {count} вибраних сесій і всі їхні повідомлення. Цю дію неможливо скасувати.",
     selectedSessionsDeleted: "Видалено сесій: {count}",
-    selectedSessionsSkippedActive: "Видалено: {deleted}; залишено: {count}, бо хід ще виконується",
     failedToDeleteSelected: "Не вдалося видалити вибрані сесії",
     resumeInChat: "Продовжити в чаті",
     newChat: "Новий чат",
-    workspace: "робоча папка",
-    workspaceDefault: "За замовчуванням",
-    workspaceRescan: "Пересканувати репозиторії",
-    workspaceCustom: "Інший шлях…",
     previousPage: "Попередня сторінка",
     nextPage: "Наступна сторінка",
     roles: {
@@ -339,11 +319,9 @@ export const uk: Translations = {
     disableRuntime: "Вимкнути",
     enableAfterInstall: "Увімкнути після встановлення",
     enableRuntime: "Увімкнути",
-    toggleTakesEffectAfterRestart:
-      "Збережено — перезапустіть шлюз, щоб застосувати зміну.",
     forceReinstall: "Примусово перевстановити (спершу видалити наявну теку)",
     headline:
-      "Знаходьте, встановлюйте, вмикайте та оновлюйте плагіни Hermes (паритет з `hermes plugins`).",
+      "Знаходьте, встановлюйте, вмикайте та оновлюйте плагіни Eir (паритет з `hermes plugins`).",
     identifierLabel: "Git URL або owner/repo",
     inactive: "неактивний",
     installBtn: "Встановити",
@@ -371,13 +349,6 @@ export const uk: Translations = {
     authRequired: "Потрібна автентифікація",
     authRequiredHint: "Виконайте цю команду, щоб автентифікуватися:",
     updateGit: "Git pull",
-    updateAll: "Оновити всі",
-    updatingAll: "Оновлення плагінів…",
-    updateAllDone: (updated: number, needsReview: number, failed: number) =>
-      `Оновлено ${updated}, потребують перевірки ${needsReview}, з помилкою ${failed}`,
-    autoUpdate: "Автооновлення",
-    autoUpdateDesc: (hours: number) =>
-      `Автоматично застосовувати оновлення плагінів під час перевірки шлюзом (кожні ${hours} год). Оновлений код завантажується в нових сесіях.`,
     versionBadge: "Версія",
     showInSidebar: "Показати у бічній панелі",
     hideFromSidebar: "Сховати з бічної панелі",
@@ -416,7 +387,7 @@ export const uk: Translations = {
     rawYaml: "Сирий YAML-конфіг",
     searchResults: "Результати пошуку",
     fields: "поле(ів)",
-    noFieldsMatch: 'Немає полів, що відповідають "{query}"',
+    noFieldsMatch: 'Немає полів, що відповідають \"{query}\"',
     configSaved: "Конфігурацію збережено",
     yamlConfigSaved: "YAML-конфігурацію збережено",
     failedToSave: "Не вдалося зберегти",
@@ -464,7 +435,7 @@ export const uk: Translations = {
     showValue: "Показати справжнє значення",
     hideValue: "Сховати значення",
     customTitle: "Власні ключі",
-    customHint: "Довільні змінні середовища, збережені у вашому .env, які Hermes не розпізнає. Використовуйте їх для впровадження змінних середовища для навичок, серверів MCP або власних інструментів.",
+    customHint: "Довільні змінні середовища, збережені у вашому .env, які Eir не розпізнає. Використовуйте їх для впровадження змінних середовища для навичок, серверів MCP або власних інструментів.",
     customConfigured: "Задано власних ключів: {count}",
     addCustomKey: "Додати власний ключ",
     customKeyName: "Назва змінної",
@@ -476,25 +447,20 @@ export const uk: Translations = {
   oauth: {
     title: "Входи постачальників (OAuth)",
     providerLogins: "Входи постачальників (OAuth)",
-    description:
-      "Підключено {connected} з {total} постачальників OAuth. Використовуйте «Увійти» для процесів, підтримуваних панеллю; команди CLI залишаються доступними для зовнішнього або резервного налаштування.",
+    description: "Підключено {connected} з {total} постачальників OAuth. Процеси входу наразі виконуються через CLI; натисніть «Скопіювати команду» та вставте у термінал, щоб налаштувати.",
     connected: "Підключено",
     expired: "Прострочено",
-    notConnected: "Не підключено. Використовуйте «Увійти», якщо доступно, або виконайте {command} у терміналі.",
+    notConnected: "Не підключено. Виконайте {command} у терміналі.",
     runInTerminal: "у терміналі.",
     noProviders: "Не виявлено постачальників із підтримкою OAuth.",
     login: "Увійти",
     disconnect: "Відключити",
     managedExternally: "Керується ззовні",
     copied: "Скопійовано ✓",
-    copyCode: "Скопіювати код",
-    copyFailed: "Не вдалося скопіювати автоматично. Виділіть код і скопіюйте його вручну.",
     cli: "Копіювати",
     copyCliCommand: "Скопіювати CLI-команду (для зовнішнього / резервного варіанту)",
     connect: "Підключити",
     sessionExpires: "Сесія завершиться через {time}",
-    sessionExpiredNoError:
-      "Час входу минув, не досягнувши провайдера. Зазвичай це означає, що сторінка входу зависла у відкритій вкладці (проблема на боці сервера) — завершіть вхід там, потім натисніть «Повторити». Якщо помилка повторюється, скористайтеся API-ключем або CLI.",
     initiatingLogin: "Запуск процесу входу…",
     exchangingCode: "Обмін коду на токени…",
     connectedClosing: "Підключено! Закриття…",
@@ -529,11 +495,11 @@ export const uk: Translations = {
   achievements: {
     hero: {
       kicker: "Agentic Gamerscore",
-      title: "Hermes Achievements",
+      title: "Eir Achievements",
       subtitle:
-        "Колекційні значки Hermes, отримані з реальної історії сеансів. Відомі, але ще не виконані досягнення показані як Виявлені; Секретні досягнення залишаються прихованими, доки не з'явиться перший відповідний сигнал.",
+        "Колекційні значки Eir, отримані з реальної історії сеансів. Відомі, але ще не виконані досягнення показані як Виявлені; Секретні досягнення залишаються прихованими, доки не з'явиться перший відповідний сигнал.",
       scan_subtitle:
-        "Сканування історії сеансів Hermes. Перше сканування на великих історіях може тривати 5–10 секунд.",
+        "Сканування історії сеансів Eir. Перше сканування на великих історіях може тривати 5–10 секунд.",
     },
     actions: {
       rescan: "Повторне сканування",
@@ -548,7 +514,7 @@ export const uk: Translations = {
       highest_tier: "Найвищий рівень",
       highest_tier_hint: "Copper → Silver → Gold → Diamond → Olympian",
       latest: "Останнє",
-      latest_hint_empty: "запускайте Hermes частіше",
+      latest_hint_empty: "запускайте Eir частіше",
       none_yet: "Поки немає",
     },
     state: {
@@ -579,10 +545,10 @@ export const uk: Translations = {
       tiers_header: "Рівні",
       secret_header: "Секретні досягнення",
       secret_body:
-        "Секрети приховують свій точний тригер. Щойно Hermes побачить пов'язаний сигнал, картка стає Виявленою та показує свою умову.",
+        "Секрети приховують свій точний тригер. Щойно Eir побачить пов'язаний сигнал, картка стає Виявленою та показує свою умову.",
       scan_status_header: "Стан сканування",
       scan_status_body:
-        "Hermes одноразово сканує локальну історію, а потім картки з'являться автоматично. Якщо це триває кілька секунд — нічого не зависло.",
+        "Eir одноразово сканує локальну історію, а потім картки з'являться автоматично. Якщо це триває кілька секунд — нічого не зависло.",
       what_scanned_header: "Що сканується",
       what_scanned_body:
         "Сеанси, виклики інструментів, метадані моделей, помилки, досягнення та локальний стан розблокування.",
@@ -629,7 +595,7 @@ export const uk: Translations = {
         "«Поділитися в X» відкриває попередньо заповнений допис у новій вкладці. Якщо хочете прикріпити значок 1200×630 — спочатку натисніть «Копіювати зображення»: X дозволить вставити його прямо в редактор твіта. «Завантажити PNG» збереже файл для використання будь-де.",
       clipboard_unsupported:
         "Цей браузер не підтримує копіювання зображень у буфер обміну — використайте «Завантажити».",
-      tweet_text: "Just unlocked {tier_part}\"{name}\" in Hermes Agent ☤",
+      tweet_text: "Just unlocked {tier_part}\"{name}\" in Eir Agent ☤",
     },
   },
   kanban: {
@@ -644,12 +610,6 @@ export const uk: Translations = {
       "Дошки дозволяють розділяти непов'язані потоки роботи — по одній на проєкт, репозиторій або домен. Воркери на одній дошці ніколи не бачать задач іншої дошки.",
     slug: "Slug",
     slugHint: "— рядкові літери, дефіси, напр. atm10-server",
-    confirmDoneMany:
-      "Mark {n} tasks as done? The workers' claims are released and dependent children become ready.",
-    confirmArchiveMany:
-      "Archive {n} tasks? They disappear from the default board view.",
-    confirmBlockedMany:
-      "Mark {n} tasks as blocked? The workers' claims are released.",
     displayName: "Відображувана назва",
     displayNameHint: "(необов'язково)",
     description: "Опис",

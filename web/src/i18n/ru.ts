@@ -50,7 +50,7 @@ export const ru: Translations = {
   },
 
   app: {
-    brand: "Hermes Agent",
+    brand: "Eir",
     brandShort: "HA",
     closeNavigation: "Закрыть навигацию",
     closeModelTools: "Закрыть модель и инструменты",
@@ -92,18 +92,9 @@ export const ru: Translations = {
     webUi: "Web UI",
   },
 
-  // ── System page: Memory section ──
-  systemMemory: {
-    activeProvider: "Активный провайдер памяти",
-    noProvider: "нет — только встроенная",
-    builtinLayer: "Встроенный слой",
-    builtinNote: "MEMORY.md и USER.md — собственная память Hermes, независимая от внешних провайдеров. По умолчанию оба файла загружаются в сессии; переключатели конфигурации (memory.memory_enabled / memory.user_profile_enabled) отключают каждый из них. Внешний провайдер дополняет их, но никогда не заменяет.",
-  },
-
   status: {
     actionFailed: "Ошибка действия",
     actionFinished: "Завершено",
-    actionFinishedOwed: "Обновлено, но работа ещё не завершена (запустите `hermes update` снова, чтобы закончить)",
     actions: "Действия",
     agent: "Агент",
     activeSessions: "Активные сессии",
@@ -129,8 +120,8 @@ export const ru: Translations = {
     starting: "Запуск",
     startedInBackground: "Запущено в фоне — следите за журналами",
     stopped: "Остановлено",
-    updateHermes: "Обновить Hermes",
-    updatingHermes: "Обновление Hermes…",
+    updateHermes: "Обновить Eir",
+    updatingHermes: "Обновление Eir…",
     waitingForOutput: "Ожидание вывода…",
   },
 
@@ -138,14 +129,8 @@ export const ru: Translations = {
     title: "Сессии",
     history: "История",
     overview: "Обзор",
-    filterChats: "Чаты",
-    filterAutomation: "Автоматизация",
-    filterAll: "Все",
-    sourceFilter: "Источник сессии",
-    anySource: "Любой источник",
     searchPlaceholder: "Поиск по содержимому сообщений...",
     noSessions: "Сессий пока нет",
-    noSessionsInFilter: "В этом фильтре нет сессий",
     noMatch: "Нет сессий, соответствующих запросу",
     startConversation: "Начните разговор, чтобы увидеть его здесь",
     noMessages: "Нет сообщений",
@@ -171,14 +156,9 @@ export const ru: Translations = {
     deleteSelectedConfirmMessage:
       "Это безвозвратно удалит {count} выбранных сессий и все их сообщения. Это действие нельзя отменить.",
     selectedSessionsDeleted: "Удалено сессий: {count}",
-    selectedSessionsSkippedActive: "Удалено: {deleted}; сохранено: {count}, так как ход ещё выполняется",
     failedToDeleteSelected: "Не удалось удалить выбранные сессии",
     resumeInChat: "Продолжить в чате",
     newChat: "Новый чат",
-    workspace: "рабочая папка",
-    workspaceDefault: "По умолчанию",
-    workspaceRescan: "Пересканировать репозитории",
-    workspaceCustom: "Другой путь…",
     previousPage: "Предыдущая страница",
     nextPage: "Следующая страница",
     roles: {
@@ -338,11 +318,9 @@ export const ru: Translations = {
     disableRuntime: "Отключить",
     enableAfterInstall: "Включить после установки",
     enableRuntime: "Включить",
-    toggleTakesEffectAfterRestart:
-      "Сохранено — перезапустите шлюз, чтобы применить изменение.",
     forceReinstall: "Принудительная переустановка (сначала удалить существующую папку)",
     headline:
-      "Поиск, установка, включение и обновление плагинов Hermes (аналог `hermes plugins`).",
+      "Поиск, установка, включение и обновление плагинов Eir (аналог `hermes plugins`).",
     identifierLabel: "Git URL или owner/repo",
     inactive: "неактивно",
     installBtn: "Установить",
@@ -370,13 +348,6 @@ export const ru: Translations = {
     authRequired: "Требуется аутентификация",
     authRequiredHint: "Выполните эту команду для аутентификации:",
     updateGit: "Git pull",
-    updateAll: "Обновить все",
-    updatingAll: "Обновление плагинов…",
-    updateAllDone: (updated: number, needsReview: number, failed: number) =>
-      `Обновлено ${updated}, требуют проверки ${needsReview}, с ошибкой ${failed}`,
-    autoUpdate: "Автообновление",
-    autoUpdateDesc: (hours: number) =>
-      `Автоматически применять обновления плагинов при проверке шлюзом (каждые ${hours} ч). Обновлённый код загружается в новых сессиях.`,
     versionBadge: "Версия",
     showInSidebar: "Показывать в боковой панели",
     hideFromSidebar: "Скрыть из боковой панели",
@@ -463,7 +434,7 @@ export const ru: Translations = {
     showValue: "Показать реальное значение",
     hideValue: "Скрыть значение",
     customTitle: "Пользовательские ключи",
-    customHint: "Произвольные переменные окружения, сохранённые в вашем .env, которые Hermes не распознаёт. Используйте их для внедрения переменных окружения для навыков, серверов MCP или собственных инструментов.",
+    customHint: "Произвольные переменные окружения, сохранённые в вашем .env, которые Eir не распознаёт. Используйте их для внедрения переменных окружения для навыков, серверов MCP или собственных инструментов.",
     customConfigured: "Задано пользовательских ключей: {count}",
     addCustomKey: "Добавить пользовательский ключ",
     customKeyName: "Имя переменной",
@@ -475,25 +446,20 @@ export const ru: Translations = {
   oauth: {
     title: "Входы провайдеров (OAuth)",
     providerLogins: "Входы провайдеров (OAuth)",
-    description:
-      "Подключено {connected} из {total} OAuth-провайдеров. Используйте «Войти» для процессов, поддерживаемых панелью; команды CLI остаются доступными для внешней или резервной настройки.",
+    description: "Подключено {connected} из {total} OAuth-провайдеров. Процесс входа в настоящее время выполняется через CLI; нажмите «Скопировать команду» и вставьте в терминал для настройки.",
     connected: "Подключено",
     expired: "Срок истёк",
-    notConnected: "Не подключено. Используйте «Войти», если доступно, или выполните {command} в терминале.",
+    notConnected: "Не подключено. Выполните {command} в терминале.",
     runInTerminal: "в терминале.",
     noProviders: "OAuth-совместимые провайдеры не обнаружены.",
     login: "Войти",
     disconnect: "Отключить",
     managedExternally: "Управляется извне",
     copied: "Скопировано ✓",
-    copyCode: "Скопировать код",
-    copyFailed: "Не удалось скопировать автоматически. Выделите код и скопируйте его вручную.",
     cli: "Копировать",
     copyCliCommand: "Скопировать CLI-команду (для внешнего / резервного варианта)",
     connect: "Подключить",
     sessionExpires: "Сессия истечёт через {time}",
-    sessionExpiredNoError:
-      "Время входа истекло, не достигнув провайдера. Обычно это означает, что страница входа зависла в открытой вкладке (проблема на стороне сервера) — завершите вход там, затем нажмите «Повторить». Если ошибка повторяется, используйте API-ключ или CLI.",
     initiatingLogin: "Запуск процесса входа…",
     exchangingCode: "Обмен кода на токены…",
     connectedClosing: "Подключено! Закрытие…",
@@ -528,11 +494,11 @@ export const ru: Translations = {
   achievements: {
     hero: {
       kicker: "Agentic Gamerscore",
-      title: "Hermes Achievements",
+      title: "Eir Achievements",
       subtitle:
-        "Коллекционные значки Hermes, полученные на основе реальной истории сессий. Известные, но ещё не полученные достижения отображаются как «Обнаруженные»; «Секретные» достижения остаются скрытыми до появления первого подходящего поведения.",
+        "Коллекционные значки Eir, полученные на основе реальной истории сессий. Известные, но ещё не полученные достижения отображаются как «Обнаруженные»; «Секретные» достижения остаются скрытыми до появления первого подходящего поведения.",
       scan_subtitle:
-        "Анализ истории сессий Hermes. Первое сканирование может занять 5–10 секунд при большой истории.",
+        "Анализ истории сессий Eir. Первое сканирование может занять 5–10 секунд при большой истории.",
     },
     actions: {
       rescan: "Пересканировать",
@@ -547,7 +513,7 @@ export const ru: Translations = {
       highest_tier: "Высший уровень",
       highest_tier_hint: "Copper → Silver → Gold → Diamond → Olympian",
       latest: "Последнее",
-      latest_hint_empty: "запускайте Hermes чаще",
+      latest_hint_empty: "запускайте Eir чаще",
       none_yet: "Пока нет",
     },
     state: {
@@ -578,10 +544,10 @@ export const ru: Translations = {
       tiers_header: "Уровни",
       secret_header: "Секретные достижения",
       secret_body:
-        "Секретные достижения скрывают свой точный триггер. Как только Hermes обнаруживает связанный сигнал, карточка становится «Обнаруженной» и показывает требование.",
+        "Секретные достижения скрывают свой точный триггер. Как только Eir обнаруживает связанный сигнал, карточка становится «Обнаруженной» и показывает требование.",
       scan_status_header: "Статус сканирования",
       scan_status_body:
-        "Hermes сканирует локальную историю один раз, затем карточки появятся автоматически. Если это занимает несколько секунд — ничего не зависло.",
+        "Eir сканирует локальную историю один раз, затем карточки появятся автоматически. Если это занимает несколько секунд — ничего не зависло.",
       what_scanned_header: "Что сканируется",
       what_scanned_body:
         "Сессии, вызовы инструментов, метаданные моделей, ошибки, достижения и локальное состояние разблокировки.",
@@ -628,7 +594,7 @@ export const ru: Translations = {
         "«Поделиться в X» открывает пост с заранее заполненным текстом в новой вкладке. Сначала нажмите «Скопировать изображение», если хотите прикрепить значок 1200×630 — X позволяет вставить его прямо в редактор твита. «Скачать PNG» сохраняет файл для использования где угодно.",
       clipboard_unsupported:
         "Копирование изображений в буфер обмена не поддерживается в этом браузере — используйте «Скачать».",
-      tweet_text: "Just unlocked {tier_part}\"{name}\" in Hermes Agent ☤",
+      tweet_text: "Just unlocked {tier_part}\"{name}\" in Eir Agent ☤",
     },
   },
   kanban: {
@@ -643,12 +609,6 @@ export const ru: Translations = {
       "Доски позволяют разделять не связанные между собой потоки работы — по одной на проект, репозиторий или область. Воркеры одной доски никогда не видят задачи другой.",
     slug: "Slug",
     slugHint: "— строчные буквы, дефисы, например atm10-server",
-    confirmDoneMany:
-      "Mark {n} tasks as done? The workers' claims are released and dependent children become ready.",
-    confirmArchiveMany:
-      "Archive {n} tasks? They disappear from the default board view.",
-    confirmBlockedMany:
-      "Mark {n} tasks as blocked? The workers' claims are released.",
     displayName: "Отображаемое имя",
     displayNameHint: "(необязательно)",
     description: "Описание",

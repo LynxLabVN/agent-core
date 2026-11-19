@@ -1,6 +1,4 @@
 import {
-  lazy,
-  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -19,22 +17,26 @@ import {
   Navigate,
   useLocation,
   useNavigate,
-} from "react-router";
+} from "react-router-dom";
 import {
   Activity,
   BarChart3,
   BookOpen,
+  Briefcase,
+  Calendar,
   Clock,
   Code,
   Cpu,
   Database,
   Download,
+  Edit3,
   Eye,
   FolderOpen,
   FileText,
   Globe,
   Heart,
   KeyRound,
+  LayoutDashboard,
   Menu,
   MessageSquare,
   Package,
@@ -44,14 +46,17 @@ import {
   Puzzle,
   Radio,
   RotateCw,
+  Send,
   Settings,
   Shield,
   ShieldCheck,
+  ShoppingBag,
   Sparkles,
   Star,
   Terminal,
   Users,
   Webhook,
+  Workflow,
   Wrench,
   X,
   Zap,
@@ -63,68 +68,64 @@ import { Typography } from "@nous-research/ui/ui/components/typography/index";
 import { ConfirmDialog } from "@nous-research/ui/ui/components/confirm-dialog";
 import { cn } from "@/lib/utils";
 import { SidebarFooter } from "@/components/SidebarFooter";
-import { CockpitSidebarSlot } from "@/components/CockpitSidebarSlot";
 import { SidebarStatusStrip, gatewayLine } from "@/components/SidebarStatusStrip";
 import { useBelowBreakpoint } from "@nous-research/ui/hooks/use-below-breakpoint";
 import { useSidebarStatus } from "@/hooks/useSidebarStatus";
 import { AuthWidget } from "@/components/AuthWidget";
 import { PageHeaderProvider } from "@/contexts/PageHeaderProvider";
+import { ProfileProvider } from "@/contexts/ProfileProvider";
 import { useProfileScope } from "@/contexts/useProfileScope";
 import { ProfileSwitcher } from "@/components/ProfileSwitcher";
 import { ProfileScopeBanner } from "@/components/ProfileScopeBanner";
-import { MemoryPressureBanner } from "@/components/MemoryPressureBanner";
-import { MultiplexStandaloneBanner } from "@/components/MultiplexStandaloneBanner";
-import { SharedMetricsConsentBanner } from "@/components/SharedMetricsConsentBanner";
 import { useSystemActions } from "@/contexts/useSystemActions";
 import type { SystemAction } from "@/contexts/system-actions-context";
-// Route pages are lazy-loaded so the initial dashboard shell does not pay for
-// every admin surface (and heavy deps like xterm) up front.
-const ConfigPage = lazy(() => import("@/pages/ConfigPage"));
-const DocsPage = lazy(() => import("@/pages/DocsPage"));
-const EnvPage = lazy(() => import("@/pages/EnvPage"));
-const FilesPage = lazy(() => import("@/pages/FilesPage"));
-const SessionsPage = lazy(() => import("@/pages/SessionsPage"));
-const LogsPage = lazy(() => import("@/pages/LogsPage"));
-const AnalyticsPage = lazy(() => import("@/pages/AnalyticsPage"));
-const ModelsPage = lazy(() => import("@/pages/ModelsPage"));
-const CronPage = lazy(() => import("@/pages/CronPage"));
-const ProfilesPage = lazy(() => import("@/pages/ProfilesPage"));
-const ProfileBuilderPage = lazy(() => import("@/pages/ProfileBuilderPage"));
-const SkillsPage = lazy(() => import("@/pages/SkillsPage"));
-const PluginsPage = lazy(() => import("@/pages/PluginsPage"));
-const McpPage = lazy(() => import("@/pages/McpPage"));
-const PairingPage = lazy(() => import("@/pages/PairingPage"));
-const ChannelsPage = lazy(() => import("@/pages/ChannelsPage"));
-const WebhooksPage = lazy(() => import("@/pages/WebhooksPage"));
-const SystemPage = lazy(() => import("@/pages/SystemPage"));
-const ChatPage = lazy(() => import("@/pages/ChatPage"));
+import ConfigPage from "@/pages/ConfigPage";
+import DocsPage from "@/pages/DocsPage";
+import EnvPage from "@/pages/EnvPage";
+import FilesPage from "@/pages/FilesPage";
+import SessionsPage from "@/pages/SessionsPage";
+import LogsPage from "@/pages/LogsPage";
+import AnalyticsPage from "@/pages/AnalyticsPage";
+import ModelsPage from "@/pages/ModelsPage";
+import CronPage from "@/pages/CronPage";
+import ProfilesPage from "@/pages/ProfilesPage";
+import ProfileBuilderPage from "@/pages/ProfileBuilderPage";
+import SkillsPage from "@/pages/SkillsPage";
+import PluginsPage from "@/pages/PluginsPage";
+import McpPage from "@/pages/McpPage";
+import PairingPage from "@/pages/PairingPage";
+import ChannelsPage from "@/pages/ChannelsPage";
+import WebhooksPage from "@/pages/WebhooksPage";
+import SystemPage from "@/pages/SystemPage";
+import ChatPage from "@/pages/ChatPage";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+
+// Office Agent — Marketing & HR dashboard surfaces (Phase 4 UI).
+import MarketingHubPage from "@/pages/marketing/MarketingHubPage";
+import PipelinePage from "@/pages/marketing/PipelinePage";
+import ScriptWorkspacePage from "@/pages/marketing/ScriptWorkspacePage";
+import ReviewQueuePage from "@/pages/marketing/ReviewQueuePage";
+import EditPreviewPage from "@/pages/marketing/EditPreviewPage";
+import PublishConsolePage from "@/pages/marketing/PublishConsolePage";
+import CommentInboxPage from "@/pages/marketing/CommentInboxPage";
+import MAnalyticsPage from "@/pages/marketing/MAnalyticsPage";
+import CatalogPage from "@/pages/marketing/CatalogPage";
+import HRHubPage from "@/pages/hr/HRHubPage";
+import HRJobsPage from "@/pages/hr/HRJobsPage";
+import HRPipelinePage from "@/pages/hr/HRPipelinePage";
+import HRCandidatesPage from "@/pages/hr/HRCandidatesPage";
+import HRSchedulePage from "@/pages/hr/HRSchedulePage";
+import HRCommsPage from "@/pages/hr/HRCommsPage";
+import HRAnalyticsPage from "@/pages/hr/HRAnalyticsPage";
 import { useI18n } from "@/i18n";
 import type { Translations } from "@/i18n/types";
 import { PluginPage, PluginSlot, usePlugins } from "@/plugins";
 import type { PluginManifest } from "@/plugins";
 import { useTheme } from "@/themes";
 import { isDashboardEmbeddedChatEnabled } from "@/lib/dashboard-flags";
-import { latchChatActivation } from "@/lib/chat-activation";
-import { sharedGatewayProfiles, sharedGatewayRestartDescription } from "@/lib/shared-gateway";
 import { api } from "@/lib/api";
 import type { StatusResponse, UpdateCheckResponse } from "@/lib/api";
-
-function RouteFallback({ label = "Loading…" }: { label?: string }) {
-  return (
-    <div
-      className="flex min-h-[12rem] flex-1 items-center justify-center"
-      aria-busy="true"
-      aria-live="polite"
-    >
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Spinner />
-        <span>{label}</span>
-      </div>
-    </div>
-  );
-}
 
 function RootRedirect() {
   return <Navigate to="/sessions" replace />;
@@ -151,10 +152,8 @@ const CHAT_NAV_ITEM: NavItem = {
  * inline near the bottom of this file — so the PTY child, WebSocket,
  * and xterm instance survive when the user visits another tab and comes
  * back.  A `display:none` toggle hides the terminal without unmounting.
- * The host itself is still deferred until the first /chat visit so the
- * xterm chunk is not downloaded on unrelated pages.  Routing still owns
- * the URL so /chat deep-links, browser back/forward, and nav highlight
- * keep working.
+ * Routing still owns the URL so /chat deep-links, browser back/forward,
+ * and nav highlight keep working.
  */
 const BUILTIN_ROUTES_CORE: Record<string, ComponentType> = {
   "/": RootRedirect,
@@ -176,6 +175,30 @@ const BUILTIN_ROUTES_CORE: Record<string, ComponentType> = {
   "/config": ConfigPage,
   "/env": EnvPage,
   "/docs": DocsPage,
+
+  // Office Agent — Marketing
+  "/marketing": MarketingHubPage,
+  "/marketing/pipeline": PipelinePage,
+  "/marketing/script/:pieceId": ScriptWorkspacePage,
+  "/marketing/script": ScriptWorkspacePage,
+  "/marketing/review": ReviewQueuePage,
+  "/marketing/edit/:pieceId": EditPreviewPage,
+  "/marketing/edit": EditPreviewPage,
+  "/marketing/publish/:pieceId": PublishConsolePage,
+  "/marketing/publish": PublishConsolePage,
+  "/marketing/comments": CommentInboxPage,
+  "/marketing/analytics": MAnalyticsPage,
+  "/marketing/catalog": CatalogPage,
+
+  // Office Agent — HR
+  "/hr": HRHubPage,
+  "/hr/jobs": HRJobsPage,
+  "/hr/pipeline/:jobId": HRPipelinePage,
+  "/hr/pipeline": HRPipelinePage,
+  "/hr/candidates": HRCandidatesPage,
+  "/hr/schedule": HRSchedulePage,
+  "/hr/comms": HRCommsPage,
+  "/hr/analytics": HRAnalyticsPage,
 };
 
 // Route placeholder for /chat.  The persistent ChatPage host (rendered
@@ -225,6 +248,30 @@ const BUILTIN_NAV_REST: NavItem[] = [
     icon: BookOpen,
   },
 ];
+
+const MARKETING_NAV: NavItem[] = [
+  { path: "/marketing", label: "Overview", icon: LayoutDashboard },
+  { path: "/marketing/pipeline", label: "Pipeline", icon: BarChart3 },
+  { path: "/marketing/script", label: "Script", icon: FileText },
+  { path: "/marketing/review", label: "Review Queue", icon: Sparkles },
+  { path: "/marketing/edit", label: "Edit & Preview", icon: Edit3 },
+  { path: "/marketing/publish", label: "Publish", icon: Send },
+  { path: "/marketing/comments", label: "Comments", icon: MessageSquare },
+  { path: "/marketing/analytics", label: "Analytics", icon: BarChart3 },
+  { path: "/marketing/catalog", label: "Catalog", icon: ShoppingBag },
+];
+
+const HR_NAV: NavItem[] = [
+  { path: "/hr", label: "Overview", icon: LayoutDashboard },
+  { path: "/hr/jobs", label: "Jobs", icon: Briefcase },
+  { path: "/hr/pipeline", label: "Pipeline", icon: Workflow },
+  { path: "/hr/candidates", label: "Candidates", icon: Users },
+  { path: "/hr/schedule", label: "Schedule", icon: Calendar },
+  { path: "/hr/comms", label: "Comms", icon: MessageSquare },
+  { path: "/hr/analytics", label: "Analytics", icon: BarChart3 },
+];
+
+type OfficeDomain = "marketing" | "hr" | null;
 
 const ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
   Activity,
@@ -375,8 +422,7 @@ const SIDEBAR_COLLAPSED_KEY = "hermes-sidebar-collapsed";
 export default function App() {
   const { t } = useI18n();
   const { pathname } = useLocation();
-  const { profile } = useProfileScope();
-  const { manifests, loading: pluginsLoading } = usePlugins(profile);
+  const { manifests, loading: pluginsLoading } = usePlugins();
   const { theme } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
   const closeMobile = useCallback(() => setMobileOpen(false), []);
@@ -388,6 +434,32 @@ export default function App() {
       return false;
     }
   });
+
+  // Office Agent domain switcher state. Persist the last chosen domain so the
+  // sidebar stays useful across reloads, but derive from the current path first.
+  const OFFICE_DOMAIN_KEY = "hermes-office-domain";
+  const resolvedDomain: OfficeDomain = pathname.startsWith("/marketing")
+    ? "marketing"
+    : pathname.startsWith("/hr")
+    ? "hr"
+    : null;
+  const [activeOfficeDomain, setActiveOfficeDomain] = useState<OfficeDomain>(() => {
+    if (resolvedDomain) return resolvedDomain;
+    try {
+      const stored = localStorage.getItem(OFFICE_DOMAIN_KEY);
+      return stored === "marketing" || stored === "hr" ? stored : null;
+    } catch {
+      return null;
+    }
+  });
+  useEffect(() => {
+    if (resolvedDomain && resolvedDomain !== activeOfficeDomain) {
+      setActiveOfficeDomain(resolvedDomain);
+      try {
+        localStorage.setItem(OFFICE_DOMAIN_KEY, resolvedDomain);
+      } catch { /* ignore */ }
+    }
+  }, [resolvedDomain, activeOfficeDomain]);
   const toggleCollapsed = useCallback(() => {
     setCollapsed((prev) => {
       const next = !prev;
@@ -405,13 +477,6 @@ export default function App() {
   const normalizedPath = pathname.replace(/\/$/, "") || "/";
   const isChatRoute = normalizedPath === "/chat";
   const embeddedChat = isDashboardEmbeddedChatEnabled();
-  // Defer mounting the persistent chat host (and its xterm chunk) until the
-  // user has actually opened /chat at least once. Sticky after that so the
-  // PTY survives later tab switches.
-  const [chatHostMounted, setChatHostMounted] = useState(isChatRoute);
-  useEffect(() => {
-    setChatHostMounted((prev) => latchChatActivation(prev, isChatRoute));
-  }, [isChatRoute]);
 
   // `dashboard.show_token_analytics` gates the Analytics nav item.  The
   // page itself remains reachable by URL (it renders an explanation when
@@ -514,6 +579,7 @@ export default function App() {
   }, []);
 
   return (
+    <ProfileProvider>
     <div
       data-layout-variant={layoutVariant}
       className="flex h-dvh max-h-dvh min-h-0 flex-col overflow-hidden bg-background-base text-text-primary antialiased"
@@ -535,8 +601,7 @@ export default function App() {
           "bg-background-base",
         )}
         style={{
-          background:
-            "var(--component-header-background, var(--background-base))",
+          background: "var(--component-header-background)",
           borderImage: "var(--component-header-border-image)",
           clipPath: "var(--component-header-clip-path)",
         }}
@@ -570,18 +635,10 @@ export default function App() {
         />
       )}
 
-      {/* Single mobile header clearance for the banner stack + content. The
-          fixed lg:hidden header is h-14/z-40; previously each banner carried
-          its own mt-14 AND the content kept pt-14, so two visible banners
-          stacked three offsets (NS-656 review P3). One spacer, applied once. */}
-      <div aria-hidden className="h-14 shrink-0 lg:hidden" />
       <PluginSlot name="header-banner" />
       <ProfileScopeBanner />
-      <MemoryPressureBanner status={sidebarStatus} />
-      <MultiplexStandaloneBanner status={sidebarStatus} />
-      <SharedMetricsConsentBanner />
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden pt-14 lg:pt-0">
         <div className="flex min-h-0 min-w-0 flex-1">
           <aside
             id="app-sidebar"
@@ -597,8 +654,7 @@ export default function App() {
               collapsed && "lg:w-14",
             )}
             style={{
-              background:
-                "var(--component-sidebar-background, var(--background-base))",
+              background: "var(--component-sidebar-background)",
               clipPath: "var(--component-sidebar-clip-path)",
               borderImage: "var(--component-sidebar-border-image)",
             }}
@@ -618,11 +674,11 @@ export default function App() {
               >
                 <PluginSlot name="header-left" />
 
-                <Typography className="font-bold text-[1.125rem] leading-[0.95] tracking-[0.0525rem] text-midground uppercase">
-                  Hermes
-                  <br />
-                  Agent
-                </Typography>
+                <img
+                  alt="Eir"
+                  src="/eir-logo.png"
+                  className="h-7 w-auto object-contain opacity-95"
+                />
               </div>
 
               <Button
@@ -654,6 +710,54 @@ export default function App() {
 
             <ProfileSwitcher collapsed={isDesktopCollapsed} />
 
+            {/* Office Agent domain switcher */}
+            <div
+              className={cn(
+                "flex shrink-0 items-center gap-1 px-3 py-2",
+                isDesktopCollapsed && "lg:hidden",
+              )}
+            >
+              <button
+                onClick={() => {
+                  setActiveOfficeDomain("marketing");
+                  try { localStorage.setItem(OFFICE_DOMAIN_KEY, "marketing"); } catch { /* ignore */ }
+                }}
+                className={cn(
+                  "flex-1 rounded px-2 py-1.5 text-xs font-semibold transition-colors",
+                  activeOfficeDomain === "marketing"
+                    ? "bg-midground text-background-base"
+                    : "text-muted-foreground hover:bg-secondary",
+                )}
+              >
+                Marketing
+              </button>
+              <button
+                onClick={() => {
+                  setActiveOfficeDomain("hr");
+                  try { localStorage.setItem(OFFICE_DOMAIN_KEY, "hr"); } catch { /* ignore */ }
+                }}
+                className={cn(
+                  "flex-1 rounded px-2 py-1.5 text-xs font-semibold transition-colors",
+                  activeOfficeDomain === "hr"
+                    ? "bg-midground text-background-base"
+                    : "text-muted-foreground hover:bg-secondary",
+                )}
+              >
+                HR
+              </button>
+              {activeOfficeDomain && (
+                <button
+                  onClick={() => {
+                    setActiveOfficeDomain(null);
+                    try { localStorage.removeItem(OFFICE_DOMAIN_KEY); } catch { /* ignore */ }
+                  }}
+                  className="px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Hide
+                </button>
+              )}
+            </div>
+
             <nav
               className="min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden border-t border-current/10 py-2"
               aria-label={t.app.navigation}
@@ -671,16 +775,90 @@ export default function App() {
                 ))}
               </ul>
 
-              <SidebarPluginNav
-                closeMobile={closeMobile}
-                collapsed={isDesktopCollapsed}
-                items={sidebarNav.pluginItems}
-                t={t}
-                tooltipWarmRef={tooltipWarmRef}
-              />
-            </nav>
+              {(activeOfficeDomain === "marketing" || activeOfficeDomain === null) && (
+                <div className="flex flex-col border-t border-current/10 pb-2" role="group">
+                  <span
+                    className={cn(
+                      "px-5 pt-2.5 pb-1",
+                      "font-sans text-display text-xs tracking-[0.12em] text-text-tertiary",
+                      isDesktopCollapsed && "lg:hidden",
+                    )}
+                  >
+                    Marketing
+                  </span>
+                  <ul className="flex flex-col">
+                    {MARKETING_NAV.map((item) => (
+                      <SidebarNavLink
+                        closeMobile={closeMobile}
+                        collapsed={isDesktopCollapsed}
+                        item={item}
+                        key={item.path}
+                        t={t}
+                        tooltipWarmRef={tooltipWarmRef}
+                      />
+                    ))}
+                  </ul>
+                </div>
+              )}
 
-            <CockpitSidebarSlot layoutVariant={layoutVariant} />
+              {(activeOfficeDomain === "hr" || activeOfficeDomain === null) && (
+                <div className="flex flex-col border-t border-current/10 pb-2" role="group">
+                  <span
+                    className={cn(
+                      "px-5 pt-2.5 pb-1",
+                      "font-sans text-display text-xs tracking-[0.12em] text-text-tertiary",
+                      isDesktopCollapsed && "lg:hidden",
+                    )}
+                  >
+                    HR
+                  </span>
+                  <ul className="flex flex-col">
+                    {HR_NAV.map((item) => (
+                      <SidebarNavLink
+                        closeMobile={closeMobile}
+                        collapsed={isDesktopCollapsed}
+                        item={item}
+                        key={item.path}
+                        t={t}
+                        tooltipWarmRef={tooltipWarmRef}
+                      />
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {sidebarNav.pluginItems.length > 0 && (
+                <div
+                  aria-labelledby="hermes-sidebar-plugin-nav-heading"
+                  className="flex flex-col border-t border-current/10 pb-2"
+                  role="group"
+                >
+                  <span
+                    className={cn(
+                      "px-5 pt-2.5 pb-1",
+                      "font-sans text-display text-xs tracking-[0.12em] text-text-tertiary",
+                      isDesktopCollapsed && "lg:hidden",
+                    )}
+                    id="hermes-sidebar-plugin-nav-heading"
+                  >
+                    {t.app.pluginNavSection}
+                  </span>
+
+                  <ul className="flex flex-col">
+                    {sidebarNav.pluginItems.map((item) => (
+                      <SidebarNavLink
+                        closeMobile={closeMobile}
+                        collapsed={isDesktopCollapsed}
+                        item={item}
+                        key={item.path}
+                        t={t}
+                        tooltipWarmRef={tooltipWarmRef}
+                      />
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </nav>
 
             <SidebarSystemActions
               collapsed={isDesktopCollapsed}
@@ -758,28 +936,35 @@ export default function App() {
                 )}
               >
                 <ProfileKeyedRoutes>
-                  <Suspense fallback={<RouteFallback />}>
-                    <Routes>
-                      {routes.map(({ key, path, element }) => (
-                        <Route key={key} path={path} element={element} />
-                      ))}
-                      <Route
-                        path="*"
-                        element={
-                          <UnknownRouteFallback pluginsLoading={pluginsLoading} />
-                        }
-                      />
-                    </Routes>
-                  </Suspense>
+                  <Routes>
+                    {routes.map(({ key, path, element }) => (
+                      <Route key={key} path={path} element={element} />
+                    ))}
+                    <Route
+                      path="*"
+                      element={
+                        <UnknownRouteFallback pluginsLoading={pluginsLoading} />
+                      }
+                    />
+                  </Routes>
                 </ProfileKeyedRoutes>
 
                 {embeddedChat &&
                   !chatOverriddenByPlugin &&
                   (pluginsLoading ? (
                     isChatRoute ? (
-                      <RouteFallback label="Loading chat…" />
+                      <div
+                        className="flex min-h-0 min-w-0 flex-1 items-center justify-center"
+                        aria-busy="true"
+                        aria-live="polite"
+                      >
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Spinner />
+                          <span>Loading chat…</span>
+                        </div>
+                      </div>
                     ) : null
-                  ) : chatHostMounted ? (
+                  ) : (
                     <div
                       data-chat-active={isChatRoute ? "true" : "false"}
                       className={cn(
@@ -788,19 +973,9 @@ export default function App() {
                       )}
                       aria-hidden={!isChatRoute}
                     >
-                      <Suspense
-                        fallback={
-                          isChatRoute ? (
-                            <RouteFallback label="Loading chat…" />
-                          ) : null
-                        }
-                      >
-                        <ChatPage isActive={isChatRoute} />
-                      </Suspense>
+                      <ChatPage isActive={isChatRoute} />
                     </div>
-                  ) : isChatRoute ? (
-                    <RouteFallback label="Loading chat…" />
-                  ) : null)}
+                  ))}
               </div>
               <PluginSlot name="post-main" />
             </div>
@@ -810,6 +985,7 @@ export default function App() {
 
       <PluginSlot name="overlay" />
     </div>
+    </ProfileProvider>
   );
 }
 
@@ -914,38 +1090,6 @@ function SidebarNavLink({
   );
 }
 
-function SidebarPluginNav({
-  items,
-  ...linkProps
-}: Omit<SidebarNavLinkProps, "item"> & { items: NavItem[] }) {
-  if (items.length === 0) return null;
-
-  return (
-    <div
-      aria-labelledby="hermes-sidebar-plugin-nav-heading"
-      className="flex flex-col border-t border-current/10 pb-2"
-      role="group"
-    >
-      <span
-        className={cn(
-          "px-5 pt-2.5 pb-1",
-          "font-sans text-display text-xs tracking-[0.12em] text-text-tertiary",
-          linkProps.collapsed && "lg:hidden",
-        )}
-        id="hermes-sidebar-plugin-nav-heading"
-      >
-        {linkProps.t.app.pluginNavSection}
-      </span>
-
-      <ul className="flex flex-col">
-        {items.map((item) => (
-          <SidebarNavLink {...linkProps} item={item} key={item.path} />
-        ))}
-      </ul>
-    </div>
-  );
-}
-
 function SidebarSystemActions({
   collapsed,
   onNavigate,
@@ -957,8 +1101,6 @@ function SidebarSystemActions({
   const { activeAction, isBusy, isRunning, pendingAction, runAction } =
     useSystemActions();
   const canUpdateHermes = status?.can_update_hermes === true;
-  // Served by the shared multiplexer: a restart blips every bot on this device — say which.
-  const sharedGateway = sharedGatewayProfiles(status);
   const [restartConfirmOpen, setRestartConfirmOpen] = useState(false);
   const [updateConfirmOpen, setUpdateConfirmOpen] = useState(false);
   const [updateConfirmInfo, setUpdateConfirmInfo] =
@@ -1092,21 +1234,17 @@ function SidebarSystemActions({
 
     <ConfirmDialog
       cancelLabel={t.common.cancel}
-      confirmLabel={sharedGateway ? "Restart all" : t.status.restartGateway}
+      confirmLabel={t.status.restartGateway}
       description={
-        sharedGateway
-          ? sharedGatewayRestartDescription(sharedGateway)
-          : (t.status.restartGatewayConfirmMessage ??
-            "This restarts the Hermes gateway process. Connected channels and active sessions will reconnect afterward.")
+        t.status.restartGatewayConfirmMessage ??
+        "This restarts the Eir gateway process. Connected channels and active sessions will reconnect afterward."
       }
       loading={pendingAction === "restart"}
       onCancel={() => setRestartConfirmOpen(false)}
       onConfirm={confirmRestart}
       open={restartConfirmOpen}
       title={
-        sharedGateway
-          ? "Restart the shared gateway?"
-          : (t.status.restartGatewayConfirmTitle ?? `${t.status.restartGateway}?`)
+        t.status.restartGatewayConfirmTitle ?? `${t.status.restartGateway}?`
       }
     />
 

@@ -50,7 +50,7 @@ export const ja: Translations = {
   },
 
   app: {
-    brand: "Hermes Agent",
+    brand: "Eir",
     brandShort: "HA",
     closeNavigation: "ナビゲーションを閉じる",
     closeModelTools: "モデルとツールを閉じる",
@@ -92,18 +92,9 @@ export const ja: Translations = {
     webUi: "Web UI",
   },
 
-  // ── System page: Memory section ──
-  systemMemory: {
-    activeProvider: "有効なメモリプロバイダー",
-    noProvider: "なし — 組み込みのみ",
-    builtinLayer: "組み込みレイヤー",
-    builtinNote: "MEMORY.md と USER.md は外部プロバイダーとは別の Hermes 自身のメモリです。どちらも既定でセッションに読み込まれ、設定の切り替え (memory.memory_enabled / memory.user_profile_enabled) でそれぞれオフにできます。外部プロバイダーはこれに追加されるもので、置き換えることはありません。",
-  },
-
   status: {
     actionFailed: "アクションが失敗しました",
     actionFinished: "完了",
-    actionFinishedOwed: "更新済みですが未完了の処理があります（完了するには `hermes update` を再実行してください）",
     actions: "アクション",
     agent: "エージェント",
     activeSessions: "アクティブなセッション",
@@ -129,8 +120,8 @@ export const ja: Translations = {
     starting: "起動中",
     startedInBackground: "バックグラウンドで起動しました — 進行状況はログをご確認ください",
     stopped: "停止",
-    updateHermes: "Hermes を更新",
-    updatingHermes: "Hermes を更新しています…",
+    updateHermes: "Eir を更新",
+    updatingHermes: "Eir を更新しています…",
     waitingForOutput: "出力を待機しています…",
   },
 
@@ -138,14 +129,8 @@ export const ja: Translations = {
     title: "セッション",
     history: "履歴",
     overview: "概要",
-    filterChats: "チャット",
-    filterAutomation: "自動化",
-    filterAll: "すべて",
-    sourceFilter: "セッションのソース",
-    anySource: "すべてのソース",
     searchPlaceholder: "メッセージ内容を検索...",
     noSessions: "まだセッションがありません",
-    noSessionsInFilter: "このフィルターにセッションはありません",
     noMatch: "検索条件に一致するセッションはありません",
     startConversation: "会話を開始するとここに表示されます",
     noMessages: "メッセージがありません",
@@ -171,14 +156,9 @@ export const ja: Translations = {
     deleteSelectedConfirmMessage:
       "選択した{count}件のセッションとそのすべてのメッセージが完全に削除されます。この操作は取り消せません。",
     selectedSessionsDeleted: "{count}件のセッションを削除しました",
-    selectedSessionsSkippedActive: "{deleted}件を削除、実行中のターンがあるため{count}件を保持しました",
     failedToDeleteSelected: "選択したセッションの削除に失敗しました",
     resumeInChat: "チャットで再開",
     newChat: "新しいチャット",
-    workspace: "ワークスペース",
-    workspaceDefault: "デフォルト",
-    workspaceRescan: "リポジトリを再スキャン",
-    workspaceCustom: "別のパス…",
     previousPage: "前のページ",
     nextPage: "次のページ",
     roles: {
@@ -337,11 +317,9 @@ export const ja: Translations = {
     disableRuntime: "無効化",
     enableAfterInstall: "インストール後に有効化",
     enableRuntime: "有効化",
-    toggleTakesEffectAfterRestart:
-      "保存しました — 変更を適用するにはゲートウェイを再起動してください。",
     forceReinstall: "強制再インストール (既存のフォルダを先に削除)",
     headline:
-      "Hermes プラグインを発見、インストール、有効化、更新します (`hermes plugins` 相当)。",
+      "Eir プラグインを発見、インストール、有効化、更新します (`hermes plugins` 相当)。",
     identifierLabel: "Git URL または owner/repo",
     inactive: "非アクティブ",
     installBtn: "インストール",
@@ -369,13 +347,6 @@ export const ja: Translations = {
     authRequired: "認証が必要",
     authRequiredHint: "認証するには次のコマンドを実行してください:",
     updateGit: "Git pull",
-    updateAll: "すべて更新",
-    updatingAll: "プラグインを更新中…",
-    updateAllDone: (updated: number, needsReview: number, failed: number) =>
-      `更新 ${updated}、要確認 ${needsReview}、失敗 ${failed}`,
-    autoUpdate: "自動更新",
-    autoUpdateDesc: (hours: number) =>
-      `ゲートウェイのチェック時（${hours} 時間ごと）にプラグインの更新を自動適用します。更新されたコードは新しいセッションで読み込まれます。`,
     versionBadge: "バージョン",
     showInSidebar: "サイドバーに表示",
     hideFromSidebar: "サイドバーから非表示",
@@ -462,7 +433,7 @@ export const ja: Translations = {
     showValue: "実際の値を表示",
     hideValue: "値を非表示",
     customTitle: "カスタムキー",
-    customHint: "Hermes が認識しない、.env に保存された任意の環境変数。スキル、MCP サーバー、または独自のツール用に環境変数を注入するために使用します。",
+    customHint: "Eir が認識しない、.env に保存された任意の環境変数。スキル、MCP サーバー、または独自のツール用に環境変数を注入するために使用します。",
     customConfigured: "カスタムキーを {count} 個設定済み",
     addCustomKey: "カスタムキーを追加",
     customKeyName: "変数名",
@@ -474,25 +445,20 @@ export const ja: Translations = {
   oauth: {
     title: "プロバイダーログイン (OAuth)",
     providerLogins: "プロバイダーログイン (OAuth)",
-    description:
-      "{connected} / {total} OAuth プロバイダーが接続されています。ダッシュボード対応のフローには「ログイン」を使用してください。外部またはフォールバック用のセットアップには引き続き CLI コマンドを利用できます。",
+    description: "{connected} / {total} OAuth プロバイダーが接続されています。ログインフローは現在 CLI 経由で実行されます。「コマンドをコピー」をクリックして、ターミナルに貼り付けてセットアップしてください。",
     connected: "接続済み",
     expired: "期限切れ",
-    notConnected: "未接続です。可能な場合は「ログイン」を使用するか、ターミナルで {command} を実行してください。",
+    notConnected: "未接続です。ターミナルで {command} を実行してください。",
     runInTerminal: "ターミナルで実行してください。",
     noProviders: "OAuth 対応プロバイダーは検出されませんでした。",
     login: "ログイン",
     disconnect: "切断",
     managedExternally: "外部で管理",
     copied: "コピーしました ✓",
-    copyCode: "コードをコピー",
-    copyFailed: "自動でコピーできませんでした。コードを選択して手動でコピーしてください。",
     cli: "コピー",
     copyCliCommand: "CLI コマンドをコピー (外部 / フォールバック用)",
     connect: "接続",
     sessionExpires: "セッションは {time} 後に期限切れになります",
-    sessionExpiredNoError:
-      "プロバイダーに到達しないままサインインの有効期限が切れました。多くの場合、開いたタブでサインインページが止まっている（サーバー側の問題）ことが原因です。そのタブでサインインを完了してから「再試行」をクリックしてください。それでも失敗する場合は、API キーまたは CLI をご利用ください。",
     initiatingLogin: "ログインフローを開始しています…",
     exchangingCode: "コードをトークンと交換しています…",
     connectedClosing: "接続しました！閉じています…",
@@ -527,11 +493,11 @@ export const ja: Translations = {
   achievements: {
     hero: {
       kicker: "Agentic Gamerscore",
-      title: "Hermes Achievements",
+      title: "Eir Achievements",
       subtitle:
-        "実際のセッション履歴から獲得できる Hermes のコレクタブル バッジです。既知の未達成の実績は「Discovered」として表示され、Secret 実績は最初の該当する挙動が検出されるまで非表示のままです。",
+        "実際のセッション履歴から獲得できる Eir のコレクタブル バッジです。既知の未達成の実績は「Discovered」として表示され、Secret 実績は最初の該当する挙動が検出されるまで非表示のままです。",
       scan_subtitle:
-        "Hermes のセッション履歴をスキャンしています。履歴が大きい場合、初回スキャンには 5～10 秒かかることがあります。",
+        "Eir のセッション履歴をスキャンしています。履歴が大きい場合、初回スキャンには 5～10 秒かかることがあります。",
     },
     actions: {
       rescan: "再スキャン",
@@ -546,7 +512,7 @@ export const ja: Translations = {
       highest_tier: "最高ティア",
       highest_tier_hint: "Copper → Silver → Gold → Diamond → Olympian",
       latest: "最新",
-      latest_hint_empty: "Hermes をもっと使ってみてください",
+      latest_hint_empty: "Eir をもっと使ってみてください",
       none_yet: "まだありません",
     },
     state: {
@@ -577,10 +543,10 @@ export const ja: Translations = {
       tiers_header: "ティア",
       secret_header: "シークレット実績",
       secret_body:
-        "シークレットはトリガー条件を隠しています。Hermes が関連するシグナルを検出すると、カードは「Discovered」になり、要件が表示されます。",
+        "シークレットはトリガー条件を隠しています。Eir が関連するシグナルを検出すると、カードは「Discovered」になり、要件が表示されます。",
       scan_status_header: "スキャン状況",
       scan_status_body:
-        "Hermes はローカル履歴を一度スキャンし、その後カードが自動的に表示されます。数秒かかってもスタックしているわけではありません。",
+        "Eir はローカル履歴を一度スキャンし、その後カードが自動的に表示されます。数秒かかってもスタックしているわけではありません。",
       what_scanned_header: "スキャン対象",
       what_scanned_body:
         "セッション、ツール呼び出し、モデルのメタデータ、エラー、実績、ローカルの解除状態。",
@@ -627,7 +593,7 @@ export const ja: Translations = {
         "「X で共有」は事前入力された投稿を新しいタブで開きます。1200×630 のバッジを添付したい場合は、先に「画像をコピー」を押してください — X では投稿エディタに直接貼り付けられます。「PNG をダウンロード」はファイルとして保存し、どこでも使えるようにします。",
       clipboard_unsupported:
         "このブラウザではクリップボードへの画像コピーがサポートされていません — 代わりに「ダウンロード」をご利用ください。",
-      tweet_text: "Just unlocked {tier_part}\"{name}\" in Hermes Agent ☤",
+      tweet_text: "Just unlocked {tier_part}\"{name}\" in Eir Agent ☤",
     },
   },
   kanban: {
@@ -642,12 +608,6 @@ export const ja: Translations = {
       "ボードを使うと、関連のない作業の流れを分けられます — プロジェクト、リポジトリ、ドメインごとに 1 つずつ。あるボードのワーカーは、別のボードのタスクを見ることはありません。",
     slug: "スラッグ",
     slugHint: "— 小文字とハイフン、例: atm10-server",
-    confirmDoneMany:
-      "Mark {n} tasks as done? The workers' claims are released and dependent children become ready.",
-    confirmArchiveMany:
-      "Archive {n} tasks? They disappear from the default board view.",
-    confirmBlockedMany:
-      "Mark {n} tasks as blocked? The workers' claims are released.",
     displayName: "表示名",
     displayNameHint: "（任意）",
     description: "説明",
