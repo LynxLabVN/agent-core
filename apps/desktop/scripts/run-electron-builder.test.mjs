@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'vitest'
 import { spawnSync } from 'node:child_process'
 import path from 'node:path'
-import { builderNodeOptions, runElectronBuilder } from './run-electron-builder.mjs'
+import { builderNodeOptions, runElectronBuilder, toolsetArguments } from './run-electron-builder.mjs'
 import fs from 'node:fs'
 import os from 'node:os'
 import { publishPackagingInputs } from './prepared-packaging.mjs'
@@ -102,4 +102,20 @@ test('source builds hand every child the builder heap without rewriting inherite
   const quoted = '--require "/tmp/sp  ace/p.cjs"'
   assert.ok(builderNodeOptions(quoted).startsWith(quoted))
   assert.match(builderNodeOptions('--max-old-space-size=16384 --max-old-space-size=4096'), heap)
+})
+
+test('toolset copies land behind a commonjs marker so node can spawn the bundled helpers', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'toolset-marker-'))
+  try {
+    const icons = path.join(root, 'icons-src')
+    fs.mkdirSync(icons)
+    fs.writeFileSync(path.join(icons, 'icon-tool.js'), 'icon tool fixture')
+    const tools = path.join(root, 'tools')
+    const args = toolsetArguments({ toolsets: { icons } }, tools)
+    assert.deepEqual(args, [`-c.toolsets.icons.url=file://${path.join(tools, 'icons')}`])
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(tools, 'package.json'), 'utf8')), { type: 'commonjs' })
+    assert.ok(fs.existsSync(path.join(tools, 'icons', 'icon-tool.js')))
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true })
+  }
 })

@@ -69,13 +69,20 @@ export function validatePreparedBuilderArgs(args, inputs) {
  * Copy mutable toolsets into the build resources directory: upstream's custom
  * Windows tool contract requires containment there. Never chmod/sign the cache.
  * @param {import('./prepared-packaging.mjs').PreparedPackaging} inputs
+ * @param {string} [tools] destination root; defaults to the app's build resources
  * @returns {string[]}
  */
-function toolsetArguments(inputs) {
-  const require = createRequire(path.join(source, 'apps/desktop/package.json'))
-  const config = require(path.join(app, 'electron-builder.config.cjs'))
-  const tools = path.join(app, config.directories?.buildResources || 'build', 'prepared-packaging-tools')
+export function toolsetArguments(inputs, tools) {
+  if (!tools) {
+    const require = createRequire(path.join(source, 'apps/desktop/package.json'))
+    const config = require(path.join(app, 'electron-builder.config.cjs'))
+    tools = path.join(app, config.directories?.buildResources || 'build', 'prepared-packaging-tools')
+  }
   fs.mkdirSync(tools, { recursive: true })
+  // The copied helpers (icon-tool, vips-node) are CommonJS bundles while this
+  // package is "type": "module"; without the marker node loads them as ESM and
+  // dies on `require` the moment a Linux target converts icons.
+  fs.writeFileSync(path.join(tools, 'package.json'), `${JSON.stringify({ type: 'commonjs' }, null, 2)}\n`)
   return Object.entries(inputs.toolsets).map(([name, directory]) => {
     const destination = path.join(tools, name)
     fs.rmSync(destination, { recursive: true, force: true })
